@@ -23,6 +23,8 @@ import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationDetailView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationSummaryView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.LetterView;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.StudentInfo;
+import tz.co.msingi.cims.registry.RegistryRepositories.StudentRepository;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.FeeView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ProfileView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ProgrammeEligibilityView;
@@ -74,6 +76,7 @@ public class ApplicationService {
     private final OtpService otp;
     private final OfferService offers;
     private final AdmissionLetterRepository letters;
+    private final StudentRepository students;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -305,7 +308,9 @@ public class ApplicationService {
         String devCode = otp.exposeInResponse() ? offers.developmentConfirmationCode(app).orElse(null) : null;
         LetterView letter = letters.findByApplicationIdAndStatus(app.getId(), AdmissionLetter.Status.VALID)
                 .map(l -> new LetterView(l.getLetterNo(), l.getEdition(), l.getVerificationCode(), l.getIssuedAt())).orElse(null);
-        return ApplicationView.of(app, blockers(app, a), devCode, letter);
+        StudentInfo student = students.findByApplicationId(app.getId())
+                .map(st -> new StudentInfo(st.getRegistrationNo(), st.getStatus().name())).orElse(null);
+        return ApplicationView.of(app, blockers(app, a), devCode, letter, student);
     }
 
     private FeeView feeView(Application app) {

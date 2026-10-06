@@ -154,6 +154,7 @@ export interface Application {
   selectedProgramme?: string;
   offer?: Offer;
   letter?: AdmissionLetterInfo;
+  student?: { registrationNo: string; status: string };
 }
 
 export interface AdmissionLetterInfo {
@@ -413,4 +414,83 @@ export interface OutcomeResult {
   queried: number;
   rejected: number;
   submission: NactvetSubmission;
+}
+
+// ---- Registry (BP-05)
+export interface RegistrySettings {
+  registrationNoPattern: string;
+  usingDefault: boolean;
+  example: string;
+}
+
+export interface HandoverRow {
+  applicationId: number;
+  referenceNo: string;
+  applicantName: string;
+  programmeName?: string;
+  letterNo?: string;
+  acceptedAt?: string;
+  studentId?: number;
+  registrationNo?: string;
+  studentStatus?: string;
+}
+
+export interface HandoverOverview {
+  windowId: number;
+  windowName: string;
+  accepted: number;
+  handedOver: number;
+  pending: number;
+  registrationNoPattern: string;
+  registrationNoExample: string;
+  rows: HandoverRow[];
+}
+
+export interface StudentSummary {
+  id: number;
+  registrationNo: string;
+  fullName: string;
+  sex: string;
+  phone: string;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  academicYear: string;
+  intake: string;
+  yearOfStudy: number;
+  status: string;
+}
+
+export interface FirstRegistration {
+  status: 'PENDING' | 'APPROVED';
+  documents: { item: string; verified: boolean }[];
+  reportedAt?: string;
+  remarks?: string;
+  checkedByName?: string;
+  approvedAt?: string;
+  approvedByName?: string;
+}
+
+export interface StudentDetail {
+  summary: StudentSummary;
+  firstName: string;
+  middleName?: string;
+  surname: string;
+  dateOfBirth: string;
+  nationality: string;
+  email?: string;
+  region?: string;
+  district?: string;
+  postalAddress?: string;
+  disability?: string;
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelation?: string;
+  awardName: string;
+  applicationRef?: string;
+  nactvetVerificationNo?: string;
+  admissionLetterNo?: string;
+  admittedAt: string;
+  admittedByName: string;
+  firstRegistration?: FirstRegistration;
 }

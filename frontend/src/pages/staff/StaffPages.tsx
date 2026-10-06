@@ -336,6 +336,7 @@ export function WindowDetailPage() {
           {win.status === 'PUBLISHED' && <Button variant="outlined" color="error" onClick={() => close.mutate()}>Close window</Button>}
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>
+          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/handover`}>Registration hand-over</Button>
           {win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
         </Stack>} />
       <ErrorAlert error={publish.error ?? close.error} />

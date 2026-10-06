@@ -77,6 +77,18 @@ public class AdmissionScenario {
                 "{\"committeeMinuteRef\":\"AC/TEST/1\"}").andExpect(status().isOk()));
     }
 
+    /** Selection approved, verified by (simulated) NACTVET and offer accepted, for the given applicants. */
+    public void admit(String officerToken, String chairToken, Applicant... applicants) throws Exception {
+        selectAndApprove(officerToken, chairToken);
+        long batch = body(call(post("/api/admission/windows/" + inst.windowId() + "/nactvet-submissions"), officerToken,
+                "{\"channel\":\"API\"}").andExpect(status().isOk())).get("id").asLong();
+        call(post("/api/admission/nactvet-submissions/" + batch + "/fetch-outcomes"), officerToken, null).andExpect(status().isOk());
+        for (Applicant a : applicants) {
+            call(post("/api/applicant/applications/" + a.applicationId() + "/offer/accept"), a.token(), "{}")
+                    .andExpect(jsonPath("$.status").value("ACCEPTED"));
+        }
+    }
+
     public String applicantToken() throws Exception {
         String phone = String.format("0755%06d", ++phoneSeq + (Math.abs(tenant.hashCode()) % 9000) * 100);
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null,

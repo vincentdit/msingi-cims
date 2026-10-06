@@ -38,6 +38,9 @@ public class Tenant {
     private String shortName;
     private String nactvetRegNo;
 
+    /** Registration number pattern (FR-REG-02); null means the default pattern. */
+    private String registrationNoPattern;
+
     @Column(nullable = false)
     private String ownership = "PRIVATE";
 

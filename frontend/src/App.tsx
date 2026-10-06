@@ -5,6 +5,7 @@ import StaffLayout from './components/StaffLayout';
 import ApplicationPage from './pages/applicant/ApplicationPage';
 import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
+import { HandoverPage, StudentDetailPage, StudentsPage } from './pages/staff/RegistryPages';
 import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages/portal/AuthPages';
 import HomePage from './pages/portal/HomePage';
 import DocumentVerifyPage from './pages/portal/VerifyPage';
@@ -33,6 +34,9 @@ export default function App() {
         <Route path="windows/:id" element={<WindowDetailPage />} />
         <Route path="windows/:id/selection" element={<SelectionPage />} />
         <Route path="windows/:id/verification" element={<VerificationPage />} />
+        <Route path="windows/:id/handover" element={<HandoverPage />} />
+        <Route path="students" element={<StudentsPage />} />
+        <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

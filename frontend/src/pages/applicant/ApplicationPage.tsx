@@ -151,6 +151,13 @@ function Outcome({ app }: { app: Application }) {
       return <>
         {block(t('offer.acceptedTitle'), t('offer.acceptedText'), programme)}
         {app.offer?.verificationNo && <Typography variant="body2" sx={{ mt: 2 }}>{t('offer.verificationNo')}: <strong>{app.offer.verificationNo}</strong></Typography>}
+        {app.student && (
+          <Alert severity={app.student.status === 'ACTIVE' ? 'success' : 'info'} icon={false} sx={{ mt: 3, textAlign: 'left' }}>
+            <Typography variant="body2">{t('offer.registrationNo')}</Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20 }}>{app.student.registrationNo}</Typography>
+            <Typography variant="body2">{app.student.status === 'ACTIVE' ? t('offer.registered') : t('offer.notYetRegistered')}</Typography>
+          </Alert>
+        )}
         <LetterDownload app={app} />
       </>;
     case 'DECLINED':

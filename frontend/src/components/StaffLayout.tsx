@@ -1,4 +1,5 @@
 import AssignmentIcon from '@mui/icons-material/AssignmentInd';
+import BadgeIcon from '@mui/icons-material/Badge';
 import DashboardIcon from '@mui/icons-material/SpaceDashboard';
 import EventIcon from '@mui/icons-material/EventAvailable';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -17,6 +18,7 @@ const NAV = [
   { to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
   { to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
   { to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
+  { to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
   { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
 ];
 

@@ -50,12 +50,14 @@ const STATUS_COLOURS: Record<string, 'default' | 'primary' | 'secondary' | 'succ
   NOT_SELECTED: 'error', WITHDRAWN: 'default', PUBLISHED: 'success', CLOSED: 'default',
   PENDING_VERIFICATION: 'info', QUERIED: 'warning', NACTVET_REJECTED: 'error', OFFERED: 'primary', ACCEPTED: 'success',
   DECLINED: 'default', OFFER_LAPSED: 'default',
+  ADMITTED: 'info', ACTIVE: 'success', POSTPONED: 'warning', SUSPENDED: 'warning', DISCONTINUED: 'error', DECEASED: 'default',
+  COMPLETED: 'primary', GRADUATED: 'primary', PENDING: 'warning', APPROVED: 'success',
 };
 
 /** Labels where the plain status name would read badly. */
 const STATUS_LABELS: Record<string, string> = {
   PENDING_VERIFICATION: 'At NACTVET', NACTVET_REJECTED: 'Not verified by NACTVET', OFFERED: 'Offer issued',
-  OFFER_LAPSED: 'Offer lapsed', QUERIED: 'Queried by NACTVET',
+  OFFER_LAPSED: 'Offer lapsed', QUERIED: 'Queried by NACTVET', ADMITTED: 'Admitted', ACTIVE: 'Registered',
 };
 
 export function statusColour(status: string) {

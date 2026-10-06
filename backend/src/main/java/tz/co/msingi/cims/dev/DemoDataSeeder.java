@@ -41,7 +41,7 @@ import java.util.Map;
 
 /**
  * Creates a demo institution ("DEMO") for local development when cims.demo.seed=true.
- * Staff sign-in: admin / Admin@2026 and admissions / Admissions@2026. Safe to run repeatedly.
+ * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026. Safe to run repeatedly.
  */
 @Slf4j
 @Component
@@ -64,7 +64,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {
@@ -94,6 +94,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         if (users.findByUsernameIgnoreCase("admin").isEmpty()) {
             staff("admin", "System Administrator", "Admin@2026", Role.INSTITUTION_ADMIN, Role.DEPUTY_PRINCIPAL_ACADEMIC);
             staff("admissions", "Admissions Officer", "Admissions@2026", Role.ADMISSIONS_OFFICER);
+        }
+        if (users.findByUsernameIgnoreCase("registry").isEmpty()) {
+            staff("registry", "Registry Officer", "Registry@2026", Role.REGISTRAR);
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();

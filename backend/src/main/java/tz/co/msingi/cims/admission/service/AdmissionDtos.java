@@ -194,16 +194,22 @@ public final class AdmissionDtos {
     public record ApplicationView(Long id, String referenceNo, String status, Long windowId, String windowName,
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
-                                  List<String> blockers, String selectedProgramme, OfferView offer, LetterView letter) {
-        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode, LetterView letter) {
+                                  List<String> blockers, String selectedProgramme, OfferView offer, LetterView letter,
+                                  StudentInfo student) {
+        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode, LetterView letter,
+                                         StudentInfo student) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
                     a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
                     a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName(),
-                    OfferView.of(a, devConfirmationCode), letter);
+                    OfferView.of(a, devConfirmationCode), letter, student);
         }
+    }
+
+    /** Once Registry has handed the applicant over: the registration number and student status (BP-05). */
+    public record StudentInfo(String registrationNo, String status) {
     }
 
     /** The applicant's valid admission letter, once issued (FR-ADM-13). */

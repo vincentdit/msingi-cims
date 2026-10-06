@@ -70,6 +70,7 @@ const en = {
     awaitingVerification: 'Awaiting NACTVET verification',
     downloadLetter: 'Download admission letter', letterPreparing: 'Your admission letter and joining instructions are being prepared. You will receive an SMS when they are ready.',
     letterCode: 'Letter verification code',
+    registrationNo: 'Your registration number', registered: 'Registration complete', notYetRegistered: 'Bring your original documents when you report to complete registration.',
   },
   verify: {
     title: 'Verify a document', intro: 'Check that an admission letter issued by this institution is genuine. Enter the code printed on the letter, or scan its QR code.',
@@ -153,6 +154,7 @@ const sw: typeof en = {
     awaitingVerification: 'Inasubiri uthibitisho wa NACTVET',
     downloadLetter: 'Pakua barua ya kujiunga', letterPreparing: 'Barua yako ya kujiunga na maelekezo ya kujiunga vinaandaliwa. Utapokea SMS vikiwa tayari.',
     letterCode: 'Namba ya uthibitisho wa barua',
+    registrationNo: 'Namba yako ya usajili', registered: 'Usajili umekamilika', notYetRegistered: 'Leta vyeti vyako halisi utakaporipoti ili kukamilisha usajili.',
   },
   verify: {
     title: 'Thibitisha hati', intro: 'Hakikisha kuwa barua ya kujiunga iliyotolewa na taasisi hii ni halali. Weka namba iliyochapishwa kwenye barua, au skani msimbo wake wa QR.',
