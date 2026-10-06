@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${CIMS_TEST_DB_URL:jdbc:postgresql://localhost:5432/cims_test}
+    username: ${CIMS_TEST_DB_USER:cims}
+    password: ${CIMS_TEST_DB_PASSWORD:cims}
+  flyway:
+    clean-disabled: false
+cims:
+  otp:
+    expose-in-response: true
+  demo:
+    seed: false
+  gepg:
+    mode: simulated
+    callback-secret: test-secret
+logging:
+  level:
+    tz.co.msingi.cims: INFO
+    org.hibernate.SQL: WARN

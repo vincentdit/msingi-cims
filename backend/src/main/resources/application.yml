@@ -1,0 +1,80 @@
+spring:
+  application:
+    name: cims-backend
+  datasource:
+    url: ${CIMS_DB_URL:jdbc:postgresql://localhost:5432/cims}
+    username: ${CIMS_DB_USER:cims}
+    password: ${CIMS_DB_PASSWORD:cims}
+    hikari:
+      maximum-pool-size: ${CIMS_DB_POOL:20}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+cims:
+  security:
+    mode: ${CIMS_SECURITY_MODE:local}
+    issuer: ${CIMS_JWT_ISSUER:cims}
+    access-token-ttl: ${CIMS_ACCESS_TOKEN_TTL:60m}
+    private-key-pem: ${CIMS_JWT_PRIVATE_KEY:}
+    public-key-pem: ${CIMS_JWT_PUBLIC_KEY:}
+    keycloak-issuer-uri: ${CIMS_KEYCLOAK_ISSUER_URI:}
+    max-failed-logins: 5
+    cors-allowed-origins: ${CIMS_CORS_ORIGINS:http://localhost:5173}
+  otp:
+    length: 6
+    ttl: 10m
+    max-attempts: 5
+    expose-in-response: false     # NEVER true in production
+  gepg:
+    mode: ${CIMS_GEPG_MODE:simulated}
+    callback-secret: ${CIMS_GEPG_CALLBACK_SECRET:change-me}
+    control-number-validity: 7d
+  necta:
+    mode: ${CIMS_NECTA_MODE:simulated}
+  privacy:
+    notice-version: "2026-10"
+  demo:
+    seed: false
+
+logging:
+  level:
+    tz.co.msingi.cims: INFO

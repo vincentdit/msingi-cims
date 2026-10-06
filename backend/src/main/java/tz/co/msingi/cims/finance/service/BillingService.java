@@ -1,0 +1,179 @@
+package tz.co.msingi.cims.finance.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tz.co.msingi.cims.common.exception.BusinessRuleException;
+import tz.co.msingi.cims.common.exception.NotFoundException;
+import tz.co.msingi.cims.finance.domain.ControlNumber;
+import tz.co.msingi.cims.finance.domain.FinanceRepositories.ControlNumberRepository;
+import tz.co.msingi.cims.finance.domain.FinanceRepositories.InvoiceRepository;
+import tz.co.msingi.cims.finance.domain.FinanceRepositories.PaymentRepository;
+import tz.co.msingi.cims.finance.domain.Invoice;
+import tz.co.msingi.cims.finance.domain.Payment;
+import tz.co.msingi.cims.finance.gepg.GepgGateway;
+import tz.co.msingi.cims.finance.gepg.GepgProperties;
+import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.platform.audit.AuditService;
+import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
+import tz.co.msingi.cims.platform.tenancy.TenantContext;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.Year;
+import java.util.List;
+import java.util.Map;
+
+/** Invoices, GePG control numbers and payment posting (BP-06). */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class BillingService {
+
+    private final InvoiceRepository invoices;
+    private final ControlNumberRepository controlNumbers;
+    private final PaymentRepository payments;
+    private final GepgGateway gepg;
+    private final GepgProperties gepgProps;
+    private final NumberSequenceService sequences;
+    private final ApplicationEventPublisher events;
+    private final AuditService audit;
+    private final SmsSender sms;
+
+    public record NewInvoice(Invoice.PayerType payerType, Long payerId, String payerName, String payerPhone, String payerEmail,
+                             String purpose, Long referenceId, String description, List<Line> lines) {
+        public record Line(String feeItemCode, String description, BigDecimal amount) {
+        }
+    }
+
+    @Transactional
+    public Invoice createInvoice(NewInvoice req) {
+        TenantContext.TenantInfo tenant = TenantContext.require();
+        Invoice inv = new Invoice();
+        inv.setInvoiceNo(NumberSequenceService.format(tenant.code() + "/INV/" + Year.now().getValue() + "/",
+                sequences.next("INVOICE-" + Year.now().getValue()), 6));
+        inv.setPayerType(req.payerType());
+        inv.setPayerId(req.payerId());
+        inv.setPayerName(req.payerName());
+        inv.setPayerPhone(req.payerPhone());
+        inv.setPayerEmail(req.payerEmail());
+        inv.setPurpose(req.purpose());
+        inv.setReferenceId(req.referenceId());
+        inv.setDescription(req.description());
+        req.lines().forEach(l -> inv.addLine(l.feeItemCode(), l.description(), l.amount()));
+        inv.setDueDate(OffsetDateTime.now().plus(gepgProps.controlNumberValidity()).toLocalDate());
+        Invoice saved = invoices.save(inv);
+        audit.record("CREATE", "Invoice", saved.getId(), Map.of("invoiceNo", saved.getInvoiceNo(), "amount", saved.getTotalAmount()));
+        return saved;
+    }
+
+    /** Returns the current usable control number for the invoice, requesting a new one from GePG if needed. */
+    @Transactional
+    public ControlNumber ensureControlNumber(Long invoiceId) {
+        Invoice inv = invoices.findById(invoiceId).orElseThrow(() -> new NotFoundException("Invoice", invoiceId));
+        if (inv.getStatus() == Invoice.Status.PAID) {
+            throw new BusinessRuleException("INVOICE_PAID", "This invoice is already paid");
+        }
+        List<ControlNumber> existing = controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId);
+        for (ControlNumber cn : existing) {
+            if (cn.isUsable()) {
+                return cn;
+            }
+            if (cn.getStatus() == ControlNumber.Status.ACTIVE) {
+                cn.setStatus(ControlNumber.Status.EXPIRED);
+            }
+        }
+        ControlNumber cn = new ControlNumber();
+        cn.setInvoice(inv);
+        cn.setBillId(TenantContext.requireTenantId() + "-" + inv.getId() + "-" + (existing.size() + 1));
+        cn.setExpiresAt(OffsetDateTime.now().plus(gepgProps.controlNumberValidity()));
+        GepgGateway.ControlNumberResponse resp = gepg.submitBill(new GepgGateway.BillRequest(
+                cn.getBillId(), inv.getPayerName(), inv.getPayerPhone(), inv.getPayerEmail(),
+                inv.getDescription(), inv.balance(), inv.getCurrency(), cn.getExpiresAt()));
+        if (resp.issued()) {
+            cn.setControlNo(resp.controlNo());
+            cn.setStatus(ControlNumber.Status.ACTIVE);
+            cn.setIssuedAt(OffsetDateTime.now());
+            if (inv.getPayerPhone() != null) {
+                sms.send(inv.getPayerPhone(), "Control number " + resp.controlNo() + " for TZS " + inv.balance().toPlainString()
+                        + " (" + inv.getDescription() + "). Pay via bank or mobile money.");
+            }
+        } else if (resp.errorMessage() != null) {
+            cn.setStatus(ControlNumber.Status.FAILED);
+        }
+        return controlNumbers.save(cn);
+    }
+
+    public record PaymentNotification(String billId, String controlNo, String gepgReceiptNo, String pspReceiptNo,
+                                      String pspName, String channel, BigDecimal amount, String payerPhone,
+                                      OffsetDateTime paidAt) {
+    }
+
+    /**
+     * Posts a GePG payment notification. Idempotent: a notification whose receipt number was
+     * already processed is acknowledged without changes.
+     */
+    @Transactional
+    public Payment recordPayment(PaymentNotification n) {
+        if (payments.existsByGepgReceiptNo(n.gepgReceiptNo())) {
+            log.info("Duplicate GePG notification {} ignored", n.gepgReceiptNo());
+            return null;
+        }
+        ControlNumber cn = controlNumbers.findByBillId(n.billId())
+                .or(() -> controlNumbers.findByControlNo(n.controlNo()))
+                .orElseThrow(() -> new NotFoundException("Bill", n.billId()));
+        Invoice inv = cn.getInvoice();
+        if (n.amount() == null || n.amount().signum() <= 0) {
+            throw new BusinessRuleException("INVALID_AMOUNT", "Payment amount must be positive");
+        }
+
+        Payment p = new Payment();
+        p.setInvoice(inv);
+        p.setControlNo(cn.getControlNo());
+        p.setGepgReceiptNo(n.gepgReceiptNo());
+        p.setPspReceiptNo(n.pspReceiptNo());
+        p.setPspName(n.pspName());
+        p.setChannel(n.channel());
+        p.setAmount(n.amount());
+        p.setPayerPhone(n.payerPhone());
+        p.setPaidAt(n.paidAt() == null ? OffsetDateTime.now() : n.paidAt());
+        p.setStatus(Payment.Status.ALLOCATED);
+        p.setReceiptNo(NumberSequenceService.format(TenantContext.require().code() + "/RCT/" + Year.now().getValue() + "/",
+                sequences.next("RECEIPT-" + Year.now().getValue()), 6));
+        payments.save(p);
+
+        boolean fullyPaid = inv.applyPayment(n.amount());
+        if (fullyPaid) {
+            cn.setStatus(ControlNumber.Status.PAID);
+        }
+        audit.recordAs(null, "GePG", "PAYMENT_RECEIVED", "Invoice", inv.getId(),
+                Map.of("receiptNo", p.getReceiptNo(), "gepgReceiptNo", n.gepgReceiptNo(), "amount", n.amount()));
+        if (inv.getPayerPhone() != null) {
+            sms.send(inv.getPayerPhone(), "Payment of TZS " + n.amount().toPlainString() + " received. Receipt " + p.getReceiptNo() + ".");
+        }
+        if (fullyPaid) {
+            events.publishEvent(new InvoicePaidEvent(inv.getId(), inv.getPurpose(), inv.getReferenceId()));
+        }
+        return p;
+    }
+
+    @Transactional(readOnly = true)
+    public Invoice get(Long invoiceId) {
+        return invoices.findById(invoiceId).orElseThrow(() -> new NotFoundException("Invoice", invoiceId));
+    }
+
+    /** Latest control number for the invoice (active or paid), or null if none was issued. */
+    @Transactional(readOnly = true)
+    public ControlNumber currentControlNumber(Long invoiceId) {
+        return controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId).stream()
+                .filter(cn -> cn.getStatus() == ControlNumber.Status.ACTIVE || cn.getStatus() == ControlNumber.Status.PAID)
+                .findFirst().orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Payment> paymentsFor(Long invoiceId) {
+        return payments.findByInvoiceIdOrderByPaidAtAsc(invoiceId);
+    }
+}

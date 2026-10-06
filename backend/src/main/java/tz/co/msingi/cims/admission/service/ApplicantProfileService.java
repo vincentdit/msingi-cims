@@ -1,0 +1,157 @@
+package tz.co.msingi.cims.admission.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tz.co.msingi.cims.admission.domain.AdmissionRepositories.ApplicantQualificationRepository;
+import tz.co.msingi.cims.admission.domain.AdmissionRepositories.ApplicantRepository;
+import tz.co.msingi.cims.admission.domain.AdmissionRepositories.ApplicationRepository;
+import tz.co.msingi.cims.admission.domain.Applicant;
+import tz.co.msingi.cims.admission.domain.ApplicantQualification;
+import tz.co.msingi.cims.admission.domain.Application;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.NectaFetchRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.PriorAwardRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.ProfileRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.ProfileView;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationView;
+import tz.co.msingi.cims.common.exception.BusinessRuleException;
+import tz.co.msingi.cims.common.exception.NotFoundException;
+import tz.co.msingi.cims.integration.necta.NectaClient;
+import tz.co.msingi.cims.platform.audit.AuditService;
+import tz.co.msingi.cims.platform.security.CurrentUser;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+
+/** Applicant profile and qualifications (NECTA results, prior NTA/NVA awards). */
+@Service
+@RequiredArgsConstructor
+public class ApplicantProfileService {
+
+    private final ApplicantRepository applicants;
+    private final ApplicantQualificationRepository qualifications;
+    private final ApplicationRepository applications;
+    private final NectaClient necta;
+    private final AuditService audit;
+
+    @Transactional(readOnly = true)
+    public Applicant currentApplicant() {
+        return applicants.findByUserId(CurrentUser.requireId())
+                .orElseThrow(() -> new NotFoundException("Applicant profile not found for this account"));
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileView myProfile() {
+        return ProfileView.of(currentApplicant());
+    }
+
+    @Transactional
+    public ProfileView updateProfile(ProfileRequest req) {
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        a.setFirstName(req.firstName().trim());
+        a.setMiddleName(ApplicantAccountService.blankToNull(req.middleName()));
+        a.setSurname(req.surname().trim());
+        a.setSex(req.sex());
+        a.setDateOfBirth(req.dateOfBirth());
+        a.setNationality(ApplicantAccountService.blankToNull(req.nationality()));
+        a.setEmail(ApplicantAccountService.blankToNull(req.email()));
+        a.setRegion(ApplicantAccountService.blankToNull(req.region()));
+        a.setDistrict(ApplicantAccountService.blankToNull(req.district()));
+        a.setPostalAddress(ApplicantAccountService.blankToNull(req.postalAddress()));
+        a.setDisability(ApplicantAccountService.blankToNull(req.disability()));
+        a.setNextOfKinName(ApplicantAccountService.blankToNull(req.nextOfKinName()));
+        a.setNextOfKinPhone(req.nextOfKinPhone() == null || req.nextOfKinPhone().isBlank() ? null : PhoneNumbers.normalise(req.nextOfKinPhone()));
+        a.setNextOfKinRelation(ApplicantAccountService.blankToNull(req.nextOfKinRelation()));
+        a.getUser().setFullName(a.fullName());
+        audit.record("UPDATE", "Applicant", a.getId(), null);
+        return ProfileView.of(a);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QualificationView> myQualifications() {
+        return qualifications.findByApplicantIdOrderByIdAsc(currentApplicant().getId()).stream().map(QualificationView::of).toList();
+    }
+
+    /** Retrieves CSEE/ACSEE results from NECTA and stores them as verified (BR-04). */
+    @Transactional
+    public QualificationView fetchNectaResults(NectaFetchRequest req) {
+        if (req.type() != ApplicantQualification.Type.CSEE && req.type() != ApplicantQualification.Type.ACSEE) {
+            throw new BusinessRuleException("INVALID_TYPE", "NECTA results are CSEE or ACSEE");
+        }
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        String index = req.indexNumber().trim().toUpperCase();
+        if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), req.type(), index)) {
+            throw new BusinessRuleException("QUALIFICATION_EXISTS", "These results are already on your application");
+        }
+        NectaClient.NectaResult r = necta.fetchResults(NectaClient.ExamType.valueOf(req.type().name()), index, req.year())
+                .orElseThrow(() -> new BusinessRuleException("NECTA_NOT_FOUND",
+                        "No NECTA results found for " + index + " (" + req.year() + "). Check the index number and year."));
+        ApplicantQualification q = new ApplicantQualification();
+        q.setApplicant(a);
+        q.setType(req.type());
+        q.setIndexNumber(index);
+        q.setExamYear((short) req.year());
+        q.setCentreName(r.centreName());
+        q.setDivision(r.division());
+        q.setPoints(r.points() == null ? null : r.points().shortValue());
+        q.setCandidateName(r.candidateName());
+        q.setSource(ApplicantQualification.Source.NECTA);
+        q.setVerified(true);
+        q.setVerifiedAt(OffsetDateTime.now());
+        r.subjects().forEach(s -> q.addSubject(s.code(), s.name(), s.grade()));
+        qualifications.save(q);
+        audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
+        return QualificationView.of(q);
+    }
+
+    /**
+     * Records a prior NTA (by AVN) or NVA award. It stays unverified until checked by an
+     * Admissions Officer (or automatically once the NACTVET AVN interface is connected).
+     */
+    @Transactional
+    public QualificationView addPriorAward(PriorAwardRequest req) {
+        if (req.type() != ApplicantQualification.Type.NTA && req.type() != ApplicantQualification.Type.NVA) {
+            throw new BusinessRuleException("INVALID_TYPE", "Prior awards are NTA or NVA");
+        }
+        boolean nva = req.type() == ApplicantQualification.Type.NVA;
+        if ((nva && (req.level() < 1 || req.level() > 3)) || (!nva && (req.level() < 4 || req.level() > 8))) {
+            throw new BusinessRuleException("INVALID_AWARD_LEVEL", nva ? "NVA levels are 1–3" : "NTA levels are 4–8");
+        }
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        ApplicantQualification q = new ApplicantQualification();
+        q.setApplicant(a);
+        q.setType(req.type());
+        q.setIndexNumber(req.number().trim().toUpperCase());
+        q.setAwardLevel(req.level());
+        q.setExamYear(req.year());
+        q.setSource(ApplicantQualification.Source.MANUAL);
+        q.setVerified(false);
+        qualifications.save(q);
+        audit.record("PRIOR_AWARD_ADDED", "Applicant", a.getId(), Map.of("type", req.type().name(), "number", q.getIndexNumber()));
+        return QualificationView.of(q);
+    }
+
+    @Transactional
+    public void removeQualification(Long id) {
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        ApplicantQualification q = qualifications.findById(id)
+                .filter(x -> x.getApplicant().getId().equals(a.getId()))
+                .orElseThrow(() -> new NotFoundException("Qualification", id));
+        qualifications.delete(q);
+        audit.record("QUALIFICATION_REMOVED", "Applicant", a.getId(), Map.of("index", q.getIndexNumber()));
+    }
+
+    private void requireNoSubmittedApplication(Applicant a) {
+        boolean submitted = applications.findByApplicantIdOrderByCreatedAtDesc(a.getId()).stream()
+                .anyMatch(app -> !app.isEditable() && app.getStatus() != Application.Status.WITHDRAWN);
+        if (submitted) {
+            throw new BusinessRuleException("APPLICATION_SUBMITTED",
+                    "Your details are locked because an application has been submitted. Contact the Admissions Office for corrections.");
+        }
+    }
+}

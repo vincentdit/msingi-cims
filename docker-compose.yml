@@ -1,0 +1,36 @@
+# Local / demo stack: PostgreSQL + CIMS backend + admission portal.
+#   docker compose up --build
+# Portal: http://localhost:8081   API docs: http://localhost:8080/swagger-ui.html
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cims
+      POSTGRES_USER: cims
+      POSTGRES_PASSWORD: cims
+    ports: ["5434:5432"]
+    volumes: [cims-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cims"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      SPRING_PROFILES_ACTIVE: dev            # demo institution + OTP shown on screen; remove in production
+      CIMS_DB_URL: jdbc:postgresql://db:5432/cims
+      CIMS_DB_USER: cims
+      CIMS_DB_PASSWORD: cims
+      CIMS_CORS_ORIGINS: http://localhost:8081
+    ports: ["8080:8080"]
+
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    ports: ["8081:80"]
+
+volumes:
+  cims-db:

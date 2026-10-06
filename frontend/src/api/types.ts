@@ -1,0 +1,233 @@
+// Types mirroring the CIMS backend DTOs.
+
+export interface Problem {
+  title?: string;
+  status: number;
+  detail?: string;
+  code?: string;
+  errors?: Record<string, string>;
+}
+
+export interface TokenResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  user: { id: number; fullName: string; userType: string; roles: string[]; tenant: string };
+}
+
+export interface Institution {
+  code: string;
+  name: string;
+  shortName?: string;
+  nactvetRegNo?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  branding: { primaryColor?: string; accentColor?: string; tagline?: string; logoUrl?: string };
+}
+
+export type ConditionType =
+  | 'CSEE_MIN_PASSES'
+  | 'CSEE_SUBJECT'
+  | 'ACSEE_MIN_PRINCIPAL_PASSES'
+  | 'ACSEE_SUBJECT'
+  | 'PRIOR_AWARD';
+
+export interface Condition {
+  type: ConditionType;
+  count?: number | null;
+  minGrade?: string | null;
+  subjects?: string[] | null;
+  family?: string | null;
+  minLevel?: number | null;
+}
+
+export interface EntryRules {
+  summary: string;
+  pathways: { label: string; conditions: Condition[] }[];
+}
+
+export interface WindowProgramme {
+  id: number;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  awardFamily: 'NVA' | 'NTA';
+  awardLevel: number;
+  awardName: string;
+  department: string;
+  capacity: number;
+  requirementSummary?: string;
+  entryRules?: EntryRules;
+}
+
+export interface AdmissionWindow {
+  id: number;
+  name: string;
+  academicYearId: number;
+  academicYear: string;
+  intakeId: number;
+  intake: string;
+  opensAt: string;
+  closesAt: string;
+  applicationFee: number;
+  maxChoices: number;
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+  open: boolean;
+  instructions?: string;
+  programmes?: WindowProgramme[];
+}
+
+export interface EligibilityResult {
+  eligible: boolean;
+  matchedPathway?: string;
+  summary?: string;
+  pathways: {
+    label: string;
+    satisfied: boolean;
+    conditions: { requirement: string; satisfied: boolean; found: string }[];
+  }[];
+}
+
+export interface Profile {
+  id: number;
+  firstName: string;
+  middleName?: string;
+  surname: string;
+  fullName: string;
+  sex?: 'M' | 'F';
+  dateOfBirth?: string;
+  nationality?: string;
+  phone: string;
+  email?: string;
+  region?: string;
+  district?: string;
+  postalAddress?: string;
+  disability?: string;
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelation?: string;
+  missingFields: string[];
+}
+
+export interface Qualification {
+  id: number;
+  type: 'CSEE' | 'ACSEE' | 'NTA' | 'NVA';
+  indexNumber: string;
+  examYear?: number;
+  awardLevel?: number;
+  centreName?: string;
+  division?: string;
+  points?: number;
+  source: string;
+  verified: boolean;
+  subjects: { code: string; name: string; grade: string }[];
+}
+
+export interface Choice {
+  id: number;
+  order: number;
+  windowProgrammeId: number;
+  programmeCode: string;
+  programmeName: string;
+  awardName: string;
+  eligible: boolean;
+  eligibility: EligibilityResult;
+}
+
+export interface Application {
+  id: number;
+  referenceNo?: string;
+  status: string;
+  windowId: number;
+  windowName: string;
+  academicYear: string;
+  intake: string;
+  windowClosesAt: string;
+  applicationFee: number;
+  maxChoices: number;
+  feePaid: boolean;
+  submittedAt?: string;
+  choices: Choice[];
+  blockers: string[];
+}
+
+export interface Fee {
+  invoiceId?: number;
+  invoiceNo?: string;
+  amount: number;
+  paid: number;
+  invoiceStatus?: string;
+  controlNo?: string;
+  controlNoExpiresAt?: string;
+  feePaid: boolean;
+}
+
+export interface ProgrammeEligibility {
+  windowProgrammeId: number;
+  programmeCode: string;
+  programmeName: string;
+  awardName: string;
+  department: string;
+  capacity: number;
+  eligible: boolean;
+  eligibility: EligibilityResult;
+}
+
+export interface Page<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface ApplicationSummary {
+  id: number;
+  referenceNo?: string;
+  status: string;
+  applicantName: string;
+  phone: string;
+  windowId: number;
+  windowName: string;
+  feePaid: boolean;
+  submittedAt?: string;
+  createdAt: string;
+}
+
+export interface ApplicationDetail {
+  application: Application;
+  applicant: Profile;
+  qualifications: Qualification[];
+  fee: Fee;
+}
+
+export interface Programme {
+  id: number;
+  code: string;
+  nactvetCode?: string;
+  name: string;
+  awardFamily: 'NVA' | 'NTA';
+  awardLevel: number;
+  awardName: string;
+  durationSemesters: number;
+  accreditedCapacity?: number;
+  description?: string;
+  active: boolean;
+  departmentId: number;
+  departmentName: string;
+}
+
+export interface Department {
+  id: number;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
+export interface WindowStats {
+  windowId: number;
+  total: number;
+  draft: number;
+  paymentPending: number;
+  submitted: number;
+}

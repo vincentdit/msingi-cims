@@ -1,0 +1,11 @@
+# Local development profile: demo institution, OTP codes returned in API responses,
+# simulated NECTA and GePG. Start with: mvn spring-boot:run -Dspring-boot.run.profiles=dev
+cims:
+  otp:
+    expose-in-response: true
+  demo:
+    seed: true
+
+logging:
+  level:
+    tz.co.msingi.cims: DEBUG
