@@ -95,6 +95,7 @@ public class DemoDataSeeder implements ApplicationRunner {
             staff("admissions", "Admissions Officer", "Admissions@2026", Role.ADMISSIONS_OFFICER);
         }
         if (!years.findAll().isEmpty()) {
+            backfillNactvetCodes();
             return;
         }
         AcademicYear year = new AcademicYear();
@@ -186,7 +187,19 @@ public class DemoDataSeeder implements ApplicationRunner {
         p.setAwardName(award);
         p.setDurationSemesters((short) semesters);
         p.setAccreditedCapacity(capacity);
+        p.setNactvetCode(nactvetCode(code));
         return programmes.save(p);
+    }
+
+    /** Illustrative NACTVET programme codes for the demo (NACTVET verification needs one per programme). */
+    private static String nactvetCode(String code) {
+        return "DEMO-" + code;
+    }
+
+    /** Databases seeded before NACTVET verification existed have programmes without codes. */
+    private void backfillNactvetCodes() {
+        programmes.findAll().stream().filter(p -> p.getNactvetCode() == null || p.getNactvetCode().isBlank())
+                .forEach(p -> p.setNactvetCode(nactvetCode(p.getCode())));
     }
 
     private static void addProgramme(AdmissionWindow w, Programme p, int capacity, EntryRules rules) {

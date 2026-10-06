@@ -48,6 +48,14 @@ export function PageTitle({ title, subtitle, action }: { title: string; subtitle
 const STATUS_COLOURS: Record<string, 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info'> = {
   DRAFT: 'default', PAYMENT_PENDING: 'warning', SUBMITTED: 'success', UNDER_REVIEW: 'info', SELECTED: 'success',
   NOT_SELECTED: 'error', WITHDRAWN: 'default', PUBLISHED: 'success', CLOSED: 'default',
+  PENDING_VERIFICATION: 'info', QUERIED: 'warning', NACTVET_REJECTED: 'error', OFFERED: 'primary', ACCEPTED: 'success',
+  DECLINED: 'default', OFFER_LAPSED: 'default',
+};
+
+/** Labels where the plain status name would read badly. */
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_VERIFICATION: 'At NACTVET', NACTVET_REJECTED: 'Not verified by NACTVET', OFFERED: 'Offer issued',
+  OFFER_LAPSED: 'Offer lapsed', QUERIED: 'Queried by NACTVET',
 };
 
 export function statusColour(status: string) {
@@ -55,5 +63,6 @@ export function statusColour(status: string) {
 }
 
 export function humanise(status: string) {
+  if (STATUS_LABELS[status]) return STATUS_LABELS[status];
   return status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ');
 }

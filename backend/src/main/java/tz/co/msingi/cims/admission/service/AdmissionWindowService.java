@@ -78,6 +78,9 @@ public class AdmissionWindowService {
         w.setClosesAt(req.closesAt());
         w.setApplicationFee(req.applicationFee());
         w.setMaxChoices(req.maxChoices());
+        if (req.offerAcceptanceDays() != null) {
+            w.setOfferAcceptanceDays(req.offerAcceptanceDays());
+        }
         w.setInstructions(req.instructions());
         w = windows.save(w);
         audit.record(id == null ? "CREATE" : "UPDATE", "AdmissionWindow", w.getId(), Map.of("name", w.getName()));

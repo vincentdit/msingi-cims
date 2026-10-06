@@ -34,7 +34,9 @@ import tz.co.msingi.cims.finance.domain.Invoice;
 import tz.co.msingi.cims.finance.gepg.GepgProperties;
 import tz.co.msingi.cims.finance.service.BillingService;
 import tz.co.msingi.cims.finance.service.InvoicePaidEvent;
+import tz.co.msingi.cims.admission.offer.OfferService;
 import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.platform.security.OtpService;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
@@ -66,6 +68,8 @@ public class ApplicationService {
     private final NumberSequenceService sequences;
     private final AuditService audit;
     private final SmsSender sms;
+    private final OtpService otp;
+    private final OfferService offers;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -294,7 +298,8 @@ public class ApplicationService {
     }
 
     private ApplicationView view(Application app, Applicant a) {
-        return ApplicationView.of(app, blockers(app, a));
+        String devCode = otp.exposeInResponse() ? offers.developmentConfirmationCode(app).orElse(null) : null;
+        return ApplicationView.of(app, blockers(app, a), devCode);
     }
 
     private FeeView feeView(Application app) {

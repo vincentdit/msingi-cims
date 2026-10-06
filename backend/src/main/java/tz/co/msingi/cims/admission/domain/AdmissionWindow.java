@@ -54,6 +54,10 @@ public class AdmissionWindow extends BaseEntity {
     @Column(nullable = false)
     private short maxChoices = 3;
 
+    /** Days a verified applicant has to accept the offer (BP-04). */
+    @Column(nullable = false)
+    private short offerAcceptanceDays = 14;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status = Status.DRAFT;

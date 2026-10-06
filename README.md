@@ -2,17 +2,19 @@
 
 **Msingi Technologies Ltd** · One platform from application to graduation for NACTVET‑registered institutions.
 
-This repository holds the first build slice of Release 1 (**Foundation + Online Admission**), as specified in `docs/` (Documents 01–07).
+This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers**), as specified in `docs/` (Documents 01–07).
 
 | Area | Delivered in this slice |
 |---|---|
 | Platform | Multi-tenant (one tenant per institution), tenant resolved from host name or `X-Tenant` header, **PostgreSQL row-level security**, JWT security (local issuer, Keycloak-ready), role-based access, append-only audit trail, per-institution number sequences, RFC 7807 errors, OpenAPI docs |
 | Academic structure | Academic years, intakes, departments, NVA/NTA programmes (levels validated) |
 | Admissions | Admission windows with capacity and **NACTVET minimum entry rules (JSON rule engine)**, applicant sign-up with SMS OTP, password reset, NECTA results lookup, prior NTA/NVA awards, profile, application, eligibility per programme with reasons, choices, submission with reference number |
+| Selection (BP-03) | Merit ranking, stable allocation of places across applicants' choices, Admissions Committee review (exclusions with reasons) and approval with segregation of duties, statistics, CSV for the committee pack |
+| NACTVET verification and offers (BP-04) | Pre-validation, submission by API or NACTVET-template file, outcome fetch or file import (all-or-nothing), query resolution and resubmission, offers with a deadline, acceptance with NACTVET confirmation code for multiple admissions (attempt-limited), decline, automatic lapse, released places re-filled by the next round |
 | Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
 
-NECTA, GePG and SMS are **simulated** in development (see *What is simulated*).
+NECTA, NACTVET, GePG and SMS are **simulated** in development (see *What is simulated*).
 
 ---
 
@@ -28,7 +30,7 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V6 (V5 = row-level security, V6 = selection)
+  src/main/resources/db/migration/   V1–V7 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -116,7 +118,16 @@ npm run dev          # http://localhost:5173 (proxies /api to 127.0.0.1:8085; ov
 | `S0101/0000` | Not found |
 | anything else in `S1234/5678` form | Deterministic random results |
 
-In the dev profile the SMS verification code is also shown on screen, and a **Simulate payment** button pays the GePG control number.
+**Simulated NACTVET outcomes** — decided by the last digit of the applicant's CSEE index number:
+
+| Last digit | Outcome |
+|---|---|
+| 7 | Queried (name does not match NECTA); verified once the query is resolved and resubmitted |
+| 9 | Not verified (does not meet minimum entry requirements) |
+| 3 | Verified, also admitted by another institution: the applicant must enter NACTVET's confirmation code to accept |
+| any other | Verified |
+
+In the dev profile the SMS verification code and the NACTVET confirmation code are also shown on screen, and a **Simulate payment** button pays the GePG control number.
 
 ## Tests
 
@@ -133,6 +144,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `GepgCallbackIT` — signature check and idempotent payment posting;
 - `EligibilityEngineTest` — NACTVET entry rule evaluation;
 - `SelectionIT`, `SelectionAllocatorTest`, `MeritScorerTest` — merit ranking, stable allocation, committee exclusions and approval;
+- `VerificationIT`, `SimulatedNactvetGatewayTest`, `CsvTest` — NACTVET submission by API and file, outcomes, queries, offers, multiple-admission confirmation and lock-out, lapse, released places, access rules;
 - `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
@@ -149,6 +161,8 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `CIMS_CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
 | `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter |
 | `CIMS_NECTA_MODE` | `simulated` | NECTA adapter |
+| `CIMS_NACTVET_MODE` | `simulated` | NACTVET admission verification adapter |
+| `CIMS_OFFER_EXPIRY_CRON` | `0 5 * * * *` | When expired offers are closed (`-` disables) |
 | `VITE_TENANT` (frontend) | — | Force an institution code in development |
 | `CIMS_API_URL` (frontend dev server) | `http://127.0.0.1:8085` | Where the Vite proxy sends `/api` |
 
@@ -168,8 +182,9 @@ Production notes: connect the application with a role that is **not** a superuse
 | NECTA | `SimulatedNectaClient` | Live NECTA results API adapter |
 | GePG | `SimulatedGepgGateway`, HMAC-signed callback | Live adapter: signed bill submission and RSA signature verification per the GePG specification, daily reconciliation |
 | SMS | `LoggingSmsSender` (log only) | SMS aggregator adapter with delivery reports |
-| NACTVET | — | Verification submission (BP-04), confirmation codes, multiple-admission handling |
-| Selection | — | Ranking and Admissions Committee approval (BP-03), admission letters with QR codes |
+| NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |
+| Letters | — | Admission letters and joining instructions with QR verification (FR-ADM-13) |
+| First-year invoice | `OfferAcceptedEvent` published on acceptance | Fee structures and invoice on acceptance (BP-06) |
 | Identity | Local JWT issuer | Keycloak realm per institution, MFA for privileged roles |
 
 ---

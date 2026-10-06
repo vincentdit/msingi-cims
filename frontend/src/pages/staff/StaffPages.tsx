@@ -325,11 +325,12 @@ export function WindowDetailPage() {
   if (!win) return <ErrorAlert error={w.error} />;
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)}`}
+      <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
         action={<Stack direction="row" spacing={1}>
           {win.status === 'DRAFT' && <Button variant="contained" color="secondary" onClick={() => publish.mutate()}>Publish</Button>}
           {win.status === 'PUBLISHED' && <Button variant="outlined" color="error" onClick={() => close.mutate()}>Close window</Button>}
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
+          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>
           {win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
         </Stack>} />
       <ErrorAlert error={publish.error ?? close.error} />

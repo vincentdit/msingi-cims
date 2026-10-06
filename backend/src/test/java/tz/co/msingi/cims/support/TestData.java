@@ -69,6 +69,7 @@ public class TestData {
             Tenant x = new Tenant();
             x.setCode(code);
             x.setName(code + " Technical College");
+            x.setNactvetRegNo("REG/" + code + "/001");
             return tenants.save(x);
         });
         return TenantContext.callAs(t.toInfo(), () -> tx.execute(s -> {
@@ -105,6 +106,7 @@ public class TestData {
             p.setAwardName(Programme.defaultAwardName(Programme.AwardFamily.NTA, 4));
             p.setDurationSemesters((short) 2);
             p.setAccreditedCapacity(100);
+            p.setNactvetCode("NTA4-IT-" + code);
             programmes.save(p);
 
             AdmissionWindow w = new AdmissionWindow();

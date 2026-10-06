@@ -10,6 +10,8 @@ cims:
     expose-in-response: true
   demo:
     seed: false
+  offers:
+    expiry-cron: "-"            # tests call the expiry job directly
   gepg:
     mode: simulated
     callback-secret: test-secret

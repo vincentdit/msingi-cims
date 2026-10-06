@@ -4,6 +4,7 @@ import PortalLayout from './components/PortalLayout';
 import StaffLayout from './components/StaffLayout';
 import ApplicationPage from './pages/applicant/ApplicationPage';
 import SelectionPage from './pages/staff/SelectionPage';
+import VerificationPage from './pages/staff/VerificationPage';
 import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages/portal/AuthPages';
 import HomePage from './pages/portal/HomePage';
 import {
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="windows" element={<WindowsPage />} />
         <Route path="windows/:id" element={<WindowDetailPage />} />
         <Route path="windows/:id/selection" element={<SelectionPage />} />
+        <Route path="windows/:id/verification" element={<VerificationPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

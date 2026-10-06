@@ -17,7 +17,9 @@ import tz.co.msingi.cims.common.BaseEntity;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /** One applicant's application in one admission window (BP-02). */
 @Getter
@@ -26,7 +28,13 @@ import java.util.List;
 @Table(name = "applications")
 public class Application extends BaseEntity {
 
-    public enum Status { DRAFT, PAYMENT_PENDING, SUBMITTED, UNDER_REVIEW, SELECTED, NOT_SELECTED, WITHDRAWN }
+    public enum Status {
+        DRAFT, PAYMENT_PENDING, SUBMITTED, UNDER_REVIEW, SELECTED, NOT_SELECTED, WITHDRAWN,
+        PENDING_VERIFICATION, QUERIED, NACTVET_REJECTED, OFFERED, ACCEPTED, DECLINED, OFFER_LAPSED;
+
+        /** Statuses in which the applicant holds a place in the selected programme (BP-04: other outcomes release it). */
+        public static final Set<Status> HOLDS_PLACE = EnumSet.of(SELECTED, PENDING_VERIFICATION, QUERIED, OFFERED, ACCEPTED);
+    }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "applicant_id")
@@ -56,9 +64,30 @@ public class Application extends BaseEntity {
 
     private Long selectionRoundId;
 
+    // ---- NACTVET verification and offer (BP-04)
+    private String verificationRemarks;
+    private String verificationReason;
+    private String nactvetVerificationNo;
+    private OffsetDateTime verifiedAt;
+
+    @Column(nullable = false)
+    private boolean multipleAdmission;
+
+    private OffsetDateTime offerIssuedAt;
+    private OffsetDateTime offerExpiresAt;
+    private OffsetDateTime offerRespondedAt;
+    private String offerDeclineReason;
+
+    @Column(nullable = false)
+    private short confirmationAttempts;
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("choiceOrder")
     private List<ApplicationChoice> choices = new ArrayList<>();
+
+    public boolean isOfferOpen(OffsetDateTime now) {
+        return status == Status.OFFERED && offerExpiresAt != null && now.isBefore(offerExpiresAt);
+    }
 
     public boolean isEditable() {
         return status == Status.DRAFT || status == Status.PAYMENT_PENDING;

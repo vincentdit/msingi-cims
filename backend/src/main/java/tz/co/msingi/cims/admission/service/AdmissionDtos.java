@@ -130,6 +130,7 @@ public final class AdmissionDtos {
             @NotNull OffsetDateTime closesAt,
             @NotNull @PositiveOrZero BigDecimal applicationFee,
             @Min(1) @Max(10) short maxChoices,
+            @Min(1) @Max(90) Short offerAcceptanceDays,
             String instructions) {
     }
 
@@ -149,11 +150,12 @@ public final class AdmissionDtos {
 
     public record WindowView(Long id, String name, Long academicYearId, String academicYear, Long intakeId, String intake,
                              OffsetDateTime opensAt, OffsetDateTime closesAt, BigDecimal applicationFee, short maxChoices,
-                             String status, boolean open, String instructions, List<WindowProgrammeView> programmes) {
+                             short offerAcceptanceDays, String status, boolean open, String instructions,
+                             List<WindowProgrammeView> programmes) {
         public static WindowView of(AdmissionWindow w, List<WindowProgramme> programmes) {
             return new WindowView(w.getId(), w.getName(), w.getAcademicYear().getId(), w.getAcademicYear().getCode(),
                     w.getIntake().getId(), w.getIntake().getName(), w.getOpensAt(), w.getClosesAt(), w.getApplicationFee(),
-                    w.getMaxChoices(), w.getStatus().name(), w.isOpen(OffsetDateTime.now()), w.getInstructions(),
+                    w.getMaxChoices(), w.getOfferAcceptanceDays(), w.getStatus().name(), w.isOpen(OffsetDateTime.now()), w.getInstructions(),
                     programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList());
         }
     }
@@ -163,6 +165,12 @@ public final class AdmissionDtos {
 
     // ------------------------------------------------------------------ applications
     public record StartApplicationRequest(@NotNull Long windowId) {
+    }
+
+    public record AcceptOfferRequest(@Size(max = 20) String confirmationCode) {
+    }
+
+    public record DeclineOfferRequest(@Size(max = 300) String reason) {
     }
 
     public record ChoicesRequest(@NotEmpty @Size(max = 10) List<@NotNull Long> windowProgrammeIds) {
@@ -184,14 +192,32 @@ public final class AdmissionDtos {
     public record ApplicationView(Long id, String referenceNo, String status, Long windowId, String windowName,
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
-                                  List<String> blockers, String selectedProgramme) {
-        public static ApplicationView of(Application a, List<String> blockers) {
+                                  List<String> blockers, String selectedProgramme, OfferView offer) {
+        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
                     a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
-                    a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName());
+                    a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName(),
+                    OfferView.of(a, devConfirmationCode));
+        }
+    }
+
+    /**
+     * The applicant's admission offer (BP-04), present once NACTVET has given an outcome.
+     * The rejection reason is shown only for NACTVET rejections; queries are handled by the admissions office.
+     */
+    public record OfferView(String verificationNo, OffsetDateTime verifiedAt, boolean multipleAdmission,
+                            OffsetDateTime expiresAt, boolean open, OffsetDateTime respondedAt, String rejectionReason,
+                            int confirmationAttemptsLeft, String devConfirmationCode) {
+        static OfferView of(Application a, String devConfirmationCode) {
+            boolean rejected = a.getStatus() == Application.Status.NACTVET_REJECTED;
+            if (a.getOfferIssuedAt() == null && !rejected) return null;
+            return new OfferView(a.getNactvetVerificationNo(), a.getVerifiedAt(), a.isMultipleAdmission(), a.getOfferExpiresAt(),
+                    a.isOfferOpen(OffsetDateTime.now()), a.getOfferRespondedAt(), rejected ? a.getVerificationReason() : null,
+                    Math.max(0, tz.co.msingi.cims.admission.offer.OfferService.MAX_CONFIRMATION_ATTEMPTS - a.getConfirmationAttempts()),
+                    devConfirmationCode);
         }
     }
 

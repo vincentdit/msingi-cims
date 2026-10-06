@@ -16,8 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import tz.co.msingi.cims.admission.offer.OfferService;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.AcceptOfferRequest;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ChoicesRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.DeclineOfferRequest;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.FeeView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.NectaFetchRequest;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.PriorAwardRequest;
@@ -41,6 +44,7 @@ public class ApplicantController {
 
     private final ApplicantProfileService profiles;
     private final ApplicationService applications;
+    private final OfferService offers;
 
     @GetMapping("/profile")
     public ProfileView profile() {
@@ -123,5 +127,19 @@ public class ApplicantController {
     @PostMapping("/applications/{id}/submit")
     public ApplicationView submit(@PathVariable Long id) {
         return applications.submit(id);
+    }
+
+    @Operation(summary = "Accept the admission offer (multiple-admission applicants give NACTVET's confirmation code)")
+    @PostMapping("/applications/{id}/offer/accept")
+    public ApplicationView acceptOffer(@PathVariable Long id, @Valid @RequestBody AcceptOfferRequest req) {
+        offers.accept(id, req.confirmationCode());
+        return applications.myApplication(id);
+    }
+
+    @Operation(summary = "Decline the admission offer; the place is released to the next selection round")
+    @PostMapping("/applications/{id}/offer/decline")
+    public ApplicationView declineOffer(@PathVariable Long id, @Valid @RequestBody DeclineOfferRequest req) {
+        offers.decline(id, req.reason());
+        return applications.myApplication(id);
     }
 }

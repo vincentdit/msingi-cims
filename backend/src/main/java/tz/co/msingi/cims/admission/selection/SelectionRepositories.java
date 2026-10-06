@@ -32,13 +32,6 @@ public final class SelectionRepositories {
         @Query("delete from Selection s where s.round.id = :roundId and s.status <> 'EXCLUDED'")
         void deleteAllButExclusions(Long roundId);
 
-        /** Places already taken in approved rounds of the window, per window programme. */
-        @Query("""
-                select s.windowProgramme.id, count(s) from Selection s
-                where s.round.window.id = :windowId and s.round.status = 'APPROVED' and s.status = 'SELECTED'
-                group by s.windowProgramme.id""")
-        List<Object[]> approvedPlacesByProgramme(Long windowId);
-
         /** How many of the round's (non-excluded) candidates listed each programme among their choices. */
         @Query("""
                 select c.windowProgramme.id, count(c) from ApplicationChoice c

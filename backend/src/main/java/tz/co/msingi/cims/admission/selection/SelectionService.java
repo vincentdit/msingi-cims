@@ -67,8 +67,8 @@ public class SelectionService {
         SelectionRound round = requireRound(roundId);
         Long windowId = round.getWindow().getId();
         List<Selection> rows = selections.findByRoundIdOrderByWindowProgrammeIdAscRankInProgrammeAscMeritScoreDesc(roundId);
-        Map<Long, Long> filledBefore = round.getStatus() == SelectionRound.Status.APPROVED
-                ? filledExcluding(windowId, roundId) : toMap(selections.approvedPlacesByProgramme(windowId));
+        // Places held by applicants of other rounds (all approved rounds, for a proposal)
+        Map<Long, Long> filledBefore = placesHeld(windowId, round.getStatus() == SelectionRound.Status.APPROVED ? roundId : null);
         Map<Long, Long> applicants = toMap(selections.applicantsByProgramme(roundId));
 
         List<SelectionDtos.ProgrammeResult> programmes = new ArrayList<>();
@@ -220,7 +220,7 @@ public class SelectionService {
 
         List<WindowProgramme> offered = windowProgrammes.findByWindowIdOrderByIdAsc(windowId);
         Map<Long, WindowProgramme> wpById = offered.stream().collect(Collectors.toMap(WindowProgramme::getId, Function.identity()));
-        Map<Long, Long> filled = toMap(selections.approvedPlacesByProgramme(windowId));
+        Map<Long, Long> filled = placesHeld(windowId, null);
         Map<Long, Integer> capacity = new HashMap<>();
         offered.forEach(wp -> capacity.put(wp.getId(), (int) Math.max(0, wp.getCapacity() - filled.getOrDefault(wp.getId(), 0L))));
 
@@ -296,11 +296,12 @@ public class SelectionService {
                 .orElseThrow(() -> new NotFoundException("Applicant is not part of this round: " + applicationId));
     }
 
-    private Map<Long, Long> filledExcluding(Long windowId, Long roundId) {
-        Map<Long, Long> all = toMap(selections.approvedPlacesByProgramme(windowId));
-        selections.findByRoundIdAndStatus(roundId, Selection.Status.SELECTED)
-                .forEach(s -> all.merge(s.getWindowProgramme().getId(), -1L, Long::sum));
-        return all;
+    /**
+     * Places currently held per programme. Applicants who decline, let their offer lapse or are rejected by
+     * NACTVET release their place, so the next round can fill it (BP-04 step 6).
+     */
+    private Map<Long, Long> placesHeld(Long windowId, Long excludeRoundId) {
+        return toMap(applications.placesHeld(windowId, Application.Status.HOLDS_PLACE, excludeRoundId));
     }
 
     private static Map<Long, Long> toMap(List<Object[]> rows) {

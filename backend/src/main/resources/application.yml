@@ -70,6 +70,10 @@ cims:
     control-number-validity: 7d
   necta:
     mode: ${CIMS_NECTA_MODE:simulated}
+  nactvet:
+    mode: ${CIMS_NACTVET_MODE:simulated}
+  offers:
+    expiry-cron: ${CIMS_OFFER_EXPIRY_CRON:0 5 * * * *}   # close expired offers hourly; "-" disables
   privacy:
     notice-version: "2026-10"
   demo:

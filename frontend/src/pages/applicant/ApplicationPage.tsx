@@ -1,5 +1,10 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { Alert, Box, Button, Card, CardContent, Chip, Container, Stack, Step, StepButton, StepContent, Stepper, Typography, useMediaQuery, useTheme } from '@mui/material';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SchoolIcon from '@mui/icons-material/School';
+import {
+  Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Step, StepButton,
+  StepContent, Stepper, TextField, Typography, useMediaQuery, useTheme,
+} from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -98,24 +103,21 @@ function Wizard({ app }: { app: Application }) {
   );
 }
 
+const AWAITING_NACTVET = ['SELECTED', 'PENDING_VERIFICATION', 'QUERIED'];
+
 function Submitted({ app }: { app: Application }) {
   const { t } = useTranslation();
+  const s = app.status;
+  const icon = s === 'NACTVET_REJECTED' || s === 'OFFER_LAPSED' || s === 'DECLINED'
+    ? <InfoOutlinedIcon color="action" sx={{ fontSize: 64 }} />
+    : s === 'OFFERED' ? <SchoolIcon color="primary" sx={{ fontSize: 64 }} /> : <CheckCircleIcon color="success" sx={{ fontSize: 64 }} />;
+  // the applicant sees one "awaiting verification" status while the office deals with NACTVET
+  const chipLabel = AWAITING_NACTVET.includes(s) ? t('offer.awaitingVerification') : humanise(s);
   return (
     <Card sx={{ borderRadius: 3, textAlign: 'center' }}>
       <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
-        <CheckCircleIcon color="success" sx={{ fontSize: 64 }} />
-        {app.status === 'SELECTED' && app.selectedProgramme ? (
-          <>
-            <Typography variant="h5" sx={{ mt: 1 }}>{t('app.selectedTitle')}</Typography>
-            <Typography sx={{ mt: 1, fontWeight: 700 }}>{app.selectedProgramme}</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>{t('app.selectedText')}</Typography>
-          </>
-        ) : (
-          <>
-            <Typography variant="h5" sx={{ mt: 1 }}>{t('app.submitted')}</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>{t('app.submittedText')}</Typography>
-          </>
-        )}
+        {icon}
+        {s === 'OFFERED' && app.offer ? <OfferPanel app={app} /> : <Outcome app={app} />}
         <Typography variant="overline" display="block" sx={{ mt: 3 }} color="text.secondary">{t('app.reference')}</Typography>
         <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 26 }}>{app.referenceNo}</Typography>
         <Typography variant="body2" color="text.secondary">{formatDateTime(app.submittedAt)}</Typography>
@@ -124,8 +126,113 @@ function Submitted({ app }: { app: Application }) {
             <Typography key={c.id}><strong>{t('app.choice', { n: c.order })}:</strong> {c.programmeName}</Typography>
           ))}
         </Stack>
-        <Chip sx={{ mt: 3 }} color={statusColour(app.status)} label={humanise(app.status)} />
+        <Chip sx={{ mt: 3 }} color={AWAITING_NACTVET.includes(s) ? 'success' : statusColour(s)} label={chipLabel} />
       </CardContent>
     </Card>
+  );
+}
+
+/** The message for every status except an open offer. */
+function Outcome({ app }: { app: Application }) {
+  const { t } = useTranslation();
+  const programme = app.selectedProgramme;
+  const block = (title: string, text: string, bold?: string) => (
+    <>
+      <Typography variant="h5" sx={{ mt: 1 }}>{title}</Typography>
+      {bold && <Typography sx={{ mt: 1, fontWeight: 700 }}>{bold}</Typography>}
+      <Typography color="text.secondary" sx={{ mt: 1 }}>{text}</Typography>
+    </>
+  );
+  switch (app.status) {
+    case 'SELECTED': case 'PENDING_VERIFICATION': case 'QUERIED':
+      return block(t('app.selectedTitle'), t('app.selectedText'), programme);
+    case 'ACCEPTED':
+      return <>
+        {block(t('offer.acceptedTitle'), t('offer.acceptedText'), programme)}
+        {app.offer?.verificationNo && <Typography variant="body2" sx={{ mt: 2 }}>{t('offer.verificationNo')}: <strong>{app.offer.verificationNo}</strong></Typography>}
+      </>;
+    case 'DECLINED':
+      return block(t('offer.declinedTitle'), t('offer.declinedText'), programme);
+    case 'OFFER_LAPSED':
+      return block(t('offer.lapsedTitle'), t('offer.lapsedText', { programme }));
+    case 'NACTVET_REJECTED':
+      return <>
+        {block(t('offer.rejectedTitle'), t('offer.rejectedText'), programme)}
+        {app.offer?.rejectionReason && <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>{app.offer.rejectionReason}</Alert>}
+      </>;
+    default:
+      return block(t('app.submitted'), t('app.submittedText'));
+  }
+}
+
+/** BP-04 step 5: accept (with NACTVET's confirmation code if admitted elsewhere) or decline before the deadline. */
+function OfferPanel({ app }: { app: Application }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const offer = app.offer!;
+  const [code, setCode] = useState('');
+  const [declining, setDeclining] = useState(false);
+  const [reason, setReason] = useState('');
+  const done = (a: Application) => {
+    qc.setQueryData(['applicant', 'applications'], [a]);
+    qc.invalidateQueries({ queryKey: ['applicant'] });
+  };
+  const accept = useMutation({
+    mutationFn: () => api<Application>(`/api/applicant/applications/${app.id}/offer/accept`, { method: 'POST', realm: 'applicant', body: { confirmationCode: code || undefined } }),
+    onSuccess: done,
+    onError: () => qc.invalidateQueries({ queryKey: ['applicant', 'applications'] }), // refresh attempts left
+  });
+  const decline = useMutation({
+    mutationFn: () => api<Application>(`/api/applicant/applications/${app.id}/offer/decline`, { method: 'POST', realm: 'applicant', body: { reason: reason || undefined } }),
+    onSuccess: (a) => { setDeclining(false); done(a); },
+  });
+  const locked = offer.multipleAdmission && offer.confirmationAttemptsLeft === 0;
+
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ mt: 1 }}>{t('offer.title')}</Typography>
+      <Typography color="text.secondary" sx={{ mt: 1 }}>{t('offer.text')}</Typography>
+      <Typography sx={{ mt: 0.5, fontWeight: 700 }}>{app.selectedProgramme}</Typography>
+      <Typography variant="body2" sx={{ mt: 1 }}>{t('offer.verificationNo')}: <strong>{offer.verificationNo}</strong></Typography>
+      {offer.open
+        ? <Chip sx={{ mt: 2 }} color="warning" variant="outlined" label={t('offer.acceptBy', { date: formatDate(offer.expiresAt) })} />
+        : <Alert severity="error" sx={{ mt: 2, textAlign: 'left' }}>{t('offer.expiredText')}</Alert>}
+
+      {offer.open && (
+        <Box sx={{ maxWidth: 440, mx: 'auto', mt: 3, textAlign: 'left' }}>
+          {offer.multipleAdmission && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <strong>{t('offer.multipleTitle')}</strong>
+              <Box>{t('offer.multipleText')}</Box>
+            </Alert>
+          )}
+          {offer.multipleAdmission && (
+            <TextField label={t('offer.confirmationCode')} fullWidth value={code} disabled={locked}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputProps={{ inputMode: 'numeric', autoComplete: 'one-time-code' }}
+              helperText={offer.confirmationAttemptsLeft < 5 ? t('offer.attemptsLeft', { n: offer.confirmationAttemptsLeft }) : ' '} sx={{ mb: 1 }} />
+          )}
+          {offer.devConfirmationCode && <Alert severity="warning" sx={{ mb: 2 }}>{t('offer.devCode', { code: offer.devConfirmationCode })}</Alert>}
+          <ErrorAlert error={accept.error ?? decline.error} />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <Button variant="contained" size="large" fullWidth disabled={accept.isPending || locked || (offer.multipleAdmission && code.length !== 6)}
+              onClick={() => accept.mutate()}>{t('offer.accept')}</Button>
+            <Button variant="outlined" color="inherit" size="large" fullWidth disabled={decline.isPending} onClick={() => setDeclining(true)}>{t('offer.decline')}</Button>
+          </Stack>
+        </Box>
+      )}
+
+      <Dialog open={declining} onClose={() => setDeclining(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('offer.declineTitle')}</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>{t('offer.declineText')}</Typography>
+          <TextField label={t('offer.declineReason')} fullWidth multiline minRows={2} value={reason} onChange={(e) => setReason(e.target.value)} inputProps={{ maxLength: 300 }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeclining(false)}>{t('offer.cancel')}</Button>
+          <Button color="error" variant="contained" disabled={decline.isPending} onClick={() => decline.mutate()}>{t('offer.confirmDecline')}</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

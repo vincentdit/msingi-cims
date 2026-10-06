@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,5 +69,20 @@ public final class AdmissionRepositories {
         long countByWindowIdAndStatus(Long windowId, Application.Status status);
 
         long countByWindowId(Long windowId);
+
+        /** Applications of the window in the given statuses, with what the verification screens show. */
+        @EntityGraph(attributePaths = {"applicant", "selectedWindowProgramme", "selectedWindowProgramme.programme"})
+        List<Application> findByWindowIdAndStatusInOrderByReferenceNoAsc(Long windowId, Collection<Application.Status> statuses);
+
+        /** Places held per window programme (BP-04: declined, lapsed and rejected applicants release theirs). */
+        @Query("""
+                select a.selectedWindowProgramme.id, count(a) from Application a
+                where a.window.id = :windowId and a.status in :statuses
+                  and (:excludeRoundId is null or a.selectionRoundId <> :excludeRoundId)
+                group by a.selectedWindowProgramme.id""")
+        List<Object[]> placesHeld(Long windowId, Collection<Application.Status> statuses, Long excludeRoundId);
+
+        @EntityGraph(attributePaths = {"applicant", "selectedWindowProgramme", "selectedWindowProgramme.programme"})
+        List<Application> findByStatusAndOfferExpiresAtBefore(Application.Status status, OffsetDateTime cutoff);
     }
 }

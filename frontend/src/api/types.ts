@@ -71,6 +71,7 @@ export interface AdmissionWindow {
   closesAt: string;
   applicationFee: number;
   maxChoices: number;
+  offerAcceptanceDays: number;
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
   open: boolean;
   instructions?: string;
@@ -150,6 +151,19 @@ export interface Application {
   choices: Choice[];
   blockers: string[];
   selectedProgramme?: string;
+  offer?: Offer;
+}
+
+export interface Offer {
+  verificationNo?: string;
+  verifiedAt?: string;
+  multipleAdmission: boolean;
+  expiresAt?: string;
+  open: boolean;
+  respondedAt?: string;
+  rejectionReason?: string;
+  confirmationAttemptsLeft: number;
+  devConfirmationCode?: string;
 }
 
 export interface Fee {
@@ -286,4 +300,71 @@ export interface SelectionRoundDetail {
   selectedBySex: Record<string, number>;
   selectedByRegion: Record<string, number>;
   canApprove: boolean;
+}
+
+// ---- NACTVET verification and offers (BP-04)
+export interface VerificationReadyRow {
+  applicationId: number;
+  referenceNo: string;
+  applicantName: string;
+  programmeName?: string;
+  indexNumber?: string;
+  remarks?: string;
+  issues: string[];
+}
+
+export interface NactvetSubmission {
+  id: number;
+  batchNo: number;
+  channel: 'API' | 'FILE';
+  status: 'SUBMITTED' | 'COMPLETED';
+  externalRef?: string;
+  submittedAt: string;
+  submittedByName: string;
+  lastOutcomeAt?: string;
+  completedAt?: string;
+  total: number;
+  pending: number;
+  verified: number;
+  queried: number;
+  rejected: number;
+}
+
+export interface VerificationApplicantRow {
+  applicationId: number;
+  referenceNo: string;
+  applicantName: string;
+  phone: string;
+  sex?: string;
+  programmeName?: string;
+  status: string;
+  indexNumber?: string;
+  verificationNo?: string;
+  multipleAdmission: boolean;
+  reason?: string;
+  remarks?: string;
+  verifiedAt?: string;
+  offerExpiresAt?: string;
+  offerRespondedAt?: string;
+  declineReason?: string;
+  offerExpired: boolean;
+}
+
+export interface VerificationOverview {
+  windowId: number;
+  offerAcceptanceDays: number;
+  institutionNactvetNo?: string;
+  counts: Record<string, number>;
+  acceptanceRate?: number;
+  ready: VerificationReadyRow[];
+  submissions: NactvetSubmission[];
+  applicants: VerificationApplicantRow[];
+}
+
+export interface OutcomeResult {
+  applied: number;
+  verified: number;
+  queried: number;
+  rejected: number;
+  submission: NactvetSubmission;
 }
