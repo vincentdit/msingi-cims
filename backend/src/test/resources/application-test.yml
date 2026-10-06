@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${CIMS_TEST_DB_URL:jdbc:postgresql://localhost:5432/cims_test}
+    url: ${CIMS_TEST_DB_URL:jdbc:postgresql://localhost:5434/cims_test}
     username: ${CIMS_TEST_DB_USER:cims}
     password: ${CIMS_TEST_DB_PASSWORD:cims}
   flyway:

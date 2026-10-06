@@ -35,7 +35,7 @@ public class JwtKeyProvider {
                 this.privateKey = (RSAPrivateKey) kf.generatePrivate(new PKCS8EncodedKeySpec(decode(props.privateKeyPem())));
                 this.publicKey = (RSAPublicKey) kf.generatePublic(new X509EncodedKeySpec(decode(props.publicKeyPem())));
             } else {
-                log.warn("No JWT signing keys configured — generating a temporary key pair (development only).");
+                log.warn("No JWT signing keys configured - generating a temporary key pair (development only).");
                 KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
                 gen.initialize(2048);
                 KeyPair pair = gen.generateKeyPair();

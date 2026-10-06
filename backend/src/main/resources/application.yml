@@ -2,7 +2,7 @@ spring:
   application:
     name: cims-backend
   datasource:
-    url: ${CIMS_DB_URL:jdbc:postgresql://localhost:5432/cims}
+    url: ${CIMS_DB_URL:jdbc:postgresql://localhost:5434/cims}
     username: ${CIMS_DB_USER:cims}
     password: ${CIMS_DB_PASSWORD:cims}
     hikari:
@@ -27,7 +27,7 @@ spring:
       enabled: true
 
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8085}
   forward-headers-strategy: framework
   error:
     include-message: never

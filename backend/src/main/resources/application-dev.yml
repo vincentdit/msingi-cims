@@ -8,4 +8,4 @@ cims:
 
 logging:
   level:
-    tz.co.msingi.cims: DEBUG
+    tz.co.msingi.cims: INFO

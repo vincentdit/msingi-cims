@@ -39,6 +39,9 @@ public final class AdmissionRepositories {
         @EntityGraph(attributePaths = "subjects")
         List<ApplicantQualification> findByApplicantIdOrderByIdAsc(Long applicantId);
 
+        @EntityGraph(attributePaths = "subjects")
+        List<ApplicantQualification> findByApplicantIdIn(java.util.Collection<Long> applicantIds);
+
         boolean existsByApplicantIdAndTypeAndIndexNumber(Long applicantId, ApplicantQualification.Type type, String indexNumber);
     }
 
@@ -58,6 +61,9 @@ public final class AdmissionRepositories {
                        or a.referenceNo like concat('%', cast(:q as string), '%')
                        or a.applicant.phone like concat('%', cast(:q as string), '%'))""")
         Page<Application> search(Long windowId, Application.Status status, String q, Pageable pageable);
+
+        @EntityGraph(attributePaths = {"applicant", "choices", "choices.windowProgramme"})
+        List<Application> findByWindowIdAndStatus(Long windowId, Application.Status status);
 
         long countByWindowIdAndStatus(Long windowId, Application.Status status);
 

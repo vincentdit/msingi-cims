@@ -49,6 +49,13 @@ public class Application extends BaseEntity {
 
     private OffsetDateTime submittedAt;
 
+    /** Programme the applicant was selected for, set when the Admissions Committee approves a round. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "selected_window_programme_id")
+    private WindowProgramme selectedWindowProgramme;
+
+    private Long selectionRoundId;
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("choiceOrder")
     private List<ApplicationChoice> choices = new ArrayList<>();

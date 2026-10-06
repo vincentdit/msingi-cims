@@ -50,6 +50,20 @@ public class TestData {
         }
     }
 
+    /** Adds a staff user to an existing institution. */
+    public void staff(Tenant tenant, String username, Role... roles) {
+        TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> {
+            UserAccount u = new UserAccount();
+            u.setUsername(username);
+            u.setFullName("Staff " + username);
+            u.setPasswordHash(passwordEncoder.encode(STAFF_PASSWORD));
+            u.setUserType(UserAccount.UserType.STAFF);
+            u.setStatus(UserAccount.Status.ACTIVE);
+            for (Role r : roles) u.grant(r);
+            users.save(u);
+        }));
+    }
+
     public Institution institution(String code, BigDecimal fee) {
         Tenant t = tx.execute(s -> {
             Tenant x = new Tenant();

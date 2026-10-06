@@ -9,3 +9,5 @@ indent_size = 4
 
 [*.{ts,tsx,js,json,yml,yaml,css,html}]
 indent_size = 2
+
+# keep Windows scripts with CRLF

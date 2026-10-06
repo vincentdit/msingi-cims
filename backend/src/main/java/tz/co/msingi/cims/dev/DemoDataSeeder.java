@@ -63,7 +63,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready — staff: admin / Admin@2026, admissions / Admissions@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {

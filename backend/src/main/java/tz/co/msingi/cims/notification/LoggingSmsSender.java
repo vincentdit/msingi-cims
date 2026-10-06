@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class LoggingSmsSender implements SmsSender {
     @Override
     public void send(String phone, String message) {
-        log.info("[SMS → {}] {}", maskPhone(phone), message);
+        log.info("[SMS -> {}] {}", maskPhone(phone), message);
     }
 
     static String maskPhone(String phone) {

@@ -104,8 +104,18 @@ function Submitted({ app }: { app: Application }) {
     <Card sx={{ borderRadius: 3, textAlign: 'center' }}>
       <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
         <CheckCircleIcon color="success" sx={{ fontSize: 64 }} />
-        <Typography variant="h5" sx={{ mt: 1 }}>{t('app.submitted')}</Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>{t('app.submittedText')}</Typography>
+        {app.status === 'SELECTED' && app.selectedProgramme ? (
+          <>
+            <Typography variant="h5" sx={{ mt: 1 }}>{t('app.selectedTitle')}</Typography>
+            <Typography sx={{ mt: 1, fontWeight: 700 }}>{app.selectedProgramme}</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>{t('app.selectedText')}</Typography>
+          </>
+        ) : (
+          <>
+            <Typography variant="h5" sx={{ mt: 1 }}>{t('app.submitted')}</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>{t('app.submittedText')}</Typography>
+          </>
+        )}
         <Typography variant="overline" display="block" sx={{ mt: 3 }} color="text.secondary">{t('app.reference')}</Typography>
         <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 26 }}>{app.referenceNo}</Typography>
         <Typography variant="body2" color="text.secondary">{formatDateTime(app.submittedAt)}</Typography>

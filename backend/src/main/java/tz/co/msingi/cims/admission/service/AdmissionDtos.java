@@ -184,13 +184,14 @@ public final class AdmissionDtos {
     public record ApplicationView(Long id, String referenceNo, String status, Long windowId, String windowName,
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
-                                  List<String> blockers) {
+                                  List<String> blockers, String selectedProgramme) {
         public static ApplicationView of(Application a, List<String> blockers) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
-                    a.getChoices().stream().map(ChoiceView::of).toList(), blockers);
+                    a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
+                    a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName());
         }
     }
 

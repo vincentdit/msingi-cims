@@ -50,6 +50,8 @@ const en = {
     submit: 'Submit application', submitted: 'Application submitted', reference: 'Reference number',
     submittedText: 'We have received your application. You will be notified by SMS when selection results are out.',
     todo: 'Still to do',
+    selectedTitle: 'Congratulations — you have been provisionally selected for',
+    selectedText: 'Your selection will be verified by NACTVET. You will receive your admission letter and joining instructions by SMS once verification is complete.',
   },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
@@ -102,6 +104,8 @@ const sw: typeof en = {
     submit: 'Wasilisha maombi', submitted: 'Maombi yamewasilishwa', reference: 'Namba ya kumbukumbu',
     submittedText: 'Tumepokea maombi yako. Utajulishwa kwa SMS matokeo ya uchaguzi yatakapotoka.',
     todo: 'Bado kukamilisha',
+    selectedTitle: 'Hongera — umechaguliwa kwa awali kujiunga na',
+    selectedText: 'Uchaguzi wako utathibitishwa na NACTVET. Utapokea barua ya kujiunga na maelekezo kwa SMS baada ya uthibitisho kukamilika.',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };

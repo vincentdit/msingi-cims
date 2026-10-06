@@ -45,6 +45,13 @@ export function clearSession(realm: Realm) {
   sessionStorage.removeItem(key(realm));
 }
 
+const UNREACHABLE: Problem = {
+  status: 503,
+  code: 'SERVER_UNREACHABLE',
+  title: 'Cannot reach the CIMS server',
+  detail: 'Cannot reach the CIMS server. Please check your connection and try again. (Developers: is the backend running, and does the frontend proxy point at it?)',
+};
+
 export class ApiError extends Error {
   constructor(public problem: Problem) {
     super(problem.detail ?? problem.title ?? 'Request failed');
@@ -59,19 +66,49 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     const token = getToken(options.realm);
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiError(UNREACHABLE);
+  }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    // An HTML page or empty proxy error instead of JSON: the request never reached the CIMS API.
+    throw new ApiError(UNREACHABLE);
+  }
+  if (!res.ok && data === undefined && res.status >= 500) {
+    throw new ApiError(UNREACHABLE);
+  }
   if (!res.ok) {
     if (res.status === 401 && options.realm) clearSession(options.realm);
     throw new ApiError((data as Problem) ?? { status: res.status, title: res.statusText });
   }
   return data as T;
+}
+
+/** Downloads a file from the API with the session token (e.g. CSV exports). */
+export async function download(path: string, realm: Realm, filename: string) {
+  const headers: Record<string, string> = {};
+  if (TENANT) headers['X-Tenant'] = TENANT;
+  const token = getToken(realm);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) throw new ApiError({ status: res.status, title: 'Download failed', detail: 'The file could not be downloaded.' });
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export const formatTzs = (n: number | undefined | null) =>

@@ -28,9 +28,10 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V5 (V5 = row-level security)
+  src/main/resources/db/migration/   V1–V6 (V5 = row-level security, V6 = selection)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
+docker/db-init/  database role and databases for Docker (non-superuser app role)
 docker-compose.yml
 ```
 
@@ -47,31 +48,53 @@ docker compose up --build
 ```
 
 - Admission portal: http://localhost:8081
-- API docs (Swagger UI): http://localhost:8080/swagger-ui.html
+- API docs (Swagger UI): http://localhost:8085/swagger-ui.html
 
 ## Local development
 
-**1. Database** (once):
+**1. Database** (once). Easiest with Docker — PostgreSQL is published on host port **5434** so it does not clash with other local databases:
+
+```bash
+docker compose up -d db
+```
+
+On first start, `docker/db-init/01-cims-roles.sql` creates the application role `cims` and the databases `cims` and `cims_test` (for integration tests).
+
+Or with a local PostgreSQL install (then set `CIMS_DB_URL=jdbc:postgresql://localhost:5432/cims`):
 
 ```sql
-CREATE ROLE cims LOGIN PASSWORD 'cims';      -- must NOT be a superuser (superusers bypass row-level security)
+CREATE ROLE cims LOGIN PASSWORD 'cims' NOSUPERUSER NOBYPASSRLS;
 CREATE DATABASE cims OWNER cims;
 CREATE DATABASE cims_test OWNER cims;        -- for integration tests
 ```
+
+#### Database role
+
+The application must connect as an **ordinary role that owns the database** — never a superuser and never a role with `BYPASSRLS`. PostgreSQL does not apply row-level security to those roles, so every institution would see every other institution's data. The backend checks this at start-up and refuses to run if the role bypasses RLS. The same rule applies in production: create a dedicated application role; keep the `postgres` superuser for administration.
+
+> **Upgrading a Docker database created before this change** (where `cims` was the superuser): the volume must be recreated. This deletes the local data; the dev profile re-seeds the demo institution.
+>
+> ```bash
+> docker compose down -v
+> docker compose up -d db
+> ```
 
 **2. Backend** (dev profile seeds a demo institution):
 
 ```bash
 cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"     # Windows (PowerShell)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev            # Linux / macOS
 ```
+
+The Maven Wrapper (`mvnw`) uses Maven 3.9.15 and reuses it from `~/.m2/wrapper` if already downloaded. The backend listens on **8085** by default (`PORT` to change).
 
 **3. Frontend:**
 
 ```bash
 cd frontend
 npm install
-npm run dev          # http://localhost:5173 (proxies /api to :8080)
+npm run dev          # http://localhost:5173 (proxies /api to 127.0.0.1:8085; override with CIMS_API_URL)
 ```
 
 ### Demo data (dev profile)
@@ -99,8 +122,8 @@ In the dev profile the SMS verification code is also shown on screen, and a **Si
 
 ```bash
 cd backend
-mvn test                 # unit + integration tests (needs the cims_test database)
-mvn test -DskipITs       # unit tests only
+.\mvnw.cmd test            # unit + integration tests (needs the cims_test database on port 5434)
+.\mvnw.cmd test "-DskipITs"  # unit tests only
 ```
 
 Integration tests run against real PostgreSQL so that row-level security, triggers and constraints are exercised. They include:
@@ -108,21 +131,26 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `TenantIsolationIT` — one institution cannot read or write another's rows (repository, native SQL, and API token checks);
 - `ApplicantJourneyIT` — register → verify → NECTA → profile → GePG fee → choices → submit;
 - `GepgCallbackIT` — signature check and idempotent payment posting;
-- `EligibilityEngineTest` — NACTVET entry rule evaluation.
+- `EligibilityEngineTest` — NACTVET entry rule evaluation;
+- `SelectionIT`, `SelectionAllocatorTest`, `MeritScorerTest` — merit ranking, stable allocation, committee exclusions and approval;
+- `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CIMS_DB_URL` / `CIMS_DB_USER` / `CIMS_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/cims`, `cims`, `cims` | Database |
+| `CIMS_DB_URL` / `CIMS_DB_USER` / `CIMS_DB_PASSWORD` | `jdbc:postgresql://localhost:5434/cims`, `cims`, `cims` | Database |
 | `CIMS_SECURITY_MODE` | `local` | `local` (CIMS issues tokens) or `keycloak` |
 | `CIMS_JWT_PRIVATE_KEY` / `CIMS_JWT_PUBLIC_KEY` | generated at start-up | RSA keys (PEM) for local mode — **set in production** |
 | `CIMS_KEYCLOAK_ISSUER_URI` | — | Issuer when `CIMS_SECURITY_MODE=keycloak` |
 | `CIMS_ACCESS_TOKEN_TTL` | `60m` | Access token lifetime |
+| `PORT` | `8085` | Backend HTTP port |
+| `CIMS_TEST_DB_URL` | `jdbc:postgresql://localhost:5434/cims_test` | Test database |
 | `CIMS_CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
 | `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter |
 | `CIMS_NECTA_MODE` | `simulated` | NECTA adapter |
 | `VITE_TENANT` (frontend) | — | Force an institution code in development |
+| `CIMS_API_URL` (frontend dev server) | `http://127.0.0.1:8085` | Where the Vite proxy sends `/api` |
 
 ## How multi-tenancy works
 

@@ -1,17 +1,21 @@
 # Local / demo stack: PostgreSQL + CIMS backend + admission portal.
 #   docker compose up --build
-# Portal: http://localhost:8081   API docs: http://localhost:8080/swagger-ui.html
+# Portal: http://localhost:8081   API docs: http://localhost:8085/swagger-ui.html
+# Host ports avoid clashes with other local projects: PostgreSQL 5434, API 8085.
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: cims
-      POSTGRES_USER: cims
-      POSTGRES_PASSWORD: cims
+      # Cluster superuser, for administration only. The app connects as the
+      # non-superuser role "cims" created by docker/db-init (row-level security).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports: ["5434:5432"]
-    volumes: [cims-db:/var/lib/postgresql/data]
+    volumes:
+      - cims-db:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cims"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cims"]
       interval: 5s
       retries: 10
 
@@ -25,7 +29,7 @@ services:
       CIMS_DB_USER: cims
       CIMS_DB_PASSWORD: cims
       CIMS_CORS_ORIGINS: http://localhost:8081
-    ports: ["8080:8080"]
+    ports: ["8085:8085"]
 
   frontend:
     build: ./frontend

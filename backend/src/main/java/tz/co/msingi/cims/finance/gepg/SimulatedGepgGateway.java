@@ -21,7 +21,7 @@ public class SimulatedGepgGateway implements GepgGateway {
     @Override
     public ControlNumberResponse submitBill(BillRequest bill) {
         String controlNo = "99" + String.format("%010d", Math.abs(random.nextLong()) % 10_000_000_000L);
-        log.info("[GePG simulated] bill {} → control number {} for TZS {}", bill.billId(), controlNo, bill.amount());
+        log.info("[GePG simulated] bill {} -> control number {} for TZS {}", bill.billId(), controlNo, bill.amount());
         return ControlNumberResponse.ok(controlNo);
     }
 }

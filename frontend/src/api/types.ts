@@ -149,6 +149,7 @@ export interface Application {
   submittedAt?: string;
   choices: Choice[];
   blockers: string[];
+  selectedProgramme?: string;
 }
 
 export interface Fee {
@@ -230,4 +231,59 @@ export interface WindowStats {
   draft: number;
   paymentPending: number;
   submitted: number;
+}
+
+export interface SelectionRoundSummary {
+  id: number;
+  roundNo: number;
+  status: 'PROPOSED' | 'APPROVED' | 'CANCELLED';
+  proposedAt: string;
+  proposedByName: string;
+  approvedAt?: string;
+  approvedByName?: string;
+  committeeMinuteRef?: string;
+  selected: number;
+  notSelected: number;
+  excluded: number;
+}
+
+export interface SelectionRow {
+  applicationId: number;
+  referenceNo?: string;
+  applicantName: string;
+  phone: string;
+  sex?: string;
+  region?: string;
+  meritScore: number;
+  choiceOrder?: number;
+  rank?: number;
+  windowProgrammeId?: number;
+  programmeName?: string;
+  exclusionReason?: string;
+  excludedByName?: string;
+}
+
+export interface SelectionProgrammeResult {
+  windowProgrammeId: number;
+  programmeCode: string;
+  programmeName: string;
+  capacity: number;
+  filledInEarlierRounds: number;
+  availableThisRound: number;
+  applicants: number;
+  selectedCount: number;
+  selectedBySex: Record<string, number>;
+  selected: SelectionRow[];
+}
+
+export interface SelectionRoundDetail {
+  round: SelectionRoundSummary;
+  meritFormula: string;
+  totals: { candidates: number; selected: number; notSelected: number; excluded: number };
+  programmes: SelectionProgrammeResult[];
+  notSelected: SelectionRow[];
+  excluded: SelectionRow[];
+  selectedBySex: Record<string, number>;
+  selectedByRegion: Record<string, number>;
+  canApprove: boolean;
 }
