@@ -5,6 +5,8 @@ cims:
     expose-in-response: true
   demo:
     seed: true
+  documents:
+    verification-url: ${CIMS_VERIFICATION_URL:http://localhost:5173/verify/{code}}   # the Vite dev portal
 
 logging:
   level:

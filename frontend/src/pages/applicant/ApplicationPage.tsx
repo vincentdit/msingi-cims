@@ -1,4 +1,5 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DownloadIcon from '@mui/icons-material/Download';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SchoolIcon from '@mui/icons-material/School';
 import {
@@ -8,7 +9,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
+import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { AdmissionWindow, Application, Profile, Qualification } from '../../api/types';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import { DetailsStep, FeeStep, ProgrammesStep, ResultsStep, ReviewStep } from './steps';
@@ -150,6 +151,7 @@ function Outcome({ app }: { app: Application }) {
       return <>
         {block(t('offer.acceptedTitle'), t('offer.acceptedText'), programme)}
         {app.offer?.verificationNo && <Typography variant="body2" sx={{ mt: 2 }}>{t('offer.verificationNo')}: <strong>{app.offer.verificationNo}</strong></Typography>}
+        <LetterDownload app={app} />
       </>;
     case 'DECLINED':
       return block(t('offer.declinedTitle'), t('offer.declinedText'), programme);
@@ -163,6 +165,28 @@ function Outcome({ app }: { app: Application }) {
     default:
       return block(t('app.submitted'), t('app.submittedText'));
   }
+}
+
+/** FR-ADM-13: the admission letter with joining instructions, once issued. */
+function LetterDownload({ app }: { app: Application }) {
+  const { t } = useTranslation();
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  if (!app.letter) return <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }}>{t('offer.letterPreparing')}</Alert>;
+  const get = () => {
+    setBusy(true); setError(null);
+    download(`/api/applicant/applications/${app.id}/admission-letter`, 'applicant', `admission-letter-${app.letter!.letterNo.replace(/\W+/g, '-')}.pdf`)
+      .catch(setError).finally(() => setBusy(false));
+  };
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Button variant="contained" size="large" startIcon={<DownloadIcon />} onClick={get} disabled={busy}>{t('offer.downloadLetter')}</Button>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        {app.letter.letterNo} · {t('offer.letterCode')}: <strong style={{ fontFamily: 'monospace' }}>{app.letter.verificationCode}</strong>
+      </Typography>
+      <Box sx={{ mt: 1 }}><ErrorAlert error={error} /></Box>
+    </Box>
+  );
 }
 
 /** BP-04 step 5: accept (with NACTVET's confirmation code if admitted elsewhere) or decline before the deadline. */

@@ -1,10 +1,12 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import BlockIcon from '@mui/icons-material/Block';
 import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import DownloadIcon from '@mui/icons-material/Download';
 import SendIcon from '@mui/icons-material/Send';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
+  Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton,
   LinearProgress, Radio, RadioGroup, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField,
   Tooltip, Typography,
 } from '@mui/material';
@@ -75,6 +77,22 @@ export default function VerificationPage() {
     onSuccess: () => { setResolving(null); setRemarks(''); setNotice('Query resolved. The applicant will be included in the next submission.'); refresh(); },
   });
   const [dlError, setDlError] = useState<unknown>(null);
+  const issueLetters = useMutation({
+    mutationFn: () => api<{ issued: number }>(`/api/admission/windows/${id}/admission-letters`, { method: 'POST', ...staff }),
+    onSuccess: (r) => { setNotice(`${r.issued} admission letter(s) issued. Applicants were told by SMS that their letter is ready.`); refresh(); },
+  });
+  const [letterAction, setLetterAction] = useState<{ kind: 'reissue' | 'revoke'; row: VerificationApplicantRow } | null>(null);
+  const [letterReason, setLetterReason] = useState('');
+  const changeLetter = useMutation({
+    mutationFn: () => api<{ letterNo: string; edition: number }>(
+      `/api/admission/applications/${letterAction!.row.applicationId}/admission-letter/${letterAction!.kind}`, { method: 'POST', ...staff, body: { reason: letterReason } }),
+    onSuccess: (r) => {
+      setNotice(letterAction!.kind === 'reissue'
+        ? `Letter ${r.letterNo} reissued as edition ${r.edition}. The previous edition now verifies as superseded.`
+        : `Letter ${r.letterNo} revoked. Verification now reports it as revoked.`);
+      setLetterAction(null); setLetterReason(''); refresh();
+    },
+  });
 
   if (win.isLoading || ov.isLoading) return <Loading />;
   const d = ov.data;
@@ -86,7 +104,7 @@ export default function VerificationPage() {
   const offers = d.applicants.filter((a) => OFFER_STATUSES.includes(a.status));
   const rejected = d.applicants.filter((a) => a.status === 'NACTVET_REJECTED');
   const atNactvet = d.applicants.filter((a) => a.status === 'PENDING_VERIFICATION');
-  const busy = submit.isPending || fetchOutcomes.isPending || importOutcomes.isPending || resolve.isPending;
+  const busy = submit.isPending || fetchOutcomes.isPending || importOutcomes.isPending || resolve.isPending || issueLetters.isPending;
 
   const onFile = (f?: File) => {
     setFileError(null);
@@ -114,7 +132,7 @@ export default function VerificationPage() {
         }
       />
       {busy && <LinearProgress sx={{ mb: 2 }} />}
-      <ErrorAlert error={submit.error ?? fetchOutcomes.error ?? resolve.error ?? dlError ?? ov.error} />
+      <ErrorAlert error={submit.error ?? fetchOutcomes.error ?? resolve.error ?? issueLetters.error ?? dlError ?? ov.error} />
       {notice && <Alert severity="success" onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice}</Alert>}
       {!d.institutionNactvetNo && <Alert severity="warning" sx={{ mb: 2 }}>The institution's NACTVET registration number is not set, so nothing can be submitted. Ask the system administrator to set it.</Alert>}
 
@@ -213,9 +231,30 @@ export default function VerificationPage() {
       )}
 
       {tab === 'offers' && (
-        <Section empty={!offers.length} emptyText="No offers yet. Offers are issued automatically when NACTVET verifies an applicant.">
-          <ApplicantTable rows={offers} columns={['ref', 'name', 'phone', 'programme', 'verification', 'expires', 'status']} />
-        </Section>
+        <Stack spacing={2}>
+          {d.lettersPending > 0 && (d.joiningInstructionsSet
+            ? <Alert severity="info" action={<Button color="inherit" size="small" disabled={busy} onClick={() => issueLetters.mutate()}>Issue {d.lettersPending} letter(s)</Button>}>
+                {d.lettersPending} accepted applicant(s) do not have an admission letter yet.
+              </Alert>
+            : <Alert severity="warning" action={<Button color="inherit" size="small" component={RouterLink} to={`/staff/windows/${id}`}>Set up</Button>}>
+                {d.lettersPending} accepted applicant(s) are waiting for their admission letter. Set the joining instructions for this window first.
+              </Alert>)}
+          <Section empty={!offers.length} emptyText="No offers yet. Offers are issued automatically when NACTVET verifies an applicant.">
+            <ApplicantTable rows={offers} columns={['ref', 'name', 'programme', 'verification', 'expires', 'status', 'letter']} actionInColumn="letter"
+              action={(r) => r.letterNo ? (
+                <Stack direction="row" spacing={0} sx={{ ml: -0.75 }}>
+                  <Tooltip title="Download letter (PDF)"><IconButton size="small" aria-label="Download letter"
+                    onClick={() => dl(`/api/admission/applications/${r.applicationId}/admission-letter`, `admission-letter-${r.referenceNo.replace(/\W+/g, '-')}.pdf`)}><DownloadIcon fontSize="small" /></IconButton></Tooltip>
+                  <Tooltip title="Reissue (corrected edition)"><IconButton size="small" aria-label="Reissue letter"
+                    onClick={() => { setLetterAction({ kind: 'reissue', row: r }); setLetterReason(''); }}><AutorenewIcon fontSize="small" /></IconButton></Tooltip>
+                  <Tooltip title="Revoke"><IconButton size="small" color="error" aria-label="Revoke letter"
+                    onClick={() => { setLetterAction({ kind: 'revoke', row: r }); setLetterReason(''); }}><BlockIcon fontSize="small" /></IconButton></Tooltip>
+                </Stack>
+              ) : r.status === 'ACCEPTED' && d.joiningInstructionsSet ? (
+                <Button size="small" onClick={() => setLetterAction({ kind: 'reissue', row: r })}>Issue letter</Button>
+              ) : null} />
+          </Section>
+        </Stack>
       )}
 
       {tab === 'rejected' && (
@@ -274,6 +313,29 @@ export default function VerificationPage() {
         </DialogActions>
       </Dialog>
 
+      {/* reissue / revoke letter */}
+      <Dialog open={!!letterAction} onClose={() => setLetterAction(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>{letterAction?.kind === 'revoke' ? 'Revoke admission letter' : letterAction?.row.letterNo ? 'Reissue admission letter' : 'Issue admission letter'}</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 1 }}><strong>{letterAction?.row.applicantName}</strong> · {letterAction?.row.referenceNo}{letterAction?.row.letterNo && <> · {letterAction.row.letterNo}</>}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {letterAction?.kind === 'revoke'
+              ? 'The letter will verify as revoked and the applicant will no longer be able to download it. Only the Principal or Deputy Principal (Academic) can revoke.'
+              : letterAction?.row.letterNo
+                ? 'A new edition with a new verification code is issued from the current applicant record and joining instructions. The current edition will verify as superseded.'
+                : 'The letter is issued from the current applicant record and joining instructions.'}
+          </Typography>
+          <TextField label="Reason (recorded in the audit trail)" fullWidth multiline minRows={2} value={letterReason}
+            onChange={(e) => setLetterReason(e.target.value)} inputProps={{ maxLength: 300 }} autoFocus />
+          <ErrorAlert error={changeLetter.error} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLetterAction(null)}>Cancel</Button>
+          <Button variant="contained" color={letterAction?.kind === 'revoke' ? 'error' : 'primary'} disabled={!letterReason.trim() || changeLetter.isPending}
+            onClick={() => changeLetter.mutate()}>{letterAction?.kind === 'revoke' ? 'Revoke' : 'Issue'}</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* resolve query */}
       <Dialog open={!!resolving} onClose={() => setResolving(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Resolve NACTVET query</DialogTitle>
@@ -319,12 +381,14 @@ function Section({ title, intro, empty, emptyText, children }: { title?: string;
   );
 }
 
-type Column = 'ref' | 'name' | 'phone' | 'programme' | 'index' | 'reason' | 'verification' | 'expires' | 'status';
+type Column = 'ref' | 'name' | 'phone' | 'programme' | 'index' | 'reason' | 'verification' | 'expires' | 'status' | 'letter';
 
-function ApplicantTable({ rows, columns, action }: { rows: VerificationApplicantRow[]; columns: Column[]; action?: (r: VerificationApplicantRow) => ReactNode }) {
+function ApplicantTable({ rows, columns, action, actionInColumn }: {
+  rows: VerificationApplicantRow[]; columns: Column[]; action?: (r: VerificationApplicantRow) => ReactNode; actionInColumn?: Column;
+}) {
   const head: Record<Column, string> = {
     ref: 'Reference', name: 'Applicant', phone: 'Phone', programme: 'Programme', index: 'CSEE index', reason: 'NACTVET reason',
-    verification: 'Verification no.', expires: 'Accept by', status: 'Status',
+    verification: 'Verification no.', expires: 'Accept by', status: 'Status', letter: 'Admission letter',
   };
   const cell = (r: VerificationApplicantRow, c: Column): ReactNode => {
     switch (c) {
@@ -340,6 +404,10 @@ function ApplicantTable({ rows, columns, action }: { rows: VerificationApplicant
         return r.status === 'OFFERED'
           ? <Typography variant="body2" color={r.offerExpired ? 'error' : undefined}>{formatDate(r.offerExpiresAt)}{r.offerExpired && ' (expired)'}</Typography>
           : r.offerRespondedAt ? <Typography variant="body2" color="text.secondary">Answered {formatDate(r.offerRespondedAt)}</Typography> : '—';
+      case 'letter':
+        return r.letterNo
+          ? <><Typography variant="body2">{r.letterNo}{r.letterEdition && r.letterEdition > 1 ? ` (ed. ${r.letterEdition})` : ''}</Typography><Typography variant="caption" color="text.secondary">Issued {formatDate(r.letterIssuedAt)}</Typography></>
+          : r.status === 'ACCEPTED' ? <Chip size="small" color="warning" variant="outlined" label="Not issued" /> : '—';
       case 'status':
         return <>
           <Chip size="small" color={statusColour(r.status)} label={humanise(r.status)} />
@@ -349,12 +417,12 @@ function ApplicantTable({ rows, columns, action }: { rows: VerificationApplicant
   };
   return (
     <Table size="small">
-      <TableHead><TableRow>{columns.map((c) => <TableCell key={c}>{head[c]}</TableCell>)}{action && <TableCell />}</TableRow></TableHead>
+      <TableHead><TableRow>{columns.map((c) => <TableCell key={c}>{head[c]}</TableCell>)}{action && !actionInColumn && <TableCell />}</TableRow></TableHead>
       <TableBody>
         {rows.map((r) => (
           <TableRow key={r.applicationId}>
-            {columns.map((c) => <TableCell key={c}>{cell(r, c)}</TableCell>)}
-            {action && <TableCell align="right">{action(r)}</TableCell>}
+            {columns.map((c) => <TableCell key={c}>{cell(r, c)}{action && actionInColumn === c && action(r)}</TableCell>)}
+            {action && !actionInColumn && <TableCell align="right">{action(r)}</TableCell>}
           </TableRow>
         ))}
       </TableBody>

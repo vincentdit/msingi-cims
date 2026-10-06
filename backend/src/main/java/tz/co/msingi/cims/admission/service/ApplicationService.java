@@ -22,6 +22,7 @@ import tz.co.msingi.cims.admission.eligibility.EligibilityResult;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationDetailView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationSummaryView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationView;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.LetterView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.FeeView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ProfileView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ProgrammeEligibilityView;
@@ -34,6 +35,8 @@ import tz.co.msingi.cims.finance.domain.Invoice;
 import tz.co.msingi.cims.finance.gepg.GepgProperties;
 import tz.co.msingi.cims.finance.service.BillingService;
 import tz.co.msingi.cims.finance.service.InvoicePaidEvent;
+import tz.co.msingi.cims.admission.letter.AdmissionLetter;
+import tz.co.msingi.cims.admission.letter.AdmissionLetterRepository;
 import tz.co.msingi.cims.admission.offer.OfferService;
 import tz.co.msingi.cims.notification.SmsSender;
 import tz.co.msingi.cims.platform.security.OtpService;
@@ -70,6 +73,7 @@ public class ApplicationService {
     private final SmsSender sms;
     private final OtpService otp;
     private final OfferService offers;
+    private final AdmissionLetterRepository letters;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -299,7 +303,9 @@ public class ApplicationService {
 
     private ApplicationView view(Application app, Applicant a) {
         String devCode = otp.exposeInResponse() ? offers.developmentConfirmationCode(app).orElse(null) : null;
-        return ApplicationView.of(app, blockers(app, a), devCode);
+        LetterView letter = letters.findByApplicationIdAndStatus(app.getId(), AdmissionLetter.Status.VALID)
+                .map(l -> new LetterView(l.getLetterNo(), l.getEdition(), l.getVerificationCode(), l.getIssuedAt())).orElse(null);
+        return ApplicationView.of(app, blockers(app, a), devCode, letter);
     }
 
     private FeeView feeView(Application app) {

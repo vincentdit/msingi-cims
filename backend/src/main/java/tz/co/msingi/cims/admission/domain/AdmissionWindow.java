@@ -13,8 +13,11 @@ import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import tz.co.msingi.cims.academic.domain.AcademicYear;
 import tz.co.msingi.cims.academic.domain.Intake;
+import tz.co.msingi.cims.admission.letter.JoiningInstructions;
 import tz.co.msingi.cims.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -57,6 +60,10 @@ public class AdmissionWindow extends BaseEntity {
     /** Days a verified applicant has to accept the offer (BP-04). */
     @Column(nullable = false)
     private short offerAcceptanceDays = 14;
+
+    /** Printed with every admission letter; letters cannot be issued until this is set (FR-ADM-13). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private JoiningInstructions joiningInstructions;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

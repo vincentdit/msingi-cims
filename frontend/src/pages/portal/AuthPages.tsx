@@ -41,7 +41,7 @@ export function RegisterPage() {
     setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const m = useMutation({
     mutationFn: () => api<OtpSent & { userId: number }>('/api/applicant-auth/register', { method: 'POST', body: { ...f, email: f.email || null } }),
-    onSuccess: (r) => navigate('/verify', { state: { phone: f.phone, masked: r.maskedPhone, devOtp: r.devOtp } }),
+    onSuccess: (r) => navigate('/verify-phone', { state: { phone: f.phone, masked: r.maskedPhone, devOtp: r.devOtp } }),
   });
   const submit = (e: FormEvent) => { e.preventDefault(); m.mutate(); };
 
@@ -112,7 +112,7 @@ export function LoginPage() {
     onSuccess: (tok) => { signIn('applicant', tok); navigate(from); },
     onError: (e: unknown) => {
       const code = (e as { problem?: { code?: string } }).problem?.code;
-      if (code === 'ACCOUNT_NOT_VERIFIED') navigate('/verify', { state: { phone: login } });
+      if (code === 'ACCOUNT_NOT_VERIFIED') navigate('/verify-phone', { state: { phone: login } });
     },
   });
 

@@ -11,6 +11,8 @@ import tz.co.msingi.cims.admission.domain.Applicant;
 import tz.co.msingi.cims.admission.domain.ApplicantQualification;
 import tz.co.msingi.cims.admission.domain.Application;
 import tz.co.msingi.cims.admission.domain.Application.Status;
+import tz.co.msingi.cims.admission.letter.AdmissionLetter;
+import tz.co.msingi.cims.admission.letter.AdmissionLetterRepository;
 import tz.co.msingi.cims.admission.offer.OfferService;
 import tz.co.msingi.cims.admission.verification.VerificationDtos.ApplicantRow;
 import tz.co.msingi.cims.admission.verification.VerificationDtos.OutcomeResult;
@@ -67,6 +69,7 @@ public class VerificationService {
     private final TenantRepository tenants;
     private final NactvetGateway nactvet;
     private final OfferService offers;
+    private final AdmissionLetterRepository letters;
     private final SmsSender sms;
     private final AuditService audit;
 
@@ -91,10 +94,14 @@ public class VerificationService {
                         index.get(a.getApplicant().getId()), a.getVerificationRemarks(), issues(a, index, tenant)))
                 .toList();
         OffsetDateTime now = OffsetDateTime.now();
+        Map<Long, AdmissionLetter> validLetters = letters.findByApplicationIdInAndStatus(
+                apps.stream().filter(a -> a.getStatus() == Status.ACCEPTED).map(Application::getId).toList(), AdmissionLetter.Status.VALID)
+                .stream().collect(Collectors.toMap(l -> l.getApplication().getId(), Function.identity()));
         List<ApplicantRow> rows = apps.stream().filter(a -> a.getStatus() != Status.SELECTED)
-                .map(a -> row(a, index.get(a.getApplicant().getId()), now)).toList();
+                .map(a -> row(a, index.get(a.getApplicant().getId()), now, validLetters.get(a.getId()))).toList();
+        long lettersPending = apps.stream().filter(a -> a.getStatus() == Status.ACCEPTED && !validLetters.containsKey(a.getId())).count();
         return new Overview(windowId, window.getOfferAcceptanceDays(), tenant.getNactvetRegNo(), counts, acceptanceRate,
-                ready, submissionViews(windowId), rows);
+                window.getJoiningInstructions() != null, lettersPending, ready, submissionViews(windowId), rows);
     }
 
     // ------------------------------------------------------------------ commands
@@ -258,7 +265,7 @@ public class VerificationService {
         app.setVerificationRemarks(remarks.trim());
         audit.record("NACTVET_QUERY_RESOLVED", "Application", applicationId,
                 Map.of("query", String.valueOf(app.getVerificationReason()), "remarks", remarks.trim()));
-        return row(app, indexNumbers(List.of(app)).get(app.getApplicant().getId()), OffsetDateTime.now());
+        return row(app, indexNumbers(List.of(app)).get(app.getApplicant().getId()), OffsetDateTime.now(), null);
     }
 
     // ------------------------------------------------------------------ files
@@ -436,13 +443,14 @@ public class VerificationService {
                 c.getOrDefault(NactvetSubmissionItem.Outcome.QUERIED, 0L), c.getOrDefault(NactvetSubmissionItem.Outcome.REJECTED, 0L));
     }
 
-    private static ApplicantRow row(Application a, String indexNumber, OffsetDateTime now) {
+    private static ApplicantRow row(Application a, String indexNumber, OffsetDateTime now, AdmissionLetter letter) {
         Applicant ap = a.getApplicant();
         boolean expired = a.getStatus() == Status.OFFERED && a.getOfferExpiresAt() != null && !now.isBefore(a.getOfferExpiresAt());
         return new ApplicantRow(a.getId(), a.getReferenceNo(), ap.fullName(), ap.getPhone(), ap.getSex(), programmeName(a),
                 a.getStatus().name(), indexNumber, a.getNactvetVerificationNo(), a.isMultipleAdmission(), a.getVerificationReason(),
                 a.getVerificationRemarks(), a.getVerifiedAt(), a.getOfferExpiresAt(), a.getOfferRespondedAt(),
-                a.getOfferDeclineReason(), expired);
+                a.getOfferDeclineReason(), expired, letter == null ? null : letter.getLetterNo(),
+                letter == null ? null : (int) letter.getEdition(), letter == null ? null : letter.getIssuedAt());
     }
 
     private static String programmeName(Application a) {

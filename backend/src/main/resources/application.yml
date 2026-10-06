@@ -72,6 +72,9 @@ cims:
     mode: ${CIMS_NECTA_MODE:simulated}
   nactvet:
     mode: ${CIMS_NACTVET_MODE:simulated}
+  documents:
+    # Link printed in the QR code of admission letters; {host} is the institution's primary domain
+    verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}
   offers:
     expiry-cron: ${CIMS_OFFER_EXPIRY_CRON:0 5 * * * *}   # close expired offers hourly; "-" disables
   privacy:

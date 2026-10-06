@@ -18,6 +18,7 @@ import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
 import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
+import JoiningInstructionsCard from './JoiningInstructionsCard';
 
 const staff = { realm: 'staff' as const };
 
@@ -306,8 +307,12 @@ function buildRules(f: { passes: string; subjects: string; minGrade: string; alt
   return { summary: f.summary, pathways };
 }
 
+const CONFIGURE_ROLES = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'];
+
 export function WindowDetailPage() {
   const { id } = useParams();
+  const { user } = useSession();
+  const canConfigure = !!user('staff')?.roles.some((r) => CONFIGURE_ROLES.includes(r));
   const qc = useQueryClient();
   const w = useQuery({ queryKey: ['staff', 'window', id], queryFn: () => api<AdmissionWindow>(`/api/admission/windows/${id}`, staff) });
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
@@ -326,7 +331,7 @@ export function WindowDetailPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
-        action={<Stack direction="row" spacing={1}>
+        action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
           {win.status === 'DRAFT' && <Button variant="contained" color="secondary" onClick={() => publish.mutate()}>Publish</Button>}
           {win.status === 'PUBLISHED' && <Button variant="outlined" color="error" onClick={() => close.mutate()}>Close window</Button>}
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
@@ -345,6 +350,7 @@ export function WindowDetailPage() {
           </TableBody>
         </Table>
       </TableContainer></Card>
+      <JoiningInstructionsCard win={win} canEdit={canConfigure} />
       <Dialog open={!!form} onClose={() => setForm(null)} fullWidth maxWidth="sm">
         <DialogTitle>Offer a programme</DialogTitle>
         {form && (

@@ -2,7 +2,7 @@
 
 **Msingi Technologies Ltd** · One platform from application to graduation for NACTVET‑registered institutions.
 
-This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers**), as specified in `docs/` (Documents 01–07).
+This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters**), as specified in `docs/` (Documents 01–07).
 
 | Area | Delivered in this slice |
 |---|---|
@@ -11,6 +11,7 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 | Admissions | Admission windows with capacity and **NACTVET minimum entry rules (JSON rule engine)**, applicant sign-up with SMS OTP, password reset, NECTA results lookup, prior NTA/NVA awards, profile, application, eligibility per programme with reasons, choices, submission with reference number |
 | Selection (BP-03) | Merit ranking, stable allocation of places across applicants' choices, Admissions Committee review (exclusions with reasons) and approval with segregation of duties, statistics, CSV for the committee pack |
 | NACTVET verification and offers (BP-04) | Pre-validation, submission by API or NACTVET-template file, outcome fetch or file import (all-or-nothing), query resolution and resubmission, offers with a deadline, acceptance with NACTVET confirmation code for multiple admissions (attempt-limited), decline, automatic lapse, released places re-filled by the next round |
+| Admission letters (FR-ADM-13, BP-16) | Joining instructions per window; PDF letter + joining instructions issued automatically on acceptance (or in bulk), QR code and 16-character verification code, public `/verify` page (rate-limited, minimal personal data), corrected editions (old code verifies as superseded), revocation, frozen snapshot so reprints match what was issued |
 | Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
 
@@ -30,7 +31,7 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V7 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers)
+  src/main/resources/db/migration/   V1–V8 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -145,6 +146,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `EligibilityEngineTest` — NACTVET entry rule evaluation;
 - `SelectionIT`, `SelectionAllocatorTest`, `MeritScorerTest` — merit ranking, stable allocation, committee exclusions and approval;
 - `VerificationIT`, `SimulatedNactvetGatewayTest`, `CsvTest` — NACTVET submission by API and file, outcomes, queries, offers, multiple-admission confirmation and lock-out, lapse, released places, access rules;
+- `LetterIT`, `AdmissionLetterRendererTest`, `RateLimiterTest` — letter issued on acceptance, PDF content and QR code decoded from the rendered page, public verification, reissue/revoke, access rules, escaping;
 - `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
@@ -163,6 +165,9 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `CIMS_NECTA_MODE` | `simulated` | NECTA adapter |
 | `CIMS_NACTVET_MODE` | `simulated` | NACTVET admission verification adapter |
 | `CIMS_OFFER_EXPIRY_CRON` | `0 5 * * * *` | When expired offers are closed (`-` disables) |
+| `CIMS_VERIFICATION_URL` | `https://{host}/verify/{code}` (dev: `http://localhost:5173/verify/{code}`) | Link encoded in letter QR codes; `{host}` is the institution's primary domain |
+
+Behind a reverse proxy, set `server.forward-headers-strategy=native` (or `framework`) so the public verification rate limit applies per real client address.
 | `VITE_TENANT` (frontend) | — | Force an institution code in development |
 | `CIMS_API_URL` (frontend dev server) | `http://127.0.0.1:8085` | Where the Vite proxy sends `/api` |
 
@@ -183,7 +188,7 @@ Production notes: connect the application with a role that is **not** a superuse
 | GePG | `SimulatedGepgGateway`, HMAC-signed callback | Live adapter: signed bill submission and RSA signature verification per the GePG specification, daily reconciliation |
 | SMS | `LoggingSmsSender` (log only) | SMS aggregator adapter with delivery reports |
 | NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |
-| Letters | — | Admission letters and joining instructions with QR verification (FR-ADM-13) |
+| Letters | HTML template (`templates/admission-letter.html`) → PDF | Per-institution letter templates and logo upload; email delivery |
 | First-year invoice | `OfferAcceptedEvent` published on acceptance | Fee structures and invoice on acceptance (BP-06) |
 | Identity | Local JWT issuer | Keycloak realm per institution, MFA for privileged roles |
 

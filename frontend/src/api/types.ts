@@ -72,6 +72,7 @@ export interface AdmissionWindow {
   applicationFee: number;
   maxChoices: number;
   offerAcceptanceDays: number;
+  joiningInstructions?: JoiningInstructions;
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
   open: boolean;
   instructions?: string;
@@ -152,6 +153,46 @@ export interface Application {
   blockers: string[];
   selectedProgramme?: string;
   offer?: Offer;
+  letter?: AdmissionLetterInfo;
+}
+
+export interface AdmissionLetterInfo {
+  letterNo: string;
+  edition: number;
+  verificationCode: string;
+  issuedAt: string;
+}
+
+export interface JoiningInstructions {
+  reportingDate: string;
+  reportingTime?: string;
+  reportingVenue: string;
+  registrationDeadline?: string;
+  documentsToBring: string[];
+  itemsToBring: string[];
+  feesNote?: string;
+  notes: string[];
+  signatoryName: string;
+  signatoryTitle: string;
+}
+
+export interface LetterVerification {
+  documentType: string;
+  status: 'VALID' | 'SUPERSEDED' | 'REVOKED';
+  institution: string;
+  institutionNactvetNo?: string;
+  letterNo: string;
+  edition: number;
+  issuedAt: string;
+  holderName: string;
+  programme: string;
+  award: string;
+  academicYear: string;
+  intake: string;
+  reportingDate: string;
+  nactvetVerificationNo?: string;
+  revokedAt?: string;
+  currentEdition?: number;
 }
 
 export interface Offer {
@@ -348,6 +389,9 @@ export interface VerificationApplicantRow {
   offerRespondedAt?: string;
   declineReason?: string;
   offerExpired: boolean;
+  letterNo?: string;
+  letterEdition?: number;
+  letterIssuedAt?: string;
 }
 
 export interface VerificationOverview {
@@ -356,6 +400,8 @@ export interface VerificationOverview {
   institutionNactvetNo?: string;
   counts: Record<string, number>;
   acceptanceRate?: number;
+  joiningInstructionsSet: boolean;
+  lettersPending: number;
   ready: VerificationReadyRow[];
   submissions: NactvetSubmission[];
   applicants: VerificationApplicantRow[];

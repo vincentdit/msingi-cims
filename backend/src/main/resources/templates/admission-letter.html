@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!--
+  Admission letter and joining instructions (FR-ADM-13).
+  Placeholders: double braces insert a value HTML-escaped; triple braces insert markup that
+  AdmissionLetterRenderer builds from escaped values. Unknown names fail rendering.
+  Must stay well-formed XHTML: the PDF renderer parses it as XML. CSS 2.1 only (no flexbox).
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Admission letter {{letterNo}}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 18mm 20mm 18mm;
+    @bottom-left { content: "Verification code {{verificationCode}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #1f2937; line-height: 1.4; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2.5pt solid {{primaryColor}}; }
+  .head td { vertical-align: middle; padding-bottom: 8pt; }
+  .badge { width: 46pt; height: 46pt; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 13pt; text-align: center; line-height: 46pt; border-radius: 23pt; }
+  .inst { font-size: 15pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; }
+  .small { font-size: 8.5pt; }
+  .meta { width: 100%; margin-top: 12pt; border-collapse: collapse; }
+  .meta td { padding: 1pt 0; }
+  .subject { margin: 12pt 0 8pt 0; font-weight: bold; text-transform: uppercase; color: #111827; border-bottom: 0.6pt solid #d1d5db; padding-bottom: 4pt; }
+  p { margin: 0 0 8pt 0; text-align: justify; }
+  table.details { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt 0; }
+  table.details th { text-align: left; width: 34%; background: #f3f4f6; font-weight: normal; color: #4b5563; padding: 4pt 6pt; border: 0.6pt solid #e5e7eb; }
+  table.details td { padding: 4pt 6pt; border: 0.6pt solid #e5e7eb; font-weight: bold; }
+  ol, ul { margin: 0 0 8pt 0; padding-left: 16pt; }
+  li { margin-bottom: 3pt; }
+  table.closing { width: 100%; border-collapse: collapse; margin-top: 10pt; }
+  table.closing > tr > td, table.closing td.sign, table.closing td.verify { vertical-align: top; }
+  td.sign { width: 46%; padding-right: 10pt; }
+  td.sign .line { margin-top: 30pt; border-top: 0.6pt solid #9ca3af; width: 170pt; padding-top: 3pt; }
+  td.verify { border: 0.8pt solid #d1d5db; background: #f9fafb; padding: 6pt; }
+  .code { font-family: Courier, monospace; font-size: 11pt; font-weight: bold; color: #111827; margin: 1pt 0 2pt 0; }
+  .tiny { font-size: 7.5pt; line-height: 1.3; }
+  h2 { font-size: 13pt; color: {{primaryColor}}; margin: 0 0 8pt 0; }
+  h3 { font-size: 10.5pt; margin: 12pt 0 4pt 0; color: #111827; }
+  .page-break { page-break-before: always; }
+  .notice { border-left: 3pt solid {{primaryColor}}; background: #f3f4f6; padding: 6pt 8pt; margin: 8pt 0; }
+</style>
+</head>
+<body>
+
+<table class="head">
+  <tr>
+    <td style="width: 56pt;"><div class="badge">{{institutionShortName}}</div></td>
+    <td>
+      <div class="inst">{{institutionName}}</div>
+      <div class="muted small">Registered by NACTVET: {{nactvetNo}}</div>
+      <div class="muted small">{{contactLine}}</div>
+    </td>
+  </tr>
+</table>
+
+<table class="meta">
+  <tr><td>Our ref: <strong>{{letterNo}}</strong>{{editionNote}}</td><td style="text-align: right;">Date: {{letterDate}}</td></tr>
+</table>
+
+<div style="margin-top: 12pt;">
+  <strong>{{applicantName}}</strong><br />
+  {{{addressLines}}}
+</div>
+
+<div class="subject">Admission to {{programmeName}} — {{academicYear}} {{intake}}</div>
+
+<p>Dear {{applicantName}},</p>
+<p>We are pleased to inform you that you have been admitted to <strong>{{institutionName}}</strong> to study the programme below.
+Your admission has been verified by the National Council for Technical and Vocational Education and Training (NACTVET)
+under verification number <strong>{{nactvetVerificationNo}}</strong>, and you accepted the offer on {{acceptedDate}}.</p>
+
+<table class="details">
+  <tr><th>Programme</th><td>{{programmeName}}</td></tr>
+  <tr><th>Award</th><td>{{awardName}}</td></tr>
+  <tr><th>NACTVET programme code</th><td>{{programmeCode}}</td></tr>
+  <tr><th>Duration</th><td>{{duration}}</td></tr>
+  <tr><th>Academic year and intake</th><td>{{academicYear}}, {{intake}}</td></tr>
+  <tr><th>Application reference</th><td>{{applicationRef}}</td></tr>
+  <tr><th>Reporting</th><td>{{reportingLine}}</td></tr>
+</table>
+
+<p>This admission is subject to the following conditions:</p>
+<ol>
+  <li>You present your original academic certificates and birth certificate for verification at registration.</li>
+  <li>The admission will be cancelled at any time if any information you gave is found to be false or your certificates are not genuine.</li>
+  <li>You register within the period given in the joining instructions; a place not taken up by then may be given to another applicant.</li>
+  <li>You abide by the rules and regulations of the institution and of NACTVET.</li>
+</ol>
+<p>The joining instructions attached to this letter give the reporting arrangements, what to bring and the fees. We look forward to welcoming you.</p>
+
+<table class="closing">
+  <tr>
+    <td class="sign">
+      Yours sincerely,
+      <div class="line"><strong>{{signatoryName}}</strong><br />{{signatoryTitle}}<br />For: {{institutionName}}</div>
+    </td>
+    <td class="verify">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="width: 78pt; padding: 0;">{{{qrImage}}}</td>
+          <td style="padding: 0 0 0 6pt;">
+            <div class="small muted">Verify this letter</div>
+            <div class="code">{{verificationCode}}</div>
+            <div class="tiny">Scan the QR code or enter the code at <strong>{{verificationUrlBase}}</strong>. The letter is genuine only if
+            the page shows it as valid with the same name and programme.</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+<h2>Joining instructions</h2>
+<p class="muted small" style="text-align: left;">{{institutionName}} · {{programmeName}} · {{academicYear}} {{intake}} · Ref {{letterNo}}</p>
+
+<h3>1. Reporting</h3>
+<table class="details">
+  <tr><th>Reporting date</th><td>{{reportingDate}}</td></tr>
+  <tr><th>Time</th><td>{{reportingTime}}</td></tr>
+  <tr><th>Venue</th><td>{{reportingVenue}}</td></tr>
+  {{{registrationRow}}}
+</table>
+
+{{{documentsBlock}}}
+{{{itemsBlock}}}
+{{{feesBlock}}}
+{{{notesBlock}}}
+
+<h3>Contacts</h3>
+<p style="text-align: left;">For any question about your admission contact the Admissions Office: {{contactLine}}.</p>
+<div class="notice small">Fees are paid only through a GePG control number issued by the institution. Do not pay money to any individual
+or into any account not shown on a control number.</div>
+
+</body>
+</html>

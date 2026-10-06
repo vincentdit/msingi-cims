@@ -60,6 +60,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have permission to perform this action");
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ProblemDetail tooMany(TooManyRequestsException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage());
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ProblemDetail conflict(ObjectOptimisticLockingFailureException ex) {
         return problem(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", "The record was changed by someone else. Reload and try again.");

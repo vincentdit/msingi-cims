@@ -21,6 +21,8 @@
         <java.version>21</java.version>
         <springdoc.version>2.6.0</springdoc.version>
         <junit-jupiter.version>5.10.5</junit-jupiter.version>
+        <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
+        <zxing.version>3.5.3</zxing.version>
         <its.exclude>none</its.exclude>
     </properties>
 
@@ -66,6 +68,23 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+        <!-- Documents: HTML templates rendered to PDF (openhtmltopdf/PDFBox), QR codes for verification (ZXing) -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>${openhtmltopdf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxing.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>${zxing.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

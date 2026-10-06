@@ -37,11 +37,11 @@ public final class VerificationDtos {
                                String programmeName, String status, String indexNumber, String verificationNo,
                                boolean multipleAdmission, String reason, String remarks, OffsetDateTime verifiedAt,
                                OffsetDateTime offerExpiresAt, OffsetDateTime offerRespondedAt, String declineReason,
-                               boolean offerExpired) {
+                               boolean offerExpired, String letterNo, Integer letterEdition, OffsetDateTime letterIssuedAt) {
     }
 
     public record Overview(Long windowId, short offerAcceptanceDays, String institutionNactvetNo,
-                           Map<String, Long> counts, Double acceptanceRate,
+                           Map<String, Long> counts, Double acceptanceRate, boolean joiningInstructionsSet, long lettersPending,
                            List<ReadyRow> ready, List<SubmissionView> submissions, List<ApplicantRow> applicants) {
     }
 

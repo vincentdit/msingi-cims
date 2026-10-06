@@ -18,6 +18,7 @@ import tz.co.msingi.cims.academic.domain.Intake;
 import tz.co.msingi.cims.academic.domain.Programme;
 import tz.co.msingi.cims.admission.domain.AdmissionRepositories.AdmissionWindowRepository;
 import tz.co.msingi.cims.admission.domain.AdmissionWindow;
+import tz.co.msingi.cims.admission.letter.JoiningInstructions;
 import tz.co.msingi.cims.admission.domain.WindowProgramme;
 import tz.co.msingi.cims.admission.eligibility.EntryRules;
 import tz.co.msingi.cims.admission.eligibility.EntryRules.Condition;
@@ -96,6 +97,8 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();
+            windows.findAll().stream().filter(x -> x.getJoiningInstructions() == null)
+                    .forEach(x -> x.setJoiningInstructions(demoJoiningInstructions()));
             return;
         }
         AcademicYear year = new AcademicYear();
@@ -144,6 +147,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                         new Condition(ConditionType.CSEE_MIN_PASSES, 4, "D", null, null, null),
                         new Condition(ConditionType.CSEE_SUBJECT, 1, "D", List.of("BASIC MATHEMATICS"), null, null))))));
         addProgramme(w, elec, 60, EntryRules.openEntry("Completed Standard Seven or Form Four"));
+        w.setJoiningInstructions(demoJoiningInstructions());
         windows.save(w);
     }
 
@@ -189,6 +193,22 @@ public class DemoDataSeeder implements ApplicationRunner {
         p.setAccreditedCapacity(capacity);
         p.setNactvetCode(nactvetCode(code));
         return programmes.save(p);
+    }
+
+    /** Example joining instructions so admission letters can be issued in the demo; edit them on the window page. */
+    private static JoiningInstructions demoJoiningInstructions() {
+        return new JoiningInstructions(LocalDate.of(2027, 9, 27), "08:00", "Main Hall, Msingi Demo Technical College",
+                LocalDate.of(2027, 10, 8),
+                List.of("This admission letter", "Original CSEE (and ACSEE, if any) certificates and a copy of each",
+                        "Original birth certificate and a copy", "Four recent passport-size photographs", "National ID (NIDA) number, if available",
+                        "Completed medical examination form"),
+                List.of("Two sets of the college uniform (available at the college shop)", "Laboratory coat and safety boots (technical programmes)",
+                        "Scientific calculator", "Bedding and personal items (if you are allocated a hostel place)"),
+                "Fees are payable only through a GePG control number issued by the college after registration.\n"
+                        + "The first instalment must be paid before registration is completed.",
+                List.of("Orientation for new students runs during the first week.",
+                        "Hostel places are limited and allocated on a first-come, first-served basis."),
+                "Dr. Amina Salum", "Principal");
     }
 
     /** Illustrative NACTVET programme codes for the demo (NACTVET verification needs one per programme). */

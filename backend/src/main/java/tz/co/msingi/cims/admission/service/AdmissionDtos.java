@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import tz.co.msingi.cims.admission.domain.AdmissionWindow;
+import tz.co.msingi.cims.admission.letter.JoiningInstructions;
 import tz.co.msingi.cims.admission.domain.Applicant;
 import tz.co.msingi.cims.admission.domain.ApplicantQualification;
 import tz.co.msingi.cims.admission.domain.Application;
@@ -151,11 +152,12 @@ public final class AdmissionDtos {
     public record WindowView(Long id, String name, Long academicYearId, String academicYear, Long intakeId, String intake,
                              OffsetDateTime opensAt, OffsetDateTime closesAt, BigDecimal applicationFee, short maxChoices,
                              short offerAcceptanceDays, String status, boolean open, String instructions,
-                             List<WindowProgrammeView> programmes) {
+                             JoiningInstructions joiningInstructions, List<WindowProgrammeView> programmes) {
         public static WindowView of(AdmissionWindow w, List<WindowProgramme> programmes) {
             return new WindowView(w.getId(), w.getName(), w.getAcademicYear().getId(), w.getAcademicYear().getCode(),
                     w.getIntake().getId(), w.getIntake().getName(), w.getOpensAt(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), w.getOfferAcceptanceDays(), w.getStatus().name(), w.isOpen(OffsetDateTime.now()), w.getInstructions(),
+                    w.getJoiningInstructions(),
                     programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList());
         }
     }
@@ -192,16 +194,20 @@ public final class AdmissionDtos {
     public record ApplicationView(Long id, String referenceNo, String status, Long windowId, String windowName,
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
-                                  List<String> blockers, String selectedProgramme, OfferView offer) {
-        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode) {
+                                  List<String> blockers, String selectedProgramme, OfferView offer, LetterView letter) {
+        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode, LetterView letter) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
                     a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
                     a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName(),
-                    OfferView.of(a, devConfirmationCode));
+                    OfferView.of(a, devConfirmationCode), letter);
         }
+    }
+
+    /** The applicant's valid admission letter, once issued (FR-ADM-13). */
+    public record LetterView(String letterNo, int edition, String verificationCode, OffsetDateTime issuedAt) {
     }
 
     /**
