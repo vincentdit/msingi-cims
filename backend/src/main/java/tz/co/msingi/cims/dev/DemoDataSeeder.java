@@ -41,12 +41,13 @@ import java.util.Map;
 
 /**
  * Creates a demo institution ("DEMO") for local development when cims.demo.seed=true.
- * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026. Safe to run repeatedly.
+ * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026. Safe to run repeatedly.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "cims.demo", name = "seed", havingValue = "true")
+@org.springframework.core.annotation.Order(1)
 public class DemoDataSeeder implements ApplicationRunner {
 
     private final TenantRepository tenants;
@@ -64,7 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {
@@ -97,6 +98,10 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
         if (users.findByUsernameIgnoreCase("registry").isEmpty()) {
             staff("registry", "Registry Officer", "Registry@2026", Role.REGISTRAR);
+        }
+        if (users.findByUsernameIgnoreCase("bursar").isEmpty()) {
+            staff("bursar", "Bursar", "Bursar@2026", Role.BURSAR);
+            staff("accountant", "Accountant", "Accountant@2026", Role.ACCOUNTANT);
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();

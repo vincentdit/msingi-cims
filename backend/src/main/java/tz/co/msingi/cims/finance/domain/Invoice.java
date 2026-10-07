@@ -71,7 +71,11 @@ public class Invoice extends BaseEntity {
     @OrderBy("id")
     private List<InvoiceLine> lines = new ArrayList<>();
 
-    public void addLine(String feeItemCode, String description, BigDecimal amount) {
+    /** Annual fee invoices: the academic year and fee structure they were billed from. */
+    private Long academicYearId;
+    private Long feeStructureId;
+
+    public InvoiceLine addLine(String feeItemCode, String description, BigDecimal amount) {
         InvoiceLine line = new InvoiceLine();
         line.setInvoice(this);
         line.setFeeItemCode(feeItemCode);
@@ -79,20 +83,30 @@ public class Invoice extends BaseEntity {
         line.setAmount(amount);
         lines.add(line);
         totalAmount = totalAmount.add(amount);
+        return line;
     }
 
     public BigDecimal balance() {
         return totalAmount.subtract(paidAmount);
     }
 
-    /** Applies a payment and returns true if the invoice became fully paid. */
-    public boolean applyPayment(BigDecimal amount) {
-        paidAmount = paidAmount.add(amount);
+    /**
+     * Applies a payment to the lines in allocation order (FR-FIN-04) and returns what went where.
+     * Anything beyond the balance is returned as unallocated (held as credit).
+     */
+    public PaymentAllocator.Result applyPayment(BigDecimal amount) {
+        PaymentAllocator.Result r = PaymentAllocator.allocate(lines, amount);
+        r.allocations().forEach(a -> a.line().setPaidAmount(a.line().getPaidAmount().add(a.amount())));
+        paidAmount = paidAmount.add(amount.subtract(r.unallocated()));
         if (paidAmount.compareTo(totalAmount) >= 0) {
             status = Status.PAID;
-            return true;
+        } else if (paidAmount.signum() > 0) {
+            status = Status.PARTIALLY_PAID;
         }
-        status = Status.PARTIALLY_PAID;
-        return false;
+        return r;
+    }
+
+    public boolean isPaid() {
+        return status == Status.PAID;
     }
 }

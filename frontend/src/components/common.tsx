@@ -52,6 +52,7 @@ const STATUS_COLOURS: Record<string, 'default' | 'primary' | 'secondary' | 'succ
   DECLINED: 'default', OFFER_LAPSED: 'default',
   ADMITTED: 'info', ACTIVE: 'success', POSTPONED: 'warning', SUSPENDED: 'warning', DISCONTINUED: 'error', DECEASED: 'default',
   COMPLETED: 'primary', GRADUATED: 'primary', PENDING: 'warning', APPROVED: 'success',
+  ISSUED: 'warning', PARTIALLY_PAID: 'info', PAID: 'success', CANCELLED: 'default', CREDITED: 'default',
 };
 
 /** Labels where the plain status name would read badly. */

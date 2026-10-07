@@ -82,6 +82,9 @@ public final class AdmissionRepositories {
                 group by a.selectedWindowProgramme.id""")
         List<Object[]> placesHeld(Long windowId, Collection<Application.Status> statuses, Long excludeRoundId);
 
+        @EntityGraph(attributePaths = {"applicant", "window", "selectedWindowProgramme", "selectedWindowProgramme.programme"})
+        List<Application> findByWindowAcademicYearIdAndStatus(Long academicYearId, Application.Status status);
+
         @EntityGraph(attributePaths = {"applicant", "selectedWindowProgramme", "selectedWindowProgramme.programme"})
         List<Application> findByStatusAndOfferExpiresAtBefore(Application.Status status, OffsetDateTime cutoff);
     }

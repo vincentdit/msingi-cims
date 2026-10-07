@@ -36,6 +36,11 @@ public final class RegistryRepositories {
         @EntityGraph(attributePaths = {"programme", "entryAcademicYear", "intake"})
         List<Student> findByProgrammeIdAndStatusInOrderBySurnameAscFirstNameAsc(Long programmeId, Collection<Student.Status> statuses);
 
+        @EntityGraph(attributePaths = {"programme", "entryAcademicYear"})
+        List<Student> findByEntryAcademicYearIdAndStatusIn(Long academicYearId, Collection<Student.Status> statuses);
+
+        Optional<Student> findByApplicantId(Long applicantId);
+
         @Query("select s.status, count(s) from Student s group by s.status")
         List<Object[]> countByStatus();
     }

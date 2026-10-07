@@ -18,6 +18,9 @@ import tz.co.msingi.cims.common.Csv;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.common.web.PageResponse;
+import tz.co.msingi.cims.finance.accounts.AccountService;
+import tz.co.msingi.cims.finance.billing.AnnualBillingService;
+import tz.co.msingi.cims.finance.fees.ClearanceGate;
 import tz.co.msingi.cims.notification.SmsSender;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
@@ -72,6 +75,8 @@ public class RegistryService {
     private final NumberSequenceService sequences;
     private final SmsSender sms;
     private final AuditService audit;
+    private final AnnualBillingService annualBilling;
+    private final AccountService accounts;
 
     // ------------------------------------------------------------------ settings (FR-REG-02)
 
@@ -209,6 +214,10 @@ public class RegistryService {
         f.setDocuments(docs.stream().map(d -> new FirstRegistration.DocumentCheck(d, false)).collect(Collectors.toCollection(ArrayList::new)));
         firstRegistrations.save(f);
 
+        // fees: the invoice raised at acceptance moves to the student; bill now if it was not raised yet (BP-06)
+        annualBilling.transferToStudent(s);
+        annualBilling.billStudent(s, w.getAcademicYear());
+
         // the applicant account becomes the student's sign-in for the student portal
         users.findById(ap.getUser().getId()).ifPresent(u -> u.grant(Role.STUDENT));
 
@@ -329,6 +338,7 @@ public class RegistryService {
         if (s.getStatus() != Student.Status.ADMITTED) {
             throw new BusinessRuleException("INVALID_STATUS", "Only admitted students can complete first registration");
         }
+        accounts.requireCleared(s, ClearanceGate.Gate.REGISTRATION); // FR-FIN-06 registration gate
         f.setStatus(FirstRegistration.Status.APPROVED);
         f.setApprovedAt(OffsetDateTime.now());
         f.setApprovedBy(CurrentUser.requireId());

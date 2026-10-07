@@ -10,9 +10,13 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.finance.domain.ControlNumber;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.ControlNumberRepository;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.InvoiceRepository;
+import tz.co.msingi.cims.finance.domain.FinanceRepositories.PaymentAllocationRepository;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.PaymentRepository;
 import tz.co.msingi.cims.finance.domain.Invoice;
+import tz.co.msingi.cims.finance.domain.InvoiceLine;
 import tz.co.msingi.cims.finance.domain.Payment;
+import tz.co.msingi.cims.finance.domain.PaymentAllocation;
+import tz.co.msingi.cims.finance.domain.PaymentAllocator;
 import tz.co.msingi.cims.finance.gepg.GepgGateway;
 import tz.co.msingi.cims.finance.gepg.GepgProperties;
 import tz.co.msingi.cims.notification.SmsSender;
@@ -35,6 +39,7 @@ public class BillingService {
     private final InvoiceRepository invoices;
     private final ControlNumberRepository controlNumbers;
     private final PaymentRepository payments;
+    private final PaymentAllocationRepository allocations;
     private final GepgGateway gepg;
     private final GepgProperties gepgProps;
     private final NumberSequenceService sequences;
@@ -43,8 +48,17 @@ public class BillingService {
     private final SmsSender sms;
 
     public record NewInvoice(Invoice.PayerType payerType, Long payerId, String payerName, String payerPhone, String payerEmail,
-                             String purpose, Long referenceId, String description, List<Line> lines) {
-        public record Line(String feeItemCode, String description, BigDecimal amount) {
+                             String purpose, Long referenceId, String description, List<Line> lines,
+                             Long academicYearId, Long feeStructureId) {
+        public NewInvoice(Invoice.PayerType payerType, Long payerId, String payerName, String payerPhone, String payerEmail,
+                          String purpose, Long referenceId, String description, List<Line> lines) {
+            this(payerType, payerId, payerName, payerPhone, payerEmail, purpose, referenceId, description, lines, null, null);
+        }
+
+        public record Line(String feeItemCode, String description, BigDecimal amount, Long feeItemId, short priority, short instalment) {
+            public Line(String feeItemCode, String description, BigDecimal amount) {
+                this(feeItemCode, description, amount, null, (short) 100, (short) 1);
+            }
         }
     }
 
@@ -62,7 +76,14 @@ public class BillingService {
         inv.setPurpose(req.purpose());
         inv.setReferenceId(req.referenceId());
         inv.setDescription(req.description());
-        req.lines().forEach(l -> inv.addLine(l.feeItemCode(), l.description(), l.amount()));
+        req.lines().forEach(l -> {
+            InvoiceLine line = inv.addLine(l.feeItemCode(), l.description(), l.amount());
+            line.setFeeItemId(l.feeItemId());
+            line.setPriority(l.priority());
+            line.setInstalment(l.instalment());
+        });
+        inv.setAcademicYearId(req.academicYearId());
+        inv.setFeeStructureId(req.feeStructureId());
         inv.setDueDate(OffsetDateTime.now().plus(gepgProps.controlNumberValidity()).toLocalDate());
         Invoice saved = invoices.save(inv);
         audit.record("CREATE", "Invoice", saved.getId(), Map.of("invoiceNo", saved.getInvoiceNo(), "amount", saved.getTotalAmount()));
@@ -142,14 +163,29 @@ public class BillingService {
         p.setStatus(Payment.Status.ALLOCATED);
         p.setReceiptNo(NumberSequenceService.format(TenantContext.require().code() + "/RCT/" + Year.now().getValue() + "/",
                 sequences.next("RECEIPT-" + Year.now().getValue()), 6));
-        payments.save(p);
 
-        boolean fullyPaid = inv.applyPayment(n.amount());
-        if (fullyPaid) {
+        boolean wasPaid = inv.isPaid();
+        PaymentAllocator.Result allocation = inv.applyPayment(n.amount());
+        p.setUnallocatedAmount(allocation.unallocated());
+        payments.save(p);
+        for (PaymentAllocator.Allocation a : allocation.allocations()) {
+            PaymentAllocation pa = new PaymentAllocation();
+            pa.setPayment(p);
+            pa.setInvoiceLine(a.line());
+            pa.setAmount(a.amount());
+            allocations.save(pa);
+        }
+        boolean fullyPaid = !wasPaid && inv.isPaid();
+        if (inv.isPaid()) {
             cn.setStatus(ControlNumber.Status.PAID);
         }
+        if (allocation.unallocated().signum() > 0) {
+            log.info("Payment {} exceeds the balance of invoice {} by {}: held as credit", n.gepgReceiptNo(), inv.getInvoiceNo(), allocation.unallocated());
+        }
         audit.recordAs(null, "GePG", "PAYMENT_RECEIVED", "Invoice", inv.getId(),
-                Map.of("receiptNo", p.getReceiptNo(), "gepgReceiptNo", n.gepgReceiptNo(), "amount", n.amount()));
+                Map.of("receiptNo", p.getReceiptNo(), "gepgReceiptNo", n.gepgReceiptNo(), "amount", n.amount(),
+                        "credit", allocation.unallocated()));
+        events.publishEvent(new PaymentPostedEvent(inv.getId(), inv.getPayerType().name(), inv.getPayerId(), p.getId()));
         if (inv.getPayerPhone() != null) {
             sms.send(inv.getPayerPhone(), "Payment of TZS " + n.amount().toPlainString() + " received. Receipt " + p.getReceiptNo() + ".");
         }

@@ -494,3 +494,141 @@ export interface StudentDetail {
   admittedByName: string;
   firstRegistration?: FirstRegistration;
 }
+
+// ---- Fees (BP-06)
+export interface AcademicYear {
+  id: number;
+  code: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+}
+
+export interface FeeItem {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  gfsCode?: string;
+  allocationPriority: number;
+  active: boolean;
+}
+
+export interface FeeStructureLine {
+  feeItemId: number;
+  feeItemCode: string;
+  feeItemName: string;
+  category: string;
+  amount: number;
+  foreignAmount?: number;
+  instalment: number;
+}
+
+export interface FeeStructure {
+  id: number;
+  academicYearId: number;
+  academicYear: string;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  yearOfStudy: number;
+  structureVersion: number;
+  status: 'DRAFT' | 'APPROVED' | 'SUPERSEDED';
+  notes?: string;
+  createdByName: string;
+  approvedAt?: string;
+  approvedByName?: string;
+  total: number;
+  foreignTotal: number;
+  firstInstalment: number;
+  lines: FeeStructureLine[];
+  canApprove: boolean;
+}
+
+export interface ClearanceGateRule {
+  gate: string;
+  enabled: boolean;
+  minPercentPaid: number;
+  firstInstalmentRequired: boolean;
+  appliedNow: boolean;
+}
+
+export interface AccountInvoice {
+  id: number;
+  invoiceNo: string;
+  purpose: string;
+  description: string;
+  payerType: string;
+  total: number;
+  paid: number;
+  balance: number;
+  status: string;
+  dueDate?: string;
+  issuedAt: string;
+  controlNo?: string;
+  controlNoExpiresAt?: string;
+  lines: { feeItemCode: string; description: string; amount: number; paid: number; balance: number; instalment: number }[];
+}
+
+export interface AccountPayment {
+  receiptNo: string;
+  paidAt: string;
+  amount: number;
+  credit: number;
+  channel?: string;
+  pspName?: string;
+  invoiceNo: string;
+  controlNo?: string;
+}
+
+export interface Statement {
+  holderName: string;
+  registrationNo?: string;
+  billed: number;
+  paid: number;
+  balance: number;
+  credit: number;
+  invoices: AccountInvoice[];
+  payments: AccountPayment[];
+}
+
+export interface Clearance {
+  gate: string;
+  enabled: boolean;
+  cleared: boolean;
+  academicYear: string;
+  invoiceTotal?: number;
+  paid?: number;
+  balance?: number;
+  minPercentPaid?: number;
+  paidPercent?: number;
+  firstInstalmentRequired: boolean;
+  firstInstalmentBalance?: number;
+  amountNeeded?: number;
+  invoiceId?: number;
+  invoiceNo?: string;
+  reason?: string;
+}
+
+export interface AmountRow { key: string; label: string; amount: number; count: number }
+
+export interface CollectionsReport {
+  from: string;
+  to: string;
+  total: number;
+  credit: number;
+  payments: number;
+  byFeeItem: AmountRow[];
+  byDay: AmountRow[];
+  byChannel: AmountRow[];
+  rows: { receiptNo: string; paidAt: string; payerName: string; invoiceNo: string; purpose: string; amount: number; credit: number; channel?: string; pspName?: string }[];
+}
+
+export interface DebtorsReport {
+  asAt: string;
+  totalBalance: number;
+  count: number;
+  byBucket: AmountRow[];
+  rows: { invoiceId: number; invoiceNo: string; payerType: string; payerName: string; registrationNo?: string; phone?: string; description: string;
+    total: number; paid: number; balance: number; dueDate?: string; daysOverdue: number; bucket: string }[];
+}

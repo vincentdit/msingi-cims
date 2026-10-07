@@ -30,4 +30,20 @@ public class InvoiceLine extends TenantScopedEntity {
 
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
+
+    private Long feeItemId;
+
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    /** Allocation order within an instalment: lower is paid first (from the fee item). */
+    @Column(nullable = false)
+    private short priority = 100;
+
+    @Column(nullable = false)
+    private short instalment = 1;
+
+    public BigDecimal balance() {
+        return amount.subtract(paidAmount);
+    }
 }

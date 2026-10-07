@@ -12,9 +12,9 @@ import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
-import { api, download, formatDate, formatDateTime } from '../../api/client';
+import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
-  HandoverOverview, Page, Programme, RegistrySettings, StudentDetail, StudentSummary,
+  Clearance, HandoverOverview, Page, Programme, RegistrySettings, Statement, StudentDetail, StudentSummary,
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
@@ -311,7 +311,7 @@ export function StudentDetailPage() {
   useEffect(() => {
     if (st.data?.firstRegistration) { setDocs(st.data.firstRegistration.documents); setRemarks(st.data.firstRegistration.remarks ?? ''); }
   }, [st.data]);
-  const done = (d: StudentDetail) => { qc.setQueryData(['staff', 'student', id], d); qc.invalidateQueries({ queryKey: ['staff', 'students'] }); qc.invalidateQueries({ queryKey: ['staff', 'student-stats'] }); };
+  const done = (d: StudentDetail) => { qc.setQueryData(['staff', 'student', id], d); qc.invalidateQueries({ queryKey: ['staff', 'student', id, 'clearance'] }); qc.invalidateQueries({ queryKey: ['staff', 'students'] }); qc.invalidateQueries({ queryKey: ['staff', 'student-stats'] }); };
   const save = useMutation({
     mutationFn: () => api<StudentDetail>(`/api/registry/students/${id}/first-registration`, { method: 'PUT', ...staff, body: { documents: docs, remarks } }),
     onSuccess: (d) => { done(d); setNotice('Checklist saved.'); },
@@ -404,6 +404,7 @@ export function StudentDetailPage() {
           </Section>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
+          <StudentFeesCard studentId={s.id} />
           <Section title="Programme">
             <Field label="Programme" value={`${s.programmeName} (${s.programmeCode})`} />
             <Field label="Award" value={d.awardName} />
@@ -432,6 +433,49 @@ export function StudentDetailPage() {
         </DialogActions>
       </Dialog>
     </Container>
+  );
+}
+
+/** Fees on the student record: balance, registration clearance and invoices with control numbers (BP-06). */
+function StudentFeesCard({ studentId }: { studentId: number }) {
+  const statement = useQuery({ queryKey: ['staff', 'student', String(studentId), 'statement'], queryFn: () => api<Statement>(`/api/finance/students/${studentId}/statement`, staff) });
+  const clearance = useQuery({ queryKey: ['staff', 'student', String(studentId), 'clearance'], queryFn: () => api<Clearance>(`/api/finance/students/${studentId}/clearance?gate=REGISTRATION`, staff) });
+  const st = statement.data;
+  const c = clearance.data;
+  return (
+    <Card sx={{ mb: 2.5 }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>Fees</Typography>
+        <ErrorAlert error={statement.error ?? clearance.error} />
+        {c && c.enabled && (
+          <Alert severity={c.cleared ? 'success' : 'warning'} sx={{ mb: 1.5 }}>
+            <strong>{c.cleared ? 'Cleared for registration' : 'Not cleared for registration'}</strong>
+            {!c.cleared && c.reason && <Box>{c.reason}</Box>}
+          </Alert>
+        )}
+        {st && (
+          <>
+            <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: '50% 50%', rowGap: 0.5 }}>
+              <Field label="Billed" value={formatTzs(st.billed)} />
+              <Field label="Paid" value={formatTzs(st.paid)} />
+              <Field label="Balance" value={formatTzs(st.balance)} />
+              {st.credit > 0 && <Field label="Credit" value={formatTzs(st.credit)} />}
+            </Box>
+            {st.invoices.map((i) => (
+              <Box key={i.id} sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2"><strong>{i.description}</strong></Typography>
+                  <Chip size="small" color={statusColour(i.status)} label={humanise(i.status)} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">{i.invoiceNo} · {formatTzs(i.paid)} of {formatTzs(i.total)}</Typography>
+                {i.controlNo && i.balance > 0 && <Typography variant="body2">Control number <strong style={{ fontFamily: 'monospace' }}>{i.controlNo}</strong></Typography>}
+              </Box>
+            ))}
+            {!st.invoices.length && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>No invoices yet.</Typography>}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

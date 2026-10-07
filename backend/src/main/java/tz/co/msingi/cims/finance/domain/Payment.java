@@ -53,6 +53,10 @@ public class Payment extends TenantScopedEntity {
 
     private String receiptNo;
 
+    /** Part of the payment beyond the invoice balance, held as credit (BP-06 exception: overpayment). */
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal unallocatedAmount = BigDecimal.ZERO;
+
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

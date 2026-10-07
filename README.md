@@ -2,7 +2,7 @@
 
 **Msingi Technologies Ltd** · One platform from application to graduation for NACTVET‑registered institutions.
 
-This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over**), as specified in `docs/` (Documents 01–07).
+This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over, Fees**), as specified in `docs/` (Documents 01–07).
 
 | Area | Delivered in this slice |
 |---|---|
@@ -13,6 +13,7 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 | NACTVET verification and offers (BP-04) | Pre-validation, submission by API or NACTVET-template file, outcome fetch or file import (all-or-nothing), query resolution and resubmission, offers with a deadline, acceptance with NACTVET confirmation code for multiple admissions (attempt-limited), decline, automatic lapse, released places re-filled by the next round |
 | Admission letters (FR-ADM-13, BP-16) | Joining instructions per window; PDF letter + joining instructions issued automatically on acceptance (or in bulk), QR code and 16-character verification code, public `/verify` page (rate-limited, minimal personal data), corrected editions (old code verifies as superseded), revocation, frozen snapshot so reprints match what was issued |
 | Registration hand-over (BP-05, FR-REG-01/02) | Accepted applicants become students without re-entering data; registration numbers from a configurable pattern (never changed, never reused — enforced by the database); student account sign-in; first registration at reporting (originals checklist from the joining instructions, Registry approval → ACTIVE); student register with search, statistics and class-list CSV |
+| Fees (BP-06, FR-FIN-01 to 04, 06, 12) | Fee items (GFS codes, allocation priority); fee structures per programme and year of study with local/foreign amounts and instalments, prepared by the Accountant and approved by the Bursar (segregation of duties), versioned; annual invoice with control number on offer acceptance, billing runs (duplicate-safe), invoice moves to the student at hand-over; payments allocated to items in order, overpayment held as credit; clearance rules (registration enforced at first registration); statements, collections and debtor ageing with CSV |
 | Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
 
@@ -29,11 +30,11 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     academic/      years, intakes, departments, programmes
     admission/     windows, applicants, applications, eligibility engine
     registry/      students, registration numbers, hand-over, first registration
-    finance/       invoices, control numbers, payments, GePG
+    finance/       fees, billing, invoices, control numbers, payments, GePG, clearance, reports
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V9 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students)
+  src/main/resources/db/migration/   V1–V10 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -110,6 +111,7 @@ npm run dev          # http://localhost:5173 (proxies /api to 127.0.0.1:8085; ov
 | Staff — administrator / approver | `admin` / `Admin@2026` |
 | Staff — admissions officer | `admissions` / `Admissions@2026` |
 | Staff — registry officer | `registry` / `Registry@2026` |
+| Staff — bursar / accountant | `bursar` / `Bursar@2026`, `accountant` / `Accountant@2026` |
 | Open window | 2027/2028 September Intake, fee TZS 10,000, four programmes |
 | Staff back-office | http://localhost:5173/staff |
 
@@ -151,6 +153,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `VerificationIT`, `SimulatedNactvetGatewayTest`, `CsvTest` — NACTVET submission by API and file, outcomes, queries, offers, multiple-admission confirmation and lock-out, lapse, released places, access rules;
 - `LetterIT`, `AdmissionLetterRendererTest`, `RateLimiterTest` — letter issued on acceptance, PDF content and QR code decoded from the rendered page, public verification, reissue/revoke, access rules, escaping;
 - `RegistryIT`, `RegistrationNumberPatternTest` — hand-over, numbering patterns, numbers skipped when already taken, database refusal to change or delete, first registration, class list, isolation;
+- `FeesIT`, `PaymentAllocatorTest` — Bursar approval and versions, billing on acceptance and in runs, foreign rates, allocation and credit, registration clearance, reports, privacy;
 - `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
@@ -193,7 +196,7 @@ Production notes: connect the application with a role that is **not** a superuse
 | SMS | `LoggingSmsSender` (log only) | SMS aggregator adapter with delivery reports |
 | NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |
 | Letters | HTML template (`templates/admission-letter.html`) → PDF | Per-institution letter templates and logo upload; email delivery |
-| First-year invoice | `OfferAcceptedEvent` published on acceptance | Fee structures and invoice on acceptance (BP-06) |
+| Reconciliation | Payments posted from the signed GePG callback | Daily GePG reconciliation file import and exception handling (FR-FIN-05); instalment plans, waivers, sponsors and refunds (R3) |
 | Registration | Hand-over and first registration | Semester and module registration with financial clearance (needs curricula and fees), NACTVET student registration (FR-REG-07), ID cards, status changes (BP-14) |
 | Identity | Local JWT issuer | Keycloak realm per institution, MFA for privileged roles |
 

@@ -83,6 +83,14 @@ const en = {
     issued: 'Issued', reporting: 'Reporting date', nactvet: 'NACTVET verification number', institution: 'Institution', edition: 'edition {{n}}',
     privacy: 'Only the details needed to confirm the document are shown.',
   },
+  fees: {
+    title: 'Fees for {{year}}', total: 'Total for the year', paid: 'Paid', balance: 'Balance', due: 'Due by {{date}}',
+    firstInstalment: 'Pay at least the first instalment ({{amount}}) before you report: registration needs it.',
+    controlNo: 'Control number', getControlNo: 'Get control number', payWith: 'Pay through your bank or mobile money (M-Pesa, Tigo Pesa, Airtel Money, HaloPesa) using this control number. You can pay in parts.',
+    paidInFull: 'Paid in full. Thank you!', credit: 'Credit on your account: {{amount}}', simulateAll: 'Simulate paying all (development)',
+    simulateFirst: 'Simulate paying the first instalment (development)', receipts: 'Payments', receipt: 'Receipt',
+    preparing: 'Your fees invoice will appear here once the fee structure for your programme is approved.',
+  },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
 
@@ -166,6 +174,14 @@ const sw: typeof en = {
     holder: 'Jina', programme: 'Programu', award: 'Tuzo', intake: 'Mwaka wa masomo na muhula', letterNo: 'Namba ya barua',
     issued: 'Imetolewa', reporting: 'Tarehe ya kuripoti', nactvet: 'Namba ya uthibitisho ya NACTVET', institution: 'Taasisi', edition: 'toleo {{n}}',
     privacy: 'Ni taarifa zinazohitajika kuthibitisha hati pekee ndizo zinazoonyeshwa.',
+  },
+  fees: {
+    title: 'Ada za {{year}}', total: 'Jumla ya mwaka', paid: 'Imelipwa', balance: 'Salio', due: 'Inatakiwa kabla ya {{date}}',
+    firstInstalment: 'Lipa angalau awamu ya kwanza ({{amount}}) kabla ya kuripoti: usajili unaihitaji.',
+    controlNo: 'Namba ya malipo', getControlNo: 'Pata namba ya malipo', payWith: 'Lipa kupitia benki au simu (M-Pesa, Tigo Pesa, Airtel Money, HaloPesa) ukitumia namba hii ya malipo. Unaweza kulipa kwa awamu.',
+    paidInFull: 'Umelipa yote. Asante!', credit: 'Salio la ziada kwenye akaunti yako: {{amount}}', simulateAll: 'Iga kulipa yote (majaribio)',
+    simulateFirst: 'Iga kulipa awamu ya kwanza (majaribio)', receipts: 'Malipo', receipt: 'Stakabadhi',
+    preparing: 'Ankara ya ada zako itaonekana hapa muundo wa ada wa programu yako utakapoidhinishwa.',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };

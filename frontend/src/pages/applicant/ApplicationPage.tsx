@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
-import type { AdmissionWindow, Application, Profile, Qualification } from '../../api/types';
+import type { AdmissionWindow, Application, Profile, Qualification, Statement } from '../../api/types';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import { DetailsStep, FeeStep, ProgrammesStep, ResultsStep, ReviewStep } from './steps';
 
@@ -159,6 +159,7 @@ function Outcome({ app }: { app: Application }) {
           </Alert>
         )}
         <LetterDownload app={app} />
+        <FeesCard />
       </>;
     case 'DECLINED':
       return block(t('offer.declinedTitle'), t('offer.declinedText'), programme);
@@ -172,6 +173,70 @@ function Outcome({ app }: { app: Application }) {
     default:
       return block(t('app.submitted'), t('app.submittedText'));
   }
+}
+
+const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
+
+/** BP-06: the year's fees with the GePG control number; the first instalment is needed for registration. */
+function FeesCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const account = useQuery({ queryKey: ['applicant', 'account'], queryFn: () => api<Statement>('/api/applicant/account', { realm: 'applicant' }) });
+  const refresh = (st: Statement) => qc.setQueryData(['applicant', 'account'], st);
+  const getCn = useMutation({ mutationFn: (id: number) => api<Statement>(`/api/applicant/invoices/${id}/control-number`, { method: 'POST', realm: 'applicant' }), onSuccess: refresh });
+  const simulate = useMutation({
+    mutationFn: ({ id, amount }: { id: number; amount?: number }) => api<Statement>(`/api/applicant/invoices/${id}/simulate-payment`, { method: 'POST', realm: 'applicant', body: amount ? { amount } : {} }),
+    onSuccess: refresh,
+  });
+  if (account.isLoading) return null;
+  const inv = account.data?.invoices.find((i) => i.purpose === 'ANNUAL_FEES');
+  if (!inv) return <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }}>{t('fees.preparing')}</Alert>;
+  const year = inv.description.match(/\d{4}\/\d{4}/)?.[0] ?? '';
+  const firstDue = inv.lines.filter((l) => l.instalment === 1).reduce((x, l) => x + l.balance, 0);
+  const firstTotal = inv.lines.filter((l) => l.instalment === 1).reduce((x, l) => x + l.amount, 0);
+  return (
+    <Card variant="outlined" sx={{ mt: 3, textAlign: 'left', borderRadius: 2 }}>
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">{t('fees.title', { year })}</Typography>
+          <Chip size="small" color={statusColour(inv.status)} label={humanise(inv.status)} />
+        </Stack>
+        <Stack direction="row" spacing={3} sx={{ mb: 1.5 }} useFlexGap flexWrap="wrap">
+          <Box><Typography variant="caption" color="text.secondary">{t('fees.total')}</Typography><Typography sx={{ fontWeight: 700 }}>{formatTzs(inv.total)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">{t('fees.paid')}</Typography><Typography sx={{ fontWeight: 700 }}>{formatTzs(inv.paid)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">{t('fees.balance')}</Typography><Typography sx={{ fontWeight: 700 }}>{formatTzs(inv.balance)}</Typography></Box>
+        </Stack>
+        {inv.balance <= 0 ? <Alert severity="success">{t('fees.paidInFull')}</Alert> : (
+          <>
+            {firstDue > 0 && <Alert severity="warning" sx={{ mb: 1.5 }}>{t('fees.firstInstalment', { amount: formatTzs(firstTotal) })}{inv.dueDate && <> {t('fees.due', { date: formatDate(inv.dueDate) })}.</>}</Alert>}
+            {inv.controlNo ? (
+              <Box>
+                <Typography variant="caption" color="text.secondary">{t('fees.controlNo')}</Typography>
+                <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
+                <Typography variant="body2" color="text.secondary">{t('fees.payWith')}</Typography>
+              </Box>
+            ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{t('fees.getControlNo')}</Button>}
+            {SHOW_DEV_TOOLS && (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>
+                {firstDue > 0 && <Button size="small" color="warning" variant="outlined" disabled={simulate.isPending} onClick={() => simulate.mutate({ id: inv.id, amount: firstDue })}>{t('fees.simulateFirst')}</Button>}
+                <Button size="small" color="warning" variant="outlined" disabled={simulate.isPending} onClick={() => simulate.mutate({ id: inv.id })}>{t('fees.simulateAll')}</Button>
+              </Stack>
+            )}
+          </>
+        )}
+        {(account.data?.credit ?? 0) > 0 && <Typography variant="body2" sx={{ mt: 1 }}>{t('fees.credit', { amount: formatTzs(account.data!.credit) })}</Typography>}
+        {!!account.data?.payments.length && (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="subtitle2">{t('fees.receipts')}</Typography>
+            {account.data.payments.filter((p) => p.invoiceNo === inv.invoiceNo).map((p) => (
+              <Typography key={p.receiptNo} variant="body2" color="text.secondary">{formatDate(p.paidAt)} · {formatTzs(p.amount)} · {t('fees.receipt')} {p.receiptNo}</Typography>
+            ))}
+          </Box>
+        )}
+        <ErrorAlert error={getCn.error ?? simulate.error} />
+      </CardContent>
+    </Card>
+  );
 }
 
 /** FR-ADM-13: the admission letter with joining instructions, once issued. */
