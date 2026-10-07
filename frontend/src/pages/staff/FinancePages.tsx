@@ -16,10 +16,11 @@ import type {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import ReconciliationTab from './ReconciliationTab';
 
 const staff = { realm: 'staff' as const };
 const CATEGORIES = ['TUITION', 'REGISTRATION', 'EXAMINATION', 'ACCOMMODATION', 'CAUTION', 'STUDENT_UNION', 'OTHER'];
-type TabKey = 'structures' | 'items' | 'gates' | 'collections' | 'debtors';
+type TabKey = 'structures' | 'items' | 'gates' | 'collections' | 'debtors' | 'reconciliation';
 
 function useRoles() {
   const { user } = useSession();
@@ -33,21 +34,24 @@ function useRoles() {
 /** Bursar's office (BP-06): fee structures, items, clearance rules, collections and debtors. */
 export default function FinancePage() {
   const [tab, setTab] = useState<TabKey>('structures');
+  const { canEdit, isBursar } = useRoles();
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Fees" subtitle="Fee structures approved by the Bursar, billing through GePG, clearance rules and collection reports." />
+      <PageTitle title="Fees" subtitle="Fee structures approved by the Bursar, billing through GePG, clearance rules, collection reports and daily GePG reconciliation." />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }}>
         <Tab value="structures" label="Fee structures" />
         <Tab value="items" label="Fee items" />
         <Tab value="gates" label="Clearance rules" />
         <Tab value="collections" label="Collections" />
         <Tab value="debtors" label="Debtors" />
+        <Tab value="reconciliation" label="GePG reconciliation" />
       </Tabs>
       {tab === 'structures' && <StructuresTab />}
       {tab === 'items' && <ItemsTab />}
       {tab === 'gates' && <GatesTab />}
       {tab === 'collections' && <CollectionsTab />}
       {tab === 'debtors' && <DebtorsTab />}
+      {tab === 'reconciliation' && <ReconciliationTab canWork={canEdit} isBursar={isBursar} />}
     </Container>
   );
 }

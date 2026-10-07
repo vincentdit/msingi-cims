@@ -2,7 +2,7 @@
 
 **Msingi Technologies Ltd** · One platform from application to graduation for NACTVET‑registered institutions.
 
-This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over, Fees**), as specified in `docs/` (Documents 01–07).
+This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over, Fees, GePG reconciliation**), as specified in `docs/` (Documents 01–07).
 
 | Area | Delivered in this slice |
 |---|---|
@@ -14,6 +14,7 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 | Admission letters (FR-ADM-13, BP-16) | Joining instructions per window; PDF letter + joining instructions issued automatically on acceptance (or in bulk), QR code and 16-character verification code, public `/verify` page (rate-limited, minimal personal data), corrected editions (old code verifies as superseded), revocation, frozen snapshot so reprints match what was issued |
 | Registration hand-over (BP-05, FR-REG-01/02) | Accepted applicants become students without re-entering data; registration numbers from a configurable pattern (never changed, never reused — enforced by the database); student account sign-in; first registration at reporting (originals checklist from the joining instructions, Registry approval → ACTIVE); student register with search, statistics and class-list CSV |
 | Fees (BP-06, FR-FIN-01 to 04, 06, 12) | Fee items (GFS codes, allocation priority); fee structures per programme and year of study with local/foreign amounts and instalments, prepared by the Accountant and approved by the Bursar (segregation of duties), versioned; annual invoice with control number on offer acceptance, billing runs (duplicate-safe), invoice moves to the student at hand-over; payments allocated to items in order, overpayment held as credit; clearance rules (registration enforced at first registration); statements, collections and debtor ageing with CSV |
+| GePG reconciliation (FR-FIN-05, BP-06 steps 6–7) | Daily import of GePG's reconciliation file (CSV, all-or-nothing validation), matched by GePG receipt number; exceptions: not received by CIMS (posted from the file with receipt and allocation), not in GePG's file (settles itself if a later file has it), amount differs, repeated line, unknown bill; each exception explained with name and time; day closed only with no open exceptions; month view and the Bursar's monthly sign-off once every day with collections is closed; CIMS payments of a day downloadable in GePG's layout |
 | Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
 
@@ -34,7 +35,7 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V10 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees)
+  src/main/resources/db/migration/   V1–V11 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -154,6 +155,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `LetterIT`, `AdmissionLetterRendererTest`, `RateLimiterTest` — letter issued on acceptance, PDF content and QR code decoded from the rendered page, public verification, reissue/revoke, access rules, escaping;
 - `RegistryIT`, `RegistrationNumberPatternTest` — hand-over, numbering patterns, numbers skipped when already taken, database refusal to change or delete, first registration, class list, isolation;
 - `FeesIT`, `PaymentAllocatorTest` — Bursar approval and versions, billing on acceptance and in runs, foreign rates, allocation and credit, registration clearance, reports, privacy;
+- `ReconciliationIT` — every exception kind, posting a missed payment, close and re-import rules, a payment matched on a later day, monthly sign-off, invalid files, roles and isolation;
 - `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
@@ -192,11 +194,11 @@ Production notes: connect the application with a role that is **not** a superuse
 | Component | Now | Next |
 |---|---|---|
 | NECTA | `SimulatedNectaClient` | Live NECTA results API adapter |
-| GePG | `SimulatedGepgGateway`, HMAC-signed callback | Live adapter: signed bill submission and RSA signature verification per the GePG specification, daily reconciliation |
+| GePG | `SimulatedGepgGateway`, HMAC-signed callback; daily reconciliation by file import | Live adapter: signed bill submission and RSA signature verification per the GePG specification; fetching the reconciliation file through GePG's API on a schedule |
 | SMS | `LoggingSmsSender` (log only) | SMS aggregator adapter with delivery reports |
 | NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |
 | Letters | HTML template (`templates/admission-letter.html`) → PDF | Per-institution letter templates and logo upload; email delivery |
-| Reconciliation | Payments posted from the signed GePG callback | Daily GePG reconciliation file import and exception handling (FR-FIN-05); instalment plans, waivers, sponsors and refunds (R3) |
+| Reconciliation | Daily GePG file import, exception handling, day close and Bursar sign-off (FR-FIN-05) | Bank statement reconciliation; instalment plans, waivers, sponsors and refunds (R3) |
 | Registration | Hand-over and first registration | Semester and module registration with financial clearance (needs curricula and fees), NACTVET student registration (FR-REG-07), ID cards, status changes (BP-14) |
 | Identity | Local JWT issuer | Keycloak realm per institution, MFA for privileged roles |
 

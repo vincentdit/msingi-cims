@@ -40,6 +40,8 @@ public final class FinanceRepositories {
     public interface PaymentRepository extends JpaRepository<Payment, Long> {
         boolean existsByGepgReceiptNo(String gepgReceiptNo);
 
+        Optional<Payment> findByGepgReceiptNo(String gepgReceiptNo);
+
         List<Payment> findByInvoiceIdOrderByPaidAtAsc(Long invoiceId);
 
         List<Payment> findByInvoiceIdInOrderByPaidAtAsc(java.util.Collection<Long> invoiceIds);

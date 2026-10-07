@@ -632,3 +632,24 @@ export interface DebtorsReport {
   rows: { invoiceId: number; invoiceNo: string; payerType: string; payerName: string; registrationNo?: string; phone?: string; description: string;
     total: number; paid: number; balance: number; dueDate?: string; daysOverdue: number; bucket: string }[];
 }
+
+export interface ReconciliationItem {
+  id: number; lineNo?: number; kind: string; status: 'MATCHED' | 'OPEN' | 'RESOLVED';
+  gepgReceiptNo?: string; billId?: string; controlNo?: string; pspName?: string; pspReceiptNo?: string; channel?: string; payerPhone?: string;
+  gepgAmount?: number; cimsAmount?: number; paidAt?: string; paymentId?: number; paidDateDiffers: boolean;
+  resolution?: string; note?: string; resolvedAt?: string; resolvedByName?: string; payerName?: string; receiptNo?: string;
+}
+
+export interface Reconciliation {
+  id: number; date: string; source: string; fileName?: string; status: 'OPEN' | 'CLOSED';
+  gepgCount: number; gepgTotal: number; cimsCount: number; cimsTotal: number; matchedCount: number; exceptionCount: number;
+  openExceptions: number; matchRate?: number; importedAt: string; importedByName: string; closedAt?: string; closedByName?: string;
+  items: ReconciliationItem[];
+}
+
+export interface ReconciliationMonth {
+  month: string; collected: number; payments: number; daysWithPayments: number; daysClosed: number; monthEnded: boolean;
+  canSignOff: boolean; signOffBlocker?: string; signedAt?: string; signedByName?: string; signOffNote?: string;
+  days: { date: string; cimsCount: number; cimsTotal: number; reconciliationId?: number; status?: 'OPEN' | 'CLOSED';
+    exceptionCount?: number; openExceptions?: number; matchedCount?: number; gepgCount?: number }[];
+}
