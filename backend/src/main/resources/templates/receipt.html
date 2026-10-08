@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<!--
+  Electronic receipt for a GePG payment (FR-FIN-04).
+  Double braces insert an escaped value; triple braces insert markup built by ReceiptRenderer from escaped values.
+  Must stay well-formed XHTML (parsed as XML). CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Receipt {{receiptNo}}</title>
+<style>
+  @page {
+    size: A5;
+    margin: 12mm 12mm 14mm 12mm;
+    @bottom-center { content: "Electronic receipt issued by CIMS. Payment confirmed by GePG receipt {{gepgReceiptNo}}."; font-family: Helvetica, Arial, sans-serif; font-size: 6.5pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1f2937; line-height: 1.35; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2pt solid {{primaryColor}}; }
+  .head td { vertical-align: middle; padding-bottom: 6pt; }
+  .badge { width: 34pt; height: 34pt; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 10pt; text-align: center; line-height: 34pt; border-radius: 17pt; }
+  .inst { font-size: 12pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; }
+  .small { font-size: 7.5pt; }
+  h1 { font-size: 13pt; letter-spacing: 1pt; margin: 10pt 0 2pt 0; color: {{primaryColor}}; }
+  table.kv { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+  table.kv th { text-align: left; width: 36%; color: #4b5563; font-weight: normal; padding: 2.5pt 0; vertical-align: top; }
+  table.kv td { padding: 2.5pt 0; font-weight: bold; }
+  .amount { margin: 10pt 0 4pt 0; border: 0.8pt solid #d1d5db; background: #f9fafb; padding: 7pt 8pt; }
+  .figure { font-size: 16pt; font-weight: bold; color: #111827; }
+  .words { font-style: italic; color: #374151; margin-top: 2pt; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+  table.lines th { text-align: left; background: #f3f4f6; color: #4b5563; font-weight: normal; padding: 3pt 5pt; border: 0.6pt solid #e5e7eb; }
+  table.lines td { padding: 3pt 5pt; border: 0.6pt solid #e5e7eb; }
+  .r { text-align: right; }
+  h3 { font-size: 9pt; margin: 10pt 0 0 0; }
+</style>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td style="width: 42pt;"><div class="badge">{{institutionShortName}}</div></td>
+    <td>
+      <div class="inst">{{institutionName}}</div>
+      <div class="muted small">{{contactLine}}</div>
+    </td>
+  </tr>
+</table>
+
+<h1>RECEIPT</h1>
+<div class="muted">No. <strong>{{receiptNo}}</strong> · {{paidAt}}</div>
+
+<table class="kv">
+  <tr><th>Received from</th><td>{{payerName}}</td></tr>
+  {{{registrationRow}}}
+  <tr><th>For invoice</th><td>{{invoiceNo}} · {{invoiceDescription}}</td></tr>
+  <tr><th>Control number</th><td>{{controlNo}}</td></tr>
+  <tr><th>Paid through</th><td>{{paidThrough}}</td></tr>
+  <tr><th>GePG receipt</th><td>{{gepgReceiptNo}}</td></tr>
+</table>
+
+<div class="amount">
+  <div class="muted small">Amount received</div>
+  <div class="figure">{{amount}}</div>
+  <div class="words">{{amountInWords}}</div>
+</div>
+
+<h3>Applied to</h3>
+<table class="lines">
+  <tr><th>Item</th><th class="r">Amount</th></tr>
+  {{{allocationRows}}}
+</table>
+
+<p class="muted small" style="margin-top: 10pt;">Balance on this invoice after this payment: <strong>{{invoiceBalance}}</strong>. Keep this receipt for your records.</p>
+</body>
+</html>

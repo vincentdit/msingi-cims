@@ -22,6 +22,14 @@ public final class FinanceRepositories {
                 select i from Invoice i where i.purpose = :purpose and i.status in ('ISSUED', 'PARTIALLY_PAID')
                   and (:academicYearId is null or i.academicYearId = :academicYearId)""")
         List<Invoice> openByPurpose(String purpose, Long academicYearId);
+
+        /** Outstanding balance per student (all live invoices). */
+        @org.springframework.data.jpa.repository.Query("""
+                select i.payerId, sum(i.totalAmount - i.paidAmount) from Invoice i
+                where i.payerType = tz.co.msingi.cims.finance.domain.Invoice.PayerType.STUDENT
+                  and i.status not in (tz.co.msingi.cims.finance.domain.Invoice.Status.CANCELLED, tz.co.msingi.cims.finance.domain.Invoice.Status.CREDITED)
+                group by i.payerId""")
+        List<Object[]> studentBalances();
     }
 
     public interface ControlNumberRepository extends JpaRepository<ControlNumber, Long> {
@@ -41,6 +49,8 @@ public final class FinanceRepositories {
         boolean existsByGepgReceiptNo(String gepgReceiptNo);
 
         Optional<Payment> findByGepgReceiptNo(String gepgReceiptNo);
+
+        Optional<Payment> findByReceiptNo(String receiptNo);
 
         List<Payment> findByInvoiceIdOrderByPaidAtAsc(Long invoiceId);
 

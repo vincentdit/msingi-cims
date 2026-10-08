@@ -28,3 +28,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Installable app (FR-STU-01): the service worker is registered in production builds only, so development always runs fresh code.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* the portal works without it */ });
+  });
+}

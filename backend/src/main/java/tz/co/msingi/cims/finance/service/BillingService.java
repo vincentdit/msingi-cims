@@ -19,7 +19,7 @@ import tz.co.msingi.cims.finance.domain.PaymentAllocation;
 import tz.co.msingi.cims.finance.domain.PaymentAllocator;
 import tz.co.msingi.cims.finance.gepg.GepgGateway;
 import tz.co.msingi.cims.finance.gepg.GepgProperties;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
@@ -45,7 +45,7 @@ public class BillingService {
     private final NumberSequenceService sequences;
     private final ApplicationEventPublisher events;
     private final AuditService audit;
-    private final SmsSender sms;
+    private final Messaging messaging;
 
     public record NewInvoice(Invoice.PayerType payerType, Long payerId, String payerName, String payerPhone, String payerEmail,
                              String purpose, Long referenceId, String description, List<Line> lines,
@@ -118,8 +118,8 @@ public class BillingService {
             cn.setStatus(ControlNumber.Status.ACTIVE);
             cn.setIssuedAt(OffsetDateTime.now());
             if (inv.getPayerPhone() != null) {
-                sms.send(inv.getPayerPhone(), "Control number " + resp.controlNo() + " for TZS " + inv.balance().toPlainString()
-                        + " (" + inv.getDescription() + "). Pay via bank or mobile money.");
+                messaging.event("CONTROL_NUMBER", inv.getPayerPhone(), Map.of("controlNo", resp.controlNo(), "amount", inv.balance(),
+                        "description", inv.getDescription()));
             }
         } else if (resp.errorMessage() != null) {
             cn.setStatus(ControlNumber.Status.FAILED);
@@ -187,7 +187,7 @@ public class BillingService {
                         "credit", allocation.unallocated()));
         events.publishEvent(new PaymentPostedEvent(inv.getId(), inv.getPayerType().name(), inv.getPayerId(), p.getId()));
         if (inv.getPayerPhone() != null) {
-            sms.send(inv.getPayerPhone(), "Payment of TZS " + n.amount().toPlainString() + " received. Receipt " + p.getReceiptNo() + ".");
+            messaging.event("PAYMENT_RECEIVED", inv.getPayerPhone(), Map.of("amount", n.amount(), "receiptNo", p.getReceiptNo()));
         }
         if (fullyPaid) {
             events.publishEvent(new InvoicePaidEvent(inv.getId(), inv.getPurpose(), inv.getReferenceId()));

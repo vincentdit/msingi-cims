@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -27,7 +27,7 @@ public class OtpService {
 
     private final OtpCodeRepository repository;
     private final PasswordEncoder encoder;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final OtpProperties props;
     private final SecureRandom random = new SecureRandom();
 
@@ -42,8 +42,7 @@ public class OtpService {
         otp.setCodeHash(encoder.encode(code));
         otp.setExpiresAt(OffsetDateTime.now().plus(props.ttl()));
         repository.save(otp);
-        sms.send(user.getPhone(), code + " is your " + institutionName + " verification code. It expires in "
-                + props.ttl().toMinutes() + " minutes. Do not share it.");
+        messaging.securityCode(user.getPhone(), code, java.util.Map.of("institution", institutionName, "minutes", props.ttl().toMinutes()));
         return code;
     }
 

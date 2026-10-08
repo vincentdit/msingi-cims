@@ -653,3 +653,79 @@ export interface ReconciliationMonth {
   days: { date: string; cimsCount: number; cimsTotal: number; reconciliationId?: number; status?: 'OPEN' | 'CLOSED';
     exceptionCount?: number; openExceptions?: number; matchedCount?: number; gepgCount?: number }[];
 }
+
+// ------------------------------------------------------------------ student portal (FR-STU-01/02, FR-REG-08)
+
+export interface StudentNotice {
+  id: number; title: string; body: string; category: string; pinned: boolean; publishAt: string; publishedByName?: string; read: boolean;
+}
+
+export interface ChangeRequest {
+  id: number; studentId: number; registrationNo: string; studentName: string; programmeName: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  changes: { field: string; label: string; from?: string; to?: string }[];
+  reason: string; needsDocuments: boolean; submittedAt: string; decidedAt?: string; decidedByName?: string; decisionNote?: string;
+}
+
+export interface StudentDashboard {
+  institutionName: string; registrationNo: string; fullName: string; firstName: string; programmeName: string; awardName: string;
+  yearOfStudy: number; academicYear: string; status: string; firstRegistrationStatus?: string;
+  billed: number; paid: number; balance: number; credit: number;
+  nextPayment?: { invoiceId: number; invoiceNo: string; description: string; balance: number; dueDate?: string; controlNo?: string };
+  clearance: Clearance[]; unreadNotices: number; latestNotices: StudentNotice[]; pendingRequest?: ChangeRequest;
+}
+
+export interface StudentProfile {
+  registrationNo: string; firstName: string; middleName?: string; surname: string; sex: string; dateOfBirth: string; nationality: string;
+  phone: string; email?: string; region?: string; district?: string; postalAddress?: string; disability?: string;
+  nextOfKinName?: string; nextOfKinPhone?: string; nextOfKinRelation?: string;
+  programmeName: string; programmeCode: string; awardName: string; academicYear: string; intake: string; yearOfStudy: number; status: string;
+  nactvetVerificationNo?: string; admissionLetterNo?: string;
+  editableFields: Record<string, string>; requests: ChangeRequest[];
+}
+
+export interface StaffNotice {
+  id: number; title: string; body: string; category: string; programmeId?: number; programmeName?: string; yearOfStudy?: number;
+  audience: string; pinned: boolean; status: 'DRAFT' | 'PUBLISHED' | 'WITHDRAWN'; publishAt?: string; expiresAt?: string; live: boolean;
+  smsSentCount: number; audienceCount: number; readCount: number; createdByName: string; publishedByName?: string;
+  withdrawnAt?: string; withdrawnByName?: string; createdAt: string;
+}
+
+// ------------------------------------------------------------------ messaging (FR-COM-01 to 03)
+
+export interface CountRow { key: string; messages: number; parts: number }
+
+export interface MessagingOverview {
+  defaultLanguage: 'EN' | 'SW'; senderId?: string; pricePerSms: number; lowBalanceWarning: number; purchased: number; used: number;
+  balance: number; lowBalance: boolean; thisMonthByStatus: CountRow[]; thisMonthByKind: CountRow[]; thisMonthCost: number;
+  deliveryRate?: number; topups: { id: number; units: number; amountPaid: number; reference: string; recordedAt: string; recordedByName: string }[];
+  gatewayMode: string;
+}
+
+export interface MessageTemplateView {
+  code: string; name: string; when: string; group: string; variables: string[]; required: string[]; bodyEn: string; bodySw: string;
+  enabled: boolean; customised: boolean; defaultEn: string; defaultSw: string; sampleEn: string; sampleSw: string; partsEn: number;
+  partsSw: number; updatedByName?: string; updatedAt?: string;
+}
+
+export interface AudienceFilter {
+  group: 'STUDENTS' | 'APPLICANTS' | 'PHONES'; studentStatuses?: string[]; programmeId?: number | null; yearOfStudy?: number | null;
+  withFeeBalance?: boolean; windowId?: number | null; applicationStatuses?: string[]; phones?: string;
+}
+
+export interface CampaignPreview {
+  audienceLabel: string; recipients: number; skippedNoPhone: number; skippedDuplicates: number; invalidPhones: string[]; placeholders: string[];
+  samples: { name?: string; phone: string; text: string; parts: number; encoding: string }[]; totalParts: number; pricePerSms: number;
+  estimatedCost: number; balance: number; enoughBalance: boolean; unicode: boolean;
+}
+
+export interface CampaignView {
+  id: number; title: string; body: string; audienceLabel: string; recipients: number; smsParts: number; estimatedCost: number;
+  sentAt: string; sentByName: string; byStatus: Record<string, number>;
+}
+
+export interface MessageView {
+  id: number; phone: string; recipientName?: string; kind: string; templateCode?: string; campaignId?: number; language: string; body: string;
+  parts: number; encoding: string; status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED'; attempts: number; error?: string; queuedAt: string;
+  sentAt?: string; deliveredAt?: string;
+}

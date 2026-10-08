@@ -14,7 +14,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SimulatedNactvetGatewayTest {
 
     final List<String> sent = new ArrayList<>();
-    final SimulatedNactvetGateway gateway = new SimulatedNactvetGateway((phone, message) -> sent.add(phone + ": " + message));
+    final SimulatedNactvetGateway gateway = new SimulatedNactvetGateway((phone, message, sender, ref) -> {
+        sent.add(phone + ": " + message);
+        return new tz.co.msingi.cims.notification.SmsGateway.Result(true, "x", null, null);
+    });
 
     @Test
     void outcomeDependsOnTheLastDigitOfTheIndexNumber() {

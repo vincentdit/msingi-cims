@@ -15,7 +15,7 @@ import tz.co.msingi.cims.admission.service.ApplicantProfileService;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
@@ -50,7 +50,7 @@ public class OfferService {
     private final ApplicantProfileService profiles;
     private final TenantRepository tenants;
     private final NactvetGateway nactvet;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final AuditService audit;
     private final ApplicationEventPublisher events;
 
@@ -65,12 +65,8 @@ public class OfferService {
         app.setOfferIssuedAt(now);
         app.setOfferExpiresAt(deadline(now, app.getWindow().getOfferAcceptanceDays()));
         app.setConfirmationAttempts((short) 0);
-        String msg = "Congratulations! NACTVET has verified your admission to " + programme(app) + " at " + institutionName
-                + ". Log in to accept your offer by " + DATE.format(app.getOfferExpiresAt().atZoneSameInstant(ZONE)) + ".";
-        if (multipleAdmission) {
-            msg += " You were admitted by more than one institution: use the confirmation code NACTVET sent you.";
-        }
-        sms.send(app.getApplicant().getPhone(), msg);
+        messaging.event(multipleAdmission ? "OFFER_MADE_MULTIPLE" : "OFFER_MADE", app.getApplicant().getPhone(), Map.of("programme", programme(app),
+                "institution", institutionName, "deadline", app.getOfferExpiresAt()));
     }
 
     /** The offer runs until the end of the day, East Africa Time, {@code days} days from now. */
@@ -114,8 +110,7 @@ public class OfferService {
         app.setStatus(Status.ACCEPTED);
         app.setOfferRespondedAt(now);
         audit.record("OFFER_ACCEPTED", "Application", app.getId(), Map.of("multipleAdmission", app.isMultipleAdmission()));
-        sms.send(app.getApplicant().getPhone(), "You have accepted your admission to " + programme(app) + " at "
-                + currentTenant().getName() + ". Your admission letter and joining instructions will be available in the portal.");
+        messaging.event("OFFER_ACCEPTED", app.getApplicant().getPhone(), Map.of("programme", programme(app), "institution", currentTenant().getName()));
         events.publishEvent(new OfferAcceptedEvent(app.getTenantId(), app.getId(), app.getApplicant().getId(),
                 app.getSelectedWindowProgramme().getId()));
     }
@@ -128,8 +123,7 @@ public class OfferService {
         app.setOfferDeclineReason(reason == null || reason.isBlank() ? null : reason.trim());
         audit.record("OFFER_DECLINED", "Application", app.getId(),
                 Map.of("reason", app.getOfferDeclineReason() == null ? "" : app.getOfferDeclineReason()));
-        sms.send(app.getApplicant().getPhone(), "You have declined your admission offer to " + programme(app)
-                + ". Thank you for letting us know.");
+        messaging.event("OFFER_DECLINED", app.getApplicant().getPhone(), Map.of("programme", programme(app)));
     }
 
     /** Closes offers whose deadline has passed in the current institution; returns how many lapsed. */
@@ -139,8 +133,7 @@ public class OfferService {
         for (Application app : expired) {
             app.setStatus(Status.OFFER_LAPSED);
             audit.recordAs(null, "System", "OFFER_LAPSED", "Application", app.getId(), Map.of("expiredAt", app.getOfferExpiresAt().toString()));
-            sms.send(app.getApplicant().getPhone(), "Your admission offer to " + programme(app)
-                    + " has lapsed because it was not accepted by the deadline. Contact the admissions office if you need help.");
+            messaging.event("OFFER_LAPSED", app.getApplicant().getPhone(), Map.of("programme", programme(app)));
         }
         if (!expired.isEmpty()) {
             log.info("Closed {} expired admission offer(s)", expired.size());

@@ -16,7 +16,7 @@ import tz.co.msingi.cims.admission.domain.Application;
 import tz.co.msingi.cims.admission.service.ApplicantProfileService;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
@@ -57,7 +57,7 @@ public class AdmissionLetterService {
     private final TenantRepository tenants;
     private final TenantDomainRepository domains;
     private final NumberSequenceService sequences;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final AuditService audit;
     private final ObjectMapper json;
 
@@ -175,8 +175,7 @@ public class AdmissionLetterService {
         audit.record(edition == 1 ? "ADMISSION_LETTER_ISSUED" : "ADMISSION_LETTER_REISSUED", "AdmissionLetter", l.getId(),
                 reissueReason == null ? Map.of("letterNo", letterNo, "edition", edition)
                         : Map.of("letterNo", letterNo, "edition", edition, "reason", reissueReason));
-        sms.send(ap.getPhone(), (edition == 1 ? "Your admission letter" : "A corrected admission letter") + " for " + p.getName()
-                + " is ready. Download it with the joining instructions from the admission portal. Verification code: " + code);
+        messaging.event(edition == 1 ? "LETTER_ISSUED" : "LETTER_REISSUED", ap.getPhone(), Map.of("programme", p.getName(), "verificationCode", code));
         return l;
     }
 

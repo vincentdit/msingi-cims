@@ -5,10 +5,12 @@ import SchoolIcon from '@mui/icons-material/School';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Step, StepButton,
   StepContent, Stepper, TextField, Typography, useMediaQuery, useTheme,
+  Link,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link as RouterLink } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { AdmissionWindow, Application, Profile, Qualification, Statement } from '../../api/types';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
@@ -156,6 +158,7 @@ function Outcome({ app }: { app: Application }) {
             <Typography variant="body2">{t('offer.registrationNo')}</Typography>
             <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20 }}>{app.student.registrationNo}</Typography>
             <Typography variant="body2">{app.student.status === 'ACTIVE' ? t('offer.registered') : t('offer.notYetRegistered')}</Typography>
+            <Button component={RouterLink} to="/student/login" variant="contained" size="small" sx={{ mt: 1.5 }}>{t('student.admissionLink')}</Button>
           </Alert>
         )}
         <LetterDownload app={app} />
@@ -229,7 +232,9 @@ function FeesCard() {
           <Box sx={{ mt: 1.5 }}>
             <Typography variant="subtitle2">{t('fees.receipts')}</Typography>
             {account.data.payments.filter((p) => p.invoiceNo === inv.invoiceNo).map((p) => (
-              <Typography key={p.receiptNo} variant="body2" color="text.secondary">{formatDate(p.paidAt)} · {formatTzs(p.amount)} · {t('fees.receipt')} {p.receiptNo}</Typography>
+              <Typography key={p.receiptNo} variant="body2" color="text.secondary">{formatDate(p.paidAt)} · {formatTzs(p.amount)} · {t('fees.receipt')}{' '}
+                <Link component="button" variant="body2" onClick={() => download(`/api/applicant/receipt.pdf?no=${encodeURIComponent(p.receiptNo)}`, 'applicant', `receipt-${p.receiptNo.replace(/\W+/g, '-')}.pdf`)}>{p.receiptNo}</Link>
+              </Typography>
             ))}
           </Box>
         )}

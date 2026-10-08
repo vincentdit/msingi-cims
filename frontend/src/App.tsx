@@ -2,6 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/session';
 import PortalLayout from './components/PortalLayout';
 import StaffLayout from './components/StaffLayout';
+import StudentLayout from './components/StudentLayout';
+import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
+import NoticesPage from './pages/staff/NoticesPage';
+import MessagingPage from './pages/staff/MessagingPage';
 import ApplicationPage from './pages/applicant/ApplicationPage';
 import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
@@ -27,6 +31,13 @@ export default function App() {
         <Route path="verify/:code" element={<DocumentVerifyPage />} />
         <Route path="application" element={<RequireAuth realm="applicant"><ApplicationPage /></RequireAuth>} />
       </Route>
+      <Route path="student/login" element={<StudentLoginPage />} />
+      <Route path="student" element={<RequireAuth realm="student"><StudentLayout /></RequireAuth>}>
+        <Route index element={<StudentHome />} />
+        <Route path="fees" element={<StudentFees />} />
+        <Route path="notices" element={<StudentNotices />} />
+        <Route path="profile" element={<StudentProfilePage />} />
+      </Route>
       <Route path="staff/login" element={<StaffLoginPage />} />
       <Route path="staff" element={<RequireAuth realm="staff"><StaffLayout /></RequireAuth>}>
         <Route index element={<StaffDashboard />} />
@@ -39,6 +50,8 @@ export default function App() {
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="finance" element={<FinancePage />} />
+        <Route path="notices" element={<NoticesPage />} />
+        <Route path="messages" element={<MessagingPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -77,6 +77,11 @@ cims:
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}
   offers:
     expiry-cron: ${CIMS_OFFER_EXPIRY_CRON:0 5 * * * *}   # close expired offers hourly; "-" disables
+  sms:
+    mode: ${CIMS_SMS_MODE:simulated}             # simulated = messages written to the log; live = aggregator adapter
+    callback-secret: ${CIMS_SMS_CALLBACK_SECRET:change-me}   # HMAC key for delivery reports
+    async: true                                  # hand messages to the gateway on a background thread after commit
+    retry-cron: ${CIMS_SMS_RETRY_CRON:30 * * * * *}  # retry messages still queued; "-" disables
   privacy:
     notice-version: "2026-10"
   demo:

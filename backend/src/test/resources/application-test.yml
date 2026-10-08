@@ -12,6 +12,11 @@ cims:
     seed: false
   offers:
     expiry-cron: "-"            # tests call the expiry job directly
+  sms:
+    mode: simulated
+    async: false                # send in the request thread after commit, so tests see the result
+    retry-cron: "-"
+    callback-secret: test-sms-secret
   gepg:
     mode: simulated
     callback-secret: test-secret

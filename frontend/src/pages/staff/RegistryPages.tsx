@@ -18,6 +18,7 @@ import type {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { ChangeRequestsButton } from './ChangeRequests';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -222,6 +223,7 @@ export function StudentsPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Students" subtitle="One record per student from admission to graduation."
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
+          <ChangeRequestsButton canDecide={canRegister} />
           <Button variant="outlined" startIcon={<NumbersIcon />} onClick={() => setNumbering(true)}>Numbering</Button>
           <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!programmeId}
             onClick={() => download(`/api/registry/programmes/${programmeId}/class-list`, 'staff', `class-list-${programmeName}.csv`).catch(setDlError)}>

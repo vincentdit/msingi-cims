@@ -21,7 +21,7 @@ import tz.co.msingi.cims.common.web.PageResponse;
 import tz.co.msingi.cims.finance.accounts.AccountService;
 import tz.co.msingi.cims.finance.billing.AnnualBillingService;
 import tz.co.msingi.cims.finance.fees.ClearanceGate;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
@@ -73,7 +73,7 @@ public class RegistryService {
     private final TenantRepository tenants;
     private final UserAccountRepository users;
     private final NumberSequenceService sequences;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final AuditService audit;
     private final AnnualBillingService annualBilling;
     private final AccountService accounts;
@@ -218,12 +218,18 @@ public class RegistryService {
         annualBilling.transferToStudent(s);
         annualBilling.billStudent(s, w.getAcademicYear());
 
-        // the applicant account becomes the student's sign-in for the student portal
-        users.findById(ap.getUser().getId()).ifPresent(u -> u.grant(Role.STUDENT));
+        // the applicant account becomes the student's sign-in for the student portal, by registration number or phone
+        users.findById(ap.getUser().getId()).ifPresent(u -> {
+            u.grant(Role.STUDENT);
+            if (!users.existsByUsernameIgnoreCase(s.getRegistrationNo())) u.setUsername(s.getRegistrationNo());
+        });
 
-        sms.send(s.getPhone(), "Welcome to " + tenant.getName() + "! Your registration number is " + s.getRegistrationNo() + ". "
-                + (j == null ? "Bring your original documents when you report."
-                : "Report on " + DAY.format(j.reportingDate()) + " at " + j.reportingVenue() + " with your original documents."));
+        if (j == null) {
+            messaging.event("STUDENT_WELCOME_NO_DATE", s.getPhone(), Map.of("institution", tenant.getName(), "registrationNo", s.getRegistrationNo()));
+        } else {
+            messaging.event("STUDENT_WELCOME", s.getPhone(), Map.of("institution", tenant.getName(), "registrationNo", s.getRegistrationNo(),
+                    "reportingDate", j.reportingDate(), "venue", j.reportingVenue()));
+        }
         audit.record("STUDENT_ADMITTED", "Student", s.getId(), Map.of("registrationNo", s.getRegistrationNo(), "application", app.getReferenceNo()));
         return s;
     }
@@ -345,8 +351,7 @@ public class RegistryService {
         f.setApprovedByName(CurrentUser.name());
         s.setStatus(Student.Status.ACTIVE);
         audit.record("FIRST_REGISTRATION_APPROVED", "Student", s.getId(), Map.of("registrationNo", s.getRegistrationNo()));
-        sms.send(s.getPhone(), "Your registration at " + currentTenant().getName() + " is complete. Registration number: "
-                + s.getRegistrationNo() + ". Welcome!");
+        messaging.event("REGISTRATION_COMPLETE", s.getPhone(), Map.of("institution", currentTenant().getName(), "registrationNo", s.getRegistrationNo()));
         return detail(s);
     }
 

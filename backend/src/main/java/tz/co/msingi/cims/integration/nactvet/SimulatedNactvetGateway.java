@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.SmsGateway;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -35,7 +35,7 @@ public class SimulatedNactvetGateway implements NactvetGateway {
 
     private static final byte[] CODE_KEY = "cims-simulated-nactvet".getBytes(StandardCharsets.UTF_8);
 
-    private final SmsSender sms;
+    private final SmsGateway sms; // NACTVET's own SMS: not the institution's, so not in its message log
 
     @Override
     public String submit(String institutionCode, List<Candidate> candidates) {
@@ -62,7 +62,7 @@ public class SimulatedNactvetGateway implements NactvetGateway {
                 if (multiple && c.phone() != null) {
                     // NACTVET itself sends the code to applicants admitted by more than one institution
                     sms.send(c.phone(), "NACTVET: You have been admitted by more than one institution. To confirm the one you choose, "
-                            + "give it this confirmation code: " + code(c.indexNumber()));
+                            + "give it this confirmation code: " + code(c.indexNumber()), "NACTVET", null);
                 }
             }
         }

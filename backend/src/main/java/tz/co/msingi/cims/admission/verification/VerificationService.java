@@ -27,7 +27,7 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway.Candidate;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway.Outcome;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
@@ -70,7 +70,7 @@ public class VerificationService {
     private final NactvetGateway nactvet;
     private final OfferService offers;
     private final AdmissionLetterRepository letters;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final AuditService audit;
 
     // ------------------------------------------------------------------ queries
@@ -337,9 +337,8 @@ public class VerificationService {
                     item.setOutcome(NactvetSubmissionItem.Outcome.REJECTED);
                     app.setStatus(Status.NACTVET_REJECTED);
                     app.setVerificationReason(o.reason());
-                    sms.send(app.getApplicant().getPhone(), "We regret that NACTVET did not verify your admission to "
-                            + programmeName(app) + " at " + institution + ": " + o.reason()
-                            + ". Please contact the admissions office for advice.");
+                    messaging.event("NACTVET_NOT_VERIFIED", app.getApplicant().getPhone(), Map.of("programme", programmeName(app),
+                            "institution", institution, "reason", o.reason() == null ? "" : o.reason()));
                     rejected++;
                 }
             }

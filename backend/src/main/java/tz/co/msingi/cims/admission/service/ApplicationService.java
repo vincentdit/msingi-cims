@@ -40,7 +40,7 @@ import tz.co.msingi.cims.finance.service.InvoicePaidEvent;
 import tz.co.msingi.cims.admission.letter.AdmissionLetter;
 import tz.co.msingi.cims.admission.letter.AdmissionLetterRepository;
 import tz.co.msingi.cims.admission.offer.OfferService;
-import tz.co.msingi.cims.notification.SmsSender;
+import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.security.OtpService;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
@@ -72,7 +72,7 @@ public class ApplicationService {
     private final GepgProperties gepgProps;
     private final NumberSequenceService sequences;
     private final AuditService audit;
-    private final SmsSender sms;
+    private final Messaging messaging;
     private final OtpService otp;
     private final OfferService offers;
     private final AdmissionLetterRepository letters;
@@ -246,7 +246,7 @@ public class ApplicationService {
         app.setStatus(Application.Status.SUBMITTED);
         app.setSubmittedAt(OffsetDateTime.now());
         audit.record("SUBMIT", "Application", app.getId(), Map.of("referenceNo", app.getReferenceNo()));
-        sms.send(a.getPhone(), "Your application " + app.getReferenceNo() + " has been received. We will notify you of the outcome by SMS.");
+        messaging.event("APPLICATION_RECEIVED", a.getPhone(), Map.of("referenceNo", app.getReferenceNo()));
         return view(app, a);
     }
 

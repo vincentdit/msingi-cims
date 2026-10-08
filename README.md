@@ -2,7 +2,7 @@
 
 **Msingi Technologies Ltd** · One platform from application to graduation for NACTVET‑registered institutions.
 
-This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over, Fees, GePG reconciliation**), as specified in `docs/` (Documents 01–07).
+This repository holds Release 1 build slices (**Foundation, Online Admission, Selection, NACTVET verification and offers, Admission letters, Registration hand-over, Fees, GePG reconciliation, Student portal, Messaging**), as specified in `docs/` (Documents 01–07).
 
 | Area | Delivered in this slice |
 |---|---|
@@ -15,6 +15,8 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 | Registration hand-over (BP-05, FR-REG-01/02) | Accepted applicants become students without re-entering data; registration numbers from a configurable pattern (never changed, never reused — enforced by the database); student account sign-in; first registration at reporting (originals checklist from the joining instructions, Registry approval → ACTIVE); student register with search, statistics and class-list CSV |
 | Fees (BP-06, FR-FIN-01 to 04, 06, 12) | Fee items (GFS codes, allocation priority); fee structures per programme and year of study with local/foreign amounts and instalments, prepared by the Accountant and approved by the Bursar (segregation of duties), versioned; annual invoice with control number on offer acceptance, billing runs (duplicate-safe), invoice moves to the student at hand-over; payments allocated to items in order, overpayment held as credit; clearance rules (registration enforced at first registration); statements, collections and debtor ageing with CSV |
 | GePG reconciliation (FR-FIN-05, BP-06 steps 6–7) | Daily import of GePG's reconciliation file (CSV, all-or-nothing validation), matched by GePG receipt number; exceptions: not received by CIMS (posted from the file with receipt and allocation), not in GePG's file (settles itself if a later file has it), amount differs, repeated line, unknown bill; each exception explained with name and time; day closed only with no open exceptions; month view and the Bursar's monthly sign-off once every day with collections is closed; CIMS payments of a day downloadable in GePG's layout |
+| Student portal (FR-STU-01/02, FR-REG-08) | Mobile-first, installable student app (`/student`, English/Kiswahili): sign-in with registration number or mobile number; dashboard with fee balance, next payment and control number, registration and examination clearance, latest notices; invoices with control numbers and payment history with **PDF receipts** (amount in words, items paid); notices from staff for all students or a programme/year, published now or scheduled, optional SMS alert, read tracking, withdrawal; requests to correct personal details, approved or rejected by Registry with reasons (name/date-of-birth changes flagged for original documents; phone change also moves the sign-in) |
+| Messaging (FR-COM-01 to 03, FR-INT-04) | Every SMS is written to an outbox in the same transaction as the event and handed to the gateway after commit (nothing goes out for work that rolls back), retried up to three times, with delivery reports (signed callback) and a full message log; 18 event messages with built-in English and Kiswahili wording that each institution may reword or switch off, sent in the institution's chosen language; verification codes sent at once and never stored; bulk messages to students (status, programme, year, only those who owe fees), applicants (window, status) or a list of numbers, with personalisation ({firstName}, {balance}, …), a preview of recipients, SMS parts and cost, and a check against the prepaid SMS bundle; delivery per bulk message and resending of failures; typographic punctuation converted so messages stay in the cheaper GSM encoding |
 | Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
 
@@ -35,7 +37,7 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V11 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation)
+  src/main/resources/db/migration/   V1–V13 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation, V12 = student portal, V13 = messaging)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -156,6 +158,8 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 - `RegistryIT`, `RegistrationNumberPatternTest` — hand-over, numbering patterns, numbers skipped when already taken, database refusal to change or delete, first registration, class list, isolation;
 - `FeesIT`, `PaymentAllocatorTest` — Bursar approval and versions, billing on acceptance and in runs, foreign rates, allocation and credit, registration clearance, reports, privacy;
 - `ReconciliationIT` — every exception kind, posting a missed payment, close and re-import rules, a payment matched on a later day, monthly sign-off, invalid files, roles and isolation;
+- `StudentPortalIT`, `AmountInWordsTest` — student sign-in by registration number, dashboard, notice audiences and scheduling, read tracking, Registry decisions on detail changes, receipts and privacy;
+- `MessagingIT`, `SmsTextTest` — templates and language, masked verification codes, no SMS on rollback, bulk audiences and placeholders, bundle balance and charging, gateway refusals and retries, resending, signed delivery reports, isolation;
 - `DatabaseRoleGuardTest` — start-up refuses a role that bypasses row-level security.
 
 ## Configuration
@@ -195,11 +199,11 @@ Production notes: connect the application with a role that is **not** a superuse
 |---|---|---|
 | NECTA | `SimulatedNectaClient` | Live NECTA results API adapter |
 | GePG | `SimulatedGepgGateway`, HMAC-signed callback; daily reconciliation by file import | Live adapter: signed bill submission and RSA signature verification per the GePG specification; fetching the reconciliation file through GePG's API on a schedule |
-| SMS | `LoggingSmsSender` (log only) | SMS aggregator adapter with delivery reports |
+| SMS | `SimulatedSmsGateway` (log only; 000 = unreachable, 999 = refused), outbox, delivery-report callback | Aggregator adapter (`SmsGateway`) for the chosen provider; email channel |
 | NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |
 | Letters | HTML template (`templates/admission-letter.html`) → PDF | Per-institution letter templates and logo upload; email delivery |
 | Reconciliation | Daily GePG file import, exception handling, day close and Bursar sign-off (FR-FIN-05) | Bank statement reconciliation; instalment plans, waivers, sponsors and refunds (R3) |
-| Registration | Hand-over and first registration | Semester and module registration with financial clearance (needs curricula and fees), NACTVET student registration (FR-REG-07), ID cards, status changes (BP-14) |
+| Registration | Hand-over, first registration, student requests to correct details | Semester and module registration with financial clearance (needs curricula and fees), NACTVET student registration (FR-REG-07), ID cards, status changes (BP-14) |
 | Identity | Local JWT issuer | Keycloak realm per institution, MFA for privileged roles |
 
 ---
