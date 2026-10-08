@@ -729,3 +729,28 @@ export interface MessageView {
   parts: number; encoding: string; status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED'; attempts: number; error?: string; queuedAt: string;
   sentAt?: string; deliveredAt?: string;
 }
+
+// ------------------------------------------------------------------ reports and dashboards (FR-RPT-01/02)
+
+export type ReportColumnType = 'TEXT' | 'NUMBER' | 'MONEY' | 'PERCENT' | 'DATE' | 'DATETIME';
+
+export interface ReportCatalogueEntry { code: string; area: string; title: string; description: string; personalData: boolean; filters: string[] }
+
+export interface ReportResult {
+  code: string; area: string; title: string; description: string; filterLines: string[];
+  columns: { key: string; label: string; type: ReportColumnType }[]; rows: unknown[][]; totals?: unknown[]; notes: string[];
+  rowCount: number; truncated: boolean; institution: string; generatedAt: string; generatedBy: string;
+}
+
+export interface DashPoint { key: string; label: string; value: number }
+export interface DashMoney { key: string; label: string; amount: number; count: number }
+export interface DashProgramme { code: string; name: string; value: number; capacity: number; accepted: number }
+
+export interface DashboardData {
+  admissions?: { windowId?: number; windowName?: string; windowStatus?: string; closesAt?: string; funnel: DashPoint[]; dailySubmissions: DashPoint[];
+    programmes: DashProgramme[]; female: number; male: number };
+  registry?: { current: number; registered: number; awaitingRegistration: number; female: number; male: number; byStatus: DashPoint[];
+    byProgramme: DashProgramme[]; pendingChangeRequests: number };
+  finance?: { academicYearId?: number; academicYear?: string; billed: number; collected: number; outstanding: number; collectionRate?: number;
+    collectedThisMonth: number; collectedToday: number; dailyCollections: DashMoney[]; ageing: DashMoney[]; daysNotReconciled: number; openExceptions: number };
+}

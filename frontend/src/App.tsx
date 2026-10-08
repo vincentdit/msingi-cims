@@ -6,6 +6,8 @@ import StudentLayout from './components/StudentLayout';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
+import DashboardPage from './pages/staff/DashboardPage';
+import ReportsPage from './pages/staff/ReportsPage';
 import ApplicationPage from './pages/applicant/ApplicationPage';
 import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
@@ -15,7 +17,7 @@ import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages
 import HomePage from './pages/portal/HomePage';
 import DocumentVerifyPage from './pages/portal/VerifyPage';
 import {
-  ApplicationsPage, ProgrammesPage, StaffDashboard, StaffLoginPage, WindowDetailPage, WindowsPage,
+  ApplicationsPage, ProgrammesPage, StaffLoginPage, WindowDetailPage, WindowsPage,
 } from './pages/staff/StaffPages';
 
 export default function App() {
@@ -40,7 +42,7 @@ export default function App() {
       </Route>
       <Route path="staff/login" element={<StaffLoginPage />} />
       <Route path="staff" element={<RequireAuth realm="staff"><StaffLayout /></RequireAuth>}>
-        <Route index element={<StaffDashboard />} />
+        <Route index element={<DashboardPage />} />
         <Route path="applications" element={<ApplicationsPage />} />
         <Route path="windows" element={<WindowsPage />} />
         <Route path="windows/:id" element={<WindowDetailPage />} />
@@ -52,6 +54,7 @@ export default function App() {
         <Route path="finance" element={<FinancePage />} />
         <Route path="notices" element={<NoticesPage />} />
         <Route path="messages" element={<MessagingPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

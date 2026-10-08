@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!--
+  Standard report (FR-RPT-02). Double braces insert escaped values; triple braces insert markup built by ReportExporter
+  from escaped values. Well-formed XHTML, CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{title}}</title>
+<style>
+  @page {
+    size: {{pageSize}};
+    margin: 12mm 10mm 14mm 10mm;
+    @bottom-left { content: "{{code}} · {{institution}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #1f2937; }
+  .head { border-bottom: 2pt solid {{primaryColor}}; padding-bottom: 5pt; margin-bottom: 6pt; }
+  .inst { font-size: 9pt; color: #4b5563; }
+  h1 { font-size: 13pt; margin: 2pt 0 3pt 0; color: #111827; }
+  .filters { font-size: 7.5pt; color: #4b5563; }
+  .muted { color: #6b7280; font-size: 7.5pt; }
+  table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; }
+  thead { display: table-header-group; }
+  th { background: #f3f4f6; color: #374151; font-weight: bold; padding: 3pt 4pt; border-bottom: 0.8pt solid #9ca3af; }
+  td { padding: 2.5pt 4pt; border-bottom: 0.4pt solid #e5e7eb; }
+  tr { page-break-inside: avoid; }
+  tr.total td { font-weight: bold; border-top: 0.8pt solid #6b7280; border-bottom: none; }
+  .r { text-align: right; }
+  .l { text-align: left; }
+</style>
+</head>
+<body>
+<div class="head">
+  <div class="inst">{{institution}}</div>
+  <h1>{{title}}</h1>
+  <div class="filters">{{{filters}}}</div>
+  <div class="muted">{{generated}}</div>
+</div>
+<table>{{{table}}}</table>
+{{{notes}}}
+</body>
+</html>

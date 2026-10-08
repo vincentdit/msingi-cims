@@ -70,6 +70,12 @@
             <version>${springdoc.version}</version>
         </dependency>
         <!-- Documents: HTML templates rendered to PDF (openhtmltopdf/PDFBox), QR codes for verification (ZXing) -->
+        <!-- Excel exports of standard reports (FR-RPT-02); streaming workbook for large lists -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
         <dependency>
             <groupId>com.openhtmltopdf</groupId>
             <artifactId>openhtmltopdf-pdfbox</artifactId>

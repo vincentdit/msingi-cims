@@ -112,11 +112,11 @@ public class AdmissionScenario {
     }
 
     public JsonNode body(ResultActions r) throws Exception {
-        return json.readTree(r.andReturn().getResponse().getContentAsString());
+        return json.readTree(r.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public String text(ResultActions r) throws Exception {
-        return r.andReturn().getResponse().getContentAsString();
+        return r.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     public record Applicant(Long applicationId, String token, String index) {

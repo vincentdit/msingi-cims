@@ -35,7 +35,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdmissionAdminController {
 
-    private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER','DEPUTY_PRINCIPAL_ACADEMIC','REGISTRAR','MANAGEMENT_VIEWER')";
+    private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER','DEPUTY_PRINCIPAL_ACADEMIC','REGISTRAR','MANAGEMENT_VIEWER','AUDITOR')";
     private static final String WRITE = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER')";
     private static final String APPROVE = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC')";
 

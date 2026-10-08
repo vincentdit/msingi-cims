@@ -2,6 +2,7 @@ import AssignmentIcon from '@mui/icons-material/AssignmentInd';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import SmsIcon from '@mui/icons-material/Sms';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import DashboardIcon from '@mui/icons-material/SpaceDashboard';
 import EventIcon from '@mui/icons-material/EventAvailable';
@@ -25,6 +26,7 @@ const NAV = [
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
+  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon /> },
   { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
 ];
 
