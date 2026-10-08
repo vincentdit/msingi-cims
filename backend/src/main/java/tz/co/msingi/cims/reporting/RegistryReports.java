@@ -17,6 +17,8 @@ import static tz.co.msingi.cims.reporting.ReportModel.ACADEMIC_YEAR;
 import static tz.co.msingi.cims.reporting.ReportModel.AWARD;
 import static tz.co.msingi.cims.reporting.ReportModel.INTAKE;
 import static tz.co.msingi.cims.reporting.ReportModel.LEVEL;
+import static tz.co.msingi.cims.reporting.ReportModel.MODULE;
+import static tz.co.msingi.cims.reporting.ReportModel.SEMESTER;
 import static tz.co.msingi.cims.reporting.ReportModel.PROGRAMME;
 import static tz.co.msingi.cims.reporting.ReportModel.SEX;
 import static tz.co.msingi.cims.reporting.ReportModel.STUDENT_STATUS;
@@ -45,6 +47,11 @@ class RegistryReports extends ReportQueries implements ReportProvider {
                         ROLES, true, all, this::nominalRoll),
                 new Definition("REG-03", "Registry", "Age profile", "Current students by age band and sex.", ROLES, false, all, this::ages),
                 new Definition("REG-04", "Registry", "Region profile", "Current students by home region and sex.", ROLES, false, all, this::regions),
+                new Definition("REG-06", "Registry", "Semester registration status",
+                        "Registered students per programme for a semester: submitted, approved, returned, and still to register.", ROLES, false,
+                        List.of(SEMESTER, PROGRAMME, AWARD, LEVEL, SEX, YEAR_OF_STUDY), this::semesterStatus),
+                new Definition("REG-07", "Registry", "Module class list", "Students whose registration for the module in the semester is approved.",
+                        ROLES, true, List.of(SEMESTER, MODULE, PROGRAMME, SEX), this::classList),
                 new Definition("REG-05", "Registry", "First registration status",
                         "Students handed over by Admissions: registered at reporting, and still to report.", ROLES, false,
                         List.of(ACADEMIC_YEAR, INTAKE, PROGRAMME, AWARD, LEVEL, SEX), this::firstRegistration));
@@ -122,6 +129,44 @@ class RegistryReports extends ReportQueries implements ReportProvider {
                 Column.number("total", "Students"), Column.percent("share", "Share")), r).withTotals();
         d.totals().set(4, total == 0 ? null : 1.0);
         return d;
+    }
+
+    private Data semesterStatus(Filter f) {
+        if (f.semesterId() == null) return new Data(List.of(Column.text("note", "Choose a semester")), List.of()).withNote("Choose the semester to report on.");
+        Sql q = filters(f, false).param("sem", f.semesterId());
+        List<List<Object>> r = rows("""
+                select p.code, p.name, count(*) filter (where s.status = 'ACTIVE'),
+                       count(*) filter (where sr.status = 'SUBMITTED'), count(*) filter (where sr.status = 'APPROVED'),
+                       count(*) filter (where sr.status = 'REJECTED'), count(*) filter (where sr.late and sr.status in ('SUBMITTED', 'APPROVED')),
+                       count(*) filter (where s.status = 'ACTIVE' and (sr.id is null or sr.status in ('CANCELLED', 'REJECTED')))
+                from students s join programmes p on p.id = s.programme_id
+                left join semester_registrations sr on sr.student_id = s.id and sr.semester_id = :sem
+                where (s.status = 'ACTIVE' or sr.id is not null)""" + q + " group by p.code, p.name order by p.name", q);
+        r.forEach(x -> x.add(ratio(x.get(4), x.get(2))));
+        Data d = new Data(List.of(Column.text("code", "Code"), Column.text("programme", "Programme"), Column.number("active", "Registered students"),
+                Column.number("submitted", "Awaiting approval"), Column.number("approved", "Approved"), Column.number("returned", "Returned"),
+                Column.number("late", "Late"), Column.number("missing", "Not yet registered"), Column.percent("rate", "Approved %")), r).withTotals();
+        d.totals().set(8, ratio(d.totals().get(4), d.totals().get(2)));
+        return d.withNote("Registered students = students whose first registration is complete (status Registered).");
+    }
+
+    private Data classList(Filter f) {
+        if (f.semesterId() == null || f.moduleId() == null) {
+            return new Data(List.of(Column.text("note", "Choose a semester and a module")), List.of()).withNote("Choose the semester and the module.");
+        }
+        Sql q = new Sql().param("sem", f.semesterId()).param("module", f.moduleId()).eq("p.id", "programme", f.programmeId()).eq("s.sex", "sex", f.sex());
+        List<List<Object>> r = rows("""
+                select s.registration_no, s.surname, concat_ws(' ', s.first_name, s.middle_name), s.sex, p.code, sr.year_of_study, mr.category, mr.attempt
+                from module_registrations mr join semester_registrations sr on sr.id = mr.semester_registration_id
+                join students s on s.id = mr.student_id join programmes p on p.id = s.programme_id
+                where sr.semester_id = :sem and mr.module_id = :module and sr.status = 'APPROVED'""" + q + " order by s.surname, s.first_name", q);
+        r.forEach(x -> {
+            x.set(6, AdmissionReports.label(String.valueOf(x.get(6))));
+            x.set(7, AdmissionReports.label(String.valueOf(x.get(7))));
+        });
+        return new Data(List.of(Column.text("regNo", "Registration no."), Column.text("surname", "Surname"), Column.text("names", "Other names"),
+                Column.text("sex", "Sex"), Column.text("programme", "Programme"), Column.number("year", "Year"), Column.text("category", "Core / elective"),
+                Column.text("attempt", "Attempt")), r);
     }
 
     private Data firstRegistration(Filter f) {

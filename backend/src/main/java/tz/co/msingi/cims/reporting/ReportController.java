@@ -49,8 +49,10 @@ public class ReportController {
                       @RequestParam(required = false) Integer yearOfStudy,
                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                      @RequestParam(required = false) String text) {
-        return reports.view(code, new Filter(academicYearId, intakeId, windowId, programmeId, awardFamily, level, sex, status, yearOfStudy, from, to, text));
+                      @RequestParam(required = false) String text, @RequestParam(required = false) Long semesterId,
+                      @RequestParam(required = false) Long moduleId) {
+        return reports.view(code, new Filter(academicYearId, intakeId, windowId, programmeId, awardFamily, level, sex, status, yearOfStudy, from, to, text,
+                semesterId, moduleId));
     }
 
     @Operation(summary = "Download a report as Excel (format=xlsx) or PDF (format=pdf)")
@@ -63,9 +65,10 @@ public class ReportController {
                                          @RequestParam(required = false) String status, @RequestParam(required = false) Integer yearOfStudy,
                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                                         @RequestParam(required = false) String text) {
+                                         @RequestParam(required = false) String text, @RequestParam(required = false) Long semesterId,
+                                         @RequestParam(required = false) Long moduleId) {
         ReportService.Export e = reports.export(code,
-                new Filter(academicYearId, intakeId, windowId, programmeId, awardFamily, level, sex, status, yearOfStudy, from, to, text), format);
+                new Filter(academicYearId, intakeId, windowId, programmeId, awardFamily, level, sex, status, yearOfStudy, from, to, text, semesterId, moduleId), format);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(e.fileName()).build().toString())
                 .contentType(MediaType.parseMediaType(e.contentType()))

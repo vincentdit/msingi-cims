@@ -43,6 +43,8 @@ public final class RegistryRepositories {
 
         Optional<Student> findByUserId(Long userId);
 
+        long countByCurriculumId(Long curriculumId);
+
         @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "programme")
         List<Student> findByStatusIn(Collection<Student.Status> statuses);
 

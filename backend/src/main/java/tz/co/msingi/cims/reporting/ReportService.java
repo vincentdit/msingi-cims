@@ -55,9 +55,13 @@ public class ReportService {
     private final IntakeRepository intakes;
     private final AdmissionWindowRepository windows;
     private final ProgrammeRepository programmes;
+    private final tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.SemesterRepository semesters;
+    private final tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules;
 
     public ReportService(List<ReportProvider> providers, AuditService audit, TenantRepository tenants, AcademicYearRepository years,
-                         IntakeRepository intakes, AdmissionWindowRepository windows, ProgrammeRepository programmes) {
+                         IntakeRepository intakes, AdmissionWindowRepository windows, ProgrammeRepository programmes,
+                         tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.SemesterRepository semesters,
+                         tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules) {
         List<String> areaOrder = List.of("Admissions", "Registry", "Finance", "Governance");
         providers.stream().flatMap(p -> p.definitions().stream())
                 .sorted((a, b) -> Integer.compare(areaOrder.indexOf(a.area()), areaOrder.indexOf(b.area())) * 1000 + a.code().compareTo(b.code()))
@@ -68,6 +72,8 @@ public class ReportService {
         this.intakes = intakes;
         this.windows = windows;
         this.programmes = programmes;
+        this.semesters = semesters;
+        this.modules = modules;
     }
 
     public List<CatalogueEntry> catalogue() {
@@ -109,7 +115,7 @@ public class ReportService {
         Definition d = definitions.get(code);
         if (d == null) throw new NotFoundException("Report", code);
         if (!allowed(d, currentRoles())) throw new AccessDeniedException("Not allowed to run " + code);
-        Filter f = honoured(d, raw == null ? new Filter(null, null, null, null, null, null, null, null, null, null, null, null) : raw);
+        Filter f = honoured(d, raw == null ? new Filter(null, null, null, null, null, null, null, null, null, null, null, null, null, null) : raw);
         Data data = d.run().apply(f);
         int count = data.rows().size();
         if (count > MAX_ROWS) {
@@ -136,7 +142,8 @@ public class ReportService {
         return new Filter(on.contains(ReportModel.ACADEMIC_YEAR) ? f.academicYearId() : null, on.contains(ReportModel.INTAKE) ? f.intakeId() : null,
                 on.contains(ReportModel.WINDOW) ? f.windowId() : null, on.contains(ReportModel.PROGRAMME) ? f.programmeId() : null,
                 on.contains(ReportModel.AWARD) ? blank(f.awardFamily()) : null, on.contains(ReportModel.LEVEL) ? f.level() : null, sex, status,
-                on.contains(ReportModel.YEAR_OF_STUDY) ? f.yearOfStudy() : null, from, to, on.contains(ReportModel.TEXT) ? blank(f.text()) : null);
+                on.contains(ReportModel.YEAR_OF_STUDY) ? f.yearOfStudy() : null, from, to, on.contains(ReportModel.TEXT) ? blank(f.text()) : null,
+                on.contains(ReportModel.SEMESTER) ? f.semesterId() : null, on.contains(ReportModel.MODULE) ? f.moduleId() : null);
     }
 
     private List<String> describe(Definition d, Filter f) {
@@ -153,6 +160,8 @@ public class ReportService {
         if (f.yearOfStudy() != null) out.add("Year of study: " + f.yearOfStudy());
         if (f.from() != null) out.add("Period: " + DAY.format(f.from()) + " – " + DAY.format(f.to()));
         if (f.text() != null) out.add("Containing: " + f.text());
+        if (f.semesterId() != null) out.add("Semester: " + semesters.findById(f.semesterId()).map(x -> x.getName() + " " + x.getAcademicYear().getCode()).orElse("?"));
+        if (f.moduleId() != null) out.add("Module: " + modules.findById(f.moduleId()).map(m -> m.getCode() + " " + m.getTitle()).orElse("?"));
         if (out.isEmpty()) out.add("All records");
         return out;
     }

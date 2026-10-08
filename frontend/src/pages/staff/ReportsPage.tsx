@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
-import type { AcademicYear, AdmissionWindow, Programme, ReportCatalogueEntry, ReportColumnType, ReportResult } from '../../api/types';
+import type { AcademicYear, AdmissionWindow, CourseModule, Programme, ReportCatalogueEntry, ReportColumnType, ReportResult, Semester } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
 
 const staff = { realm: 'staff' as const };
@@ -171,6 +171,8 @@ function FilterBar({ entry, filters, onChange }: { entry: ReportCatalogueEntry; 
   const intakes = useQuery({ queryKey: ['staff', 'intakes'], enabled: has('intake'), queryFn: () => api<{ id: number; name: string }[]>('/api/academic/intakes', staff) });
   const windows = useQuery({ queryKey: ['staff', 'windows'], enabled: has('window'), retry: false, queryFn: () => api<AdmissionWindow[]>('/api/admission/windows', staff) });
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], enabled: has('programme'), queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  const semesters = useQuery({ queryKey: ['staff', 'semesters'], enabled: has('semester'), queryFn: () => api<Semester[]>('/api/academic/semesters', staff) });
+  const modules = useQuery({ queryKey: ['staff', 'modules'], enabled: has('module'), queryFn: () => api<CourseModule[]>('/api/academic/modules', staff) });
   const set = (k: string, v: string) => onChange({ ...filters, [k]: v });
   const sel = (key: string, label: string, options: { value: string | number; label: string }[], all = 'All') => (
     <Grid size={{ xs: 12, sm: 6, md: 3 }} key={key}>
@@ -182,6 +184,8 @@ function FilterBar({ entry, filters, onChange }: { entry: ReportCatalogueEntry; 
   );
   return (
     <Grid container spacing={1.5} sx={{ mt: 1.5 }}>
+      {has('semester') && sel('semesterId', 'Semester', semesters.data?.map((s) => ({ value: s.id, label: `${s.name} · ${s.academicYear}` })) ?? [], 'Choose a semester')}
+      {has('module') && sel('moduleId', 'Module', modules.data?.map((m) => ({ value: m.id, label: `${m.code} · ${m.title}` })) ?? [], 'Choose a module')}
       {has('academicYear') && sel('academicYearId', 'Academic year', years.data?.map((y) => ({ value: y.id, label: y.code })) ?? [], 'All years')}
       {has('intake') && sel('intakeId', 'Intake', intakes.data?.map((i) => ({ value: i.id, label: i.name })) ?? [], 'All intakes')}
       {has('window') && windows.data && sel('windowId', 'Admission window', windows.data.map((w) => ({ value: w.id, label: w.name })), 'All windows')}

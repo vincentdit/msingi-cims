@@ -30,7 +30,8 @@ public final class MessageTemplates {
                 Map.entry("programme", "Ordinary Diploma in Information Technology"), Map.entry("deadline", "20 October 2026"),
                 Map.entry("reason", "The CSEE results could not be confirmed"), Map.entry("verificationCode", "K7Q2-9XMA-31PD-7HCE"),
                 Map.entry("registrationNo", "DEMO/NTA6/27/0001"), Map.entry("reportingDate", "27 September 2027"),
-                Map.entry("venue", "Main Hall"), Map.entry("title", "Orientation week starts on Monday"));
+                Map.entry("venue", "Main Hall"), Map.entry("title", "Orientation week starts on Monday"),
+                Map.entry("semester", "Semester 1 2027/2028"), Map.entry("modules", "6"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -98,6 +99,14 @@ public final class MessageTemplates {
                 List.of("institution", "registrationNo"), Set.of(),
                 "Your registration at {institution} is complete. Registration number: {registrationNo}. Welcome!",
                 "Usajili wako {institution} umekamilika. Namba ya usajili: {registrationNo}. Karibu!", s);
+        add("SEMESTER_REGISTRATION_APPROVED", "Semester registration approved", "Registry approves a student's semester registration", "Registry",
+                List.of("semester", "modules", "institution"), Set.of(),
+                "Your registration for {semester} is approved: {modules} modules. See them on the student portal.",
+                "Usajili wako wa {semester} umeidhinishwa: moduli {modules}. Ziangalie kwenye tovuti ya mwanafunzi.", s);
+        add("SEMESTER_REGISTRATION_REJECTED", "Semester registration returned", "Registry returns a semester registration for correction", "Registry",
+                List.of("semester", "reason", "institution"), Set.of("reason"),
+                "Your registration for {semester} needs correcting: {reason}. Update it on the student portal.",
+                "Usajili wako wa {semester} unahitaji marekebisho: {reason}. Urekebishe kwenye tovuti ya mwanafunzi.", s);
         add("DETAILS_CHANGE_APPROVED", "Details update approved", "Registry approves a student's request to update details", "Registry",
                 List.of("institution"), Set.of(),
                 "Your request to update your details has been approved by Registry.",

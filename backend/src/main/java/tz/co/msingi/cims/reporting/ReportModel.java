@@ -32,13 +32,13 @@ public final class ReportModel {
      * Percentages in rows are fractions (0.45 = 45%).
      */
     public record Filter(Long academicYearId, Long intakeId, Long windowId, Long programmeId, String awardFamily, Integer level, String sex,
-                         String status, Integer yearOfStudy, LocalDate from, LocalDate to, String text) {
+                         String status, Integer yearOfStudy, LocalDate from, LocalDate to, String text, Long semesterId, Long moduleId) {
     }
 
     /** Filter names, as used by the definitions and the user interface. */
     public static final String ACADEMIC_YEAR = "academicYear", INTAKE = "intake", WINDOW = "window", PROGRAMME = "programme",
             AWARD = "awardFamily", LEVEL = "level", SEX = "sex", APPLICATION_STATUS = "applicationStatus", STUDENT_STATUS = "studentStatus",
-            YEAR_OF_STUDY = "yearOfStudy", PERIOD = "period", TEXT = "text";
+            YEAR_OF_STUDY = "yearOfStudy", PERIOD = "period", TEXT = "text", SEMESTER = "semester", MODULE = "module";
 
     public record Data(List<Column> columns, List<List<Object>> rows, List<Object> totals, List<String> notes) {
         public Data(List<Column> columns, List<List<Object>> rows) {

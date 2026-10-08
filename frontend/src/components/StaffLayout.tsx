@@ -9,6 +9,9 @@ import EventIcon from '@mui/icons-material/EventAvailable';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import SchoolIcon from '@mui/icons-material/School';
+import CalendarIcon from '@mui/icons-material/CalendarMonth';
+import CurriculumIcon from '@mui/icons-material/MenuBook';
+import HowToRegIcon from '@mui/icons-material/HowToReg';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -23,6 +26,9 @@ const NAV = [
   { to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
   { to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
   { to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
+  { to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
+  { to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
+  { to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },

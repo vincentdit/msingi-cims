@@ -123,8 +123,13 @@ public class AccountService {
      */
     @Transactional(readOnly = true)
     public Clearance evaluate(Student s, ClearanceGate.Gate gate) {
+        return evaluate(s, gate, s.getEntryAcademicYear());
+    }
+
+    /** The gate for a given academic year (e.g. a continuing student registering for a semester of their second year). */
+    @Transactional(readOnly = true)
+    public Clearance evaluate(Student s, ClearanceGate.Gate gate, tz.co.msingi.cims.academic.domain.AcademicYear year) {
         ClearanceGate g = gates.findByGate(gate).orElse(null);
-        var year = s.getEntryAcademicYear();
         Invoice inv = invoices.findByPayerTypeAndPayerIdAndPurposeAndStatusNotIn(Invoice.PayerType.STUDENT, s.getId(),
                         AnnualBillingService.PURPOSE, java.util.EnumSet.of(Invoice.Status.CANCELLED, Invoice.Status.CREDITED)).stream()
                 .filter(i -> year.getId().equals(i.getAcademicYearId())).findFirst().orElse(null);

@@ -754,3 +754,204 @@ export interface DashboardData {
   finance?: { academicYearId?: number; academicYear?: string; billed: number; collected: number; outstanding: number; collectionRate?: number;
     collectedThisMonth: number; collectedToday: number; dailyCollections: DashMoney[]; ageing: DashMoney[]; daysNotReconciled: number; openExceptions: number };
 }
+
+// ------------------------------------------------------------------ curricula, calendar and semester registration (FR-ACA-02/03/04, FR-REG-03)
+
+export type SemesterWindow = 'NOT_OPEN' | 'OPEN' | 'LATE' | 'CLOSED';
+
+export interface Semester {
+  id: number;
+  academicYearId: number;
+  academicYear: string;
+  semesterNo: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  registrationOpens: string;
+  registrationCloses: string;
+  lateRegistrationCloses?: string;
+  window: SemesterWindow;
+}
+
+export const CALENDAR_EVENT_KINDS = ['REGISTRATION', 'TEACHING', 'MARKS_ENTRY', 'EXAMINATIONS', 'RESULTS', 'HOLIDAY', 'GRADUATION', 'OTHER'] as const;
+
+export interface CalendarEvent {
+  id: number;
+  academicYearId: number;
+  semesterId?: number;
+  semesterName?: string;
+  kind: (typeof CALENDAR_EVENT_KINDS)[number];
+  title: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface AcademicCalendar {
+  academicYearId: number;
+  academicYear: string;
+  semesters: Semester[];
+  events: CalendarEvent[];
+}
+
+export interface CourseModule {
+  id: number;
+  code: string;
+  title: string;
+  credits: number;
+  ntaLevel?: number;
+  assessmentType: 'GRADED' | 'COMPETENCE';
+  departmentId?: number;
+  departmentName?: string;
+  description?: string;
+  active: boolean;
+  usedInCurricula: number;
+}
+
+export interface CurriculumModuleSlot {
+  id?: number;
+  moduleId: number;
+  code: string;
+  title: string;
+  credits: number;
+  ntaLevel?: number;
+  assessmentType: string;
+  yearOfStudy: number;
+  semesterNo: number;
+  category: 'CORE' | 'ELECTIVE';
+}
+
+export interface ElectiveRule {
+  yearOfStudy: number;
+  semesterNo: number;
+  minElectives: number;
+  maxElectives: number;
+}
+
+export interface CurriculumSlot {
+  yearOfStudy: number;
+  semesterNo: number;
+  coreCredits: number;
+  core: number;
+  electives: number;
+  minElectives?: number;
+  maxElectives?: number;
+  problems: string[];
+}
+
+export interface Curriculum {
+  id: number;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  programmeSemesters: number;
+  curriculumVersion: number;
+  effectiveYearId: number;
+  effectiveYear: string;
+  status: 'DRAFT' | 'APPROVED' | 'RETIRED';
+  notes?: string;
+  createdByName?: string;
+  approvedAt?: string;
+  approvedByName?: string;
+  retiredAt?: string;
+  canApprove: boolean;
+  studentsOnIt: number;
+  modules: CurriculumModuleSlot[];
+  electiveRules: ElectiveRule[];
+  slots: CurriculumSlot[];
+  problems: string[];
+}
+
+export interface CurriculumSummary {
+  id: number;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  curriculumVersion: number;
+  effectiveYear: string;
+  status: 'DRAFT' | 'APPROVED' | 'RETIRED';
+  modules: number;
+  totalCredits: number;
+  approvedAt?: string;
+}
+
+export interface SemesterInfo {
+  id: number;
+  name: string;
+  academicYear: string;
+  semesterNo: number;
+  startDate: string;
+  endDate: string;
+  registrationOpens: string;
+  registrationCloses: string;
+  lateRegistrationCloses?: string;
+  window: SemesterWindow;
+}
+
+export interface ModuleOption {
+  moduleId: number;
+  code: string;
+  title: string;
+  credits: number;
+  category: 'CORE' | 'ELECTIVE';
+  assessmentType: string;
+  selected: boolean;
+}
+
+export interface RegisteredModule {
+  moduleId: number;
+  code: string;
+  title: string;
+  credits: number;
+  category: 'CORE' | 'ELECTIVE';
+  attempt: string;
+}
+
+export interface SemesterRegistration {
+  id: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  programmeName: string;
+  semesterId: number;
+  semesterName: string;
+  yearOfStudy: number;
+  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  late: boolean;
+  totalCredits: number;
+  clearance?: Record<string, unknown>;
+  detailsConfirmed: boolean;
+  submittedAt: string;
+  submittedByName?: string;
+  decidedAt?: string;
+  decidedByName?: string;
+  decisionNote?: string;
+  curriculum?: string;
+  modules: RegisteredModule[];
+}
+
+export type StudentRegistrationState = 'NO_SEMESTER' | 'NOT_ACTIVE' | 'NO_CURRICULUM' | 'NOT_OPEN' | 'OPEN' | 'LATE' | 'CLOSED' | 'NOTHING_TO_REGISTER';
+
+export interface StudentSemesterRegistration {
+  semester?: SemesterInfo;
+  state: StudentRegistrationState;
+  message?: string;
+  yearOfStudy: number;
+  curriculum?: string;
+  core: ModuleOption[];
+  electives: ModuleOption[];
+  minElectives: number;
+  maxElectives: number;
+  clearance?: Clearance;
+  registration?: SemesterRegistration;
+  history: SemesterRegistration[];
+}
+
+export interface SemesterRegistrationSummary {
+  semesterId: number;
+  semesterName: string;
+  window: SemesterWindow;
+  currentStudents: number;
+  notRegistered: number;
+  byStatus: Record<string, number>;
+}

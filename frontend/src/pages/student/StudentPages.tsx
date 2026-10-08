@@ -166,7 +166,7 @@ export function StudentHome() {
   );
 }
 
-function ClearanceRow({ c }: { c: Clearance }) {
+export function ClearanceRow({ c }: { c: Clearance }) {
   const { t } = useTranslation();
   return (
     <Stack direction="row" spacing={1.5} alignItems="center">

@@ -1,5 +1,6 @@
 import CampaignIcon from '@mui/icons-material/CampaignOutlined';
 import HomeIcon from '@mui/icons-material/HomeOutlined';
+import RegisterIcon from '@mui/icons-material/HowToRegOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PaymentsIcon from '@mui/icons-material/PaymentsOutlined';
 import PersonIcon from '@mui/icons-material/PersonOutline';
@@ -18,6 +19,7 @@ import { useInstitution } from './InstitutionContext';
 
 const TABS = [
   { to: '/student', key: 'navHome', icon: <HomeIcon /> },
+  { to: '/student/register', key: 'navRegister', icon: <RegisterIcon /> },
   { to: '/student/fees', key: 'navFees', icon: <PaymentsIcon /> },
   { to: '/student/notices', key: 'navNotices', icon: <CampaignIcon /> },
   { to: '/student/profile', key: 'navProfile', icon: <PersonIcon /> },

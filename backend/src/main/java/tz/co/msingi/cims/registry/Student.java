@@ -79,6 +79,9 @@ public class Student extends BaseEntity {
     @Column(nullable = false)
     private short yearOfStudy = 1;
 
+    /** The curriculum version the student follows (set at the first semester registration, then kept). */
+    private Long curriculumId;
+
     private String nactvetVerificationNo;
     private String admissionLetterNo;
 
