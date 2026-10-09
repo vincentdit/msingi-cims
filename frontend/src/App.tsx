@@ -5,6 +5,9 @@ import StaffLayout from './components/StaffLayout';
 import StudentLayout from './components/StudentLayout';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
+import StudentResultsPage from './pages/student/StudentResultsPage';
+import { MarksPage, OfferingPage } from './pages/staff/MarksPages';
+import { RegulationsPage, ResultSheetPage, ResultSheetsPage } from './pages/staff/ResultsPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -40,6 +43,7 @@ export default function App() {
       <Route path="student" element={<RequireAuth realm="student"><StudentLayout /></RequireAuth>}>
         <Route index element={<StudentHome />} />
         <Route path="register" element={<SemesterRegistrationPage />} />
+        <Route path="results" element={<StudentResultsPage />} />
         <Route path="fees" element={<StudentFees />} />
         <Route path="notices" element={<StudentNotices />} />
         <Route path="profile" element={<StudentProfilePage />} />
@@ -57,6 +61,11 @@ export default function App() {
         <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="semester-registrations" element={<SemesterRegistrationsPage />} />
         <Route path="calendar" element={<CalendarPage />} />
+        <Route path="marks" element={<MarksPage />} />
+        <Route path="marks/:id" element={<OfferingPage />} />
+        <Route path="results" element={<ResultSheetsPage />} />
+        <Route path="results/:id" element={<ResultSheetPage />} />
+        <Route path="regulations" element={<RegulationsPage />} />
         <Route path="curricula" element={<CurriculaPage />} />
         <Route path="curricula/:id" element={<CurriculumEditorPage />} />
         <Route path="finance" element={<FinancePage />} />

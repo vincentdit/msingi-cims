@@ -64,6 +64,20 @@ public class TestData {
         }));
     }
 
+    /** Adds a staff user whose role is limited to part of the institution, e.g. a Head of Department for one department. */
+    public void staffScoped(Tenant tenant, String username, Role role, String scopeType, Long scopeId) {
+        TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> {
+            UserAccount u = new UserAccount();
+            u.setUsername(username);
+            u.setFullName("Staff " + username);
+            u.setPasswordHash(passwordEncoder.encode(STAFF_PASSWORD));
+            u.setUserType(UserAccount.UserType.STAFF);
+            u.setStatus(UserAccount.Status.ACTIVE);
+            u.grant(role, scopeType, scopeId);
+            users.save(u);
+        }));
+    }
+
     public Institution institution(String code, BigDecimal fee) {
         Tenant t = tx.execute(s -> {
             Tenant x = new Tenant();

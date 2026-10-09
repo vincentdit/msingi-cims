@@ -24,6 +24,7 @@ function cell(type: ReportColumnType, v: unknown) {
   if (v == null || v === '') return '';
   switch (type) {
     case 'NUMBER': return Number(v).toLocaleString();
+    case 'DECIMAL': return Number(v).toFixed(2);
     case 'MONEY': return Number(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     case 'PERCENT': return `${(Number(v) * 100).toFixed(1)}%`;
     case 'DATE': return formatDate(String(v));
@@ -131,13 +132,13 @@ function ReportView({ entry }: { entry: ReportCatalogueEntry }) {
           <TableContainer sx={{ maxHeight: 640 }}>
             <Table size="small" stickyHeader>
               <TableHead><TableRow>
-                {r.columns.map((c) => <TableCell key={c.key} align={['NUMBER', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'} sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>{c.label}</TableCell>)}
+                {r.columns.map((c) => <TableCell key={c.key} align={['NUMBER', 'DECIMAL', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'} sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>{c.label}</TableCell>)}
               </TableRow></TableHead>
               <TableBody>
                 {r.rows.map((row, i) => (
                   <TableRow key={i} hover>
                     {r.columns.map((c, j) => (
-                      <TableCell key={c.key} align={['NUMBER', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'}
+                      <TableCell key={c.key} align={['NUMBER', 'DECIMAL', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'}
                         sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: c.key === 'details' || c.key === 'note' ? 'normal' : 'nowrap', maxWidth: c.key === 'details' ? 420 : undefined, minWidth: c.key === 'details' ? 280 : undefined, wordBreak: c.key === 'details' ? 'break-word' : undefined, fontSize: c.key === 'details' ? 12 : undefined }}>
                         {cell(c.type, row[j])}
                       </TableCell>
@@ -148,7 +149,7 @@ function ReportView({ entry }: { entry: ReportCatalogueEntry }) {
                 {r.totals && !!r.rows.length && (
                   <TableRow>
                     {r.columns.map((c, j) => (
-                      <TableCell key={c.key} align={['NUMBER', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'} sx={{ fontWeight: 700, borderTop: '2px solid', borderColor: 'divider' }}>
+                      <TableCell key={c.key} align={['NUMBER', 'DECIMAL', 'MONEY', 'PERCENT'].includes(c.type) ? 'right' : 'left'} sx={{ fontWeight: 700, borderTop: '2px solid', borderColor: 'divider' }}>
                         {cell(c.type, r.totals![j])}
                       </TableCell>
                     ))}

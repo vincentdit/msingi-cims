@@ -1,4 +1,5 @@
-import CampaignIcon from '@mui/icons-material/CampaignOutlined';
+import NotificationsIcon from '@mui/icons-material/NotificationsOutlined';
+import ResultsIcon from '@mui/icons-material/GradingOutlined';
 import HomeIcon from '@mui/icons-material/HomeOutlined';
 import RegisterIcon from '@mui/icons-material/HowToRegOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -20,8 +21,8 @@ import { useInstitution } from './InstitutionContext';
 const TABS = [
   { to: '/student', key: 'navHome', icon: <HomeIcon /> },
   { to: '/student/register', key: 'navRegister', icon: <RegisterIcon /> },
+  { to: '/student/results', key: 'navResults', icon: <ResultsIcon /> },
   { to: '/student/fees', key: 'navFees', icon: <PaymentsIcon /> },
-  { to: '/student/notices', key: 'navNotices', icon: <CampaignIcon /> },
   { to: '/student/profile', key: 'navProfile', icon: <PersonIcon /> },
 ];
 
@@ -35,11 +36,10 @@ export default function StudentLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dash = useQuery({ queryKey: ['student', 'dashboard'], queryFn: () => api<StudentDashboard>('/api/student/dashboard', { realm: 'student' }) });
-  const current = [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
+  const current = pathname.startsWith('/student/notices') ? false
+    : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
-  const label = (key: string) => (key === 'navNotices' && unread
-    ? <Badge color="error" badgeContent={unread} sx={{ '& .MuiBadge-badge': { right: -10 } }}>{t(`student.${key}`)}</Badge>
-    : t(`student.${key}`));
+  const label = (key: string) => t(`student.${key}`);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: wide ? 4 : 9 }}>
@@ -52,6 +52,12 @@ export default function StudentLayout() {
             <Typography variant="subtitle1" noWrap sx={{ fontFamily: 'Sora', fontWeight: 700, lineHeight: 1.2 }}>{inst.shortName ?? inst.name}</Typography>
             <Typography variant="caption" color="text.secondary" noWrap display="block">{t('student.portal')}</Typography>
           </Box>
+          <Tooltip title={t('student.navNotices')}>
+            <IconButton aria-label={t('student.navNotices')} onClick={() => navigate('/student/notices')}
+              color={pathname.startsWith('/student/notices') ? 'primary' : 'default'}>
+              <Badge color="error" badgeContent={unread}><NotificationsIcon /></Badge>
+            </IconButton>
+          </Tooltip>
           <ToggleButtonGroup size="small" exclusive value={i18n.language} onChange={(_, v) => v && setLanguage(v)} aria-label="language">
             <ToggleButton value="en" sx={{ px: 1, py: 0.25 }}>EN</ToggleButton>
             <ToggleButton value="sw" sx={{ px: 1, py: 0.25 }}>SW</ToggleButton>
@@ -81,7 +87,7 @@ export default function StudentLayout() {
           <BottomNavigation showLabels value={current} onChange={(_, v) => navigate(v)}>
             {TABS.map((x) => (
               <BottomNavigationAction key={x.to} value={x.to} label={t(`student.${x.key}`)}
-                icon={x.key === 'navNotices' ? <Badge color="error" badgeContent={unread}>{x.icon}</Badge> : x.icon} />
+                icon={x.icon} />
             ))}
           </BottomNavigation>
         </Paper>

@@ -101,7 +101,7 @@ final class ReportExporter {
 
     private static Map<Type, CellStyle> styles(SXSSFWorkbook wb, Font font) {
         Map<Type, CellStyle> m = new EnumMap<>(Type.class);
-        Map<Type, String> formats = Map.of(Type.NUMBER, "#,##0", Type.MONEY, "#,##0.00", Type.PERCENT, "0.0%", Type.DATE, "dd/mm/yyyy",
+        Map<Type, String> formats = Map.of(Type.NUMBER, "#,##0", Type.DECIMAL, "0.00", Type.MONEY, "#,##0.00", Type.PERCENT, "0.0%", Type.DATE, "dd/mm/yyyy",
                 Type.DATETIME, "dd/mm/yyyy hh:mm");
         for (Type t : Type.values()) {
             CellStyle s = wb.createCellStyle();
@@ -189,7 +189,7 @@ final class ReportExporter {
 
     private static String align(Column c) {
         return switch (c.type()) {
-            case NUMBER, MONEY, PERCENT -> "r";
+            case NUMBER, DECIMAL, MONEY, PERCENT -> "r";
             default -> "l";
         };
     }
@@ -198,6 +198,7 @@ final class ReportExporter {
         if (v == null) return "";
         return switch (type) {
             case NUMBER -> v instanceof Number n ? String.format(Locale.ENGLISH, "%,d", n.longValue()) : String.valueOf(v);
+            case DECIMAL -> v instanceof Number n ? new BigDecimal(n.toString()).setScale(2, RoundingMode.HALF_UP).toPlainString() : String.valueOf(v);
             case MONEY -> v instanceof Number n ? String.format(Locale.ENGLISH, "%,.2f", new BigDecimal(n.toString())) : String.valueOf(v);
             case PERCENT -> v instanceof Number n ? new BigDecimal(n.toString()).movePointRight(2).setScale(1, RoundingMode.HALF_UP) + "%" : String.valueOf(v);
             case DATE -> v instanceof LocalDate d ? DATE.format(d) : String.valueOf(v);

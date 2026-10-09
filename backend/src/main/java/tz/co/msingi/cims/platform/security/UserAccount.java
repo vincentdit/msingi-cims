@@ -67,6 +67,11 @@ public class UserAccount extends BaseEntity {
         roles.add(new RoleAssignment(role, "INSTITUTION", null));
     }
 
+    /** Grants a role limited to part of the institution, e.g. HEAD_OF_DEPARTMENT for one department (scope DEPARTMENT). */
+    public void grant(Role role, String scopeType, Long scopeId) {
+        roles.add(new RoleAssignment(role, scopeType, scopeId));
+    }
+
     public boolean hasRole(Role role) {
         return roles.stream().anyMatch(r -> r.getRole() == role);
     }

@@ -41,7 +41,7 @@ import java.util.Map;
 
 /**
  * Creates a demo institution ("DEMO") for local development when cims.demo.seed=true.
- * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026. Safe to run repeatedly.
+ * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026. Safe to run repeatedly.
  */
 @Slf4j
 @Component
@@ -65,7 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {
@@ -106,6 +106,10 @@ public class DemoDataSeeder implements ApplicationRunner {
         if (users.findByUsernameIgnoreCase("hod").isEmpty()) {
             staff("hod", "Head of ICT Department", "Hod@2026", Role.HEAD_OF_DEPARTMENT);
             staff("academic", "Deputy Principal (Academic)", "Academic@2026", Role.DEPUTY_PRINCIPAL_ACADEMIC);
+        }
+        if (users.findByUsernameIgnoreCase("lecturer").isEmpty()) {
+            staff("lecturer", "Mr. Juma Lecturer", "Lecturer@2026", Role.LECTURER);
+            staff("exams", "Examinations Officer", "Exams@2026", Role.EXAMINATIONS_OFFICER);
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();

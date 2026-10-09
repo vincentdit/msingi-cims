@@ -16,11 +16,13 @@ public final class ReportModel {
     private ReportModel() {
     }
 
-    public enum Type { TEXT, NUMBER, MONEY, PERCENT, DATE, DATETIME }
+    public enum Type { TEXT, NUMBER, DECIMAL, MONEY, PERCENT, DATE, DATETIME }
 
     public record Column(String key, String label, Type type) {
         public static Column text(String key, String label) { return new Column(key, label, Type.TEXT); }
         public static Column number(String key, String label) { return new Column(key, label, Type.NUMBER); }
+        /** Two decimals, e.g. a GPA or an average mark. */
+        public static Column decimal(String key, String label) { return new Column(key, label, Type.DECIMAL); }
         public static Column money(String key, String label) { return new Column(key, label, Type.MONEY); }
         public static Column percent(String key, String label) { return new Column(key, label, Type.PERCENT); }
         public static Column date(String key, String label) { return new Column(key, label, Type.DATE); }

@@ -62,7 +62,7 @@ public class ReportService {
                          IntakeRepository intakes, AdmissionWindowRepository windows, ProgrammeRepository programmes,
                          tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.SemesterRepository semesters,
                          tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules) {
-        List<String> areaOrder = List.of("Admissions", "Registry", "Finance", "Governance");
+        List<String> areaOrder = List.of("Admissions", "Registry", "Examinations", "Finance", "Governance");
         providers.stream().flatMap(p -> p.definitions().stream())
                 .sorted((a, b) -> Integer.compare(areaOrder.indexOf(a.area()), areaOrder.indexOf(b.area())) * 1000 + a.code().compareTo(b.code()))
                 .forEach(d -> definitions.put(d.code(), d));

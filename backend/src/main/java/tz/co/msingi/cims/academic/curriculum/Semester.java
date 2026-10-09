@@ -39,6 +39,10 @@ public class Semester extends BaseEntity {
     @Column(nullable = false)
     private LocalDate registrationCloses;
     private LocalDate lateRegistrationCloses;
+    /** From this date lecturers may enter semester-examination marks (FR-EXM-02). */
+    private LocalDate marksEntryOpens;
+    /** After this date no marks can be entered. */
+    private LocalDate marksEntryCloses;
 
     public Window window(LocalDate today) {
         if (today.isBefore(registrationOpens)) return Window.NOT_OPEN;

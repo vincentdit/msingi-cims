@@ -732,7 +732,7 @@ export interface MessageView {
 
 // ------------------------------------------------------------------ reports and dashboards (FR-RPT-01/02)
 
-export type ReportColumnType = 'TEXT' | 'NUMBER' | 'MONEY' | 'PERCENT' | 'DATE' | 'DATETIME';
+export type ReportColumnType = 'TEXT' | 'NUMBER' | 'DECIMAL' | 'MONEY' | 'PERCENT' | 'DATE' | 'DATETIME';
 
 export interface ReportCatalogueEntry { code: string; area: string; title: string; description: string; personalData: boolean; filters: string[] }
 
@@ -770,6 +770,8 @@ export interface Semester {
   registrationOpens: string;
   registrationCloses: string;
   lateRegistrationCloses?: string;
+  marksEntryOpens?: string;
+  marksEntryCloses?: string;
   window: SemesterWindow;
 }
 
@@ -954,4 +956,243 @@ export interface SemesterRegistrationSummary {
   currentStudents: number;
   notRegistered: number;
   byStatus: Record<string, number>;
+}
+
+// ------------------------------------------------------------------ examinations and results (FR-ACA-05, FR-EXM-01..07/10)
+
+export interface GradeBand {
+  grade: string;
+  minMark: number;
+  maxMark: number;
+  points: number;
+  remark?: string;
+  passing: boolean;
+}
+
+export interface ClassificationBand {
+  name: string;
+  minGpa: number;
+  maxGpa: number;
+}
+
+export interface Regulation {
+  id: number;
+  name: string;
+  awardFamily: 'NTA' | 'NVA';
+  levelFrom: number;
+  levelTo: number;
+  effectiveYearId: number;
+  effectiveYear: string;
+  caWeight: number;
+  seWeight: number;
+  caPassPercent: number;
+  sePassPercent: number;
+  caPassMark: number;
+  sePassMark: number;
+  gpaDecimals: number;
+  gpaRounding: 'ROUND' | 'TRUNCATE';
+  suppMaxFailedPercent: number;
+  suppMaxGrade?: string;
+  discontinueGpaBelow?: number;
+  notes?: string;
+  createdByName?: string;
+  inUse: boolean;
+  gradeBands: GradeBand[];
+  classifications: ClassificationBand[];
+}
+
+export interface Person {
+  id: number;
+  fullName: string;
+}
+
+export interface StaffOption extends Person {
+  roles: string[];
+}
+
+export type OfferingStatus = 'DRAFT' | 'SUBMITTED' | 'HOD_APPROVED' | 'BOARD_APPROVED';
+
+export interface OfferingSummary {
+  id: number;
+  semesterId: number;
+  semesterName: string;
+  moduleId: number;
+  code: string;
+  title: string;
+  credits: number;
+  departmentName?: string;
+  status: OfferingStatus;
+  students: number;
+  complete: number;
+  lecturers: Person[];
+  regulation: string;
+  returnedNote?: string;
+  mine: boolean;
+}
+
+export interface AssessmentComponent {
+  id?: number;
+  name: string;
+  category: 'CA' | 'SE';
+  weight: number;
+  maxScore: number;
+}
+
+export interface ScoreCell {
+  score?: number;
+  absent: boolean;
+}
+
+export interface MarksRow {
+  moduleRegistrationId: number;
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  programmeCode: string;
+  category: string;
+  scores: Record<string, ScoreCell>;
+  caTotal?: number;
+  seTotal?: number;
+  total?: number;
+  grade?: string;
+  points?: number;
+  remark: 'PASS' | 'FAIL' | 'INCOMPLETE' | 'ABSENT';
+  failReason?: string;
+}
+
+export interface MarksStats {
+  students: number;
+  graded: number;
+  passed: number;
+  passRate?: number;
+  mean?: number;
+  distribution: Record<string, number>;
+  flags: string[];
+}
+
+export interface Offering {
+  id: number;
+  semesterId: number;
+  semesterName: string;
+  academicYear: string;
+  moduleId: number;
+  code: string;
+  title: string;
+  credits: number;
+  departmentName?: string;
+  status: OfferingStatus;
+  lecturers: Person[];
+  regulationId: number;
+  regulation: string;
+  caWeight: number;
+  seWeight: number;
+  caPassMark: number;
+  sePassMark: number;
+  gradeBands: GradeBand[];
+  marksEntryOpens?: string;
+  marksEntryCloses?: string;
+  marksWindowNote: string;
+  useDepartmentBoard: boolean;
+  components: AssessmentComponent[];
+  rows: MarksRow[];
+  stats: MarksStats;
+  submittedByName?: string;
+  submittedAt?: string;
+  hodByName?: string;
+  hodAt?: string;
+  boardByName?: string;
+  boardAt?: string;
+  returnedNote?: string;
+  returnedByName?: string;
+  returnedAt?: string;
+  can: {
+    editPlan: boolean; enterCa: boolean; enterSe: boolean; submit: boolean; hodApprove: boolean; boardApprove: boolean;
+    returnToLecturer: boolean; assign: boolean;
+  };
+}
+
+export interface UploadResult {
+  updated: number;
+  errors: { row: number; message: string }[];
+}
+
+export type Decision = 'PASS' | 'SUPPLEMENTARY' | 'SPECIAL_EXAM' | 'INCOMPLETE' | 'REPEAT' | 'DISCONTINUE';
+export const DECISIONS: Decision[] = ['PASS', 'SUPPLEMENTARY', 'SPECIAL_EXAM', 'INCOMPLETE', 'REPEAT', 'DISCONTINUE'];
+export type SheetStatus = 'NOT_COMPUTED' | 'COMPUTED' | 'RECOMMENDED' | 'CONFIRMED' | 'PUBLISHED';
+
+export interface SheetSummary {
+  id?: number;
+  semesterId: number;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  yearOfStudy: number;
+  students: number;
+  status: SheetStatus;
+  modulesPending: string[];
+  computedAt?: string;
+  publishedAt?: string;
+  decisions: Record<string, number>;
+}
+
+export interface SheetRow {
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  sex?: string;
+  cells: Record<string, { grade?: string; total?: number; remark: string }>;
+  creditsRegistered: number;
+  creditsPassed: number;
+  gpa?: number;
+  cgpa?: number;
+  modulesFailed: number;
+  proposedDecision: Decision;
+  decision: Decision;
+  decisionReason?: string;
+  classification?: string;
+}
+
+export interface ResultSheet {
+  id: number;
+  semesterId: number;
+  semesterName: string;
+  academicYear: string;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+  yearOfStudy: number;
+  status: Exclude<SheetStatus, 'NOT_COMPUTED'>;
+  regulation: string;
+  modules: { moduleId: number; code: string; title: string; credits: number }[];
+  rows: SheetRow[];
+  decisions: Record<string, number>;
+  computedByName?: string;
+  computedAt?: string;
+  recommendedByName?: string;
+  recommendedAt?: string;
+  committeeNote?: string;
+  confirmedByName?: string;
+  confirmedAt?: string;
+  publishedByName?: string;
+  publishedAt?: string;
+  returnedNote?: string;
+  returnedByName?: string;
+  returnedAt?: string;
+  can: { compute: boolean; decide: boolean; recommend: boolean; confirm: boolean; publish: boolean; returnSheet: boolean };
+}
+
+export interface StudentSemesterResult {
+  id: number;
+  semesterName: string;
+  academicYear: string;
+  yearOfStudy: number;
+  publishedAt: string;
+  withheld: boolean;
+  withheldReason?: string;
+  modules: { code: string; title: string; credits: number; grade?: string; points?: number; remark: string }[];
+  creditsRegistered: number;
+  creditsPassed?: number;
+  gpa?: number;
+  cgpa?: number;
+  decision?: Decision;
 }

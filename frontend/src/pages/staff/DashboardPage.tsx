@@ -4,7 +4,7 @@ import { Alert, Box, Button, Card, CardContent, Container, Stack, Typography } f
 import Grid from '@mui/material/Grid2';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Navigate, Link as RouterLink } from 'react-router-dom';
 import { api, formatDate, formatTzs } from '../../api/client';
 import type { DashboardData } from '../../api/types';
 import { useSession } from '../../auth/session';
@@ -17,9 +17,13 @@ const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(n >= 1
 /** Role-based dashboard (FR-RPT-01): admissions, registry and finance sections as the user's roles allow. */
 export default function DashboardPage() {
   const { user } = useSession();
-  const q = useQuery({ queryKey: ['staff', 'dashboard'], queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
+  const roles = user('staff')?.roles ?? [];
+  // Lecturers and assessors have no dashboard: their work is their modules' marks.
+  const teachingOnly = roles.length > 0 && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR');
+  const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
   const d = q.data;
-  const first = user('staff')?.fullName?.split(' ')[0];
+  const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
+  if (teachingOnly) return <Navigate to="/staff/marks" replace />;
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={first ? `Welcome, ${first}` : 'Dashboard'} subtitle="Today at a glance. Figures update every minute; full detail is under Reports."

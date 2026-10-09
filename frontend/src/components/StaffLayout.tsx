@@ -9,6 +9,9 @@ import EventIcon from '@mui/icons-material/EventAvailable';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import SchoolIcon from '@mui/icons-material/School';
+import MarksIcon from '@mui/icons-material/EditNote';
+import ResultsIcon from '@mui/icons-material/FactCheck';
+import RulesIcon from '@mui/icons-material/Rule';
 import CalendarIcon from '@mui/icons-material/CalendarMonth';
 import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
@@ -21,7 +24,9 @@ import { useSession } from '../auth/session';
 import { useInstitution } from './InstitutionContext';
 
 const WIDTH = 248;
-const NAV = [
+const TEACHING = ['LECTURER', 'ASSESSOR'];
+const EXAMS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'MANAGEMENT_VIEWER'];
+const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?: string[]; teaching?: boolean }[] = [
   { to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
   { to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
   { to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
@@ -29,6 +34,9 @@ const NAV = [
   { to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
   { to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
   { to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
+  { to: '/staff/marks', label: 'Marks', icon: <MarksIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
+  { to: '/staff/results', label: 'Results', icon: <ResultsIcon />, roles: EXAMS },
+  { to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon />, roles: EXAMS },
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
@@ -45,6 +53,10 @@ export default function StaffLayout() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const me = user('staff');
+  const roles = me?.roles ?? [];
+  // Lecturers and assessors only see their marks; other menu items follow the roles that use them.
+  const teachingOnly = roles.length > 0 && roles.every((r) => TEACHING.includes(r));
+  const nav = NAV.filter((n) => (teachingOnly ? n.teaching : !n.roles || n.roles.some((r) => roles.includes(r))));
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>
@@ -54,7 +66,7 @@ export default function StaffLayout() {
       </Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
       <List sx={{ px: 1, flexGrow: 1 }}>
-        {NAV.map((n) => (
+        {nav.map((n) => (
           <ListItemButton
             key={n.to}
             component={NavLink}

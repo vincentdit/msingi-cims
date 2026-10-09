@@ -94,7 +94,7 @@ const en = {
   student: {
     portal: 'Student portal', signInTitle: 'Student sign-in', signInHint: 'Use your registration number (or mobile number) and the password you created when you applied.',
     login: 'Registration number or mobile number', notStudentYet: 'Still an applicant?', toAdmission: 'Go to the admission portal',
-    navHome: 'Home', navRegister: 'Register', navFees: 'Fees', navNotices: 'Notices', navProfile: 'Profile',
+    navHome: 'Home', navRegister: 'Register', navResults: 'Results', navFees: 'Fees', navNotices: 'Notices', navProfile: 'Profile',
     hello: 'Hello, {{name}}', year: 'Year {{n}}', regNo: 'Registration number',
     statusADMITTED: 'Admitted — report for registration', statusACTIVE: 'Registered', statusOther: 'Status: {{status}}',
     reportHint: 'Bring your original documents to Registry to complete your first registration.',
@@ -118,6 +118,15 @@ const en = {
     fields: { firstName: 'First name', middleName: 'Middle name', surname: 'Surname', dateOfBirth: 'Date of birth', phone: 'Mobile number', email: 'Email',
       region: 'Region', district: 'District', postalAddress: 'Postal address', disability: 'Disability or support needs', nextOfKinName: 'Next of kin',
       nextOfKinPhone: "Next of kin's phone", nextOfKinRelation: 'Relationship' },
+  },
+  results: {
+    title: 'Results', none: 'No results have been published for you yet. You will get an SMS when they are.',
+    yearPublished: 'Year {{year}} · published {{date}}', gpa: 'GPA', cgpa: 'CGPA', credits: 'Credits passed',
+    withheld: 'Results withheld until fees are cleared.',
+    decisionPASS: 'Pass', decisionSUPPLEMENTARY: 'Supplementary', decisionSPECIAL_EXAM: 'Special exam', decisionINCOMPLETE: 'Incomplete',
+    decisionREPEAT: 'Repeat', decisionDISCONTINUE: 'Discontinued',
+    remarkFAIL: 'Failed', remarkABSENT: 'Absent', remarkINCOMPLETE: 'Incomplete',
+    provisional: 'These are provisional results. Your statement of results and transcript are issued by the Examinations Office.',
   },
   semReg: {
     title: 'Semester registration', curriculum: 'Curriculum', yearSem: 'Year {{year}} · {{semester}}',
@@ -236,7 +245,7 @@ const sw: typeof en = {
   student: {
     portal: 'Tovuti ya mwanafunzi', signInTitle: 'Kuingia kwa mwanafunzi', signInHint: 'Tumia namba yako ya usajili (au namba ya simu) na nenosiri ulilotengeneza ulipoomba.',
     login: 'Namba ya usajili au namba ya simu', notStudentYet: 'Bado ni mwombaji?', toAdmission: 'Nenda kwenye tovuti ya udahili',
-    navHome: 'Mwanzo', navRegister: 'Sajili', navFees: 'Ada', navNotices: 'Matangazo', navProfile: 'Wasifu',
+    navHome: 'Mwanzo', navRegister: 'Sajili', navResults: 'Matokeo', navFees: 'Ada', navNotices: 'Matangazo', navProfile: 'Wasifu',
     hello: 'Habari, {{name}}', year: 'Mwaka wa {{n}}', regNo: 'Namba ya usajili',
     statusADMITTED: 'Umedahiliwa — ripoti kwa usajili', statusACTIVE: 'Umesajiliwa', statusOther: 'Hali: {{status}}',
     reportHint: 'Leta vyeti vyako halisi Ofisi ya Usajili ili kukamilisha usajili wako wa kwanza.',
@@ -260,6 +269,15 @@ const sw: typeof en = {
     fields: { firstName: 'Jina la kwanza', middleName: 'Jina la kati', surname: 'Jina la ukoo', dateOfBirth: 'Tarehe ya kuzaliwa', phone: 'Namba ya simu', email: 'Barua pepe',
       region: 'Mkoa', district: 'Wilaya', postalAddress: 'Anwani ya posta', disability: 'Ulemavu au mahitaji maalum', nextOfKinName: 'Ndugu wa karibu',
       nextOfKinPhone: 'Simu ya ndugu wa karibu', nextOfKinRelation: 'Uhusiano' },
+  },
+  results: {
+    title: 'Matokeo', none: 'Bado hakuna matokeo yaliyotolewa kwako. Utapata SMS yatakapotoka.',
+    yearPublished: 'Mwaka {{year}} · yalitolewa {{date}}', gpa: 'GPA', cgpa: 'CGPA', credits: 'Krediti ulizofaulu',
+    withheld: 'Matokeo yamezuiliwa hadi ada ilipwe.',
+    decisionPASS: 'Umefaulu', decisionSUPPLEMENTARY: 'Mtihani wa marudio', decisionSPECIAL_EXAM: 'Mtihani maalum', decisionINCOMPLETE: 'Hayajakamilika',
+    decisionREPEAT: 'Kurudia mwaka', decisionDISCONTINUE: 'Umesimamishwa masomo',
+    remarkFAIL: 'Umeshindwa', remarkABSENT: 'Hukufanya mtihani', remarkINCOMPLETE: 'Hayajakamilika',
+    provisional: 'Haya ni matokeo ya awali. Taarifa ya matokeo na nakala ya matokeo hutolewa na Ofisi ya Mitihani.',
   },
   semReg: {
     title: 'Usajili wa muhula', curriculum: 'Mtaala', yearSem: 'Mwaka {{year}} · {{semester}}',

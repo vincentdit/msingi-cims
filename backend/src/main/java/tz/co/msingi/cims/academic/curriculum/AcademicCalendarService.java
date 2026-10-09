@@ -82,6 +82,9 @@ public class AcademicCalendarService {
         if (req.registrationCloses().isBefore(req.registrationOpens())) {
             throw new BusinessRuleException("INVALID_DATES", "Registration must close after it opens");
         }
+        if (req.marksEntryOpens() != null && req.marksEntryCloses() != null && req.marksEntryCloses().isBefore(req.marksEntryOpens())) {
+            throw new BusinessRuleException("INVALID_DATES", "Marks entry must close after it opens");
+        }
         if (req.lateRegistrationCloses() != null && req.lateRegistrationCloses().isBefore(req.registrationCloses())) {
             throw new BusinessRuleException("INVALID_DATES", "Late registration must end after normal registration closes");
         }
@@ -92,6 +95,8 @@ public class AcademicCalendarService {
         s.setRegistrationOpens(req.registrationOpens());
         s.setRegistrationCloses(req.registrationCloses());
         s.setLateRegistrationCloses(req.lateRegistrationCloses());
+        s.setMarksEntryOpens(req.marksEntryOpens());
+        s.setMarksEntryCloses(req.marksEntryCloses());
     }
 
     @Transactional

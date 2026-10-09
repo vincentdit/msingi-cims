@@ -44,7 +44,8 @@ function defaultYear(years?: AcademicYear[]) {
 
 // ============================================================ academic calendar (FR-ACA-04)
 
-type SemesterForm = Omit<Semester, 'id' | 'academicYear' | 'window' | 'lateRegistrationCloses'> & { id?: number; lateRegistrationCloses: string };
+type SemesterForm = Omit<Semester, 'id' | 'academicYear' | 'window' | 'lateRegistrationCloses' | 'marksEntryOpens' | 'marksEntryCloses'>
+  & { id?: number; lateRegistrationCloses: string; marksEntryOpens: string; marksEntryCloses: string };
 type EventForm = { id?: number; academicYearId: number; semesterId: string; kind: string; title: string; startDate: string; endDate: string };
 
 export function CalendarPage() {
@@ -83,7 +84,7 @@ export function CalendarPage() {
               {canEdit && nextNo <= 3 && (
                 <Button startIcon={<AddIcon />} onClick={() => setSem({
                   academicYearId: year.id, semesterNo: nextNo, name: `Semester ${nextNo}`, startDate: '', endDate: '',
-                  registrationOpens: '', registrationCloses: '', lateRegistrationCloses: '',
+                  registrationOpens: '', registrationCloses: '', lateRegistrationCloses: '', marksEntryOpens: '', marksEntryCloses: '',
                 })}>Add semester</Button>
               )}
             </Stack>
@@ -96,7 +97,7 @@ export function CalendarPage() {
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <Typography variant="h6" sx={{ flexGrow: 1 }}>{s.name}</Typography>
                         <Chip size="small" color={WINDOW_COLOUR[s.window]} label={WINDOW_LABEL[s.window]} />
-                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => setSem({ ...s, lateRegistrationCloses: s.lateRegistrationCloses ?? '' })}><EditIcon fontSize="small" /></IconButton></Tooltip>}
+                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => setSem({ ...s, lateRegistrationCloses: s.lateRegistrationCloses ?? '', marksEntryOpens: s.marksEntryOpens ?? '', marksEntryCloses: s.marksEntryCloses ?? '' })}><EditIcon fontSize="small" /></IconButton></Tooltip>}
                       </Stack>
                       <Typography color="text.secondary">{formatDate(s.startDate)} – {formatDate(s.endDate)}</Typography>
                       <Divider sx={{ my: 1.5 }} />
@@ -104,6 +105,8 @@ export function CalendarPage() {
                       <Typography variant="body2" color="text.secondary">
                         {s.lateRegistrationCloses ? `Late registration until ${formatDate(s.lateRegistrationCloses)}` : 'No late registration period'}
                       </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}><strong>Examination marks:</strong>{' '}
+                        {s.marksEntryOpens ? `${formatDate(s.marksEntryOpens)} – ${s.marksEntryCloses ? formatDate(s.marksEntryCloses) : 'open-ended'}` : 'not opened yet'}</Typography>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -157,7 +160,7 @@ function SemesterDialog({ form: initial, year, onClose, onSaved }: { form: Semes
   const set = (k: keyof SemesterForm) => (v: string) => setF({ ...f, [k]: v });
   const save = useMutation({
     mutationFn: () => api<Semester>(f.id ? `/api/academic/semesters/${f.id}` : '/api/academic/semesters', {
-      ...staff, method: f.id ? 'PUT' : 'POST', body: { ...f, lateRegistrationCloses: f.lateRegistrationCloses || null },
+      ...staff, method: f.id ? 'PUT' : 'POST', body: { ...f, lateRegistrationCloses: f.lateRegistrationCloses || null, marksEntryOpens: f.marksEntryOpens || null, marksEntryCloses: f.marksEntryCloses || null },
     }),
     onSuccess: onSaved,
   });
@@ -176,6 +179,10 @@ function SemesterDialog({ form: initial, year, onClose, onSaved }: { form: Semes
             <Grid size={{ xs: 12, sm: 4 }}><DateField label="Opens" value={f.registrationOpens} onChange={set('registrationOpens')} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><DateField label="Closes" value={f.registrationCloses} onChange={set('registrationCloses')} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><DateField label="Late until" value={f.lateRegistrationCloses} onChange={set('lateRegistrationCloses')} required={false} helper="Optional" /></Grid>
+            <Grid size={12}><Typography variant="subtitle2">Marks entry</Typography></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><DateField label="Examination marks from" value={f.marksEntryOpens} onChange={set('marksEntryOpens')} required={false}
+              helper="Coursework marks can be entered any time before marks close" /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><DateField label="All marks close" value={f.marksEntryCloses} onChange={set('marksEntryCloses')} required={false} helper="Optional" /></Grid>
           </Grid>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
             Dates must fall within {year.code} ({formatDate(year.startDate)} – {formatDate(year.endDate)}). Students who register after the window closes are marked late.

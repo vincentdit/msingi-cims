@@ -111,6 +111,23 @@ export async function download(path: string, realm: Realm, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Sends a file as the raw request body (e.g. a filled Excel template) and returns the JSON response. */
+export async function upload<T>(path: string, realm: Realm, file: File): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type || 'application/octet-stream' };
+  if (TENANT) headers['X-Tenant'] = TENANT;
+  const token = getToken(realm);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: file });
+  } catch {
+    throw new ApiError(UNREACHABLE);
+  }
+  const data = await res.json().catch(() => undefined);
+  if (!res.ok) throw new ApiError((data as Problem) ?? { status: res.status, title: res.statusText });
+  return data as T;
+}
+
 export const formatTzs = (n: number | undefined | null) =>
   n == null ? '—' : `TZS ${Number(n).toLocaleString('en-TZ', { maximumFractionDigits: 0 })}`;
 
