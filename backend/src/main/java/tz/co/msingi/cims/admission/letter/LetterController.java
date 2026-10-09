@@ -42,6 +42,7 @@ public class LetterController {
     private static final String REVOKE = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC')";
 
     private final AdmissionLetterService service;
+    private final tz.co.msingi.cims.exams.TranscriptService transcripts;
     private RateLimiter verifyLimiter;
 
     @Value("${cims.documents.verify-rate-limit:30}")
@@ -106,11 +107,13 @@ public class LetterController {
 
     @Operation(summary = "Verify an admission letter by its code (public, rate-limited)")
     @GetMapping("/api/public/verify/{code}")
-    public ResponseEntity<LetterVerification> verify(@PathVariable String code, HttpServletRequest request) {
+    public ResponseEntity<Object> verify(@PathVariable String code, HttpServletRequest request) {
         if (!verifyLimiter.tryAcquire(clientIp(request))) {
             throw new TooManyRequestsException("Too many verification attempts. Please wait a minute and try again.");
         }
-        LetterVerification v = service.verify(code).orElseThrow(() -> new NotFoundException("No document was found with this verification code"));
+        // admission letters, then statements of results / provisional transcripts (FR-EXM-13)
+        Object v = service.verify(code).<Object>map(x -> x).or(() -> transcripts.verify(code))
+                .orElseThrow(() -> new NotFoundException("No document was found with this verification code"));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(v);
     }
 

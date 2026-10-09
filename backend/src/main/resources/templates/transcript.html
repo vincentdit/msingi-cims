@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+  Statement of results / provisional transcript (FR-EXM-13).
+  Placeholders: double braces insert a value HTML-escaped; triple braces insert markup that TranscriptRenderer builds from escaped
+  values. Must stay well-formed XHTML (the PDF renderer parses it as XML). CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Statement of results {{documentNo}}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 16mm 18mm 16mm;
+    @bottom-left { content: "{{documentNo}} · verification code {{verificationCode}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1f2937; line-height: 1.35; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2.5pt solid {{primaryColor}}; }
+  .head td { vertical-align: middle; padding-bottom: 8pt; }
+  .badge { width: 44pt; height: 44pt; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 12pt; text-align: center; line-height: 44pt; border-radius: 22pt; }
+  .inst { font-size: 14pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; }
+  .small { font-size: 8pt; }
+  h1 { font-size: 13pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #111827; margin: 12pt 0 2pt 0; }
+  .provisional { color: #b45309; font-weight: bold; font-size: 8.5pt; margin-bottom: 8pt; }
+  table.who { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt 0; }
+  table.who th { text-align: left; width: 20%; color: #4b5563; font-weight: normal; padding: 2.5pt 4pt; background: #f3f4f6; border: 0.6pt solid #e5e7eb; }
+  table.who td { padding: 2.5pt 4pt; font-weight: bold; border: 0.6pt solid #e5e7eb; width: 30%; }
+  h2 { font-size: 10pt; margin: 10pt 0 3pt 0; color: {{primaryColor}}; }
+  table.marks { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
+  table.marks th { background: #f3f4f6; text-align: left; font-weight: bold; padding: 3pt 4pt; border-bottom: 0.8pt solid #d1d5db; font-size: 8pt; }
+  table.marks td { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #e5e7eb; }
+  table.marks .r { text-align: right; }
+  table.marks .c { text-align: center; }
+  table.marks tr.sum td { font-weight: bold; border-top: 0.8pt solid #9ca3af; border-bottom: none; }
+  .fail { color: #b91c1c; }
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 12pt; page-break-inside: avoid; }
+  table.summary td { padding: 6pt 8pt; border: 0.8pt solid #d1d5db; vertical-align: middle; }
+  .big { font-size: 15pt; font-weight: bold; color: #111827; }
+  table.closing { width: 100%; border-collapse: collapse; margin-top: 14pt; page-break-inside: avoid; }
+  td.sign { width: 55%; vertical-align: top; padding-right: 10pt; }
+  td.sign .line { margin-top: 30pt; border-top: 0.6pt solid #9ca3af; width: 170pt; padding-top: 3pt; }
+  td.verify { border: 0.8pt solid #d1d5db; background: #f9fafb; padding: 6pt; vertical-align: top; }
+  .code { font-family: Courier, monospace; font-size: 10.5pt; font-weight: bold; color: #111827; }
+  .tiny { font-size: 7pt; line-height: 1.3; }
+</style>
+</head>
+<body>
+
+<table class="head">
+  <tr>
+    <td style="width: 54pt;"><div class="badge">{{institutionShortName}}</div></td>
+    <td>
+      <div class="inst">{{institutionName}}</div>
+      <div class="muted small">Registered by NACTVET: {{nactvetNo}}</div>
+      <div class="muted small">{{contactLine}}</div>
+    </td>
+  </tr>
+</table>
+
+<h1>Statement of results</h1>
+<div class="provisional">PROVISIONAL TRANSCRIPT · issued {{issuedOn}} · {{documentNo}}</div>
+
+<table class="who">
+  <tr><th>Name</th><td>{{studentName}}</td><th>Registration no.</th><td>{{registrationNo}}</td></tr>
+  <tr><th>Programme</th><td>{{programmeName}}</td><th>Award</th><td>{{awardName}}</td></tr>
+  <tr><th>Sex</th><td>{{sex}}</td><th>Date of birth</th><td>{{dateOfBirth}}</td></tr>
+  <tr><th>Entry year</th><td>{{entryYear}}</td><th>NACTVET verification</th><td>{{nactvetVerificationNo}}</td></tr>
+</table>
+
+{{{semesters}}}
+
+<table class="summary">
+  <tr>
+    <td style="width: 25%;"><div class="muted small">Credits earned</div><div class="big">{{creditsEarned}}</div></td>
+    <td style="width: 25%;"><div class="muted small">Cumulative GPA</div><div class="big">{{cgpa}}</div></td>
+    <td><div class="muted small">Classification so far</div><div class="big">{{classification}}</div></td>
+  </tr>
+</table>
+<div class="tiny muted" style="margin-top: 4pt;">{{gradingKey}}</div>
+
+<table class="closing">
+  <tr>
+    <td class="sign">
+      <div>This statement shows the results confirmed by the Governing Board up to the date of issue. It is not the final award transcript.</div>
+      <div class="line">Examinations Officer</div>
+    </td>
+    <td class="verify">
+      <table style="border-collapse: collapse;"><tr>
+        <td style="vertical-align: top; padding-right: 6pt;">{{{qrImage}}}</td>
+        <td style="vertical-align: top;">
+          <div class="tiny muted">Verify this document</div>
+          <div class="code">{{verificationCode}}</div>
+          <div class="tiny">Scan the code or enter it at {{verificationUrlBase}}</div>
+        </td>
+      </tr></table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

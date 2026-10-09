@@ -33,6 +33,9 @@ public class ModuleOffering extends BaseEntity {
 
     public enum Status { DRAFT, SUBMITTED, HOD_APPROVED, BOARD_APPROVED }
 
+    /** Supplementary and special examination marks: lecturer → Head of Department. */
+    public enum ResitStatus { DRAFT, SUBMITTED, APPROVED }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "semester_id")
     private Semester semester;
@@ -58,6 +61,14 @@ public class ModuleOffering extends BaseEntity {
     private OffsetDateTime hodAt;
     private String boardByName;
     private OffsetDateTime boardAt;
+
+    @Enumerated(EnumType.STRING)
+    private ResitStatus resitStatus;
+    private String resitSubmittedByName;
+    private OffsetDateTime resitSubmittedAt;
+    private String resitApprovedByName;
+    private OffsetDateTime resitApprovedAt;
+    private String resitReturnedNote;
 
     @OneToMany(mappedBy = "offering", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")

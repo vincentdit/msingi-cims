@@ -55,13 +55,27 @@ function Result({ v }: { v: LetterVerification }) {
   const icon = v.status === 'VALID' ? <VerifiedIcon color="success" sx={{ fontSize: 40 }} /> : v.status === 'REVOKED'
     ? <CancelIcon color="error" sx={{ fontSize: 40 }} /> : <ErrorOutlineIcon color="warning" sx={{ fontSize: 40 }} />;
   const title = v.status === 'VALID' ? t('verify.valid') : v.status === 'REVOKED' ? t('verify.revoked') : t('verify.superseded');
-  const text = v.status === 'VALID' ? t('verify.validText') : v.status === 'REVOKED' ? t('verify.revokedText')
-    : t('verify.supersededText', { n: v.currentEdition ?? '' });
-  const rows: [string, string | undefined][] = [
+  const statement = v.documentType === 'STATEMENT_OF_RESULTS';
+  const text = statement
+    ? (v.status === 'VALID' ? t('verify.statementValid') : v.status === 'REVOKED' ? t('verify.revokedText') : t('verify.statementSuperseded'))
+    : v.status === 'VALID' ? t('verify.validText') : v.status === 'REVOKED' ? t('verify.revokedText')
+      : t('verify.supersededText', { n: v.currentEdition ?? '' });
+  const rows: [string, string | undefined][] = statement ? [
+    [t('verify.document'), t('verify.statement')],
+    [t('verify.holder'), v.holderName],
+    [t('verify.regNo'), v.registrationNo],
+    [t('verify.programme'), v.programme],
+    [t('verify.upTo'), v.lastSemester],
+    [t('verify.cgpa'), v.cgpa == null ? undefined : String(v.cgpa)],
+    [t('verify.classification'), v.classification],
+    [t('verify.documentNo'), v.letterNo],
+    [t('verify.issued'), formatDate(v.issuedAt)],
+    [t('verify.institution'), v.institutionNactvetNo ? `${v.institution} (${v.institutionNactvetNo})` : v.institution],
+  ] : [
     [t('verify.holder'), v.holderName],
     [t('verify.programme'), v.programme],
     [t('verify.award'), v.award],
-    [t('verify.intake'), `${v.academicYear}, ${v.intake}`],
+    [t('verify.intake'), v.academicYear ? `${v.academicYear}, ${v.intake}` : undefined],
     [t('verify.reporting'), formatDate(v.reportingDate)],
     [t('verify.letterNo'), v.edition > 1 ? `${v.letterNo} (${t('verify.edition', { n: v.edition })})` : v.letterNo],
     [t('verify.issued'), formatDate(v.issuedAt)],

@@ -18,6 +18,8 @@ import type {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { StudentExamCard } from './ExamRecordsPages';
+import { useRoles } from './MarksPages';
 import { ChangeRequestsButton } from './ChangeRequests';
 
 const staff = { realm: 'staff' as const };
@@ -211,6 +213,7 @@ export function StudentsPage() {
   const canRegister = useCanRegister();
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(0); }, 300); return () => clearTimeout(t); }, [q]);
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  const seesRequests = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER']);
   const stats = useQuery({ queryKey: ['staff', 'student-stats'], queryFn: () => api<Record<string, number>>('/api/registry/students/stats', staff) });
   const params = new URLSearchParams({ page: String(page), size: '25' });
   if (search) params.set('q', search);
@@ -223,7 +226,7 @@ export function StudentsPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Students" subtitle="One record per student from admission to graduation."
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
-          <ChangeRequestsButton canDecide={canRegister} />
+          {seesRequests && <ChangeRequestsButton canDecide={canRegister} />}
           <Button variant="outlined" startIcon={<NumbersIcon />} onClick={() => setNumbering(true)}>Numbering</Button>
           <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!programmeId}
             onClick={() => download(`/api/registry/programmes/${programmeId}/class-list`, 'staff', `class-list-${programmeName}.csv`).catch(setDlError)}>
@@ -305,6 +308,7 @@ export function StudentDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
   const canRegister = useCanRegister();
+  const canSeeFees = useRoles()(['INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'AUDITOR', 'REGISTRAR']);
   const st = useQuery({ queryKey: ['staff', 'student', id], queryFn: () => api<StudentDetail>(`/api/registry/students/${id}`, staff) });
   const [docs, setDocs] = useState<{ item: string; verified: boolean }[]>([]);
   const [remarks, setRemarks] = useState('');
@@ -406,7 +410,8 @@ export function StudentDetailPage() {
           </Section>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
-          <StudentFeesCard studentId={s.id} />
+          {canSeeFees && <StudentFeesCard studentId={s.id} />}
+          <StudentExamCard studentId={s.id} regNo={s.registrationNo} />
           <Section title="Programme">
             <Field label="Programme" value={`${s.programmeName} (${s.programmeCode})`} />
             <Field label="Award" value={d.awardName} />

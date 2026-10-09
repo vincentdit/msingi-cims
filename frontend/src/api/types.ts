@@ -188,12 +188,18 @@ export interface LetterVerification {
   holderName: string;
   programme: string;
   award: string;
-  academicYear: string;
-  intake: string;
-  reportingDate: string;
+  academicYear?: string;
+  intake?: string;
+  reportingDate?: string;
   nactvetVerificationNo?: string;
   revokedAt?: string;
   currentEdition?: number;
+  /** statements of results (documentType STATEMENT_OF_RESULTS) */
+  registrationNo?: string;
+  cgpa?: number;
+  classification?: string;
+  creditsEarned?: number;
+  lastSemester?: string;
 }
 
 export interface Offer {
@@ -1116,8 +1122,9 @@ export interface UploadResult {
   errors: { row: number; message: string }[];
 }
 
-export type Decision = 'PASS' | 'SUPPLEMENTARY' | 'SPECIAL_EXAM' | 'INCOMPLETE' | 'REPEAT' | 'DISCONTINUE';
-export const DECISIONS: Decision[] = ['PASS', 'SUPPLEMENTARY', 'SPECIAL_EXAM', 'INCOMPLETE', 'REPEAT', 'DISCONTINUE'];
+export type Decision = 'PASS' | 'SUPPLEMENTARY' | 'SPECIAL_EXAM' | 'INCOMPLETE' | 'REPEAT' | 'DISCONTINUE' | 'CARRY_OVER';
+export const DECISIONS: Decision[] = ['PASS', 'SUPPLEMENTARY', 'SPECIAL_EXAM', 'INCOMPLETE', 'CARRY_OVER', 'REPEAT', 'DISCONTINUE'];
+export type SheetRound = 'MAIN' | 'RESIT';
 export type SheetStatus = 'NOT_COMPUTED' | 'COMPUTED' | 'RECOMMENDED' | 'CONFIRMED' | 'PUBLISHED';
 
 export interface SheetSummary {
@@ -1127,6 +1134,7 @@ export interface SheetSummary {
   programmeCode: string;
   programmeName: string;
   yearOfStudy: number;
+  round: SheetRound;
   students: number;
   status: SheetStatus;
   modulesPending: string[];
@@ -1140,7 +1148,7 @@ export interface SheetRow {
   registrationNo: string;
   name: string;
   sex?: string;
-  cells: Record<string, { grade?: string; total?: number; remark: string }>;
+  cells: Record<string, { grade?: string; total?: number; remark: string; attempt?: 'SUPPLEMENTARY' | 'SPECIAL' }>;
   creditsRegistered: number;
   creditsPassed: number;
   gpa?: number;
@@ -1161,6 +1169,7 @@ export interface ResultSheet {
   programmeCode: string;
   programmeName: string;
   yearOfStudy: number;
+  round: SheetRound;
   status: Exclude<SheetStatus, 'NOT_COMPUTED'>;
   regulation: string;
   modules: { moduleId: number; code: string; title: string; credits: number }[];
@@ -1178,6 +1187,7 @@ export interface ResultSheet {
   returnedNote?: string;
   returnedByName?: string;
   returnedAt?: string;
+  nactvetSubmissions: NactvetResultSubmission[];
   can: { compute: boolean; decide: boolean; recommend: boolean; confirm: boolean; publish: boolean; returnSheet: boolean };
 }
 
@@ -1186,13 +1196,172 @@ export interface StudentSemesterResult {
   semesterName: string;
   academicYear: string;
   yearOfStudy: number;
+  round: SheetRound;
   publishedAt: string;
   withheld: boolean;
   withheldReason?: string;
-  modules: { code: string; title: string; credits: number; grade?: string; points?: number; remark: string }[];
+  modules: { code: string; title: string; credits: number; grade?: string; points?: number; remark: string; attempt?: 'SUPPLEMENTARY' | 'SPECIAL' }[];
   creditsRegistered: number;
   creditsPassed?: number;
   gpa?: number;
   cgpa?: number;
   decision?: Decision;
+}
+
+// ------------------------------------------------------------------ resits, amendments, transcripts, NACTVET (FR-EXM-08/11/13)
+
+export interface NactvetResultSubmission {
+  id: number;
+  status: 'SUBMITTED' | 'ACCEPTED' | 'QUERIED';
+  reference?: string;
+  note?: string;
+  students: number;
+  submittedByName: string;
+  submittedAt: string;
+  responseByName?: string;
+  responseAt?: string;
+}
+
+export interface ResitSession {
+  id: number;
+  semesterId: number;
+  semesterName: string;
+  academicYear: string;
+  supplementaryFee: number;
+  specialFee: number;
+  registrationCloses: string;
+  examPeriod?: string;
+  registrationOpen: boolean;
+  eligibleStudents: number;
+  eligibleModules: number;
+  registered: number;
+  modules: { offeringId: number; code: string; title: string; supplementary: number; special: number; awaitingPayment: number; resitStatus: string }[];
+}
+
+export interface EligibleResit {
+  moduleResultId: number;
+  code: string;
+  title: string;
+  credits: number;
+  kind: 'SUPPLEMENTARY' | 'SPECIAL';
+  firstGrade?: string;
+  firstRemark: string;
+  fee: number;
+  resitId?: number;
+  resitStatus?: string;
+  paid: boolean;
+  grade?: string;
+  remark?: string;
+}
+
+export interface StudentResits {
+  sessionId?: number;
+  semesterName?: string;
+  academicYear?: string;
+  registrationCloses?: string;
+  examPeriod?: string;
+  registrationOpen: boolean;
+  modules: EligibleResit[];
+  invoiceId?: number;
+  invoiceNo?: string;
+  controlNo?: string;
+  amountDue?: number;
+}
+
+export interface ResitRow {
+  resitId: number;
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  programmeCode: string;
+  kind: 'SUPPLEMENTARY' | 'SPECIAL';
+  paid: boolean;
+  caTotal?: number;
+  firstGrade?: string;
+  score?: number;
+  absent: boolean;
+  seTotal?: number;
+  total?: number;
+  grade?: string;
+  capped: boolean;
+  remark?: string;
+  failReason?: string;
+}
+
+export interface ResitMarks {
+  offeringId: number;
+  code: string;
+  title: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED';
+  submittedByName?: string;
+  submittedAt?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  returnedNote?: string;
+  seWeight: number;
+  suppMaxGrade?: string;
+  rows: ResitRow[];
+  canEnter: boolean;
+  canSubmit: boolean;
+  canApprove: boolean;
+  canReturn: boolean;
+}
+
+export interface Amendment {
+  id: number;
+  moduleResultId: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  moduleCode: string;
+  moduleTitle: string;
+  semester: string;
+  oldCaTotal?: number;
+  oldSeTotal?: number;
+  oldTotal?: number;
+  oldGrade?: string;
+  oldRemark?: string;
+  newCaTotal: number;
+  newSeTotal: number;
+  newTotal?: number;
+  newGrade?: string;
+  newRemark?: string;
+  reason: string;
+  evidenceRef?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedByName: string;
+  requestedAt: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  canDecide: boolean;
+}
+
+export interface StudentModuleRecord {
+  moduleResultId: number;
+  semester: string;
+  code: string;
+  title: string;
+  caTotal?: number;
+  seTotal?: number;
+  total?: number;
+  grade?: string;
+  remark: string;
+  locked: boolean;
+  pendingAmendment: boolean;
+  resitKind?: 'SUPPLEMENTARY' | 'SPECIAL';
+  resitGrade?: string;
+  resitRemark?: string;
+}
+
+export interface AcademicDocumentView {
+  id: number;
+  kind: string;
+  documentNo: string;
+  verificationCode: string;
+  status: 'VALID' | 'SUPERSEDED' | 'REVOKED';
+  issuedAt: string;
+  issuedByName: string;
+  cgpa?: number;
+  semesters: number;
 }

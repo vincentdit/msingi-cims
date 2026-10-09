@@ -86,7 +86,7 @@ class ExamReports extends ReportQueries implements ReportProvider {
         Sql q = new Sql().param("sem", f.semesterId()).param("prog", f.programmeId()).param("year", f.yearOfStudy());
         List<List<Object>> head = rows("""
                 select rs.id, rs.status, reg.name from result_sheets rs join regulation_sets reg on reg.id = rs.regulation_set_id
-                where rs.semester_id = :sem and rs.programme_id = :prog and rs.year_of_study = :year""", q);
+                where rs.semester_id = :sem and rs.programme_id = :prog and rs.year_of_study = :year and rs.round = 'MAIN'""", q);
         if (head.isEmpty()) {
             return new Data(List.of(Column.text("note", "Not computed")), List.of())
                     .withNote("The Examinations Officer has not yet computed results for this class.");
@@ -135,19 +135,19 @@ class ExamReports extends ReportQueries implements ReportProvider {
         if (f.semesterId() == null) return new Data(List.of(Column.text("note", "Choose a semester")), List.of()).withNote("Choose the semester to report on.");
         Sql q = new Sql().param("sem", f.semesterId()).eq("p.id", "programme", f.programmeId());
         List<List<Object>> r = rows("""
-                select p.code, p.name, rs.year_of_study, rs.status, count(sr.id),
+                select p.code, p.name, rs.year_of_study, case rs.round when 'RESIT' then 'After resits' else 'Main' end, rs.status, count(sr.id),
                        count(sr.id) filter (where sr.decision = 'PASS'), count(sr.id) filter (where sr.decision = 'SUPPLEMENTARY'),
-                       count(sr.id) filter (where sr.decision = 'SPECIAL_EXAM'), count(sr.id) filter (where sr.decision in ('REPEAT', 'DISCONTINUE')),
+                       count(sr.id) filter (where sr.decision = 'SPECIAL_EXAM'), count(sr.id) filter (where sr.decision in ('REPEAT', 'DISCONTINUE', 'CARRY_OVER')),
                        round(avg(sr.gpa), 2)
                 from result_sheets rs join programmes p on p.id = rs.programme_id left join semester_results sr on sr.result_sheet_id = rs.id
-                where rs.semester_id = :sem""" + q + " group by p.code, p.name, rs.year_of_study, rs.status order by p.code, rs.year_of_study", q);
+                where rs.semester_id = :sem""" + q + " group by p.code, p.name, rs.year_of_study, rs.round, rs.status order by p.code, rs.year_of_study, rs.round", q);
         r.forEach(x -> {
-            x.set(3, sheetStage(String.valueOf(x.get(3))));
-            x.add(9, ratio(x.get(5), x.get(4)));
+            x.set(4, sheetStage(String.valueOf(x.get(4))));
+            x.add(10, ratio(x.get(6), x.get(5)));
         });
         Data d = new Data(List.of(Column.text("code", "Code"), Column.text("programme", "Programme"), Column.number("year", "Year"),
-                Column.text("stage", "Stage"), Column.number("students", "Students"), Column.number("pass", "Pass"),
-                Column.number("supp", "Supplementary"), Column.number("special", "Special exam"), Column.number("repeat", "Repeat or discontinue"),
+                Column.text("round", "Results"), Column.text("stage", "Stage"), Column.number("students", "Students"), Column.number("pass", "Pass"),
+                Column.number("supp", "Supplementary"), Column.number("special", "Special exam"), Column.number("repeat", "Carry over, repeat or discontinue"),
                 Column.percent("passRate", "Pass %"), Column.decimal("gpa", "Average GPA")), r);
         return d;
     }

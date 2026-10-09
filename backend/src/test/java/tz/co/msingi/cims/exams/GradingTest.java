@@ -33,6 +33,7 @@ class GradingTest {
         rs.setGpaRounding(r.gpaRounding());
         rs.setSuppMaxFailedPercent(r.suppMaxFailedPercent());
         rs.setDiscontinueGpaBelow(r.discontinueGpaBelow());
+        rs.setSuppMaxGrade(r.suppMaxGrade());
         for (GradeBandDto b : r.gradeBands()) {
             GradeBand g = new GradeBand();
             g.setGrade(b.grade());
@@ -171,6 +172,31 @@ class GradingTest {
         assertThatThrownBy(() -> RegulationService.checkBands(overlap)).hasMessageContaining("overlaps");
         List<GradeBandDto> noPass = ok.stream().map(b -> new GradeBandDto(b.grade(), b.minMark(), b.maxMark(), b.points(), null, false)).toList();
         assertThatThrownBy(() -> RegulationService.checkBands(noPass)).hasMessage("At least one grade must be a pass");
+    }
+
+    @Test
+    void aSupplementaryIsCappedAndASpecialExamIsNot() {
+        ModuleOutcome supp = Grading.resit(CERT, new BigDecimal("24"), new BigDecimal("85"), false, true);   // 24 + 51 = 75, a B
+        assertThat(supp.total()).isEqualByComparingTo("75");
+        assertThat(supp.grade()).isEqualTo("C");
+        assertThat(supp.points()).isEqualByComparingTo("2");
+        assertThat(Grading.capped(CERT, supp)).isTrue();
+        ModuleOutcome special = Grading.resit(CERT, new BigDecimal("24"), new BigDecimal("85"), false, false);
+        assertThat(special.grade()).isEqualTo("B");
+        assertThat(Grading.capped(CERT, special)).isFalse();
+        assertThat(Grading.resit(CERT, new BigDecimal("12"), new BigDecimal("100"), false, true).remark()).isEqualTo(Remark.FAIL); // CA below 20
+        assertThat(Grading.resit(CERT, new BigDecimal("30"), null, true, true).remark()).isEqualTo(Remark.ABSENT);
+        // a C on a supplementary stays a C
+        assertThat(Grading.capped(CERT, Grading.resit(CERT, new BigDecimal("24"), new BigDecimal("50"), false, true))).isFalse();
+    }
+
+    @Test
+    void afterResitsAFewFailedModulesAreCarriedOver() {
+        ModuleOutcome pass = outcome(Remark.PASS), fail = outcome(Remark.FAIL);
+        assertThat(Grading.decideAfterResits(CERT, List.of(pass, pass, pass), new BigDecimal("2.5"))).isEqualTo(Decision.PASS);
+        assertThat(Grading.decideAfterResits(CERT, List.of(pass, pass, fail), new BigDecimal("2.3"))).isEqualTo(Decision.CARRY_OVER);
+        assertThat(Grading.decideAfterResits(CERT, List.of(pass, fail), new BigDecimal("1.5"))).isEqualTo(Decision.DISCONTINUE);
+        assertThat(Grading.decideAfterResits(CERT, List.of(pass, outcome(Remark.ABSENT)), null)).isEqualTo(Decision.INCOMPLETE);
     }
 
     private static ModuleOutcome outcome(Remark r) {

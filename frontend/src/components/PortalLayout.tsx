@@ -60,7 +60,7 @@ export default function PortalLayout() {
               {inst.name}{inst.nactvetRegNo ? ` · NACTVET ${inst.nactvetRegNo}` : ''}
               {inst.contactPhone ? ` · ${inst.contactPhone}` : ''}{inst.contactEmail ? ` · ${inst.contactEmail}` : ''}
             </Typography>
-            <Stack direction="row" spacing={2} sx={{ '& > *': { whiteSpace: 'nowrap' } }}>
+            <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" rowGap={0.5} sx={{ '& > *': { whiteSpace: 'nowrap' } }}>
               <Typography variant="body2" color="text.secondary" component={RouterLink} to="/verify" sx={{ textDecoration: 'none' }}>
                 {t('verify.title')}
               </Typography>

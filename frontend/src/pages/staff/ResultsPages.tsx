@@ -15,7 +15,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import {
   DECISIONS, type AcademicYear, type ClassificationBand, type Decision, type GradeBand, type Regulation, type ResultSheet, type SheetRow,
-  type SheetSummary,
+  type SheetSummary, type ResitSession, type NactvetResultSubmission,
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles, useSemesterChoice } from './MarksPages';
@@ -23,8 +23,9 @@ import { useRoles, useSemesterChoice } from './MarksPages';
 const staff = { realm: 'staff' as const };
 export const DECISION_LABEL: Record<Decision, string> = {
   PASS: 'Pass', SUPPLEMENTARY: 'Supplementary', SPECIAL_EXAM: 'Special exam', INCOMPLETE: 'Incomplete', REPEAT: 'Repeat', DISCONTINUE: 'Discontinue',
+  CARRY_OVER: 'Carry over',
 };
-export const DECISION_COLOUR = { PASS: 'success', SUPPLEMENTARY: 'warning', SPECIAL_EXAM: 'info', INCOMPLETE: 'default', REPEAT: 'error', DISCONTINUE: 'error' } as const;
+export const DECISION_COLOUR = { PASS: 'success', SUPPLEMENTARY: 'warning', SPECIAL_EXAM: 'info', INCOMPLETE: 'default', REPEAT: 'error', DISCONTINUE: 'error', CARRY_OVER: 'warning' } as const;
 const SHEET_STAGE = {
   NOT_COMPUTED: 'Not computed', COMPUTED: 'With Academic Committee', RECOMMENDED: 'With Governing Board', CONFIRMED: 'Confirmed: ready to publish', PUBLISHED: 'Published',
 } as const;
@@ -43,7 +44,7 @@ export function ResultSheetsPage() {
     queryFn: () => api<SheetSummary[]>(`/api/exams/sheets?semesterId=${semesterId}`, staff),
   });
   const compute = useMutation({
-    mutationFn: (x: SheetSummary) => api<ResultSheet>('/api/exams/sheets/compute', { ...staff, method: 'POST', body: { semesterId, programmeId: x.programmeId, yearOfStudy: x.yearOfStudy } }),
+    mutationFn: (x: SheetSummary) => api<ResultSheet>('/api/exams/sheets/compute', { ...staff, method: 'POST', body: { semesterId, programmeId: x.programmeId, yearOfStudy: x.yearOfStudy, round: x.round } }),
     onSuccess: (s) => { qc.invalidateQueries({ queryKey: ['staff', 'sheets'] }); navigate(`/staff/results/${s.id}`); },
   });
   const officer = can(['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER']);
@@ -51,21 +52,23 @@ export function ResultSheetsPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Results" subtitle="Class result sheets: computed by the Examinations Officer, reviewed by the Academic Committee, confirmed by the Governing Board, then published." action={picker} />
       <ErrorAlert error={semesters.error ?? list.error ?? compute.error} />
+      {semesterId && <ResitSessionCard semesterId={semesterId} canEdit={officer} />}
       {list.isLoading && <Loading />}
       <Stack spacing={1.5}>
         {list.data?.map((x) => (
-          <Card key={`${x.programmeId}-${x.yearOfStudy}`}>
+          <Card key={`${x.programmeId}-${x.yearOfStudy}-${x.round}`} sx={{ ml: x.round === 'RESIT' ? { md: 4 } : 0 }}>
             <CardContent>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                   <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
-                    <Typography variant="h6" sx={{ fontSize: 17 }}>{x.programmeCode} · Year {x.yearOfStudy}</Typography>
+                    <Typography variant="h6" sx={{ fontSize: 17 }}>{x.programmeCode} · Year {x.yearOfStudy}{x.round === 'RESIT' && ' · after resits'}</Typography>
                     <Chip size="small" color={SHEET_COLOUR[x.status]} label={SHEET_STAGE[x.status]} />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">{x.programmeName} · {x.students} student{x.students === 1 ? '' : 's'}
                     {x.publishedAt && <> · published {formatDate(x.publishedAt)}</>}</Typography>
                   {x.modulesPending.length > 0 && (
-                    <Typography variant="body2" color="warning.main" sx={{ mt: 0.5 }}>Waiting for department approval: {x.modulesPending.join(', ')}</Typography>
+                    <Typography variant="body2" color="warning.main" sx={{ mt: 0.5 }}>
+                      {x.round === 'RESIT' ? 'Waiting for approval of resit marks: ' : 'Waiting for department approval: '}{x.modulesPending.join(', ')}</Typography>
                   )}
                   {Object.keys(x.decisions).length > 0 && (
                     <Stack direction="row" spacing={0.5} sx={{ mt: 1 }} useFlexGap flexWrap="wrap">
@@ -116,9 +119,9 @@ export function ResultSheetPage() {
   return (
     <Container maxWidth="xl" disableGutters>
       <Button component={RouterLink} to="/staff/results" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Results</Button>
-      <PageTitle title={`${s.programmeCode} year ${s.yearOfStudy} · ${s.semesterName} ${s.academicYear}`}
+      <PageTitle title={`${s.programmeCode} year ${s.yearOfStudy} · ${s.semesterName} ${s.academicYear}${s.round === 'RESIT' ? ' · after resits' : ''}`}
         subtitle={<>{s.programmeName} · {s.rows.length} student{s.rows.length === 1 ? '' : 's'} · {s.regulation}</>}
-        action={
+        action={s.round === 'MAIN' &&
           <Stack direction="row" spacing={1}>
             <Button startIcon={<DownloadIcon />} onClick={() => download(exportUrl, 'staff', `${s.programmeCode} Y${s.yearOfStudy} ${s.semesterName} results.xlsx`)}>Excel</Button>
             <Button startIcon={<DownloadIcon />} onClick={() => download(exportUrl.replace('format=xlsx', 'format=pdf'), 'staff', `${s.programmeCode} Y${s.yearOfStudy} ${s.semesterName} results.pdf`)}>PDF</Button>
@@ -177,7 +180,7 @@ export function ResultSheetPage() {
                   return (
                     <TableCell key={m.code} align="center" sx={{ color: colour, fontWeight: 600 }}>
                       <Tooltip title={c ? `${c.total ?? '—'} · ${c.remark.toLowerCase()}` : 'Not registered'}>
-                        <span>{!c ? '' : c.grade ?? (c.remark === 'ABSENT' ? 'ABS' : 'I')}</span>
+                        <span>{!c ? '' : c.grade ?? (c.remark === 'ABSENT' ? 'ABS' : 'I')}{c?.attempt && <sup style={{ fontSize: 9, marginLeft: 1 }}>{c.attempt === 'SPECIAL' ? 'sp' : 's'}</sup>}</span>
                       </Tooltip>
                     </TableCell>
                   );
@@ -201,11 +204,156 @@ export function ResultSheetPage() {
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        Red: failed · ABS: absent from the examination · I: incomplete · * changed by the Academic Committee. Classification is provisional, on the CGPA so far.
+        Red: failed · ABS: absent from the examination · I: incomplete · * changed by the Academic Committee{s.round === 'RESIT' && ' · s: supplementary (capped) · sp: special examination'}. Classification is provisional, on the CGPA so far.
       </Typography>
+      {(s.status === 'CONFIRMED' || s.status === 'PUBLISHED') && <NactvetCard sheet={s} onChange={done} />}
       {deciding && <DecisionDialog sheetId={s.id} row={deciding} onClose={() => setDeciding(null)} onDone={(x) => { done(x); setDeciding(null); }} />}
       {noteFor && <NoteDialog sheetId={s.id} what={noteFor} onClose={() => setNoteFor(null)} onDone={(x) => { done(x); setNoteFor(null); }} />}
     </Container>
+  );
+}
+
+// ============================================================ supplementary and special examinations (FR-EXM-08, BP-10)
+
+function ResitSessionCard({ semesterId, canEdit }: { semesterId: number; canEdit: boolean }) {
+  const navigate = useNavigate();
+  const q = useQuery({ queryKey: ['staff', 'resit-session', semesterId], queryFn: async () => (await api<ResitSession | undefined>(`/api/exams/resit-sessions?semesterId=${semesterId}`, staff)) ?? null });
+  const [open, setOpen] = useState(false);
+  const s = q.data;
+  if (q.isLoading || (!s && !canEdit)) return null;
+  return (
+    <Card sx={{ mb: 2, borderLeft: 4, borderColor: s ? 'warning.main' : 'divider' }}>
+      <CardContent>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ md: 'center' }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontSize: 17 }}>Supplementary and special examinations</Typography>
+            {s ? (
+              <Typography variant="body2" color="text.secondary">
+                {s.eligibleStudents} student{s.eligibleStudents === 1 ? '' : 's'} eligible for {s.eligibleModules} module{s.eligibleModules === 1 ? '' : 's'} · {s.registered} registered ·
+                fee {Number(s.supplementaryFee).toLocaleString()} (supplementary) / {Number(s.specialFee).toLocaleString()} (special) per module ·
+                registration {s.registrationOpen ? `open until ${formatDate(s.registrationCloses)}` : `closed ${formatDate(s.registrationCloses)}`}
+                {s.examPeriod && ` · ${s.examPeriod}`}
+              </Typography>
+            ) : <Typography variant="body2" color="text.secondary">Once a class's results are published, open registration for students with a supplementary or special-examination decision.</Typography>}
+          </Box>
+          {canEdit && <Button variant={s ? 'outlined' : 'contained'} onClick={() => setOpen(true)} sx={{ flexShrink: 0 }}>{s ? 'Edit' : 'Open resits'}</Button>}
+        </Stack>
+        {s && s.modules.length > 0 && (
+          <Table size="small" sx={{ mt: 1.5 }}>
+            <TableHead><TableRow><TableCell>Module</TableCell><TableCell align="right">Supplementary</TableCell><TableCell align="right">Special</TableCell>
+              <TableCell align="right">Awaiting payment</TableCell><TableCell>Resit marks</TableCell></TableRow></TableHead>
+            <TableBody>
+              {s.modules.map((m) => (
+                <TableRow key={m.offeringId} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/staff/marks/${m.offeringId}`)}>
+                  <TableCell><strong>{m.code}</strong> {m.title}</TableCell><TableCell align="right">{m.supplementary}</TableCell>
+                  <TableCell align="right">{m.special}</TableCell><TableCell align="right">{m.awaitingPayment}</TableCell>
+                  <TableCell><Chip size="small" color={m.resitStatus === 'APPROVED' ? 'success' : m.resitStatus === 'SUBMITTED' ? 'info' : 'default'}
+                    label={{ DRAFT: 'With lecturer', SUBMITTED: 'With Head of Department', APPROVED: 'Approved' }[m.resitStatus] ?? m.resitStatus} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      {open && <ResitSessionDialog semesterId={semesterId} session={s} onClose={() => setOpen(false)} onDone={() => { setOpen(false); q.refetch(); }} />}
+    </Card>
+  );
+}
+
+function ResitSessionDialog({ semesterId, session, onClose, onDone }: { semesterId: number; session?: ResitSession | null; onClose: () => void; onDone: () => void }) {
+  const [f, setF] = useState({ supplementaryFee: String(session?.supplementaryFee ?? 0), specialFee: String(session?.specialFee ?? 0),
+    registrationCloses: session?.registrationCloses ?? '', examPeriod: session?.examPeriod ?? '' });
+  const m = useMutation({
+    mutationFn: () => api(`/api/exams/semesters/${semesterId}/resit-session`, { ...staff, method: 'PUT',
+      body: { ...f, supplementaryFee: Number(f.supplementaryFee), specialFee: Number(f.specialFee), examPeriod: f.examPeriod || null } }),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{session ? 'Resit session' : 'Open supplementary and special examinations'}</DialogTitle>
+      <DialogContent>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid size={6}><TextField fullWidth type="number" label="Fee per supplementary (TZS)" value={f.supplementaryFee} onChange={(e) => setF({ ...f, supplementaryFee: e.target.value })} /></Grid>
+          <Grid size={6}><TextField fullWidth type="number" label="Fee per special exam (TZS)" value={f.specialFee} onChange={(e) => setF({ ...f, specialFee: e.target.value })} helperText="Often free" /></Grid>
+          <Grid size={6}><TextField fullWidth type="date" label="Students register by" value={f.registrationCloses} onChange={(e) => setF({ ...f, registrationCloses: e.target.value })}
+            slotProps={{ inputLabel: { shrink: true } }} /></Grid>
+          <Grid size={6}><TextField fullWidth label="Examination period" placeholder="e.g. 10–14 July 2028" value={f.examPeriod} onChange={(e) => setF({ ...f, examPeriod: e.target.value })} /></Grid>
+        </Grid>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Students with a published Supplementary decision can register for their failed modules; with Special exam, for the modules they missed. A GePG invoice is raised for any fee,
+          and lecturers enter marks only for students who have paid. Supplementary grades are capped by the examination regulations.
+        </Typography>
+        <ErrorAlert error={m.error} />
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={!f.registrationCloses || m.isPending} onClick={() => m.mutate()}>Save</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+// ============================================================ NACTVET results submission (FR-EXM-11)
+
+function NactvetCard({ sheet, onChange }: { sheet: ResultSheet; onChange: (s: ResultSheet) => void }) {
+  const can = useRoles()(['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER']);
+  const qc = useQueryClient();
+  const [form, setForm] = useState<{ reference: string; note: string } | null>(null);
+  const refresh = () => api<ResultSheet>(`/api/exams/sheets/${sheet.id}`, staff).then((x) => { onChange(x); qc.invalidateQueries({ queryKey: ['staff', 'sheets'] }); });
+  const submit = useMutation({ mutationFn: () => api(`/api/exams/sheets/${sheet.id}/nactvet-submissions`, { ...staff, method: 'POST', body: form }), onSuccess: () => { setForm(null); refresh(); } });
+  const respond = useMutation({
+    mutationFn: (x: { id: number; status: 'ACCEPTED' | 'QUERIED'; note?: string }) => api(`/api/exams/nactvet-submissions/${x.id}`, { ...staff, method: 'PUT', body: { status: x.status, note: x.note } }),
+    onSuccess: refresh,
+  });
+  const label = (x: NactvetResultSubmission) => ({ SUBMITTED: 'Sent, awaiting NACTVET', ACCEPTED: 'Accepted by NACTVET', QUERIED: 'Queried by NACTVET' }[x.status]);
+  return (
+    <Card sx={{ mt: 2 }}>
+      <CardContent>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} alignItems={{ sm: 'center' }}>
+          <Box>
+            <Typography variant="h6">NACTVET results submission</Typography>
+            <Typography variant="body2" color="text.secondary">Download the results file, upload it to NACTVET, then record the submission and NACTVET's response here.</Typography>
+          </Box>
+          {can && (
+            <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+              <Button startIcon={<DownloadIcon />} onClick={() => download(`/api/exams/sheets/${sheet.id}/nactvet-file`, 'staff', `NACTVET results ${sheet.programmeCode} Y${sheet.yearOfStudy}.xlsx`)}>Results file</Button>
+              <Button variant="outlined" onClick={() => setForm({ reference: '', note: '' })}>Record submission</Button>
+            </Stack>
+          )}
+        </Stack>
+        <ErrorAlert error={submit.error ?? respond.error} />
+        {sheet.nactvetSubmissions.length > 0 && (
+          <Table size="small" sx={{ mt: 1.5 }}>
+            <TableHead><TableRow><TableCell>Sent</TableCell><TableCell>Reference</TableCell><TableCell>Status</TableCell><TableCell>Note</TableCell>{can && <TableCell />}</TableRow></TableHead>
+            <TableBody>
+              {sheet.nactvetSubmissions.map((x) => (
+                <TableRow key={x.id}>
+                  <TableCell>{formatDateTime(x.submittedAt)}<br /><Typography variant="caption" color="text.secondary">{x.submittedByName} · {x.students} student{x.students === 1 ? '' : 's'}</Typography></TableCell>
+                  <TableCell>{x.reference ?? '—'}</TableCell>
+                  <TableCell><Chip size="small" color={x.status === 'ACCEPTED' ? 'success' : x.status === 'QUERIED' ? 'warning' : 'info'} label={label(x)} /></TableCell>
+                  <TableCell>{x.note ?? ''}</TableCell>
+                  {can && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{x.status === 'SUBMITTED' && (
+                    <>
+                      <Button size="small" color="success" onClick={() => respond.mutate({ id: x.id, status: 'ACCEPTED' })}>Accepted</Button>
+                      <Button size="small" color="warning" onClick={() => { const n = window.prompt("NACTVET's query"); if (n) respond.mutate({ id: x.id, status: 'QUERIED', note: n }); }}>Queried</Button>
+                    </>
+                  )}</TableCell>}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      {form && (
+        <Dialog open onClose={() => setForm(null)} fullWidth maxWidth="sm">
+          <DialogTitle>Record the submission to NACTVET</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField label="NACTVET reference (if given)" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+              <TextField label="Note" multiline minRows={2} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="e.g. Uploaded on the NACTVET results portal" />
+            </Stack>
+          </DialogContent>
+          <DialogActions><Button onClick={() => setForm(null)}>Cancel</Button><Button variant="contained" onClick={() => submit.mutate()} disabled={submit.isPending}>Save</Button></DialogActions>
+        </Dialog>
+      )}
+    </Card>
   );
 }
 

@@ -32,6 +32,9 @@ public class ResultSheet extends BaseEntity {
 
     public enum Status { COMPUTED, RECOMMENDED, CONFIRMED, PUBLISHED }
 
+    /** MAIN: the semester's results; RESIT: the class's results after supplementary and special examinations. */
+    public enum Round { MAIN, RESIT }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "semester_id")
     private Semester semester;
@@ -42,6 +45,10 @@ public class ResultSheet extends BaseEntity {
 
     @Column(nullable = false)
     private short yearOfStudy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Round round = Round.MAIN;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "regulation_set_id")

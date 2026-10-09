@@ -37,7 +37,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RegistryController {
 
-    private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','DEPUTY_PRINCIPAL_ACADEMIC','ADMISSIONS_OFFICER','HEAD_OF_DEPARTMENT','MANAGEMENT_VIEWER')";
+    private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','DEPUTY_PRINCIPAL_ACADEMIC','ADMISSIONS_OFFICER','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','MANAGEMENT_VIEWER')";
     private static final String REGISTRY = "hasAnyRole('INSTITUTION_ADMIN','REGISTRAR')";
 
     private final RegistryService service;

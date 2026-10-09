@@ -58,7 +58,8 @@ public final class ExamRepositories {
         @EntityGraph(attributePaths = {"programme", "semester", "regulationSet"})
         List<ResultSheet> findBySemesterIdOrderByProgrammeIdAscYearOfStudyAsc(Long semesterId);
 
-        Optional<ResultSheet> findBySemesterIdAndProgrammeIdAndYearOfStudy(Long semesterId, Long programmeId, short yearOfStudy);
+        Optional<ResultSheet> findBySemesterIdAndProgrammeIdAndYearOfStudyAndRound(Long semesterId, Long programmeId, short yearOfStudy,
+                                                                                    ResultSheet.Round round);
 
         long countByRegulationSetId(Long regulationSetId);
     }
@@ -66,5 +67,44 @@ public final class ExamRepositories {
     public interface SemesterResultRepository extends JpaRepository<SemesterResult, Long> {
         @EntityGraph(attributePaths = {"sheet", "sheet.semester", "sheet.semester.academicYear"})
         List<SemesterResult> findByStudentIdOrderByIdAsc(Long studentId);
+    }
+
+    public interface ResitSessionRepository extends JpaRepository<ResitSession, Long> {
+        Optional<ResitSession> findBySemesterId(Long semesterId);
+    }
+
+    public interface ResitRepository extends JpaRepository<Resit, Long> {
+        @EntityGraph(attributePaths = {"moduleResult", "session"})
+        List<Resit> findByOfferingIdAndStatus(Long offeringId, Resit.Status status);
+
+        @EntityGraph(attributePaths = {"moduleResult", "session"})
+        List<Resit> findByStudentIdAndStatus(Long studentId, Resit.Status status);
+
+        @EntityGraph(attributePaths = {"moduleResult"})
+        List<Resit> findBySessionIdAndStatus(Long sessionId, Resit.Status status);
+
+        Optional<Resit> findByModuleResultId(Long moduleResultId);
+    }
+
+    public interface ResultAmendmentRepository extends JpaRepository<ResultAmendment, Long> {
+        @EntityGraph(attributePaths = "moduleResult")
+        List<ResultAmendment> findByStatusOrderByRequestedAtDesc(ResultAmendment.Status status);
+
+        @EntityGraph(attributePaths = "moduleResult")
+        List<ResultAmendment> findTop100ByOrderByRequestedAtDesc();
+
+        boolean existsByModuleResultIdAndStatus(Long moduleResultId, ResultAmendment.Status status);
+    }
+
+    public interface AcademicDocumentRepository extends JpaRepository<AcademicDocument, Long> {
+        List<AcademicDocument> findByStudentIdOrderByIssuedAtDesc(Long studentId);
+
+        Optional<AcademicDocument> findFirstByStudentIdAndKindAndStatus(Long studentId, AcademicDocument.Kind kind, AcademicDocument.Status status);
+
+        Optional<AcademicDocument> findByVerificationCode(String verificationCode);
+    }
+
+    public interface NactvetResultSubmissionRepository extends JpaRepository<NactvetResultSubmission, Long> {
+        List<NactvetResultSubmission> findBySheetIdOrderBySubmittedAtDesc(Long sheetId);
     }
 }

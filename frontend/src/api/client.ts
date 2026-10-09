@@ -95,14 +95,17 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   return data as T;
 }
 
-/** Downloads a file from the API with the session token (e.g. CSV exports). */
-export async function download(path: string, realm: Realm, filename: string) {
+/** Downloads a file from the API with the session token (e.g. CSV exports); method POST for documents issued on request. */
+export async function download(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET') {
   const headers: Record<string, string> = {};
   if (TENANT) headers['X-Tenant'] = TENANT;
   const token = getToken(realm);
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (!res.ok) throw new ApiError({ status: res.status, title: 'Download failed', detail: 'The file could not be downloaded.' });
+  const res = await fetch(`${API_BASE}${path}`, { headers, method });
+  if (!res.ok) {
+    const problem = await res.json().catch(() => undefined);
+    throw new ApiError(problem ?? { status: res.status, title: 'Download failed', detail: 'The file could not be downloaded.' });
+  }
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement('a');
   a.href = url;

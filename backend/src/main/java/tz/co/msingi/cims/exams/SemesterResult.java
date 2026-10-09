@@ -21,7 +21,7 @@ import java.math.BigDecimal;
 @Table(name = "semester_results")
 public class SemesterResult extends TenantScopedEntity {
 
-    public enum Decision { PASS, SUPPLEMENTARY, SPECIAL_EXAM, INCOMPLETE, REPEAT, DISCONTINUE }
+    public enum Decision { PASS, SUPPLEMENTARY, SPECIAL_EXAM, INCOMPLETE, REPEAT, DISCONTINUE, CARRY_OVER }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "result_sheet_id")

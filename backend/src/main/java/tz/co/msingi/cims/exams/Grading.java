@@ -120,6 +120,65 @@ public final class Grading {
         return Decision.REPEAT;
     }
 
+    /**
+     * Grades a supplementary or special examination (FR-EXM-08): coursework is carried from the first attempt, the resit (out of 100)
+     * replaces the semester examination at its weight. A supplementary grade is capped at the regulations' supplementary grade.
+     */
+    public static ModuleOutcome resit(RegulationSet rs, BigDecimal caTotal, BigDecimal score, boolean absent, boolean supplementary) {
+        BigDecimal ca = caTotal == null ? BigDecimal.ZERO : caTotal;
+        if (absent) return new ModuleOutcome(ca, BigDecimal.ZERO.setScale(2), null, null, null, Remark.ABSENT, "Absent from the "
+                + (supplementary ? "supplementary" : "special") + " examination");
+        if (score == null) return new ModuleOutcome(ca, null, null, null, null, Remark.INCOMPLETE, "Mark missing");
+        BigDecimal se = score.multiply(rs.getSeWeight()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal total = ca.add(se).setScale(0, RoundingMode.HALF_UP).min(HUNDRED);
+        GradeBand band = band(rs, total);
+        String reason = null;
+        if (!band.isPassing()) reason = "Grade " + band.getGrade() + " is not a pass";
+        else if (ca.compareTo(caPassMark(rs)) < 0) reason = "Coursework " + plain(ca) + " is below the pass mark of " + plain(caPassMark(rs));
+        else if (se.compareTo(sePassMark(rs)) < 0) reason = "Examination " + plain(se) + " is below the pass mark of " + plain(sePassMark(rs));
+        String grade = band.getGrade();
+        BigDecimal points = band.getPoints();
+        if (supplementary && rs.getSuppMaxGrade() != null) {
+            GradeBand cap = rs.getGradeBands().stream().filter(b -> b.getGrade().equalsIgnoreCase(rs.getSuppMaxGrade())).findFirst().orElse(null);
+            if (cap != null && band.getPoints().compareTo(cap.getPoints()) > 0) {
+                grade = cap.getGrade();
+                points = cap.getPoints();
+            }
+        }
+        return new ModuleOutcome(ca, se, total, grade, points, reason == null ? Remark.PASS : Remark.FAIL, reason);
+    }
+
+    /** Grades from corrected CA and SE totals (an amendment to a confirmed result). */
+    public static ModuleOutcome fromTotals(RegulationSet rs, BigDecimal ca, BigDecimal se) {
+        BigDecimal total = ca.add(se).setScale(0, RoundingMode.HALF_UP).min(HUNDRED);
+        GradeBand band = band(rs, total);
+        String reason = null;
+        if (!band.isPassing()) reason = "Grade " + band.getGrade() + " is not a pass";
+        else if (ca.compareTo(caPassMark(rs)) < 0) reason = "Coursework " + plain(ca) + " is below the pass mark of " + plain(caPassMark(rs));
+        else if (se.compareTo(sePassMark(rs)) < 0) reason = "Examination " + plain(se) + " is below the pass mark of " + plain(sePassMark(rs));
+        return new ModuleOutcome(ca, se, total, band.getGrade(), band.getPoints(), reason == null ? Remark.PASS : Remark.FAIL, reason);
+    }
+
+    /** Whether a resit grade was lowered to the supplementary cap. */
+    public static boolean capped(RegulationSet rs, ModuleOutcome o) {
+        return o.total() != null && !band(rs, o.total()).getGrade().equals(o.grade());
+    }
+
+    /**
+     * The decision after supplementary and special examinations: missed again or missing → incomplete; nothing failed → pass; a few
+     * failed (under the supplementary limit) → carry over; otherwise discontinue below the GPA threshold, else repeat.
+     */
+    public static Decision decideAfterResits(RegulationSet rs, Collection<ModuleOutcome> modules, BigDecimal gpa) {
+        long missing = modules.stream().filter(m -> m.remark() == Remark.ABSENT || m.remark() == Remark.INCOMPLETE).count();
+        long failed = modules.stream().filter(m -> m.remark() == Remark.FAIL).count();
+        if (missing > 0) return Decision.INCOMPLETE;
+        if (failed == 0) return Decision.PASS;
+        BigDecimal failedPercent = BigDecimal.valueOf(failed * 100).divide(BigDecimal.valueOf(modules.size()), 2, RoundingMode.HALF_UP);
+        if (failedPercent.compareTo(rs.getSuppMaxFailedPercent()) < 0) return Decision.CARRY_OVER;
+        if (rs.getDiscontinueGpaBelow() != null && gpa != null && gpa.compareTo(rs.getDiscontinueGpaBelow()) < 0) return Decision.DISCONTINUE;
+        return Decision.REPEAT;
+    }
+
     static String plain(BigDecimal n) {
         return n.stripTrailingZeros().toPlainString();
     }

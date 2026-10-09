@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, upload } from '../../api/client';
-import type { AssessmentComponent, MarksRow, Offering, OfferingStatus, OfferingSummary, Semester, StaffOption, UploadResult } from '../../api/types';
+import type { AssessmentComponent, MarksRow, Offering, OfferingStatus, OfferingSummary, ResitMarks, Semester, StaffOption, UploadResult } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 
@@ -450,6 +450,7 @@ export function OfferingPage() {
           </Stack>
         </Grid>
       </Grid>
+      <ResitMarksCard offeringId={o.id} />
       {planOpen && <PlanDialog o={o} onClose={() => setPlanOpen(false)} onSaved={(x) => { put(x); setPlanOpen(false); }} />}
       {assigning && <AssignDialog offering={o} onClose={() => setAssigning(false)} onDone={() => { setAssigning(false); q.refetch(); }} />}
       {returning && <ReturnDialog id={o.id} onClose={() => setReturning(false)} onDone={(x) => { put(x); setReturning(false); }} />}
@@ -539,5 +540,102 @@ function ReturnDialog({ id, onClose, onDone }: { id: number; onClose: () => void
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button><Button color="warning" variant="contained" disabled={!note.trim() || m.isPending} onClick={() => m.mutate()}>Return</Button></DialogActions>
     </Dialog>
+  );
+}
+
+// ============================================================ supplementary and special examination marks (FR-EXM-08)
+
+function ResitMarksCard({ offeringId }: { offeringId: number }) {
+  const qc = useQueryClient();
+  const key = ['staff', 'resit-marks', offeringId];
+  const q = useQuery({ queryKey: key, queryFn: () => api<ResitMarks>(`/api/exams/offerings/${offeringId}/resits`, staff) });
+  const [edits, setEdits] = useState<Record<number, string>>({});
+  const [returning, setReturning] = useState(false);
+  const [note, setNote] = useState('');
+  const put = (x: ResitMarks) => { qc.setQueryData(key, x); setEdits({}); };
+  const save = useMutation({
+    mutationFn: () => api<ResitMarks>(`/api/exams/offerings/${offeringId}/resits`, { ...staff, method: 'PUT', body: {
+      entries: Object.entries(edits).map(([id, v]) => {
+        const abs = v.trim().toUpperCase() === 'ABS';
+        return { resitId: Number(id), score: abs || v.trim() === '' ? null : Number(v), absent: abs };
+      }) } }),
+    onSuccess: put,
+  });
+  const act = useMutation({
+    mutationFn: (what: 'submit' | 'approve' | 'return') => api<ResitMarks>(`/api/exams/offerings/${offeringId}/resits/${what}`, { ...staff, method: 'POST',
+      body: what === 'return' ? { note } : undefined }),
+    onSuccess: (x) => { put(x); setReturning(false); qc.invalidateQueries({ queryKey: ['staff', 'resit-session'] }); },
+  });
+  const r = q.data;
+  if (!r || !r.rows.length) return null;
+  const bad = Object.values(edits).some((v) => { const t = v.trim().toUpperCase(); if (t === 'ABS' || t === '') return false; const n = Number(t); return Number.isNaN(n) || n < 0 || n > 100; });
+  const dirty = Object.keys(edits).length > 0;
+  const missing = r.rows.filter((x) => x.paid && (!x.remark || x.remark === 'INCOMPLETE')).length;
+  return (
+    <Card sx={{ mt: 2, borderTop: 3, borderColor: 'warning.main' }}>
+      <CardContent sx={{ pb: 1 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
+          <Box>
+            <Typography variant="h6">Supplementary and special examinations</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Coursework is carried from the first attempt; the resit (out of 100) replaces the examination at {num(r.seWeight)}%.
+              {r.suppMaxGrade && ` A supplementary grade is capped at ${r.suppMaxGrade}.`} Marks can be entered once the student has paid.
+            </Typography>
+          </Box>
+          <Chip sx={{ alignSelf: { md: 'flex-start' } }} color={r.status === 'APPROVED' ? 'success' : r.status === 'SUBMITTED' ? 'info' : 'default'}
+            label={{ DRAFT: 'With lecturer', SUBMITTED: 'With Head of Department', APPROVED: `Approved${r.approvedByName ? ` by ${r.approvedByName}` : ''}` }[r.status]} />
+        </Stack>
+        {r.returnedNote && r.status === 'DRAFT' && <Alert severity="warning" sx={{ mt: 1 }}><strong>Returned:</strong> {r.returnedNote}</Alert>}
+      </CardContent>
+      <TableContainer>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell>Student</TableCell><TableCell>Resit</TableCell><TableCell>First attempt</TableCell><TableCell align="right">CA</TableCell>
+            <TableCell align="center">Resit exam /100</TableCell><TableCell align="right">SE</TableCell><TableCell align="right">Total</TableCell><TableCell>Grade</TableCell><TableCell>Result</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {r.rows.map((x) => {
+              const value = edits[x.resitId] ?? (x.absent ? 'ABS' : x.score == null ? '' : String(Number(x.score)));
+              return (
+                <TableRow key={x.resitId}>
+                  <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{x.registrationNo}</Typography><Typography variant="caption" color="text.secondary">{x.name}</Typography></TableCell>
+                  <TableCell>{x.kind === 'SPECIAL' ? 'Special' : 'Supplementary'}</TableCell>
+                  <TableCell>{x.firstGrade ?? '—'}</TableCell>
+                  <TableCell align="right">{num(x.caTotal)}</TableCell>
+                  <TableCell align="center">
+                    {!x.paid ? <Chip size="small" variant="outlined" color="warning" label="Not paid" />
+                      : r.canEnter ? <TextField size="small" value={value} sx={{ width: 76, '& input': { textAlign: 'center', py: 0.75 } }}
+                        slotProps={{ htmlInput: { 'aria-label': `${x.registrationNo} resit` } }}
+                        onChange={(e) => setEdits({ ...edits, [x.resitId]: e.target.value })} />
+                      : (value || '—')}
+                  </TableCell>
+                  <TableCell align="right">{num(x.seTotal)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{num(x.total)}</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>{x.grade ?? '—'}{x.capped && <Tooltip title="Capped: a supplementary grade cannot be higher"><Chip size="small" label="capped" sx={{ ml: 0.5, height: 18 }} /></Tooltip>}</TableCell>
+                  <TableCell>{x.remark && <Tooltip title={x.failReason ?? ''}><Chip size="small" color={REMARK_COLOUR[x.remark as keyof typeof REMARK_COLOUR] ?? 'default'}
+                    label={x.remark.charAt(0) + x.remark.slice(1).toLowerCase()} /></Tooltip>}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <ErrorAlert error={save.error ?? act.error} />
+      {(r.canEnter || r.canApprove || r.canReturn) && (
+        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          {r.canEnter && <Button variant="contained" disabled={!dirty || bad || save.isPending} onClick={() => save.mutate()}>Save resit marks</Button>}
+          {r.canSubmit && <Button variant="outlined" color="success" disabled={dirty || missing > 0 || act.isPending} onClick={() => act.mutate('submit')}>Submit to Head of Department</Button>}
+          {r.canReturn && <Button color="warning" onClick={() => setReturning(true)}>Return to lecturer</Button>}
+          {r.canApprove && <Button variant="contained" color="success" disabled={act.isPending} onClick={() => act.mutate('approve')}>Approve resit marks</Button>}
+        </Stack>
+      )}
+      {returning && (
+        <Dialog open onClose={() => setReturning(false)} fullWidth maxWidth="sm">
+          <DialogTitle>Return the resit marks</DialogTitle>
+          <DialogContent><TextField autoFocus fullWidth multiline minRows={2} sx={{ mt: 1 }} label="What should be corrected?" value={note} onChange={(e) => setNote(e.target.value)} /></DialogContent>
+          <DialogActions><Button onClick={() => setReturning(false)}>Cancel</Button><Button color="warning" variant="contained" disabled={!note.trim()} onClick={() => act.mutate('return')}>Return</Button></DialogActions>
+        </Dialog>
+      )}
+    </Card>
   );
 }

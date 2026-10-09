@@ -12,6 +12,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import MarksIcon from '@mui/icons-material/EditNote';
 import ResultsIcon from '@mui/icons-material/FactCheck';
 import RulesIcon from '@mui/icons-material/Rule';
+import AmendIcon from '@mui/icons-material/PublishedWithChanges';
 import CalendarIcon from '@mui/icons-material/CalendarMonth';
 import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
@@ -36,6 +37,7 @@ const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?
   { to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
   { to: '/staff/marks', label: 'Marks', icon: <MarksIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
   { to: '/staff/results', label: 'Results', icon: <ResultsIcon />, roles: EXAMS },
+  { to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon />, roles: ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'] },
   { to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon />, roles: EXAMS },
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },

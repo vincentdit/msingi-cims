@@ -8,6 +8,7 @@ import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
 import StudentResultsPage from './pages/student/StudentResultsPage';
 import { MarksPage, OfferingPage } from './pages/staff/MarksPages';
 import { RegulationsPage, ResultSheetPage, ResultSheetsPage } from './pages/staff/ResultsPages';
+import { AmendmentsPage } from './pages/staff/ExamRecordsPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="results" element={<ResultSheetsPage />} />
         <Route path="results/:id" element={<ResultSheetPage />} />
         <Route path="regulations" element={<RegulationsPage />} />
+        <Route path="amendments" element={<AmendmentsPage />} />
         <Route path="curricula" element={<CurriculaPage />} />
         <Route path="curricula/:id" element={<CurriculumEditorPage />} />
         <Route path="finance" element={<FinancePage />} />
