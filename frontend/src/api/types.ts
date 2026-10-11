@@ -1064,6 +1064,8 @@ export interface MarksRow {
   points?: number;
   remark: 'PASS' | 'FAIL' | 'INCOMPLETE' | 'ABSENT';
   failReason?: string;
+  /** From the latest eligibility list; absent when no list has been generated. */
+  examEligible?: boolean | null;
 }
 
 export interface MarksStats {
@@ -1364,4 +1366,261 @@ export interface AcademicDocumentView {
   issuedByName: string;
   cgpa?: number;
   semesters: number;
+}
+
+// ---------------------------------------------------------------- teaching, attendance and examination eligibility
+
+export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
+export type SessionKind = 'LECTURE' | 'TUTORIAL' | 'PRACTICAL' | 'SEMINAR';
+
+export interface ExamSettings {
+  useDepartmentBoard: boolean;
+  minAttendancePercent: number;
+  eligibilityRequiresCa: boolean;
+  eligibilityRequiresClearance: boolean;
+  attendanceAlertAfterSessions: number;
+}
+
+export interface RegisterLine {
+  moduleRegistrationId: number;
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  programmeCode: string;
+  status?: AttendanceStatus | null;
+  note?: string | null;
+}
+
+export interface SessionRequest {
+  clientRef: string;
+  sessionDate: string;
+  startTime: string;
+  durationMinutes: number;
+  kind: SessionKind;
+  topic?: string;
+  marks: { moduleRegistrationId: number; status: AttendanceStatus; note?: string }[];
+}
+
+export interface SessionSummary {
+  id: number;
+  sessionDate: string;
+  startTime: string;
+  durationMinutes: number;
+  kind: SessionKind;
+  topic?: string;
+  present: number;
+  late: number;
+  absent: number;
+  excused: number;
+  recordedByName: string;
+  recordedAt: string;
+}
+
+export interface ClassSessionView {
+  id: number;
+  offeringId: number;
+  sessionDate: string;
+  startTime: string;
+  durationMinutes: number;
+  kind: SessionKind;
+  topic?: string;
+  recordedByName: string;
+  recordedAt: string;
+  editable: boolean;
+  register: RegisterLine[];
+}
+
+export interface StudentAttendance {
+  moduleRegistrationId: number;
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  programmeCode: string;
+  counted: number;
+  attended: number;
+  absent: number;
+  excused: number;
+  percent?: number | null;
+  below: boolean;
+  alertedAt?: string | null;
+  eligible?: boolean | null;
+  exempted: boolean;
+}
+
+export interface AttendanceView {
+  offeringId: number;
+  semesterId: number;
+  semesterName: string;
+  code: string;
+  title: string;
+  departmentName?: string;
+  status: OfferingStatus;
+  lecturers: string[];
+  threshold: number;
+  sessions: number;
+  minutesTaught: number;
+  averagePercent?: number | null;
+  below: number;
+  canRecord: boolean;
+  sessionList: SessionSummary[];
+  students: StudentAttendance[];
+}
+
+export interface OfferingAttendance {
+  offeringId: number;
+  code: string;
+  title: string;
+  departmentName?: string;
+  lecturers: string[];
+  students: number;
+  sessions: number;
+  minutesTaught: number;
+  averagePercent?: number | null;
+  below: number;
+  mine: boolean;
+  lastSession?: string | null;
+}
+
+export interface WorkloadModule {
+  offeringId: number;
+  code: string;
+  title: string;
+  credits: number;
+  students: number;
+  sessions: number;
+  minutesTaught: number;
+  sharedWith: number;
+}
+
+export interface Workload {
+  userId: number;
+  fullName: string;
+  roles: string[];
+  modules: number;
+  credits: number;
+  students: number;
+  sessions: number;
+  hoursTaught: number;
+  offerings: WorkloadModule[];
+}
+
+export interface WorkloadView {
+  semesterId: number;
+  staff: Workload[];
+  unallocated: WorkloadModule[];
+}
+
+export interface EligibilityRules {
+  minAttendancePercent: number;
+  requiresCa: boolean;
+  requiresClearance: boolean;
+}
+
+export interface GenerateEligibilityResult {
+  offerings: number;
+  students: number;
+  eligible: number;
+  notEligible: number;
+  skipped: number;
+  notes: string[];
+}
+
+export interface OfferingEligibility {
+  offeringId: number;
+  code: string;
+  title: string;
+  departmentName?: string;
+  status: OfferingStatus;
+  students: number;
+  eligible: number;
+  notEligible: number;
+  exempted: number;
+  pendingExemptions: number;
+  generatedAt?: string | null;
+  generatedByName?: string | null;
+}
+
+export interface EligibilityOverview {
+  semesterId: number;
+  rules: EligibilityRules;
+  canGenerate: boolean;
+  canDecide: boolean;
+  offerings: OfferingEligibility[];
+}
+
+export interface ExemptionView {
+  id: number;
+  offeringId: number;
+  moduleCode: string;
+  moduleRegistrationId: number;
+  studentId: number;
+  registrationNo?: string;
+  studentName?: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedByName: string;
+  requestedAt: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  reasonsNotMet: string[];
+  canDecide: boolean;
+}
+
+export interface EligibilityLine {
+  moduleRegistrationId: number;
+  studentId: number;
+  registrationNo: string;
+  name: string;
+  programmeCode: string;
+  attendancePercent?: number | null;
+  sessionsCounted: number;
+  sessionsAttended: number;
+  attendanceMet: boolean;
+  caMet: boolean;
+  clearanceMet: boolean;
+  rulesMet: boolean;
+  exempted: boolean;
+  eligible: boolean;
+  reasons: string[];
+  exemption?: ExemptionView | null;
+}
+
+export interface OfferingEligibilityView {
+  offeringId: number;
+  semesterId: number;
+  semesterName: string;
+  code: string;
+  title: string;
+  departmentName?: string;
+  status: OfferingStatus;
+  rules: EligibilityRules;
+  generatedAt?: string | null;
+  generatedByName?: string | null;
+  canRequest: boolean;
+  canDecide: boolean;
+  students: EligibilityLine[];
+}
+
+export interface MyModuleAttendance {
+  offeringId?: number | null;
+  code: string;
+  title: string;
+  counted: number;
+  attended: number;
+  absent: number;
+  excused: number;
+  percent?: number | null;
+  below: boolean;
+  eligible?: boolean | null;
+  exempted: boolean;
+  reasons: string[];
+}
+
+export interface MyAttendance {
+  semesterId?: number | null;
+  semesterName?: string | null;
+  threshold: number;
+  listPublished: boolean;
+  modules: MyModuleAttendance[];
 }

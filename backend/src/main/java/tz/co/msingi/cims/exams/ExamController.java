@@ -108,7 +108,7 @@ public class ExamController {
     @GetMapping("/api/exams/settings")
     @PreAuthorize(STAFF)
     public SettingsView settings() {
-        return new SettingsView(regulations.settings().isUseDepartmentBoard());
+        return RegulationService.settingsView(regulations.settings());
     }
 
     @PutMapping("/api/exams/settings")

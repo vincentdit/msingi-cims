@@ -92,6 +92,7 @@ public class OfferingService {
     private final UserAccountRepository users;
     private final ExamAccess access;
     private final AuditService audit;
+    private final tz.co.msingi.cims.teaching.TeachingRepositories.ExamEligibilityRepository eligibility;
 
     // ------------------------------------------------------------------ set-up and allocation
 
@@ -269,12 +270,17 @@ public class OfferingService {
         Set<Long> regs = registrations.students(o.getSemester().getId(), o.getModule().getId(), APPROVED).stream().map(ModuleRegistration::getId)
                 .collect(Collectors.toSet());
         Window w = window(o.getSemester());
+        Map<Long, Boolean> eligible = eligibleByRegistration(o);
         for (ScoreEntry e : entries) {
             AssessmentComponent c = comps.get(e.componentId());
             if (c == null) throw new BusinessRuleException("UNKNOWN_COMPONENT", "That assessment item is not part of this module");
             if (!regs.contains(e.moduleRegistrationId())) throw new BusinessRuleException("NOT_IN_CLASS", "That student is not registered for this module");
             checkWindow(w, c);
             checkScore(c, e.score(), e.absent());
+            if (c.getCategory() == AssessmentComponent.Category.SE && e.score() != null && Boolean.FALSE.equals(eligible.get(e.moduleRegistrationId()))) {
+                throw new BusinessRuleException("NOT_ELIGIBLE_FOR_EXAM", "A student on the list is not eligible to sit this examination, so has no "
+                        + c.getName() + " mark. See the eligibility list.");
+            }
         }
         Map<String, AssessmentScore> current = scores.findByOffering(o.getId()).stream()
                 .collect(Collectors.toMap(s -> key(s.getComponent().getId(), s.getModuleRegistrationId()), Function.identity()));
@@ -367,6 +373,7 @@ public class OfferingService {
     @Transactional
     public UploadResult upload(Long id, byte[] file) {
         ModuleOffering o = require(id);
+        Map<Long, Boolean> eligibleNow = eligibleByRegistration(o);
         requireLecturer(o);
         List<UploadError> errors = new ArrayList<>();
         List<ScoreEntry> entries = new ArrayList<>();
@@ -425,6 +432,10 @@ public class OfferingService {
                         checkScore(c, score, absent);
                     } catch (BusinessRuleException ex) {
                         errors.add(new UploadError(r + 1, regNo + ", " + c.getName() + ": " + ex.getMessage()));
+                        continue;
+                    }
+                    if (c.getCategory() == AssessmentComponent.Category.SE && score != null && Boolean.FALSE.equals(eligibleNow.get(m.getId()))) {
+                        errors.add(new UploadError(r + 1, regNo + ", " + c.getName() + ": not eligible to sit the examination (leave blank or ABS)"));
                         continue;
                     }
                     entries.add(new ScoreEntry(m.getId(), c.getId(), score, absent));
@@ -560,13 +571,17 @@ public class OfferingService {
         Map<Long, ModuleResult> res = results.findByOfferingId(o.getId()).stream()
                 .collect(Collectors.toMap(ModuleResult::getModuleRegistrationId, Function.identity()));
         List<StudentRow> rows = new ArrayList<>();
+        Map<Long, Boolean> eligible = eligibleByRegistration(o);
         for (ModuleRegistration m : regs) {
             Student s = m.getRegistration().getStudent();
             ModuleResult r = res.get(m.getId());
+            Boolean el = eligible.get(m.getId());
+            String reason = r == null ? "Marks missing" : r.getFailReason();
+            if (Boolean.FALSE.equals(el) && (r == null || r.getRemark() == Remark.INCOMPLETE)) reason = "Not eligible to sit the examination";
             rows.add(new StudentRow(m.getId(), s.getId(), s.getRegistrationNo(), s.fullName(), s.getProgramme().getCode(), m.getCategory().name(),
                     cells.getOrDefault(m.getId(), Map.of()), r == null ? null : r.getCaTotal(), r == null ? null : r.getSeTotal(),
                     r == null ? null : r.getTotal(), r == null ? null : r.getGrade(), r == null ? null : r.getGradePoints(),
-                    r == null ? Remark.INCOMPLETE.name() : r.getRemark().name(), r == null ? "Marks missing" : r.getFailReason()));
+                    r == null ? Remark.INCOMPLETE.name() : r.getRemark().name(), reason, el));
         }
         Window w = window(o.getSemester());
         boolean lecturer = isMine(o, access.me()) && o.getStatus() == ModuleOffering.Status.DRAFT;
@@ -653,6 +668,12 @@ public class OfferingService {
     }
 
     // ------------------------------------------------------------------ access
+
+    /** Eligibility from the latest list (FR-EXM-04); students with no entry have no list yet and may be given marks. */
+    private Map<Long, Boolean> eligibleByRegistration(ModuleOffering o) {
+        return eligibility.findByOfferingId(o.getId()).stream()
+                .collect(Collectors.toMap(e -> e.getModuleRegistrationId(), e -> e.isEligible()));
+    }
 
     private boolean isMine(ModuleOffering o, Long me) {
         return o.getStaff().stream().anyMatch(s -> s.getUserId().equals(me));

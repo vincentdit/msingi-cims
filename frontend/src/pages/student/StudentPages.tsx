@@ -19,6 +19,7 @@ import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/
 import type { ChangeRequest, Clearance, Statement, StudentDashboard, StudentNotice, StudentProfile, TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
+import StudentAttendanceCard from './StudentAttendanceCard';
 import { useInstitution } from '../../components/InstitutionContext';
 
 const student = { realm: 'student' as const };
@@ -130,6 +131,8 @@ export function StudentHome() {
           </CardContent>
         </CardActionArea>
       </Card>
+
+      <StudentAttendanceCard />
 
       <Card sx={{ borderRadius: 3 }}>
         <CardContent>

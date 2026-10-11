@@ -9,6 +9,8 @@ import StudentResultsPage from './pages/student/StudentResultsPage';
 import { MarksPage, OfferingPage } from './pages/staff/MarksPages';
 import { RegulationsPage, ResultSheetPage, ResultSheetsPage } from './pages/staff/ResultsPages';
 import { AmendmentsPage } from './pages/staff/ExamRecordsPages';
+import { AttendancePage, TeachingPage } from './pages/staff/TeachingPages';
+import { EligibilityPage, OfferingEligibilityPage } from './pages/staff/EligibilityPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -64,6 +66,10 @@ export default function App() {
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="marks" element={<MarksPage />} />
         <Route path="marks/:id" element={<OfferingPage />} />
+        <Route path="teaching" element={<TeachingPage />} />
+        <Route path="teaching/:id" element={<AttendancePage />} />
+        <Route path="eligibility" element={<EligibilityPage />} />
+        <Route path="eligibility/:id" element={<OfferingEligibilityPage />} />
         <Route path="results" element={<ResultSheetsPage />} />
         <Route path="results/:id" element={<ResultSheetPage />} />
         <Route path="regulations" element={<RegulationsPage />} />

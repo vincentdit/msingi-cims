@@ -159,6 +159,13 @@ const en = {
     approvedHint: 'Your modules are confirmed. To change them, please see Registry.', changeHint: 'You can change your electives until Registry approves.',
     history: 'Earlier semesters', change: 'Change my electives', modulesCount: '{{n}} modules', late: 'Late', feeClearance: 'Fee clearance', payFirst: 'Pay the amount shown under Fees, then register.',
   },
+  attendance: {
+    title: 'Attendance', semester: '{{semester}} · you need {{threshold}} to sit each examination',
+    none: 'No attendance recorded for you yet this semester.', noSemester: 'You are not registered for a semester yet.',
+    attended: '{{attended}} of {{counted}} sessions', excused: '{{n}} excused', notYet: 'No sessions yet',
+    below: 'Below {{threshold}}: attend every class to be allowed to sit the examination.',
+    eligible: 'May sit exam', exempted: 'Allowed (exemption)', notEligible: 'Not eligible', contact: 'Contact the Examinations Office.',
+  },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
 
@@ -318,6 +325,13 @@ const sw: typeof en = {
     registryNote: 'Ujumbe kutoka Usajili', submitted: 'Usajili umewasilishwa. Ofisi ya Usajili itaupitia na utapata SMS.',
     approvedHint: 'Moduli zako zimethibitishwa. Kuzibadilisha, tafadhali fika ofisi ya Usajili.', changeHint: 'Unaweza kubadilisha moduli za hiari hadi Usajili uidhinishe.',
     history: 'Mihula iliyopita', change: 'Badilisha moduli za hiari', modulesCount: 'Moduli {{n}}', late: 'Kuchelewa', feeClearance: 'Kibali cha ada', payFirst: 'Lipa kiasi kinachoonyeshwa kwenye Ada, kisha ujisajili.',
+  },
+  attendance: {
+    title: 'Mahudhurio', semester: '{{semester}} · unahitaji {{threshold}} ili kufanya kila mtihani',
+    none: 'Bado hakuna mahudhurio yaliyorekodiwa kwako muhula huu.', noSemester: 'Bado hujasajiliwa kwa muhula.',
+    attended: 'Vipindi {{attended}} kati ya {{counted}}', excused: '{{n}} kwa ruhusa', notYet: 'Bado hakuna vipindi',
+    below: 'Chini ya {{threshold}}: hudhuria kila kipindi ili uruhusiwe kufanya mtihani.',
+    eligible: 'Unaweza kufanya mtihani', exempted: 'Umeruhusiwa (msamaha)', notEligible: 'Hujakidhi vigezo', contact: 'Wasiliana na Ofisi ya Mitihani.',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };

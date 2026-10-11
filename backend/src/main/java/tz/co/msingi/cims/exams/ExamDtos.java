@@ -52,7 +52,9 @@ public final class ExamDtos {
                                  String createdByName, boolean inUse, List<GradeBandDto> gradeBands, List<ClassificationDto> classifications) {
     }
 
-    public record SettingsView(boolean useDepartmentBoard) {
+    /** Fields left out (null) keep their current value. */
+    public record SettingsView(Boolean useDepartmentBoard, BigDecimal minAttendancePercent, Boolean eligibilityRequiresCa,
+                               Boolean eligibilityRequiresClearance, Integer attendanceAlertAfterSessions) {
     }
 
     // ------------------------------------------------------------------ offerings, plans and marks (FR-EXM-01/02/03/05)
@@ -111,7 +113,7 @@ public final class ExamDtos {
 
     public record StudentRow(Long moduleRegistrationId, Long studentId, String registrationNo, String name, String programmeCode,
                              String category, Map<Long, ScoreCell> scores, BigDecimal caTotal, BigDecimal seTotal, BigDecimal total,
-                             String grade, BigDecimal points, String remark, String failReason) {
+                             String grade, BigDecimal points, String remark, String failReason, Boolean examEligible) {
     }
 
     public record Stats(int students, int graded, int passed, BigDecimal passRate, BigDecimal mean, Map<String, Integer> distribution,

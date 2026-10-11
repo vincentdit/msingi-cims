@@ -267,8 +267,8 @@ export function OfferingPage() {
 
   if (q.isLoading) return <Loading />;
   if (!o) return <ErrorAlert error={q.error} onRetry={() => q.refetch()} />;
-  const editable = (c: AssessmentComponent) => (c.category === 'CA' ? o.can.enterCa : o.can.enterSe);
-  const anyEditable = o.components.some(editable);
+  const editable = (c: AssessmentComponent, r?: MarksRow) => (c.category === 'CA' ? o.can.enterCa : o.can.enterSe && r?.examEligible !== false);
+  const anyEditable = o.components.some((c) => editable(c));
   const invalid = Object.entries(edits).some(([k, v]) => {
     const c = o.components.find((x) => x.id === Number(k.split(':')[1]));
     return !c || !parseCell(v, c.maxScore).ok;
@@ -287,7 +287,10 @@ export function OfferingPage() {
       <Button component={RouterLink} to="/staff/marks" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Marks</Button>
       <PageTitle title={`${o.code} · ${o.title}`}
         subtitle={<>{o.semesterName} {o.academicYear} · {num(o.credits)} credits{o.departmentName && <> · {o.departmentName}</>} · {o.lecturers.map((l) => l.fullName).join(', ') || 'No lecturer allocated'}</>}
-        action={o.can.assign && <Button startIcon={<GroupIcon />} onClick={() => setAssigning(true)}>Lecturers</Button>} />
+        action={<Stack direction="row" spacing={1}>
+          <Button component={RouterLink} to={`/staff/teaching/${o.id}`}>Attendance</Button>
+          {o.can.assign && <Button startIcon={<GroupIcon />} onClick={() => setAssigning(true)}>Lecturers</Button>}
+        </Stack>} />
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Stepper activeStep={active} alternativeLabel>
@@ -348,6 +351,7 @@ export function OfferingPage() {
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.registrationNo}</Typography>
                         <Typography variant="caption" color="text.secondary">{r.name} · {r.programmeCode}</Typography>
+                        {r.examEligible === false && <Chip size="small" color="error" variant="outlined" label="Not eligible for exam" sx={{ ml: 0.5, height: 18, fontSize: 11 }} />}
                       </TableCell>
                       {o.components.map((c, ci) => {
                         const k = key(r.moduleRegistrationId, c.id!);
@@ -355,7 +359,7 @@ export function OfferingPage() {
                         const bad = edits[k] != null && !parseCell(edits[k], c.maxScore).ok;
                         return (
                           <TableCell key={c.id} align="center" sx={{ py: 0.5 }}>
-                            {editable(c) ? (
+                            {editable(c, r) ? (
                               <TextField size="small" value={value} error={bad} sx={{ width: 76, '& input': { textAlign: 'center', py: 0.75 },
                                 '& .MuiOutlinedInput-root': { bgcolor: edits[k] != null ? 'action.hover' : undefined } }}
                                 slotProps={{ htmlInput: { 'data-cell': `${ri}-${ci}`, 'aria-label': `${r.registrationNo} ${c.name}`, inputMode: 'decimal' } }}

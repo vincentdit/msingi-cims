@@ -16,6 +16,8 @@ import AmendIcon from '@mui/icons-material/PublishedWithChanges';
 import CalendarIcon from '@mui/icons-material/CalendarMonth';
 import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import TeachingIcon from '@mui/icons-material/CoPresent';
+import EligibleIcon from '@mui/icons-material/VerifiedUser';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -35,7 +37,9 @@ const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?
   { to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
   { to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
   { to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
+  { to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
   { to: '/staff/marks', label: 'Marks', icon: <MarksIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
+  { to: '/staff/eligibility', label: 'Exam eligibility', icon: <EligibleIcon />, roles: EXAMS },
   { to: '/staff/results', label: 'Results', icon: <ResultsIcon />, roles: EXAMS },
   { to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon />, roles: ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'] },
   { to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon />, roles: EXAMS },
@@ -56,7 +60,7 @@ export default function StaffLayout() {
   const navigate = useNavigate();
   const me = user('staff');
   const roles = me?.roles ?? [];
-  // Lecturers and assessors only see their marks; other menu items follow the roles that use them.
+  // Lecturers and assessors only see their teaching and marks; other menu items follow the roles that use them.
   const teachingOnly = roles.length > 0 && roles.every((r) => TEACHING.includes(r));
   const nav = NAV.filter((n) => (teachingOnly ? n.teaching : !n.roles || n.roles.some((r) => roles.includes(r))));
 

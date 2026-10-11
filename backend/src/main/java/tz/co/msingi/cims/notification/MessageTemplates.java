@@ -32,7 +32,8 @@ public final class MessageTemplates {
                 Map.entry("registrationNo", "DEMO/NTA6/27/0001"), Map.entry("reportingDate", "27 September 2027"),
                 Map.entry("venue", "Main Hall"), Map.entry("title", "Orientation week starts on Monday"),
                 Map.entry("semester", "Semester 1 2027/2028"), Map.entry("modules", "6"), Map.entry("gpa", "3.4"),
-                Map.entry("decision", "Pass"), Map.entry("module", "ITU 05102"), Map.entry("grade", "C"));
+                Map.entry("decision", "Pass"), Map.entry("module", "ITU 05102"), Map.entry("grade", "C"),
+                Map.entry("percent", "62%"), Map.entry("threshold", "75%"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -116,6 +117,18 @@ public final class MessageTemplates {
                 List.of("module", "semester", "grade", "institution"), Set.of(),
                 "Your result in {module} for {semester} has been corrected: grade {grade}. See the student portal.",
                 "Matokeo yako ya {module} ya {semester} yamesahihishwa: daraja {grade}. Angalia tovuti ya mwanafunzi.", s);
+        add("ATTENDANCE_LOW", "Low attendance warning", "A student's attendance in a module falls below the examination threshold", "Teaching",
+                List.of("module", "percent", "threshold", "institution"), Set.of(),
+                "Your attendance in {module} is {percent}. You need at least {threshold} to sit the examination. Please attend all classes.",
+                "Mahudhurio yako katika {module} ni {percent}. Unahitaji angalau {threshold} ili kufanya mtihani. Tafadhali hudhuria vipindi vyote.", s);
+        add("EXAM_NOT_ELIGIBLE", "Not eligible for an examination", "The eligibility list shows a student may not sit a module's examination", "Examinations",
+                List.of("module", "semester", "reason", "institution"), Set.of(),
+                "You are not eligible to sit the {module} examination for {semester}: {reason}. Contact the Examinations Office.",
+                "Hujakidhi vigezo vya kufanya mtihani wa {module} wa {semester}: {reason}. Wasiliana na Ofisi ya Mitihani.", s);
+        add("EXAM_EXEMPTION_APPROVED", "Examination exemption approved", "An exemption from the eligibility rules is approved", "Examinations",
+                List.of("module", "semester", "institution"), Set.of(),
+                "You have been allowed to sit the {module} examination for {semester}.",
+                "Umeruhusiwa kufanya mtihani wa {module} wa {semester}.", s);
         add("RESULTS_WITHHELD", "Results withheld", "Results are published but withheld until fees are cleared", "Examinations",
                 List.of("semester", "reason", "institution"), Set.of(),
                 "Your results for {semester} are ready but withheld: {reason}. They will show on the student portal once fees are cleared.",

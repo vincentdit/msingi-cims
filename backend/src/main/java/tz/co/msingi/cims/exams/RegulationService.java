@@ -96,10 +96,32 @@ public class RegulationService {
     @Transactional
     public SettingsView updateSettings(SettingsView req) {
         ExamSettings s = settings.findFirstByOrderByIdAsc().orElseGet(ExamSettings::new);
-        s.setUseDepartmentBoard(req.useDepartmentBoard());
+        if (req.useDepartmentBoard() != null) s.setUseDepartmentBoard(req.useDepartmentBoard());
+        if (req.minAttendancePercent() != null) {
+            if (req.minAttendancePercent().signum() < 0 || req.minAttendancePercent().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new BusinessRuleException("INVALID_THRESHOLD", "The attendance threshold must be between 0 and 100%");
+            }
+            s.setMinAttendancePercent(req.minAttendancePercent().setScale(2, java.math.RoundingMode.HALF_UP));
+        }
+        if (req.eligibilityRequiresCa() != null) s.setEligibilityRequiresCa(req.eligibilityRequiresCa());
+        if (req.eligibilityRequiresClearance() != null) s.setEligibilityRequiresClearance(req.eligibilityRequiresClearance());
+        if (req.attendanceAlertAfterSessions() != null) {
+            if (req.attendanceAlertAfterSessions() < 1 || req.attendanceAlertAfterSessions() > 50) {
+                throw new BusinessRuleException("INVALID_SETTING", "Warn students after between 1 and 50 sessions");
+            }
+            s.setAttendanceAlertAfterSessions(req.attendanceAlertAfterSessions().shortValue());
+        }
         settings.save(s);
-        audit.record("EXAM_SETTINGS_UPDATED", "ExamSettings", s.getId(), Map.of("useDepartmentBoard", req.useDepartmentBoard()));
-        return new SettingsView(s.isUseDepartmentBoard());
+        SettingsView out = settingsView(s);
+        audit.record("EXAM_SETTINGS_UPDATED", "ExamSettings", s.getId(), Map.of("useDepartmentBoard", out.useDepartmentBoard(),
+                "minAttendancePercent", out.minAttendancePercent(), "eligibilityRequiresCa", out.eligibilityRequiresCa(),
+                "eligibilityRequiresClearance", out.eligibilityRequiresClearance(), "attendanceAlertAfterSessions", out.attendanceAlertAfterSessions()));
+        return out;
+    }
+
+    public static SettingsView settingsView(ExamSettings s) {
+        return new SettingsView(s.isUseDepartmentBoard(), s.getMinAttendancePercent(), s.isEligibilityRequiresCa(), s.isEligibilityRequiresClearance(),
+                (int) s.getAttendanceAlertAfterSessions());
     }
 
     boolean inUse(RegulationSet rs) {

@@ -15,7 +15,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import {
   DECISIONS, type AcademicYear, type ClassificationBand, type Decision, type GradeBand, type Regulation, type ResultSheet, type SheetRow,
-  type SheetSummary, type ResitSession, type NactvetResultSubmission,
+  type SheetSummary, type ResitSession, type NactvetResultSubmission, type ExamSettings,
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles, useSemesterChoice } from './MarksPages';
@@ -408,9 +408,9 @@ export function RegulationsPage() {
   const can = useRoles();
   const editor = can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'EXAMINATIONS_OFFICER']);
   const list = useQuery({ queryKey: ['staff', 'regulations'], queryFn: () => api<Regulation[]>('/api/exams/regulations', staff) });
-  const settings = useQuery({ queryKey: ['staff', 'exam-settings'], queryFn: () => api<{ useDepartmentBoard: boolean }>('/api/exams/settings', staff) });
+  const settings = useQuery({ queryKey: ['staff', 'exam-settings'], queryFn: () => api<ExamSettings>('/api/exams/settings', staff) });
   const saveSettings = useMutation({
-    mutationFn: (v: boolean) => api('/api/exams/settings', { ...staff, method: 'PUT', body: { useDepartmentBoard: v } }),
+    mutationFn: (v: Partial<ExamSettings>) => api('/api/exams/settings', { ...staff, method: 'PUT', body: v }),
     onSuccess: () => settings.refetch(),
   });
   const [form, setForm] = useState<RegForm | null>(null);
@@ -436,11 +436,13 @@ export function RegulationsPage() {
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <FormControlLabel disabled={!can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
-              control={<Switch checked={settings.data.useDepartmentBoard} onChange={(e) => saveSettings.mutate(e.target.checked)} />}
+              control={<Switch checked={settings.data.useDepartmentBoard} onChange={(e) => saveSettings.mutate({ useDepartmentBoard: e.target.checked })} />}
               label="Module results go to a Department Board after the Head of Department" />
           </CardContent>
         </Card>
       )}
+      {settings.data && <EligibilitySettingsCard settings={settings.data} editable={can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
+        saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
       {list.isLoading && <Loading />}
       <Grid container spacing={2}>
         {list.data?.map((r) => (
@@ -560,5 +562,42 @@ function RegulationDialog({ form: initial, onClose, onSaved }: { form: RegForm; 
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={save.isPending || !f.name.trim() || !f.effectiveYearId} onClick={() => save.mutate()}>Save</Button></DialogActions>
     </Dialog>
+  );
+}
+
+/** The examination eligibility rules (BRU-08) and when students are warned about low attendance. */
+function EligibilitySettingsCard({ settings, editable, saving, onSave }: {
+  settings: ExamSettings; editable: boolean; saving: boolean; onSave: (v: Partial<ExamSettings>) => void;
+}) {
+  const [threshold, setThreshold] = useState(String(settings.minAttendancePercent));
+  const [after, setAfter] = useState(String(settings.attendanceAlertAfterSessions));
+  const [ca, setCa] = useState(settings.eligibilityRequiresCa);
+  const [fees, setFees] = useState(settings.eligibilityRequiresClearance);
+  const t = Number(threshold);
+  const a = Number(after);
+  const valid = threshold !== '' && t >= 0 && t <= 100 && Number.isInteger(a) && a >= 1 && a <= 50;
+  const changed = t !== Number(settings.minAttendancePercent) || a !== settings.attendanceAlertAfterSessions || ca !== settings.eligibilityRequiresCa
+    || fees !== settings.eligibilityRequiresClearance;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Examination eligibility</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>What a student needs to sit a semester examination. Applies to the next list generated.</Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+          <TextField size="small" type="number" label="Minimum attendance %" value={threshold} onChange={(e) => setThreshold(e.target.value)} disabled={!editable}
+            sx={{ width: { md: 190 } }} slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }} />
+          <TextField size="small" type="number" label="Warn students after (sessions)" value={after} onChange={(e) => setAfter(e.target.value)} disabled={!editable}
+            sx={{ width: { md: 230 } }} slotProps={{ htmlInput: { min: 1, max: 50 } }} />
+          <FormControlLabel disabled={!editable} control={<Switch checked={ca} onChange={(e) => setCa(e.target.checked)} />} label="Every coursework item marked" />
+          <FormControlLabel disabled={!editable} control={<Switch checked={fees} onChange={(e) => setFees(e.target.checked)} />} label="Examination fees clearance" />
+          {editable && (
+            <Button variant="outlined" disabled={!valid || !changed || saving}
+              onClick={() => onSave({ minAttendancePercent: t, attendanceAlertAfterSessions: a, eligibilityRequiresCa: ca, eligibilityRequiresClearance: fees })}>
+              Save
+            </Button>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
