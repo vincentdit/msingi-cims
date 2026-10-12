@@ -71,6 +71,10 @@ public class Student extends BaseEntity {
     private String nextOfKinDistrict;
     private String nextOfKinWard;
     private String nextOfKinStreet;
+    private String primarySchool;
+    private String primarySchoolCode;
+    private String olevelSchool;
+    private String alevelSchool;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "programme_id")

@@ -214,6 +214,10 @@ const en = {
     residence: 'WHERE YOU LIVE', region: 'Region', district: 'District', ward: 'Ward', street: 'Village / street', postalAddress: 'Postal address',
     chooseFirst: 'Choose the {{level}} first', nextOfKin: 'NEXT OF KIN', kinName: 'Full name', relationship: 'Relationship',
     kinPhone: 'Mobile number', kinEmail: 'Email (optional)', kinAddress: 'Address (optional)', kinAddressHint: 'House, plot or P.O. Box',
+    education: 'EDUCATION HISTORY', primarySchool: 'Primary school', primaryHint: 'Type at least 2 letters and choose your school; type it in full if it is not listed',
+    typeTwo: 'Type at least 2 letters', notListed: 'Not on the list — keep typing the full name', fromList: 'From the NECTA school list',
+    olevelSchool: "O'level secondary school", alevelSchool: "A'level secondary school (if any)", fromNecta: 'From your NECTA results',
+    olevelHint: 'As on your Form Four certificate', alevelHint: 'Added from NECTA when you fetch Form Six results',
   },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
@@ -430,6 +434,10 @@ const sw: typeof en = {
     residence: 'UNAPOISHI', region: 'Mkoa', district: 'Wilaya', ward: 'Kata', street: 'Kijiji / mtaa', postalAddress: 'Anwani ya posta',
     chooseFirst: 'Chagua {{level}} kwanza', nextOfKin: 'NDUGU WA KARIBU', kinName: 'Jina kamili', relationship: 'Uhusiano',
     kinPhone: 'Namba ya simu', kinEmail: 'Barua pepe (si lazima)', kinAddress: 'Anwani (si lazima)', kinAddressHint: 'Nyumba, kiwanja au S.L.P.',
+    education: 'HISTORIA YA ELIMU', primarySchool: 'Shule ya msingi', primaryHint: 'Andika angalau herufi 2 kisha chagua shule yako; iandike kamili kama haipo kwenye orodha',
+    typeTwo: 'Andika angalau herufi 2', notListed: 'Haipo kwenye orodha — endelea kuandika jina kamili', fromList: 'Kutoka orodha ya shule ya NECTA',
+    olevelSchool: 'Shule ya sekondari (kidato cha nne)', alevelSchool: 'Shule ya sekondari (kidato cha sita, kama ipo)', fromNecta: 'Kutoka matokeo yako ya NECTA',
+    olevelHint: 'Kama ilivyo kwenye cheti cha kidato cha nne', alevelHint: 'Huongezwa kutoka NECTA ukipata matokeo ya kidato cha sita',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };

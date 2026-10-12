@@ -130,6 +130,12 @@ export interface Profile {
   nextOfKinDistrict?: string;
   nextOfKinWard?: string;
   nextOfKinStreet?: string;
+  primarySchool?: string;
+  primarySchoolCode?: string;
+  olevelSchool?: string;
+  olevelFromNecta?: boolean;
+  alevelSchool?: string;
+  alevelFromNecta?: boolean;
 }
 
 export interface Qualification {

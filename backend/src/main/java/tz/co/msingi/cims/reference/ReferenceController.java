@@ -22,6 +22,13 @@ import java.util.Map;
 public class ReferenceController {
 
     private final GeographyService geo;
+    private final PrimarySchoolDirectory primarySchools;
+
+    @Operation(summary = "Search Tanzania's primary schools (NECTA PSLE list) by name, code, region or council; at least 2 characters")
+    @GetMapping("/schools/primary")
+    public ResponseEntity<List<PrimarySchoolDirectory.School>> primarySchools(@RequestParam(defaultValue = "") String q) {
+        return cached(primarySchools.search(q));
+    }
 
     @Operation(summary = "Regions of Tanzania")
     @GetMapping("/geo/regions")

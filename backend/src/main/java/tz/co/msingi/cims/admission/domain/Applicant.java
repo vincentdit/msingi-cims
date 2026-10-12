@@ -60,6 +60,16 @@ public class Applicant extends BaseEntity {
     private String nextOfKinWard;
     private String nextOfKinStreet;
 
+    /** Education history: primary school (from NECTA's PSLE list or typed) and secondary schools (from NECTA results when fetched). */
+    private String primarySchool;
+    private String primarySchoolCode;
+    private String olevelSchool;
+    @Column(nullable = false)
+    private boolean olevelFromNecta;
+    private String alevelSchool;
+    @Column(nullable = false)
+    private boolean alevelFromNecta;
+
     /** The Form Four (CSEE) index number and year the applicant registered with; names come from NECTA. */
     private String nectaIndexNumber;
     private Short nectaExamYear;

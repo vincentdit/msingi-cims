@@ -19,6 +19,7 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.necta.NectaClient;
 import tz.co.msingi.cims.reference.Address;
 import tz.co.msingi.cims.reference.GeographyService;
+import tz.co.msingi.cims.reference.PrimarySchoolDirectory;
 import tz.co.msingi.cims.reference.ProfileOptions;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
@@ -26,6 +27,7 @@ import tz.co.msingi.cims.platform.security.CurrentUser;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Applicant profile and qualifications (NECTA results, prior NTA/NVA awards). */
 @Service
@@ -37,6 +39,7 @@ public class ApplicantProfileService {
     private final ApplicationRepository applications;
     private final NectaClient necta;
     private final GeographyService geo;
+    private final PrimarySchoolDirectory primarySchools;
     private final AuditService audit;
 
     @Transactional(readOnly = true)
@@ -80,6 +83,14 @@ public class ApplicantProfileService {
         a.setNextOfKinDistrict(kin.district());
         a.setNextOfKinWard(kin.ward());
         a.setNextOfKinStreet(kin.street());
+        // primary school: one from NECTA's PSLE list (by code), or typed when it is not on the list
+        Optional<PrimarySchoolDirectory.School> listed = primarySchools.byCode(req.primarySchoolCode())
+                .filter(x -> req.primarySchool() == null || req.primarySchool().isBlank() || x.name().equalsIgnoreCase(req.primarySchool().trim()));
+        a.setPrimarySchool(listed.map(PrimarySchoolDirectory.School::name).orElse(ApplicantAccountService.blankToNull(req.primarySchool())));
+        a.setPrimarySchoolCode(listed.map(PrimarySchoolDirectory.School::code).orElse(null));
+        // secondary schools from NECTA results stay as NECTA has them
+        if (!a.isOlevelFromNecta()) a.setOlevelSchool(upper(req.olevelSchool()));
+        if (!a.isAlevelFromNecta()) a.setAlevelSchool(upper(req.alevelSchool()));
         a.getUser().setFullName(a.fullName());
         audit.record("UPDATE", "Applicant", a.getId(), null);
         return ProfileView.of(a);
@@ -106,9 +117,27 @@ public class ApplicantProfileService {
                 .orElseThrow(() -> new BusinessRuleException("NECTA_NOT_FOUND",
                         "No NECTA results found for " + index + " (" + req.year() + "). Check the index number and year."));
         ApplicantQualification q = fromNecta(a, req.type(), r);
+        takeSchool(a, req.type(), r);
         qualifications.save(q);
         audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
         return QualificationView.of(q);
+    }
+
+    /** The secondary school of the first CSEE / ACSEE results fetched from NECTA becomes the O-level / A-level school. */
+    static void takeSchool(Applicant a, ApplicantQualification.Type type, NectaClient.NectaResult r) {
+        if (r.centreName() == null) return;
+        if (type == ApplicantQualification.Type.CSEE && !a.isOlevelFromNecta()) {
+            a.setOlevelSchool(r.centreName());
+            a.setOlevelFromNecta(true);
+        } else if (type == ApplicantQualification.Type.ACSEE && !a.isAlevelFromNecta()) {
+            a.setAlevelSchool(r.centreName());
+            a.setAlevelFromNecta(true);
+        }
+    }
+
+    private static String upper(String s) {
+        String v = ApplicantAccountService.blankToNull(s);
+        return v == null ? null : v.toUpperCase();
     }
 
     /** A verified CSEE/ACSEE qualification from NECTA's answer. */
@@ -168,6 +197,20 @@ public class ApplicantProfileService {
             throw new BusinessRuleException("QUALIFICATION_LOCKED", "These are the Form Four results you registered with, so they cannot be removed");
         }
         qualifications.delete(q);
+        // the school came from these results: take it from another NECTA sitting, or let the applicant type it
+        if (q.getSource() == ApplicantQualification.Source.NECTA && (q.getType() == ApplicantQualification.Type.CSEE || q.getType() == ApplicantQualification.Type.ACSEE)) {
+            boolean olevel = q.getType() == ApplicantQualification.Type.CSEE;
+            Optional<ApplicantQualification> other = qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream()
+                    .filter(x -> !x.getId().equals(q.getId()) && x.getType() == q.getType() && x.getSource() == ApplicantQualification.Source.NECTA
+                            && x.getCentreName() != null).findFirst();
+            if (olevel) {
+                a.setOlevelSchool(other.map(ApplicantQualification::getCentreName).orElse(null));
+                a.setOlevelFromNecta(other.isPresent());
+            } else {
+                a.setAlevelSchool(other.map(ApplicantQualification::getCentreName).orElse(null));
+                a.setAlevelFromNecta(other.isPresent());
+            }
+        }
         audit.record("QUALIFICATION_REMOVED", "Applicant", a.getId(), Map.of("index", q.getIndexNumber()));
     }
 

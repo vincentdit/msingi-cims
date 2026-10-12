@@ -100,7 +100,11 @@ public final class AdmissionDtos {
             @Size(max = 60) String nextOfKinRegion,
             @Size(max = 60) String nextOfKinDistrict,
             @Size(max = 80) String nextOfKinWard,
-            @Size(max = 120) String nextOfKinStreet) {
+            @Size(max = 120) String nextOfKinStreet,
+            @Size(max = 150) String primarySchool,
+            @Size(max = 20) String primarySchoolCode,
+            @Size(max = 150) String olevelSchool,
+            @Size(max = 150) String alevelSchool) {
     }
 
     public record ProfileView(Long id, String firstName, String middleName, String surname, String fullName, String sex,
@@ -109,14 +113,16 @@ public final class AdmissionDtos {
                               String nextOfKinPhone, String nextOfKinRelation, List<String> missingFields,
                               String nectaIndexNumber, Short nectaExamYear, boolean namesFromNecta, String ward, String street,
                               String nextOfKinEmail, String nextOfKinAddress, String nextOfKinRegion, String nextOfKinDistrict,
-                              String nextOfKinWard, String nextOfKinStreet) {
+                              String nextOfKinWard, String nextOfKinStreet, String primarySchool, String primarySchoolCode,
+                              String olevelSchool, boolean olevelFromNecta, String alevelSchool, boolean alevelFromNecta) {
         public static ProfileView of(Applicant a) {
             return new ProfileView(a.getId(), a.getFirstName(), a.getMiddleName(), a.getSurname(), a.fullName(), a.getSex(),
                     a.getDateOfBirth(), a.getNationality(), a.getPhone(), a.getEmail(), a.getRegion(), a.getDistrict(),
                     a.getPostalAddress(), a.getDisability(), a.getNextOfKinName(), a.getNextOfKinPhone(),
                     a.getNextOfKinRelation(), a.missingProfileFields(), a.getNectaIndexNumber(), a.getNectaExamYear(), a.isNamesFromNecta(),
                     a.getWard(), a.getStreet(), a.getNextOfKinEmail(), a.getNextOfKinAddress(), a.getNextOfKinRegion(),
-                    a.getNextOfKinDistrict(), a.getNextOfKinWard(), a.getNextOfKinStreet());
+                    a.getNextOfKinDistrict(), a.getNextOfKinWard(), a.getNextOfKinStreet(), a.getPrimarySchool(), a.getPrimarySchoolCode(),
+                    a.getOlevelSchool(), a.isOlevelFromNecta(), a.getAlevelSchool(), a.isAlevelFromNecta());
         }
     }
 

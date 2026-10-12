@@ -205,6 +205,10 @@ public class RegistryService {
         s.setNextOfKinDistrict(ap.getNextOfKinDistrict());
         s.setNextOfKinWard(ap.getNextOfKinWard());
         s.setNextOfKinStreet(ap.getNextOfKinStreet());
+        s.setPrimarySchool(ap.getPrimarySchool());
+        s.setPrimarySchoolCode(ap.getPrimarySchoolCode());
+        s.setOlevelSchool(ap.getOlevelSchool());
+        s.setAlevelSchool(ap.getAlevelSchool());
         s.setProgramme(programme);
         s.setEntryAcademicYear(w.getAcademicYear());
         s.setIntake(w.getIntake());

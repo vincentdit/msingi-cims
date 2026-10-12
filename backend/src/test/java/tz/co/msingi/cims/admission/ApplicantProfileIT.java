@@ -14,7 +14,9 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -94,5 +96,45 @@ class ApplicantProfileIT {
         // clearing optional choices is allowed
         s.call(put("/api/applicant/profile"), token, profile("\"region\":\"Arusha\",\"disability\":\"\""))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.district").doesNotExist()).andExpect(jsonPath("$.disability").doesNotExist());
+    }
+
+    @Test
+    void educationHistoryUsesThePrimarySchoolListAndNectaSchools() throws Exception {
+        JsonNode found = s.body(s.call(get("/api/public/schools/primary?q=bangata"), null, null).andExpect(status().isOk()));
+        assertThat(found.findValuesAsText("name")).contains("BANGATA PRIMARY SCHOOL");
+        assertThat(found.get(0).get("code").asText()).isEqualTo("PS0101001");
+        assertThat(found.get(0).get("region").asText()).isEqualTo("ARUSHA");
+        assertThat(s.body(s.call(get("/api/public/schools/primary?q=ps0101001"), null, null)).get(0).get("name").asText()).isEqualTo("BANGATA PRIMARY SCHOOL");
+        assertThat(s.body(s.call(get("/api/public/schools/primary?q=b"), null, null)).size()).isZero();
+        assertThat(s.body(s.call(get("/api/public/schools/primary?q=primary"), null, null)).size()).isEqualTo(25);
+
+        // the O-level school comes with the Form Four results the applicant registered with
+        String index = "S0909/0001";
+        String school = s.lookup(index).get("centreName").asText();
+        String token = s.applicantToken();
+        s.call(get("/api/applicant/profile"), token, null)
+                .andExpect(jsonPath("$.olevelSchool").value(school)).andExpect(jsonPath("$.olevelFromNecta").value(true))
+                .andExpect(jsonPath("$.alevelFromNecta").value(false));
+
+        // primary school from the list (by code) or typed; NECTA's O-level school cannot be overwritten; A-level typed
+        s.call(put("/api/applicant/profile"), token, profile("""
+                "region":"Arusha","primarySchool":"Bangata Primary School","primarySchoolCode":"ps0101001",
+                "olevelSchool":"Somewhere Else","alevelSchool":"Ilboru secondary school\""""))
+                .andExpect(jsonPath("$.primarySchool").value("BANGATA PRIMARY SCHOOL"))
+                .andExpect(jsonPath("$.primarySchoolCode").value("PS0101001"))
+                .andExpect(jsonPath("$.olevelSchool").value(school))
+                .andExpect(jsonPath("$.alevelSchool").value("ILBORU SECONDARY SCHOOL"));
+        s.call(put("/api/applicant/profile"), token, profile("\"region\":\"Arusha\",\"primarySchool\":\"Old Mission School\",\"primarySchoolCode\":\"PS0101001\""))
+                .andExpect(jsonPath("$.primarySchool").value("Old Mission School"))
+                .andExpect(jsonPath("$.primarySchoolCode").doesNotExist());
+
+        // Form Six results from NECTA bring the A-level school; removing them lets the applicant type it again
+        JsonNode acsee = s.body(s.call(post("/api/applicant/qualifications/necta"), token, "{\"type\":\"ACSEE\",\"indexNumber\":\"S0909/0101\",\"year\":2025}")
+                .andExpect(status().isCreated()));
+        s.call(get("/api/applicant/profile"), token, null)
+                .andExpect(jsonPath("$.alevelSchool").value(acsee.get("centreName").asText())).andExpect(jsonPath("$.alevelFromNecta").value(true));
+        s.call(delete("/api/applicant/qualifications/" + acsee.get("id").asLong()), token, null).andExpect(status().isNoContent());
+        s.call(get("/api/applicant/profile"), token, null)
+                .andExpect(jsonPath("$.alevelSchool").doesNotExist()).andExpect(jsonPath("$.alevelFromNecta").value(false));
     }
 }

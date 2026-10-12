@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { api, formatDateTime, formatTzs } from '../../api/client';
 import type { Application, EligibilityResult, Fee, Profile, ProgrammeEligibility, Qualification } from '../../api/types';
 import { AreaPicker } from '../../components/AreaPicker';
+import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
 import { ErrorAlert, Loading } from '../../components/common';
 
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
@@ -160,6 +161,15 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
         <AreaPicker requireRegion value={{ region: f.region, district: f.district, ward: f.ward, street: f.street }}
           onChange={(a) => setF({ ...f, region: a.region ?? undefined, district: a.district ?? undefined, ward: a.ward ?? undefined, street: a.street ?? undefined })} />
         {field('postalAddress', t('profile.postalAddress'), { placeholder: 'P.O. Box 123, Arusha' })}
+
+        <Divider textAlign="left"><Typography variant="caption" color="text.secondary">{t('profile.education')}</Typography></Divider>
+        <PrimarySchoolPicker name={f.primarySchool} code={f.primarySchoolCode} onChange={(name, code) => setF({ ...f, primarySchool: name ?? undefined, primarySchoolCode: code ?? undefined })} />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          {field('olevelSchool', t('profile.olevelSchool'), { fullWidth: true, disabled: f.olevelFromNecta,
+            helperText: f.olevelFromNecta ? t('profile.fromNecta') : t('profile.olevelHint') })}
+          {field('alevelSchool', t('profile.alevelSchool'), { fullWidth: true, disabled: f.alevelFromNecta,
+            helperText: f.alevelFromNecta ? t('profile.fromNecta') : t('profile.alevelHint') })}
+        </Stack>
 
         <Divider textAlign="left"><Typography variant="caption" color="text.secondary">{t('profile.nextOfKin')}</Typography></Divider>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

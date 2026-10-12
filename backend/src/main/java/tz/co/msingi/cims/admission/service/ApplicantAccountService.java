@@ -114,6 +114,8 @@ public class ApplicantAccountService {
         if (!qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), ApplicantQualification.Type.CSEE, idx.indexNumber())) {
             qualifications.save(ApplicantProfileService.fromNecta(a, ApplicantQualification.Type.CSEE, r));
         }
+        a.setOlevelFromNecta(false); // the school of the index number registered with
+        ApplicantProfileService.takeSchool(a, ApplicantQualification.Type.CSEE, r);
 
         String code = otp.issue(user, OtpService.PURPOSE_PHONE_VERIFICATION, institutionName());
         audit.recordAs(user.getId(), user.getFullName(), existing == null ? "REGISTER" : "REGISTER_RESTARTED", "Applicant", a.getId(),
