@@ -7,6 +7,7 @@ import { api } from '../../api/client';
 import type { TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
+import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
 
 interface OtpSent {
   maskedPhone: string;
@@ -49,6 +50,7 @@ export function RegisterPage() {
   const [candidate, setCandidate] = useState<NectaCandidate | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [f, setF] = useState({ phone: '', email: '', password: '', acceptPrivacyNotice: false });
+  const [confirm, setConfirm] = useState('');
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   // "S0101/0001/2023" typed in one go fills in the year
@@ -131,10 +133,11 @@ export function RegisterPage() {
             </Alert>
             <TextField label={t('auth.phone')} value={f.phone} onChange={set('phone')} required placeholder="0712 345 678" inputMode="tel" autoComplete="tel" autoFocus />
             <TextField label={t('auth.email')} value={f.email} onChange={set('email')} type="email" autoComplete="email" />
-            <TextField label={t('auth.password')} value={f.password} onChange={set('password')} type="password" required helperText={t('auth.passwordHelp')} autoComplete="new-password" />
+            <NewPasswordFields password={f.password} confirm={confirm} onPassword={(v) => setF({ ...f, password: v })} onConfirm={setConfirm} />
             <FormControlLabel control={<Checkbox checked={f.acceptPrivacyNotice} onChange={set('acceptPrivacyNotice')} />} label={<Typography variant="body2">{t('auth.privacy')}</Typography>} />
             <ErrorAlert error={m.error} />
-            <Button type="submit" variant="contained" size="large" disabled={m.isPending || !f.acceptPrivacyNotice}>{t('auth.create')}</Button>
+            <Button type="submit" variant="contained" size="large"
+              disabled={m.isPending || !f.acceptPrivacyNotice || !passwordOk(f.password) || confirm !== f.password}>{t('auth.create')}</Button>
           </Stack>
         </form>
       )}
@@ -215,6 +218,7 @@ export function ForgotPasswordPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [sent, setSent] = useState<OtpSent | null>(null);
   const send = useMutation({
     mutationFn: () => api<OtpSent>('/api/applicant-auth/forgot-password', { method: 'POST', body: { phone } }),
@@ -236,8 +240,8 @@ export function ForgotPasswordPage() {
             <Alert severity="info">{sent.message}</Alert>
             <DevCode code={sent.devOtp} />
             <TextField label={t('auth.code')} value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" />
-            <TextField label={t('auth.newPassword')} type="password" value={password} onChange={(e) => setPassword(e.target.value)} helperText={t('auth.passwordHelp')} />
-            <Button variant="contained" onClick={() => reset.mutate()} disabled={reset.isPending}>{t('auth.reset')}</Button>
+            <NewPasswordFields label={t('auth.newPassword')} password={password} confirm={confirm} onPassword={setPassword} onConfirm={setConfirm} />
+            <Button variant="contained" onClick={() => reset.mutate()} disabled={reset.isPending || !code || !passwordOk(password) || confirm !== password}>{t('auth.reset')}</Button>
           </>
         )}
         <ErrorAlert error={send.error ?? reset.error} />

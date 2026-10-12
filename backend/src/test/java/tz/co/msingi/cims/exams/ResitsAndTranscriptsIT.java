@@ -268,7 +268,7 @@ class ResitsAndTranscriptsIT {
             String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
             reg[i] = byPhone.get(phone);
             studentId[i] = idByReg.get(reg[i]);
-            tok[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + reg[i] + "\",\"password\":\"Secret123\"}")).get("accessToken").asText();
+            tok[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + reg[i] + "\",\"password\":\"Secret@123\"}")).get("accessToken").asText();
             s.call(post("/api/student/semester-registration"), tok[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }

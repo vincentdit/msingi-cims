@@ -55,13 +55,13 @@ class ApplicantJourneyIT {
 
         // names typed by the browser are not accepted: they come from NECTA again on registration
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0002/2025","firstName":"Someone","surname":"Else","phone":"0755 123 456","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0002/2025","firstName":"Someone","surname":"Else","phone":"0755 123 456","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
         assertThat(reg.get("fullName").asText()).isEqualTo(fullName);
         String otp = reg.get("devOtp").asText();
 
         call(post("/api/applicant-auth/login"), null, """
-                {"login":"0755123456","password":"Secret123"}""")
+                {"login":"0755123456","password":"Secret@123"}""")
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_VERIFIED"));
 
@@ -85,9 +85,9 @@ class ApplicantJourneyIT {
 
         // the applicant can also sign in with the index number
         call(post("/api/applicant-auth/login"), null, """
-                {"login":"S0101/0002/2025","password":"Secret123"}""").andExpect(status().isOk());
+                {"login":"S0101/0002/2025","password":"Secret@123"}""").andExpect(status().isOk());
         call(post("/api/applicant-auth/login"), null, """
-                {"login":"s0101/0002","password":"Secret123"}""").andExpect(status().isOk());
+                {"login":"s0101/0002","password":"Secret@123"}""").andExpect(status().isOk());
 
         // weak results → not eligible
         JsonNode elig = body(call(get("/api/applicant/eligibility?windowId=" + inst.windowId()), token, null));
@@ -148,7 +148,7 @@ class ApplicantJourneyIT {
         call(post("/api/applicant-auth/necta-lookup"), null, """
                 {"indexNumber":"S0101/0002","examYear":2025}""").andExpect(jsonPath("$.alreadyRegistered").value(true));
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0002","examYear":2025,"phone":"0755 999 888","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0002","examYear":2025,"phone":"0755 999 888","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(jsonPath("$.code").value("INDEX_REGISTERED"));
     }
 
@@ -163,7 +163,7 @@ class ApplicantJourneyIT {
         call(post("/api/applicant-auth/necta-lookup"), null, """
                 {"indexNumber":"S0101/0000","examYear":2025}""").andExpect(jsonPath("$.code").value("NECTA_NOT_FOUND"));
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0000","examYear":2025,"phone":"0688 444 555","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0000","examYear":2025,"phone":"0688 444 555","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(jsonPath("$.code").value("NECTA_NOT_FOUND"));
     }
 
@@ -171,26 +171,26 @@ class ApplicantJourneyIT {
     void anUnconfirmedRegistrationCanBeStartedAgain() throws Exception {
         // registered with a phone the candidate never confirmed (e.g. a typing mistake)
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 999","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 999","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated());
         JsonNode again = body(call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 998","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 998","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
         String token = body(call(post("/api/applicant-auth/verify"), null,
                 "{\"phone\":\"0688000998\",\"code\":\"" + again.get("devOtp").asText() + "\"}").andExpect(status().isOk())).get("accessToken").asText();
         assertThat(body(call(get("/api/applicant/qualifications"), token, null)).size()).isEqualTo(1);
         // the first number is free again
         call(post("/api/applicant-auth/login"), null, """
-                {"login":"0688000999","password":"Secret123"}""").andExpect(status().isUnauthorized());
+                {"login":"0688000999","password":"Secret@123"}""").andExpect(status().isUnauthorized());
     }
 
     @Test
     void duplicatePhoneIsRejectedAndWrongOtpCounts() throws Exception {
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0003","examYear":2025,"phone":"0688 000 111","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0003","examYear":2025,"phone":"0688 000 111","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated());
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0004","examYear":2025,"phone":"0688 000 111","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0004","examYear":2025,"phone":"0688 000 111","password":"Secret@123","acceptPrivacyNotice":true}""")
                 .andExpect(jsonPath("$.code").value("PHONE_REGISTERED"));
         call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000111\",\"code\":\"000000\"}")
                 .andExpect(status().isUnprocessableEntity())
@@ -198,9 +198,22 @@ class ApplicantJourneyIT {
     }
 
     @Test
+    void passwordsNeedUpperLowerDigitAndSpecialCharacter() throws Exception {
+        for (String weak : new String[]{"Secret123", "secret@123", "SECRET@123", "Secret@abc", "Se@1"}) {
+            call(post("/api/applicant-auth/register"), null, """
+                    {"indexNumber":"S0101/0006","examYear":2025,"phone":"0688 222 444","password":"%s","acceptPrivacyNotice":true}""".formatted(weak))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors.password").exists());
+        }
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0006","examYear":2025,"phone":"0688 222 444","password":"Secret@123","acceptPrivacyNotice":true}""")
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void privacyConsentIsRequired() throws Exception {
         call(post("/api/applicant-auth/register"), null, """
-                {"indexNumber":"S0101/0005","examYear":2025,"phone":"0688 222 333","password":"Secret123","acceptPrivacyNotice":false}""")
+                {"indexNumber":"S0101/0005","examYear":2025,"phone":"0688 222 333","password":"Secret@123","acceptPrivacyNotice":false}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.acceptPrivacyNotice").exists());
     }

@@ -32,8 +32,9 @@ public final class AdmissionDtos {
     private AdmissionDtos() {
     }
 
-    public static final String PASSWORD_RULE = "^(?=.*[A-Za-z])(?=.*\\d).{8,72}$";
-    public static final String PASSWORD_MESSAGE = "Use at least 8 characters with letters and numbers";
+    /** As in NOAS: at least 8 characters with an upper-case letter, a lower-case letter, a digit and a special character. */
+    public static final String PASSWORD_RULE = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,72}$";
+    public static final String PASSWORD_MESSAGE = "Use at least 8 characters with an upper-case letter, a lower-case letter, a digit and a special character";
 
     // ------------------------------------------------------------------ applicant auth
     /**
