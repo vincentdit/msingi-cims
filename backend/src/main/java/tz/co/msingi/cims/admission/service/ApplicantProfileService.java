@@ -17,6 +17,9 @@ import tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationView;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.necta.NectaClient;
+import tz.co.msingi.cims.reference.Address;
+import tz.co.msingi.cims.reference.GeographyService;
+import tz.co.msingi.cims.reference.ProfileOptions;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
 
@@ -33,6 +36,7 @@ public class ApplicantProfileService {
     private final ApplicantQualificationRepository qualifications;
     private final ApplicationRepository applications;
     private final NectaClient necta;
+    private final GeographyService geo;
     private final AuditService audit;
 
     @Transactional(readOnly = true)
@@ -59,13 +63,23 @@ public class ApplicantProfileService {
         a.setDateOfBirth(req.dateOfBirth());
         a.setNationality(ApplicantAccountService.blankToNull(req.nationality()));
         a.setEmail(ApplicantAccountService.blankToNull(req.email()));
-        a.setRegion(ApplicantAccountService.blankToNull(req.region()));
-        a.setDistrict(ApplicantAccountService.blankToNull(req.district()));
+        Address home = Address.check(geo, "", req.region(), req.district(), req.ward(), req.street());
+        Address kin = Address.check(geo, "Next of kin", req.nextOfKinRegion(), req.nextOfKinDistrict(), req.nextOfKinWard(), req.nextOfKinStreet());
+        a.setDisability(Address.choice(ProfileOptions.DISABILITIES, req.disability(), a.getDisability(), "INVALID_DISABILITY", "impairment"));
+        a.setNextOfKinRelation(Address.choice(ProfileOptions.RELATIONSHIPS, req.nextOfKinRelation(), a.getNextOfKinRelation(), "INVALID_RELATIONSHIP", "relationship"));
+        a.setRegion(home.region());
+        a.setDistrict(home.district());
+        a.setWard(home.ward());
+        a.setStreet(home.street());
         a.setPostalAddress(ApplicantAccountService.blankToNull(req.postalAddress()));
-        a.setDisability(ApplicantAccountService.blankToNull(req.disability()));
         a.setNextOfKinName(ApplicantAccountService.blankToNull(req.nextOfKinName()));
         a.setNextOfKinPhone(req.nextOfKinPhone() == null || req.nextOfKinPhone().isBlank() ? null : PhoneNumbers.normalise(req.nextOfKinPhone()));
-        a.setNextOfKinRelation(ApplicantAccountService.blankToNull(req.nextOfKinRelation()));
+        a.setNextOfKinEmail(ApplicantAccountService.blankToNull(req.nextOfKinEmail()));
+        a.setNextOfKinAddress(ApplicantAccountService.blankToNull(req.nextOfKinAddress()));
+        a.setNextOfKinRegion(kin.region());
+        a.setNextOfKinDistrict(kin.district());
+        a.setNextOfKinWard(kin.ward());
+        a.setNextOfKinStreet(kin.street());
         a.getUser().setFullName(a.fullName());
         audit.record("UPDATE", "Applicant", a.getId(), null);
         return ProfileView.of(a);

@@ -63,6 +63,14 @@ public class Student extends BaseEntity {
     private String nextOfKinName;
     private String nextOfKinPhone;
     private String nextOfKinRelation;
+    private String ward;
+    private String street;
+    private String nextOfKinEmail;
+    private String nextOfKinAddress;
+    private String nextOfKinRegion;
+    private String nextOfKinDistrict;
+    private String nextOfKinWard;
+    private String nextOfKinStreet;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "programme_id")

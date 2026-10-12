@@ -209,6 +209,12 @@ const en = {
     logDRAFT: 'Draft', logSUBMITTED: 'With supervisor', logAPPROVED: 'Approved', logRETURNED: 'Returned',
     approved: '{{n}} of {{total}} weeks approved', mark: 'IPT mark', marks: 'Marks: {{n}} of 3 recorded', declinedTry: 'Your request for {{org}} was declined. Please choose another organisation.', cancel: 'Cancel',
   },
+  profile: {
+    sex: 'Sex', dateOfBirth: 'Date of birth', nationality: 'Nationality', disability: 'Disability / physical impairment', none: 'None',
+    residence: 'WHERE YOU LIVE', region: 'Region', district: 'District', ward: 'Ward', street: 'Village / street', postalAddress: 'Postal address',
+    chooseFirst: 'Choose the {{level}} first', nextOfKin: 'NEXT OF KIN', kinName: 'Full name', relationship: 'Relationship',
+    kinPhone: 'Mobile number', kinEmail: 'Email (optional)', kinAddress: 'Address (optional)', kinAddressHint: 'House, plot or P.O. Box',
+  },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
 
@@ -418,6 +424,12 @@ const sw: typeof en = {
     challenges: 'Changamoto', hours: 'Saa', saveDraft: 'Hifadhi rasimu', submitWeek: 'Wasilisha kwa msimamizi', newWeek: 'Ongeza wiki {{n}}', edit: 'Hariri',
     logDRAFT: 'Rasimu', logSUBMITTED: 'Iko kwa msimamizi', logAPPROVED: 'Imekubaliwa', logRETURNED: 'Imerudishwa',
     approved: 'Wiki {{n}} kati ya {{total}} zimekubaliwa', mark: 'Alama ya IPT', marks: 'Alama: {{n}} kati ya 3 zimewekwa', declinedTry: 'Ombi lako la {{org}} limekataliwa. Tafadhali chagua taasisi nyingine.', cancel: 'Ghairi',
+  },
+  profile: {
+    sex: 'Jinsia', dateOfBirth: 'Tarehe ya kuzaliwa', nationality: 'Uraia', disability: 'Ulemavu / changamoto ya kimwili', none: 'Hakuna',
+    residence: 'UNAPOISHI', region: 'Mkoa', district: 'Wilaya', ward: 'Kata', street: 'Kijiji / mtaa', postalAddress: 'Anwani ya posta',
+    chooseFirst: 'Chagua {{level}} kwanza', nextOfKin: 'NDUGU WA KARIBU', kinName: 'Jina kamili', relationship: 'Uhusiano',
+    kinPhone: 'Namba ya simu', kinEmail: 'Barua pepe (si lazima)', kinAddress: 'Anwani (si lazima)', kinAddressHint: 'Nyumba, kiwanja au S.L.P.',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };

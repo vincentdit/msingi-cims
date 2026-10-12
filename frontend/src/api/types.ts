@@ -122,6 +122,14 @@ export interface Profile {
   nectaIndexNumber?: string;
   nectaExamYear?: number;
   namesFromNecta: boolean;
+  ward?: string;
+  street?: string;
+  nextOfKinEmail?: string;
+  nextOfKinAddress?: string;
+  nextOfKinRegion?: string;
+  nextOfKinDistrict?: string;
+  nextOfKinWard?: string;
+  nextOfKinStreet?: string;
 }
 
 export interface Qualification {

@@ -92,19 +92,31 @@ public final class AdmissionDtos {
             @Size(max = 120) String disability,
             @Size(max = 150) String nextOfKinName,
             String nextOfKinPhone,
-            @Size(max = 40) String nextOfKinRelation) {
+            @Size(max = 40) String nextOfKinRelation,
+            @Size(max = 80) String ward,
+            @Size(max = 120) String street,
+            @Email @Size(max = 120) String nextOfKinEmail,
+            @Size(max = 200) String nextOfKinAddress,
+            @Size(max = 60) String nextOfKinRegion,
+            @Size(max = 60) String nextOfKinDistrict,
+            @Size(max = 80) String nextOfKinWard,
+            @Size(max = 120) String nextOfKinStreet) {
     }
 
     public record ProfileView(Long id, String firstName, String middleName, String surname, String fullName, String sex,
                               LocalDate dateOfBirth, String nationality, String phone, String email, String region,
                               String district, String postalAddress, String disability, String nextOfKinName,
                               String nextOfKinPhone, String nextOfKinRelation, List<String> missingFields,
-                              String nectaIndexNumber, Short nectaExamYear, boolean namesFromNecta) {
+                              String nectaIndexNumber, Short nectaExamYear, boolean namesFromNecta, String ward, String street,
+                              String nextOfKinEmail, String nextOfKinAddress, String nextOfKinRegion, String nextOfKinDistrict,
+                              String nextOfKinWard, String nextOfKinStreet) {
         public static ProfileView of(Applicant a) {
             return new ProfileView(a.getId(), a.getFirstName(), a.getMiddleName(), a.getSurname(), a.fullName(), a.getSex(),
                     a.getDateOfBirth(), a.getNationality(), a.getPhone(), a.getEmail(), a.getRegion(), a.getDistrict(),
                     a.getPostalAddress(), a.getDisability(), a.getNextOfKinName(), a.getNextOfKinPhone(),
-                    a.getNextOfKinRelation(), a.missingProfileFields(), a.getNectaIndexNumber(), a.getNectaExamYear(), a.isNamesFromNecta());
+                    a.getNextOfKinRelation(), a.missingProfileFields(), a.getNectaIndexNumber(), a.getNectaExamYear(), a.isNamesFromNecta(),
+                    a.getWard(), a.getStreet(), a.getNextOfKinEmail(), a.getNextOfKinAddress(), a.getNextOfKinRegion(),
+                    a.getNextOfKinDistrict(), a.getNextOfKinWard(), a.getNextOfKinStreet());
         }
     }
 

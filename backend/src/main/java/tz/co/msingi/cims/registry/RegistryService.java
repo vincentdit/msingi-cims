@@ -197,6 +197,14 @@ public class RegistryService {
         s.setNextOfKinName(ap.getNextOfKinName());
         s.setNextOfKinPhone(ap.getNextOfKinPhone());
         s.setNextOfKinRelation(ap.getNextOfKinRelation());
+        s.setWard(ap.getWard());
+        s.setStreet(ap.getStreet());
+        s.setNextOfKinEmail(ap.getNextOfKinEmail());
+        s.setNextOfKinAddress(ap.getNextOfKinAddress());
+        s.setNextOfKinRegion(ap.getNextOfKinRegion());
+        s.setNextOfKinDistrict(ap.getNextOfKinDistrict());
+        s.setNextOfKinWard(ap.getNextOfKinWard());
+        s.setNextOfKinStreet(ap.getNextOfKinStreet());
         s.setProgramme(programme);
         s.setEntryAcademicYear(w.getAcademicYear());
         s.setIntake(w.getIntake());

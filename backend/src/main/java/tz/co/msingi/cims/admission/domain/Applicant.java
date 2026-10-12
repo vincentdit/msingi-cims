@@ -51,6 +51,14 @@ public class Applicant extends BaseEntity {
     private String nextOfKinName;
     private String nextOfKinPhone;
     private String nextOfKinRelation;
+    private String ward;
+    private String street;
+    private String nextOfKinEmail;
+    private String nextOfKinAddress;
+    private String nextOfKinRegion;
+    private String nextOfKinDistrict;
+    private String nextOfKinWard;
+    private String nextOfKinStreet;
 
     /** The Form Four (CSEE) index number and year the applicant registered with; names come from NECTA. */
     private String nectaIndexNumber;

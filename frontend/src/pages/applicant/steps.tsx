@@ -13,12 +13,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, formatDateTime, formatTzs } from '../../api/client';
 import type { Application, EligibilityResult, Fee, Profile, ProgrammeEligibility, Qualification } from '../../api/types';
+import { AreaPicker } from '../../components/AreaPicker';
 import { ErrorAlert, Loading } from '../../components/common';
 
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
-const REGIONS = ['Arusha', 'Dar es Salaam', 'Dodoma', 'Geita', 'Iringa', 'Kagera', 'Katavi', 'Kigoma', 'Kilimanjaro', 'Lindi', 'Manyara',
-  'Mara', 'Mbeya', 'Morogoro', 'Mtwara', 'Mwanza', 'Njombe', 'Pemba North', 'Pemba South', 'Pwani', 'Rukwa', 'Ruvuma', 'Shinyanga',
-  'Simiyu', 'Singida', 'Songwe', 'Tabora', 'Tanga', 'Unguja North', 'Unguja South', 'Unguja Urban West'];
 
 function useInvalidate() {
   const qc = useQueryClient();
@@ -117,6 +115,8 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
   const { t } = useTranslation();
   const invalidate = useInvalidate();
   const profile = useQuery({ queryKey: ['applicant', 'profile'], queryFn: () => api<Profile>('/api/applicant/profile', { realm: 'applicant' }) });
+  const options = useQuery({ queryKey: ['profile-options'], staleTime: Infinity,
+    queryFn: () => api<{ disabilities: string[]; relationships: string[] }>('/api/public/profile-options') });
   const [f, setF] = useState<Partial<Profile> | null>(null);
   // initialise once — later refetches must not overwrite what the applicant is typing
   useEffect(() => { if (profile.data && f === null) setF(profile.data); }, [profile.data, f]);
@@ -139,28 +139,45 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
         </Stack>
         {f.namesFromNecta && <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>{t('auth.namesFromNecta')}</Typography>}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField select label="Sex" value={f.sex ?? ''} onChange={(e) => setF({ ...f, sex: e.target.value as 'M' | 'F' })} required>
-            <MenuItem value="F">Female</MenuItem>
-            <MenuItem value="M">Male</MenuItem>
+          <TextField select label={t('profile.sex')} value={f.sex ?? ''} onChange={(e) => setF({ ...f, sex: e.target.value as 'M' | 'F' })} required fullWidth>
+            <MenuItem value="F">{t('auth.sexF')}</MenuItem>
+            <MenuItem value="M">{t('auth.sexM')}</MenuItem>
           </TextField>
-          {field('dateOfBirth', 'Date of birth', { type: 'date', required: true, slotProps: { inputLabel: { shrink: true } } })}
-          {field('nationality', 'Nationality', { required: true, placeholder: 'Tanzanian' })}
+          {field('dateOfBirth', t('profile.dateOfBirth'), { type: 'date', required: true, fullWidth: true, slotProps: { inputLabel: { shrink: true } } })}
+          {field('nationality', t('profile.nationality'), { required: true, placeholder: 'Tanzanian', fullWidth: true })}
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField select label="Region" value={f.region ?? ''} onChange={(e) => setF({ ...f, region: e.target.value })} required>
-            {REGIONS.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+          <TextField select fullWidth label={t('profile.disability')} value={options.data?.disabilities.find((d) => d.toLowerCase() === (f.disability ?? '').toLowerCase()) ?? f.disability ?? ''}
+            onChange={(e) => setF({ ...f, disability: e.target.value })}>
+            <MenuItem value="">{t('profile.none')}</MenuItem>
+            {f.disability && !options.data?.disabilities.some((d) => d.toLowerCase() === f.disability!.toLowerCase()) && <MenuItem value={f.disability}>{f.disability}</MenuItem>}
+            {options.data?.disabilities.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
           </TextField>
-          {field('district', 'District')}
-          {field('email', t('auth.email'), { type: 'email' })}
+          {field('email', t('auth.email'), { type: 'email', fullWidth: true })}
         </Stack>
-        {field('postalAddress', 'Postal address')}
-        {field('disability', 'Disability or special support needed (optional)')}
-        <Divider textAlign="left"><Typography variant="caption" color="text.secondary">NEXT OF KIN</Typography></Divider>
+
+        <Divider textAlign="left"><Typography variant="caption" color="text.secondary">{t('profile.residence')}</Typography></Divider>
+        <AreaPicker requireRegion value={{ region: f.region, district: f.district, ward: f.ward, street: f.street }}
+          onChange={(a) => setF({ ...f, region: a.region ?? undefined, district: a.district ?? undefined, ward: a.ward ?? undefined, street: a.street ?? undefined })} />
+        {field('postalAddress', t('profile.postalAddress'), { placeholder: 'P.O. Box 123, Arusha' })}
+
+        <Divider textAlign="left"><Typography variant="caption" color="text.secondary">{t('profile.nextOfKin')}</Typography></Divider>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          {field('nextOfKinName', 'Full name', { required: true })}
-          {field('nextOfKinPhone', 'Mobile number', { required: true, inputMode: 'tel' })}
-          {field('nextOfKinRelation', 'Relationship', { placeholder: 'Parent / Guardian' })}
+          {field('nextOfKinName', t('profile.kinName'), { required: true, fullWidth: true })}
+          <TextField select fullWidth label={t('profile.relationship')}
+            value={options.data?.relationships.find((r) => r.toLowerCase() === (f.nextOfKinRelation ?? '').toLowerCase()) ?? f.nextOfKinRelation ?? ''}
+            onChange={(e) => setF({ ...f, nextOfKinRelation: e.target.value })}>
+            {f.nextOfKinRelation && !options.data?.relationships.some((r) => r.toLowerCase() === f.nextOfKinRelation!.toLowerCase()) && <MenuItem value={f.nextOfKinRelation}>{f.nextOfKinRelation}</MenuItem>}
+            {options.data?.relationships.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+          </TextField>
         </Stack>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          {field('nextOfKinPhone', t('profile.kinPhone'), { required: true, inputMode: 'tel', placeholder: '0712 345 678', fullWidth: true })}
+          {field('nextOfKinEmail', t('profile.kinEmail'), { type: 'email', fullWidth: true })}
+        </Stack>
+        {field('nextOfKinAddress', t('profile.kinAddress'), { placeholder: t('profile.kinAddressHint') })}
+        <AreaPicker value={{ region: f.nextOfKinRegion, district: f.nextOfKinDistrict, ward: f.nextOfKinWard, street: f.nextOfKinStreet }}
+          onChange={(a) => setF({ ...f, nextOfKinRegion: a.region ?? undefined, nextOfKinDistrict: a.district ?? undefined, nextOfKinWard: a.ward ?? undefined, nextOfKinStreet: a.street ?? undefined })} />
         <ErrorAlert error={save.error} />
         <Box><Button type="submit" variant="contained" disabled={save.isPending}>{t('app.save')} & {t('app.next').toLowerCase()}</Button></Box>
       </Stack>
