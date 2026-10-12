@@ -1,0 +1,5 @@
+# Copy to application-dev.yml (not committed) and fill in the NECTA results API key.
+cims:
+  necta:
+    mode: ${CIMS_NECTA_MODE:live}
+    api-key: ${NECTA_API_KEY:put-the-key-here}

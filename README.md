@@ -201,7 +201,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `CIMS_CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
 | `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter |
 | `CIMS_NECTA_MODE` | `simulated` | NECTA results: `simulated` or `live` (the NECTA results API, `POST /api/results/individual`) |
-| `NECTA_API_KEY` | — | NECTA results API key; required when `CIMS_NECTA_MODE=live` (never stored in the code) |
+| `NECTA_API_KEY` | — | NECTA results API key; required when `CIMS_NECTA_MODE=live`. For development it can sit in `backend/config/application-dev.yml` (not committed; copy `application-dev.yml.example`), which makes the dev profile use live NECTA |
 | `CIMS_NECTA_BASE_URL` | `https://api.necta.go.tz` | NECTA results API address |
 | `CIMS_NACTVET_MODE` | `simulated` | NACTVET admission verification adapter |
 | `CIMS_OFFER_EXPIRY_CRON` | `0 5 * * * *` | When expired offers are closed (`-` disables) |

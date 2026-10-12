@@ -14,3 +14,6 @@ Thumbs.db
 # Secrets
 .env
 *.pem
+# Local configuration with keys
+backend/config/*.yml
+!backend/config/*.example
