@@ -47,6 +47,14 @@ public final class MessageTemplates {
                 List.of("referenceNo", "institution"), Set.of("referenceNo"),
                 "Your application {referenceNo} has been received. We will notify you of the outcome by SMS.",
                 "Maombi yako {referenceNo} yamepokelewa. Tutakujulisha matokeo kwa SMS.", s);
+        add("ADMISSION_WINDOW_CLOSED", "Admission window closed early", "The Admissions Office closes a window before its closing date", "Admission",
+                List.of("window", "reason", "institution"), Set.of("window"),
+                "{institution}: applications for {window} have closed. Your application was not submitted. {reason}",
+                "{institution}: maombi ya {window} yamefungwa. Maombi yako hayakuwasilishwa. {reason}", s);
+        add("ADMISSION_WINDOW_REOPENED", "Admission window reopened", "The Admissions Office reopens a closed window", "Admission",
+                List.of("window", "deadline", "institution"), Set.of("window", "deadline"),
+                "{institution}: applications for {window} are open again until {deadline}. Complete and submit your application before then.",
+                "{institution}: maombi ya {window} yamefunguliwa tena hadi {deadline}. Kamilisha na uwasilishe maombi yako kabla ya hapo.", s);
         add("OFFER_MADE", "Admission offer", "NACTVET verifies an applicant and the offer is made", "Admission",
                 List.of("programme", "institution", "deadline"), Set.of(),
                 "Congratulations! NACTVET has verified your admission to {programme} at {institution}. Log in to accept your offer by {deadline}.",

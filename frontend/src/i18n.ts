@@ -19,6 +19,8 @@ const en = {
     how2: 'Enter your NECTA index number — results are fetched automatically',
     how3: 'Pay the application fee with a GePG control number',
     how4: 'Choose up to {{n}} programmes you qualify for and submit',
+    opensOn: 'Applications for {{window}} open on {{date}}.',
+    windowClosed: 'Applications for {{window}} closed on {{date}}, so this application can no longer be submitted. You will get an SMS if the window reopens.',
   },
   auth: {
     registerTitle: 'Create your applicant account',
@@ -220,6 +222,8 @@ const sw: typeof en = {
     how2: 'Weka namba yako ya mtihani wa NECTA — matokeo yanapatikana yenyewe',
     how3: 'Lipa ada ya maombi kwa namba ya malipo ya GePG',
     how4: 'Chagua hadi programu {{n}} unazostahili kisha wasilisha',
+    opensOn: 'Maombi ya {{window}} yanafunguliwa tarehe {{date}}.',
+    windowClosed: 'Maombi ya {{window}} yalifungwa tarehe {{date}}, hivyo maombi haya hayawezi kuwasilishwa tena. Utapata SMS dirisha likifunguliwa tena.',
   },
   auth: {
     registerTitle: 'Fungua akaunti ya mwombaji',

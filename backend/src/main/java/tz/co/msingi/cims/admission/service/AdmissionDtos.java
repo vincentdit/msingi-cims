@@ -152,14 +152,28 @@ public final class AdmissionDtos {
     public record WindowView(Long id, String name, Long academicYearId, String academicYear, Long intakeId, String intake,
                              OffsetDateTime opensAt, OffsetDateTime closesAt, BigDecimal applicationFee, short maxChoices,
                              short offerAcceptanceDays, String status, boolean open, String instructions,
-                             JoiningInstructions joiningInstructions, List<WindowProgrammeView> programmes) {
+                             JoiningInstructions joiningInstructions, List<WindowProgrammeView> programmes, String state) {
         public static WindowView of(AdmissionWindow w, List<WindowProgramme> programmes) {
             return new WindowView(w.getId(), w.getName(), w.getAcademicYear().getId(), w.getAcademicYear().getCode(),
                     w.getIntake().getId(), w.getIntake().getName(), w.getOpensAt(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), w.getOfferAcceptanceDays(), w.getStatus().name(), w.isOpen(OffsetDateTime.now()), w.getInstructions(),
                     w.getJoiningInstructions(),
-                    programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList());
+                    programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList(), w.state(OffsetDateTime.now()));
         }
+    }
+
+    /** Open a window now; optionally with a new closing date. */
+    public record OpenRequest(OffsetDateTime closesAt) {
+    }
+
+    public record CloseRequest(@NotBlank @Size(max = 500) String reason, Boolean notifyApplicants) {
+    }
+
+    public record ReopenRequest(@NotNull OffsetDateTime closesAt, @NotBlank @Size(max = 500) String reason, Boolean notifyApplicants) {
+    }
+
+    public record WindowEventView(Long id, String action, String reason, OffsetDateTime opensAt, OffsetDateTime closesAt,
+                                  OffsetDateTime previousClosesAt, int applicantsNotified, boolean automatic, String byName, OffsetDateTime at) {
     }
 
     public record WindowStats(Long windowId, long total, long draft, long paymentPending, long submitted) {

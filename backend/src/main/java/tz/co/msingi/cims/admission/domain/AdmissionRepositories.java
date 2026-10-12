@@ -23,6 +23,17 @@ public final class AdmissionRepositories {
         @EntityGraph(attributePaths = {"academicYear", "intake"})
         @Query("select w from AdmissionWindow w where w.status = 'PUBLISHED' and w.opensAt <= :now and w.closesAt > :now order by w.closesAt")
         List<AdmissionWindow> findOpen(OffsetDateTime now);
+
+        @EntityGraph(attributePaths = {"academicYear", "intake"})
+        @Query("select w from AdmissionWindow w where w.status = 'PUBLISHED' and w.opensAt > :now order by w.opensAt")
+        List<AdmissionWindow> findUpcoming(OffsetDateTime now);
+
+        @Query("select w from AdmissionWindow w where w.status = 'PUBLISHED' and w.closesAt <= :now")
+        List<AdmissionWindow> findPastClosingDate(OffsetDateTime now);
+    }
+
+    public interface AdmissionWindowEventRepository extends JpaRepository<AdmissionWindowEvent, Long> {
+        List<AdmissionWindowEvent> findByWindowIdOrderByAtDescIdDesc(Long windowId);
     }
 
     public interface WindowProgrammeRepository extends JpaRepository<WindowProgramme, Long> {

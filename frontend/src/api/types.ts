@@ -74,9 +74,18 @@ export interface AdmissionWindow {
   offerAcceptanceDays: number;
   joiningInstructions?: JoiningInstructions;
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+  /** What applicants see: hidden draft, published but not yet open, open, or closed. */
+  state: WindowState;
   open: boolean;
   instructions?: string;
   programmes?: WindowProgramme[];
+}
+
+export type WindowState = 'DRAFT' | 'SCHEDULED' | 'OPEN' | 'CLOSED';
+
+export interface WindowEvent {
+  id: number; action: 'CREATED' | 'PUBLISHED' | 'OPENED' | 'CLOSED' | 'REOPENED' | 'EXTENDED' | 'RESCHEDULED'; reason?: string;
+  opensAt?: string; closesAt?: string; previousClosesAt?: string; applicantsNotified: number; automatic: boolean; byName: string; at: string;
 }
 
 export interface EligibilityResult {

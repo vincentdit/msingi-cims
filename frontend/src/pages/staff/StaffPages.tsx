@@ -19,6 +19,7 @@ import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../co
 import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
 import JoiningInstructionsCard from './JoiningInstructionsCard';
+import { WindowFormDialog, WindowHistoryCard, WindowLifecycle, WindowStateChip, useWindowRoles } from './WindowAdmin';
 
 const staff = { realm: 'staff' as const };
 
@@ -57,7 +58,7 @@ export function StaffLoginPage() {
 // ---------------------------------------------------------------- Dashboard
 export function StaffDashboard() {
   const windows = useQuery({ queryKey: ['staff', 'windows'], queryFn: () => api<AdmissionWindow[]>('/api/admission/windows', staff) });
-  const current = windows.data?.find((w) => w.status === 'PUBLISHED') ?? windows.data?.[0];
+  const current = windows.data?.find((w) => w.state === 'OPEN') ?? windows.data?.find((w) => w.state === 'SCHEDULED') ?? windows.data?.[0];
   const stats = useQuery({
     queryKey: ['staff', 'stats', current?.id], enabled: !!current,
     queryFn: () => api<WindowStats>(`/api/admission/windows/${current!.id}/stats`, staff),
@@ -71,7 +72,7 @@ export function StaffDashboard() {
   ];
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Admissions dashboard" subtitle={current ? `${current.name} · closes ${formatDate(current.closesAt)}` : 'No admission window yet'} />
+      <PageTitle title="Admissions dashboard" subtitle={current ? `${current.name} · ${current.state === 'OPEN' ? `closes ${formatDateTime(current.closesAt)}` : current.state === 'SCHEDULED' ? `opens ${formatDateTime(current.opensAt)}` : current.state === 'CLOSED' ? `closed ${formatDate(current.closesAt)}` : 'draft'}` : 'No admission window yet'} />
       <ErrorAlert error={windows.error ?? stats.error} />
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {tiles.map((t) => (
@@ -273,25 +274,31 @@ export function ProgrammesPage() {
 // ---------------------------------------------------------------- Windows
 export function WindowsPage() {
   const list = useQuery({ queryKey: ['staff', 'windows'], queryFn: () => api<AdmissionWindow[]>('/api/admission/windows', staff) });
+  const { canEdit } = useWindowRoles();
+  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Admission windows" subtitle="Intakes, dates, fees and programmes on offer." />
+      <PageTitle title="Admission windows" subtitle="Intakes, dates, fees and programmes on offer. Open, close and reopen windows from each window's page."
+        action={canEdit && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>New window</Button>} />
       <ErrorAlert error={list.error} />
+      {list.data && !list.data.length && <Alert severity="info">No admission windows yet.</Alert>}
       <Stack spacing={2}>
         {list.data?.map((w) => (
           <Card key={w.id} component={RouterLink} to={`/staff/windows/${w.id}`} sx={{ textDecoration: 'none' }}>
             <CardContent>
-              <Stack direction="row" justifyContent="space-between">
+              <Stack direction="row" justifyContent="space-between" spacing={2}>
                 <Box>
                   <Typography variant="h6">{w.name}</Typography>
                   <Typography color="text.secondary">{formatDateTime(w.opensAt)} → {formatDateTime(w.closesAt)} · Fee {formatTzs(w.applicationFee)} · Up to {w.maxChoices} choices</Typography>
                 </Box>
-                <Chip color={statusColour(w.status)} label={w.open ? 'Open now' : humanise(w.status)} />
+                <Box><WindowStateChip state={w.state} /></Box>
               </Stack>
             </CardContent>
           </Card>
         ))}
       </Stack>
+      {creating && <WindowFormDialog win={null} onClose={() => setCreating(false)} onSaved={(w) => navigate(`/staff/windows/${w.id}`)} />}
     </Container>
   );
 }
@@ -317,8 +324,7 @@ export function WindowDetailPage() {
   const w = useQuery({ queryKey: ['staff', 'window', id], queryFn: () => api<AdmissionWindow>(`/api/admission/windows/${id}`, staff) });
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const refresh = () => qc.invalidateQueries({ queryKey: ['staff'] });
-  const publish = useMutation({ mutationFn: () => api(`/api/admission/windows/${id}/publish`, { method: 'POST', realm: 'staff' }), onSuccess: refresh });
-  const close = useMutation({ mutationFn: () => api(`/api/admission/windows/${id}/close`, { method: 'POST', realm: 'staff' }), onSuccess: refresh });
+  const [editing, setEditing] = useState(false);
   const empty = { programmeId: '', capacity: '50', passes: '4', subjects: 'BASIC MATHEMATICS', minGrade: 'D', altFamily: '', altLevel: '3', summary: 'Four passes in CSEE including Basic Mathematics' };
   const [form, setForm] = useState<typeof empty | null>(null);
   const add = useMutation({
@@ -332,15 +338,12 @@ export function WindowDetailPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
-          {win.status === 'DRAFT' && <Button variant="contained" color="secondary" onClick={() => publish.mutate()}>Publish</Button>}
-          {win.status === 'PUBLISHED' && <Button variant="outlined" color="error" onClick={() => close.mutate()}>Close window</Button>}
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/handover`}>Registration hand-over</Button>
-          {win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
+          {canConfigure && win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
         </Stack>} />
-      <ErrorAlert error={publish.error ?? close.error} />
-      {win.status === 'DRAFT' && <Alert severity="info" sx={{ mb: 2 }}>Draft — applicants cannot see this window until it is published by the Deputy Principal (Academic).</Alert>}
+      <WindowLifecycle win={win} onEdit={() => setEditing(true)} />
       <Card><TableContainer>
         <Table size="small">
           <TableHead><TableRow><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell align="right">Places</TableCell><TableCell>Minimum entry requirements</TableCell></TableRow></TableHead>
@@ -352,6 +355,8 @@ export function WindowDetailPage() {
         </Table>
       </TableContainer></Card>
       <JoiningInstructionsCard win={win} canEdit={canConfigure} />
+      <WindowHistoryCard windowId={win.id} />
+      {editing && <WindowFormDialog win={win} onClose={() => setEditing(false)} onSaved={(x) => { setEditing(false); qc.setQueryData(['staff', 'window', id], x); refresh(); }} />}
       <Dialog open={!!form} onClose={() => setForm(null)} fullWidth maxWidth="sm">
         <DialogTitle>Offer a programme</DialogTitle>
         {form && (

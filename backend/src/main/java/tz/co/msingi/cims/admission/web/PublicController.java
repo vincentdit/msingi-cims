@@ -43,4 +43,10 @@ public class PublicController {
     public List<WindowView> openWindows() {
         return windows.openWindows();
     }
+
+    @Operation(summary = "Published admission windows that open later")
+    @GetMapping("/windows/upcoming")
+    public List<WindowView> upcomingWindows() {
+        return windows.upcomingWindows();
+    }
 }

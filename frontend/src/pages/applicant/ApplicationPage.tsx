@@ -22,6 +22,8 @@ export default function ApplicationPage() {
   const qc = useQueryClient();
   const apps = useQuery({ queryKey: ['applicant', 'applications'], queryFn: () => api<Application[]>('/api/applicant/applications', { realm: 'applicant' }) });
   const windows = useQuery({ queryKey: ['public-windows'], queryFn: () => api<AdmissionWindow[]>('/api/public/windows') });
+  const upcoming = useQuery({ queryKey: ['public-windows', 'upcoming'], enabled: windows.isSuccess && !windows.data?.length,
+    queryFn: () => api<AdmissionWindow[]>('/api/public/windows/upcoming') }).data?.[0];
   const start = useMutation({
     mutationFn: (windowId: number) => api<Application>('/api/applicant/applications', { method: 'POST', realm: 'applicant', body: { windowId } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['applicant'] }),
@@ -44,7 +46,7 @@ export default function ApplicationPage() {
                 <Button sx={{ mt: 2 }} variant="contained" onClick={() => start.mutate(w.id)} disabled={start.isPending}>{t('home.startApplication')}</Button>
               </CardContent>
             </Card>
-          )) : <Alert severity="info">{t('home.noWindow')}</Alert>}
+          )) : <Alert severity="info">{upcoming ? t('home.opensOn', { window: upcoming.name, date: formatDateTime(upcoming.opensAt) }) : t('home.noWindow')}</Alert>}
         </>
       )}
       {current && (current.status === 'DRAFT' || current.status === 'PAYMENT_PENDING'
@@ -89,6 +91,9 @@ function Wizard({ app }: { app: Application }) {
         </Box>
         <Chip color={statusColour(app.status)} label={humanise(app.status)} />
       </Stack>
+      {new Date(app.windowClosesAt) <= new Date() && (
+        <Alert severity="warning" sx={{ mb: 2 }}>{t('home.windowClosed', { window: app.windowName, date: formatDateTime(app.windowClosesAt) })}</Alert>
+      )}
       <Card sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           <Stepper nonLinear activeStep={active} orientation={mobile ? 'vertical' : 'horizontal'} alternativeLabel={!mobile}>

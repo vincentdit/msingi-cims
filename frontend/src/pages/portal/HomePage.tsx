@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid2';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
-import { api, formatDate, formatTzs } from '../../api/client';
+import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { AdmissionWindow } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading } from '../../components/common';
@@ -18,6 +18,8 @@ export default function HomePage() {
   const { user } = useSession();
   const q = useQuery({ queryKey: ['public-windows'], queryFn: () => api<AdmissionWindow[]>('/api/public/windows') });
   const window = q.data?.[0];
+  const upcoming = useQuery({ queryKey: ['public-windows', 'upcoming'], enabled: q.isSuccess && !window,
+    queryFn: () => api<AdmissionWindow[]>('/api/public/windows/upcoming') }).data?.[0];
   const cta = user('applicant') ? '/application' : '/register';
 
   return (
@@ -41,7 +43,9 @@ export default function HomePage() {
               </Stack>
             </Stack>
           ) : (
-            q.isSuccess && <Alert severity="info" sx={{ mt: 4, maxWidth: 560 }}>{t('home.noWindow')}</Alert>
+            q.isSuccess && <Alert severity="info" sx={{ mt: 4, maxWidth: 560 }}>
+              {upcoming ? t('home.opensOn', { window: upcoming.name, date: formatDateTime(upcoming.opensAt) }) : t('home.noWindow')}
+            </Alert>
           )}
         </Container>
       </Box>

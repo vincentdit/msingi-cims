@@ -17,6 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 import tz.co.msingi.cims.admission.domain.Application;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationDetailView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationSummaryView;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.CloseRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.OpenRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.ReopenRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.WindowEventView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.WindowProgrammeRequest;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.WindowProgrammeView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.WindowRequest;
@@ -37,7 +41,7 @@ public class AdmissionAdminController {
 
     private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER','DEPUTY_PRINCIPAL_ACADEMIC','REGISTRAR','MANAGEMENT_VIEWER','AUDITOR')";
     private static final String WRITE = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER')";
-    private static final String APPROVE = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC')";
+    private static final String OPEN_CLOSE = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER','DEPUTY_PRINCIPAL_ACADEMIC')";
 
     private final AdmissionWindowService windows;
     private final ApplicationService applications;
@@ -86,17 +90,35 @@ public class AdmissionAdminController {
         return windows.updateProgramme(id, wpId, req);
     }
 
-    /** Publication is an approval step (BP-01 step 5): Deputy Principal (Academic) or administrator. */
+    /** Publishing, opening, closing and reopening windows: the Admissions Office, the administrator or the Deputy Principal (Academic). */
     @PostMapping("/windows/{id}/publish")
-    @PreAuthorize(APPROVE)
+    @PreAuthorize(OPEN_CLOSE)
     public WindowView publish(@PathVariable Long id) {
         return windows.publish(id);
     }
 
+    @PostMapping("/windows/{id}/open")
+    @PreAuthorize(OPEN_CLOSE)
+    public WindowView open(@PathVariable Long id, @Valid @RequestBody(required = false) OpenRequest req) {
+        return windows.open(id, req);
+    }
+
     @PostMapping("/windows/{id}/close")
-    @PreAuthorize(APPROVE)
-    public WindowView close(@PathVariable Long id) {
-        return windows.close(id);
+    @PreAuthorize(OPEN_CLOSE)
+    public WindowView close(@PathVariable Long id, @Valid @RequestBody CloseRequest req) {
+        return windows.close(id, req);
+    }
+
+    @PostMapping("/windows/{id}/reopen")
+    @PreAuthorize(OPEN_CLOSE)
+    public WindowView reopen(@PathVariable Long id, @Valid @RequestBody ReopenRequest req) {
+        return windows.reopen(id, req);
+    }
+
+    @GetMapping("/windows/{id}/events")
+    @PreAuthorize(READ)
+    public List<WindowEventView> events(@PathVariable Long id) {
+        return windows.events(id);
     }
 
     @GetMapping("/applications")

@@ -76,6 +76,13 @@ public class AdmissionWindow extends BaseEntity {
     @OrderBy("id")
     private List<WindowProgramme> programmes = new ArrayList<>();
 
+    /** What applicants see: DRAFT (hidden), SCHEDULED (published, opens later), OPEN, or CLOSED (closed, or its closing date has passed). */
+    public String state(OffsetDateTime now) {
+        if (status == Status.DRAFT) return "DRAFT";
+        if (status == Status.CLOSED || !now.isBefore(closesAt)) return "CLOSED";
+        return now.isBefore(opensAt) ? "SCHEDULED" : "OPEN";
+    }
+
     public boolean isOpen(OffsetDateTime now) {
         return status == Status.PUBLISHED && !now.isBefore(opensAt) && now.isBefore(closesAt);
     }
