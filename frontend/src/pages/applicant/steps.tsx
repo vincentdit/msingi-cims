@@ -2,11 +2,10 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import LockIcon from '@mui/icons-material/LockOutlined';
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Collapse, Divider,
-  FormControlLabel, IconButton, MenuItem, Stack, Switch, TextField, Tooltip, Typography,
+  IconButton, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -27,56 +26,23 @@ function useInvalidate() {
 // ---------------------------------------------------------------- Results
 export function ResultsStep({ onNext }: { onNext: () => void }) {
   const { t } = useTranslation();
-  const invalidate = useInvalidate();
   const quals = useQuery({ queryKey: ['applicant', 'qualifications'], queryFn: () => api<Qualification[]>('/api/applicant/qualifications', { realm: 'applicant' }) });
-  const [type, setType] = useState<'CSEE' | 'ACSEE'>('ACSEE');
-  const [index, setIndex] = useState('');
-  const [year, setYear] = useState(String(new Date().getFullYear() - 1));
-  const [prior, setPrior] = useState(false);
-  const [award, setAward] = useState({ type: 'NVA', number: '', level: '3', year: '' });
-
-  const fetchNecta = useMutation({
-    mutationFn: () => api('/api/applicant/qualifications/necta', { method: 'POST', realm: 'applicant', body: { type, indexNumber: index.trim().toUpperCase(), year: Number(year) } }),
-    onSuccess: () => { setIndex(''); invalidate(); },
-  });
-  const addAward = useMutation({
-    mutationFn: () => api('/api/applicant/qualifications/prior-award', { method: 'POST', realm: 'applicant', body: { ...award, level: Number(award.level), year: award.year ? Number(award.year) : null } }),
-    onSuccess: () => { setAward({ ...award, number: '' }); invalidate(); },
-  });
-  const remove = useMutation({
-    mutationFn: (id: number) => api(`/api/applicant/qualifications/${id}`, { method: 'DELETE', realm: 'applicant' }),
-    onSuccess: invalidate,
-  });
-
+  // the Form Four results registered with (and any older results); further sittings and awards come after the fee
+  const shown = (quals.data ?? []).filter((q) => q.registration || ((q.type === 'CSEE' || q.type === 'ACSEE') && !quals.data?.some((x) => x.registration)));
   return (
     <Stack spacing={3}>
       <Typography color="text.secondary">{t('app.resultsIntro')}</Typography>
-      <form onSubmit={(e) => { e.preventDefault(); fetchNecta.mutate(); }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField select label={t('app.examType')} value={type} onChange={(e) => setType(e.target.value as 'CSEE' | 'ACSEE')} sx={{ minWidth: 170 }}>
-            <MenuItem value="CSEE">CSEE (Form Four)</MenuItem>
-            <MenuItem value="ACSEE">ACSEE (Form Six)</MenuItem>
-          </TextField>
-          <TextField label={t('app.indexNumber')} placeholder="S0101/0001" value={index} onChange={(e) => setIndex(e.target.value)} required />
-          <TextField label={t('app.year')} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ''))} required sx={{ maxWidth: { sm: 120 } }} inputMode="numeric" />
-          <Button type="submit" variant="contained" disabled={fetchNecta.isPending} sx={{ minWidth: 150 }}>{t('app.fetch')}</Button>
-        </Stack>
-      </form>
-      <ErrorAlert error={fetchNecta.error ?? addAward.error ?? remove.error} />
-
-      {quals.isLoading ? <Loading /> : quals.data?.map((q) => (
+      {quals.isLoading ? <Loading /> : shown.map((q) => (
         <Card key={q.id}>
           <CardContent>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
               <Box>
-                <Typography sx={{ fontWeight: 700 }}>{q.type} · {q.indexNumber}{q.examYear ? ` · ${q.examYear}` : ''}{q.awardLevel ? ` · Level ${q.awardLevel}` : ''}</Typography>
+                <Typography sx={{ fontWeight: 700 }}>{q.type} · {q.indexNumber}{q.examYear ? ` · ${q.examYear}` : ''}</Typography>
                 {q.centreName && <Typography variant="body2" color="text.secondary">{q.centreName}{q.division ? ` · Division ${q.division}` : ''}{q.points ? ` (${q.points} points)` : ''}</Typography>}
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Chip size="small" color={q.verified ? 'success' : 'warning'} label={q.verified ? t('app.verified') : t('app.pending')} />
-                {q.registration
-                  ? <Tooltip title={t('app.registrationResults')}><LockIcon fontSize="small" color="action" /></Tooltip>
-                  : <IconButton size="small" onClick={() => remove.mutate(q.id)} aria-label={t('app.remove')}><DeleteIcon fontSize="small" /></IconButton>}
+                {q.registration && <Tooltip title={t('app.registrationResults')}><LockIcon fontSize="small" color="action" /></Tooltip>}
               </Stack>
             </Stack>
             {q.subjects.length > 0 && (
@@ -90,22 +56,6 @@ export function ResultsStep({ onNext }: { onNext: () => void }) {
           </CardContent>
         </Card>
       ))}
-
-      <FormControlLabel control={<Switch checked={prior} onChange={(e) => setPrior(e.target.checked)} />} label={t('app.priorAward')} />
-      <Collapse in={prior}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField select label="Award" value={award.type} onChange={(e) => setAward({ ...award, type: e.target.value, level: e.target.value === 'NVA' ? '3' : '5' })} sx={{ minWidth: 110 }}>
-            <MenuItem value="NVA">NVA</MenuItem>
-            <MenuItem value="NTA">NTA</MenuItem>
-          </TextField>
-          <TextField label={t('app.awardNumber')} value={award.number} onChange={(e) => setAward({ ...award, number: e.target.value })} />
-          <TextField select label={t('app.level')} value={award.level} onChange={(e) => setAward({ ...award, level: e.target.value })} sx={{ minWidth: 100 }}>
-            {(award.type === 'NVA' ? [1, 2, 3] : [4, 5, 6, 7, 8]).map((l) => <MenuItem key={l} value={String(l)}>{l}</MenuItem>)}
-          </TextField>
-          <Button variant="outlined" onClick={() => addAward.mutate()} disabled={!award.number || addAward.isPending}>{t('app.add')}</Button>
-        </Stack>
-      </Collapse>
-
       <Box><Button variant="contained" onClick={onNext} disabled={!quals.data?.length}>{t('app.next')}</Button></Box>
     </Stack>
   );

@@ -40,6 +40,14 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /** A body that cannot be read, e.g. a value that is not one of the allowed choices. */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ProblemDetail unreadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        String detail = ex.getCause() instanceof com.fasterxml.jackson.databind.exc.InvalidFormatException f && !f.getPath().isEmpty()
+                ? "Invalid value for " + f.getPath().get(f.getPath().size() - 1).getFieldName() : "The request could not be read";
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", detail);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail constraint(ConstraintViolationException ex) {
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", ex.getMessage());
@@ -63,6 +71,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(tz.co.msingi.cims.integration.necta.NectaUnavailableException.class)
     public ProblemDetail nectaUnavailable(tz.co.msingi.cims.integration.necta.NectaUnavailableException ex) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "NECTA_UNAVAILABLE", ex.getMessage());
+    }
+
+    @ExceptionHandler(tz.co.msingi.cims.integration.nactvet.NactvetUnavailableException.class)
+    public ProblemDetail nactvetUnavailable(tz.co.msingi.cims.integration.nactvet.NactvetUnavailableException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "NACTVET_UNAVAILABLE", ex.getMessage());
     }
 
     @ExceptionHandler(TooManyRequestsException.class)

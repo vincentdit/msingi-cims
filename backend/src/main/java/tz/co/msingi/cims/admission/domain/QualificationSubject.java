@@ -28,4 +28,6 @@ public class QualificationSubject extends TenantScopedEntity {
 
     @Column(nullable = false)
     private String grade;
+
+    private Short credits;
 }

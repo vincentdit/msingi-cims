@@ -17,6 +17,9 @@ import tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationView;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.necta.NectaClient;
+import tz.co.msingi.cims.integration.nactvet.NactvetAwardClient;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.NtaAwardRequest;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.OtherAwardRequest;
 import tz.co.msingi.cims.reference.Address;
 import tz.co.msingi.cims.reference.GeographyService;
 import tz.co.msingi.cims.reference.PrimarySchoolDirectory;
@@ -38,6 +41,7 @@ public class ApplicantProfileService {
     private final ApplicantQualificationRepository qualifications;
     private final ApplicationRepository applications;
     private final NectaClient necta;
+    private final NactvetAwardClient nactvetAwards;
     private final GeographyService geo;
     private final PrimarySchoolDirectory primarySchools;
     private final AuditService audit;
@@ -156,6 +160,98 @@ public class ApplicantProfileService {
         q.setVerifiedAt(OffsetDateTime.now());
         r.subjects().forEach(sub -> q.addSubject(sub.code(), sub.name(), sub.grade()));
         return q;
+    }
+
+    /**
+     * Looks up an NTA award at NACTVET by registration number and graduation year and stores it as verified,
+     * with the programme, institution, GPA, class of award and modules. As in NOAS, the award must carry the
+     * applicant's first name, and second name when both have one.
+     */
+    @Transactional
+    public QualificationView lookupNtaAward(NtaAwardRequest req) {
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        String reg = req.registrationNumber().trim().toUpperCase().replaceAll("\\s+", "");
+        if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), ApplicantQualification.Type.NTA, reg)) {
+            throw new BusinessRuleException("QUALIFICATION_EXISTS", "This NTA award is already on your application");
+        }
+        NactvetAwardClient.NtaAward award = nactvetAwards.fetchAward(reg, req.graduationYear())
+                .orElseThrow(() -> new BusinessRuleException("NTA_AWARD_NOT_FOUND", "NACTVET has no NTA award " + reg + " for graduation in "
+                        + req.graduationYear() + ". Check the registration number and the year you graduated."));
+        requireSameNames(a, award);
+        if (award.ntaLevel() == null) {
+            throw new BusinessRuleException("NTA_LEVEL_UNKNOWN", "NACTVET did not give the NTA level of this award. Contact the Admissions Office.");
+        }
+        ApplicantQualification q = new ApplicantQualification();
+        q.setApplicant(a);
+        q.setType(ApplicantQualification.Type.NTA);
+        q.setIndexNumber(reg);
+        q.setExamYear(req.graduationYear().shortValue());
+        q.setAwardLevel(award.ntaLevel().shortValue());
+        q.setAwardName(award.programme());
+        q.setInstitution(award.institution());
+        q.setCentreName(award.institution());
+        q.setGpa(award.gpa());
+        q.setClassAward(award.classAward());
+        q.setCandidateName(String.join(" ", java.util.stream.Stream.of(award.firstName(), award.middleName(), award.surname())
+                .filter(x -> x != null && !x.isBlank()).toList()));
+        if (q.getCandidateName().isEmpty()) q.setCandidateName(null);
+        q.setSource(ApplicantQualification.Source.NACTVET);
+        q.setVerified(true);
+        q.setVerifiedAt(OffsetDateTime.now());
+        award.modules().forEach(m -> q.addSubject(m.code() == null ? "" : m.code(), m.name() == null ? "" : m.name(),
+                m.grade() == null ? "-" : m.grade(), m.credits() == null ? null : m.credits().shortValue()));
+        qualifications.save(q);
+        audit.record("NTA_AWARD_ADDED", "Applicant", a.getId(), Map.of("registrationNumber", reg, "level", award.ntaLevel()));
+        return QualificationView.of(q);
+    }
+
+    /** Another award (not NTA or NVA) declared by the applicant; the Admissions Office checks it against the certificate. */
+    @Transactional
+    public QualificationView addOtherAward(OtherAwardRequest req) {
+        Applicant a = currentApplicant();
+        requireNoSubmittedApplication(a);
+        String ref = ApplicantAccountService.blankToNull(req.reference());
+        String index = ref != null ? ref.toUpperCase() : "OTH-" + Long.toString(System.nanoTime() % 2176782336L, 36).toUpperCase();
+        if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), ApplicantQualification.Type.OTHER, index)) {
+            throw new BusinessRuleException("QUALIFICATION_EXISTS", "An award with this reference is already on your application");
+        }
+        ApplicantQualification q = new ApplicantQualification();
+        q.setApplicant(a);
+        q.setType(ApplicantQualification.Type.OTHER);
+        q.setIndexNumber(index);
+        q.setExamYear(req.year().shortValue());
+        q.setAwardName(req.awardName().trim());
+        q.setInstitution(req.institution().trim());
+        q.setCentreName(req.institution().trim());
+        q.setOtherLevel(req.level());
+        q.setSource(ApplicantQualification.Source.MANUAL);
+        q.setVerified(false);
+        qualifications.save(q);
+        audit.record("OTHER_AWARD_ADDED", "Applicant", a.getId(), Map.of("award", q.getAwardName(), "year", req.year()));
+        return QualificationView.of(q);
+    }
+
+    /** As in NOAS: the first name must match, and the second name when both records carry one. */
+    static void requireSameNames(Applicant a, NactvetAwardClient.NtaAward award) {
+        List<String> mine = tokens(a.getFirstName(), a.getMiddleName(), a.getSurname());
+        List<String> theirs = tokens(award.firstName(), award.middleName(), award.surname());
+        if (theirs.isEmpty()) return; // NACTVET gave no names to compare
+        boolean first = !mine.isEmpty() && mine.get(0).equals(theirs.get(0));
+        boolean second = mine.size() < 2 || theirs.size() < 2 || mine.get(1).equals(theirs.get(1));
+        if (!first || !second) {
+            throw new BusinessRuleException("NTA_AWARD_NAME_MISMATCH", "The names on this NTA award (" + String.join(" ", theirs)
+                    + ") do not match your names from NECTA (" + String.join(" ", mine) + "). You can only add an award that is yours.");
+        }
+    }
+
+    private static List<String> tokens(String... parts) {
+        List<String> out = new java.util.ArrayList<>();
+        for (String p : parts) {
+            if (p == null) continue;
+            for (String t : p.trim().toUpperCase().split("\\s+")) if (!t.isBlank()) out.add(t);
+        }
+        return out;
     }
 
     /**

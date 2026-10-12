@@ -68,6 +68,20 @@ public class ApplicantController {
         return profiles.fetchNectaResults(req);
     }
 
+    @Operation(summary = "Look up an NTA award at NACTVET by registration number and graduation year")
+    @PostMapping("/qualifications/nta")
+    @ResponseStatus(HttpStatus.CREATED)
+    public QualificationView lookupNtaAward(@Valid @RequestBody tz.co.msingi.cims.admission.service.AdmissionDtos.NtaAwardRequest req) {
+        return profiles.lookupNtaAward(req);
+    }
+
+    @Operation(summary = "Declare another (non-NTA) award; checked by the Admissions Office")
+    @PostMapping("/qualifications/other")
+    @ResponseStatus(HttpStatus.CREATED)
+    public QualificationView addOtherAward(@Valid @RequestBody tz.co.msingi.cims.admission.service.AdmissionDtos.OtherAwardRequest req) {
+        return profiles.addOtherAward(req);
+    }
+
     @Operation(summary = "Add a prior NTA (AVN) or NVA award (verified later by the Admissions Office)")
     @PostMapping("/qualifications/prior-award")
     @ResponseStatus(HttpStatus.CREATED)

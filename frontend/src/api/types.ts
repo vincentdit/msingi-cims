@@ -140,7 +140,7 @@ export interface Profile {
 
 export interface Qualification {
   id: number;
-  type: 'CSEE' | 'ACSEE' | 'NTA' | 'NVA';
+  type: 'CSEE' | 'ACSEE' | 'NTA' | 'NVA' | 'OTHER';
   indexNumber: string;
   examYear?: number;
   awardLevel?: number;
@@ -153,6 +153,11 @@ export interface Qualification {
   candidateName?: string;
   /** The Form Four results the applicant registered with; they cannot be removed. */
   registration: boolean;
+  awardName?: string;
+  institution?: string;
+  gpa?: number;
+  classAward?: string;
+  otherLevel?: string;
 }
 
 export interface Choice {

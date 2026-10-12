@@ -182,7 +182,12 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
             <Typography variant="subtitle2" color="text.secondary">Qualifications</Typography>
             {a.qualifications.map((q) => (
               <Box key={q.id} sx={{ mt: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{q.type} {q.indexNumber} {q.examYear ?? ''} {q.verified ? '✓ verified' : '(unverified)'}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {q.type}{q.awardLevel ? ` Level ${q.awardLevel}` : ''}{q.otherLevel ? ` (${humanise(q.otherLevel)})` : ''} {q.indexNumber} {q.examYear ?? ''} {q.verified ? '✓ verified' : '(unverified — check the certificate)'}
+                </Typography>
+                {(q.awardName || q.institution) && (
+                  <Typography variant="body2">{[q.awardName, q.institution, q.gpa != null ? `GPA ${q.gpa}` : null, q.classAward].filter(Boolean).join(' · ')}</Typography>
+                )}
                 <Typography variant="body2" color="text.secondary">{q.subjects.map((s) => `${s.name} ${s.grade}`).join(', ')}</Typography>
               </Box>
             ))}

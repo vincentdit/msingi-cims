@@ -144,9 +144,20 @@ public final class AdmissionDtos {
     public record SubjectView(String code, String name, String grade) {
     }
 
+    /** An NTA award to look up at NACTVET, e.g. NS0816/0129/2015 graduating in 2018. */
+    public record NtaAwardRequest(@NotBlank @Size(max = 40) String registrationNumber, @NotNull @Min(1990) @Max(2100) Integer graduationYear) {
+    }
+
+    /** Another (non-NTA) award declared by the applicant, checked by the Admissions Office. */
+    public record OtherAwardRequest(@NotBlank @Size(max = 200) String awardName, @NotBlank @Size(max = 200) String institution,
+                                    @NotNull @Min(1960) @Max(2100) Integer year, @Size(max = 40) String reference,
+                                    @NotNull ApplicantQualification.OtherLevel level) {
+    }
+
     public record QualificationView(Long id, String type, String indexNumber, Short examYear, Short awardLevel,
                                     String centreName, String division, Short points, String source, boolean verified,
-                                    List<SubjectView> subjects, String candidateName, boolean registration) {
+                                    List<SubjectView> subjects, String candidateName, boolean registration, String awardName,
+                                    String institution, java.math.BigDecimal gpa, String classAward, String otherLevel) {
         public static QualificationView of(ApplicantQualification q) {
             Applicant a = q.getApplicant();
             boolean registration = q.getType() == ApplicantQualification.Type.CSEE && a != null && q.getIndexNumber().equals(a.getNectaIndexNumber())
@@ -154,7 +165,8 @@ public final class AdmissionDtos {
             return new QualificationView(q.getId(), q.getType().name(), q.getIndexNumber(), q.getExamYear(), q.getAwardLevel(),
                     q.getCentreName(), q.getDivision(), q.getPoints(), q.getSource().name(), q.isVerified(),
                     q.getSubjects().stream().map(s -> new SubjectView(s.getSubjectCode(), s.getSubjectName(), s.getGrade())).toList(),
-                    q.getCandidateName(), registration);
+                    q.getCandidateName(), registration, q.getAwardName(), q.getInstitution(), q.getGpa(), q.getClassAward(),
+                    q.getOtherLevel() == null ? null : q.getOtherLevel().name());
         }
     }
 

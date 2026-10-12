@@ -1,5 +1,10 @@
-# Copy to application-dev.yml (not committed) and fill in the NECTA results API key.
+# Copy to application-dev.yml (not committed) and fill in the keys.
 cims:
   necta:
     mode: ${CIMS_NECTA_MODE:live}
     api-key: ${NECTA_API_KEY:put-the-key-here}
+  nactvet:
+    awards:
+      mode: ${CIMS_NACTVET_AWARDS_MODE:live}
+      authorization: ${NACTE_AUTHORIZATION:put-the-token-here}
+      api-code: ${NACTE_API_CODE:put-the-code-here}

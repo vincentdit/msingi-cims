@@ -79,6 +79,14 @@ cims:
     lookup-rate-limit: 20       # public index-number look-ups per minute per client address
   nactvet:
     mode: ${CIMS_NACTVET_MODE:simulated}
+    awards:
+      # NTA awards of applicants (NACTVET particulars, as in NOAS): simulated or live. Live needs NACTE_AUTHORIZATION and NACTE_API_CODE.
+      mode: ${CIMS_NACTVET_AWARDS_MODE:simulated}
+      base-url: ${CIMS_NACTE_BASE_URL:https://www.nacte.go.tz}
+      particulars-path: /nacteapi/index.php/api-out-service/particulars
+      authorization: ${NACTE_AUTHORIZATION:}
+      api-code: ${NACTE_API_CODE:}
+      prefer-ip: ${NACTE_PREFER_IP:}
   documents:
     # Link printed in the QR code of admission letters; {host} is the institution's primary domain
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}

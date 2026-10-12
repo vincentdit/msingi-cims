@@ -15,6 +15,7 @@ import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/
 import type { AdmissionWindow, Application, Profile, Qualification, Statement } from '../../api/types';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import { DetailsStep, FeeStep, ProgrammesStep, ResultsStep, ReviewStep } from './steps';
+import { OtherQualificationsStep } from './OtherQualificationsStep';
 
 /** The applicant's home: start an application, then complete it step by step (BP-02). */
 export default function ApplicationPage() {
@@ -67,6 +68,7 @@ function Wizard({ app }: { app: Application }) {
     !!quals.data?.some((q) => q.verified),
     profile.data ? profile.data.missingFields.length === 0 : false,
     app.feePaid,
+    app.feePaid && (!!quals.data?.some((q) => !q.registration) || app.choices.length > 0),
     app.choices.length > 0,
     false,
   ];
@@ -78,7 +80,8 @@ function Wizard({ app }: { app: Application }) {
     { label: t('app.steps.results'), body: <ResultsStep onNext={() => setActive(1)} /> },
     { label: t('app.steps.details'), body: <DetailsStep onNext={() => setActive(2)} /> },
     { label: t('app.steps.fee'), body: <FeeStep app={app} onNext={() => setActive(3)} /> },
-    { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(4)} /> },
+    { label: t('app.steps.other'), body: <OtherQualificationsStep app={app} onNext={() => setActive(4)} /> },
+    { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(5)} /> },
     { label: t('app.steps.review'), body: <ReviewStep app={app} /> },
   ];
 

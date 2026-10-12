@@ -27,7 +27,10 @@ import java.util.List;
 @Table(name = "applicant_qualifications")
 public class ApplicantQualification extends BaseEntity {
 
-    public enum Type { CSEE, ACSEE, NTA, NVA }
+    public enum Type { CSEE, ACSEE, NTA, NVA, OTHER }
+
+    /** Level of an award that is not NTA or NVA (declared by the applicant). */
+    public enum OtherLevel { CERTIFICATE, DIPLOMA, ADVANCED_DIPLOMA, DEGREE, MASTERS, OTHER }
 
     public enum Source { NECTA, NACTVET, MANUAL }
 
@@ -48,6 +51,13 @@ public class ApplicantQualification extends BaseEntity {
     private String division;
     private Short points;
     private String candidateName;
+    private String awardName;
+    private String institution;
+    private java.math.BigDecimal gpa;
+    private String classAward;
+
+    @Enumerated(EnumType.STRING)
+    private OtherLevel otherLevel;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -61,6 +71,11 @@ public class ApplicantQualification extends BaseEntity {
     @OneToMany(mappedBy = "qualification", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id")
     private List<QualificationSubject> subjects = new ArrayList<>();
+
+    public void addSubject(String code, String name, String grade, Short credits) {
+        addSubject(code, name, grade);
+        subjects.get(subjects.size() - 1).setCredits(credits);
+    }
 
     public void addSubject(String code, String name, String grade) {
         QualificationSubject s = new QualificationSubject();
