@@ -14,7 +14,9 @@ import java.util.Random;
  * so the same index always gives the same grades. Index numbers ending in "/0000" are "not found".
  *
  * Handy test values (CSEE):  S0101/0001 → strong results (Division I);
- *                            S0101/0002 → weak results (fewer than four passes).
+ *                            S0101/0002 → weak results (fewer than four passes);
+ *                            S0101/0000 → no such candidate.
+ * Names, sex and school are made up from the index number.
  */
 @Slf4j
 @Component
@@ -60,8 +62,20 @@ public class SimulatedNectaClient implements NectaClient {
         return Optional.of(result(exam, idx, year, divisions[Math.abs(rnd.nextInt()) % 4], 7 + Math.abs(rnd.nextInt()) % 25, subjects));
     }
 
+    private static final String[] FEMALE = {"Neema", "Asha", "Rehema", "Zawadi", "Halima", "Grace", "Mwanaidi", "Upendo", "Faraja", "Salma"};
+    private static final String[] MALE = {"Baraka", "Juma", "Hassan", "Emmanuel", "Daudi", "Omari", "Joseph", "Said", "Frank", "Ally"};
+    private static final String[] SURNAMES = {"Mushi", "Mwakyusa", "Kweka", "Massawe", "Lyimo", "Ngowi", "Mrema", "Kimaro", "Swai", "Mollel",
+            "Mbwambo", "Temba", "Shirima", "Urassa", "Minja"};
+    private static final String[] SCHOOLS = {"AZANIA SECONDARY SCHOOL", "MZUMBE SECONDARY SCHOOL", "KIBAHA SECONDARY SCHOOL",
+            "TABORA GIRLS SECONDARY SCHOOL", "ILBORU SECONDARY SCHOOL", "MSALATO GIRLS SECONDARY SCHOOL"};
+
+    /** Names, sex and school derived from the index number, so the same candidate always has the same particulars. */
     private static NectaResult result(ExamType exam, String idx, int year, String division, int points, List<SubjectGrade> subjects) {
         log.debug("[NECTA simulated] {} {} {}", exam, idx, year);
-        return new NectaResult(exam, idx, year, "CANDIDATE " + idx, "SIMULATED SECONDARY SCHOOL", division, points, subjects);
+        Random r = new Random(idx.hashCode());
+        boolean female = r.nextBoolean();
+        String[] first = female ? FEMALE : MALE;
+        return new NectaResult(exam, idx, year, first[r.nextInt(first.length)], MALE[r.nextInt(MALE.length)],
+                SURNAMES[r.nextInt(SURNAMES.length)], female ? "F" : "M", SCHOOLS[r.nextInt(SCHOOLS.length)], division, points, subjects);
     }
 }

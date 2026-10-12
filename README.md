@@ -8,7 +8,7 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 |---|---|
 | Platform | Multi-tenant (one tenant per institution), tenant resolved from host name or `X-Tenant` header, **PostgreSQL row-level security**, JWT security (local issuer, Keycloak-ready), role-based access, append-only audit trail, per-institution number sequences, RFC 7807 errors, OpenAPI docs |
 | Academic structure | Academic years, intakes, departments, NVA/NTA programmes (levels validated) |
-| Admissions | Admission windows with capacity and **NACTVET minimum entry rules (JSON rule engine)**, created and run by the Admissions Office or the administrator: published to open on their date (applicants see when applications open) or opened at once, closed early with a reason, reopened with a new closing date until selection starts, extended, and closed automatically when the closing date passes; applicants who have started but not submitted are told by SMS when a window closes early or reopens, and every change is kept in the window's opening and closing record; applicant sign-up with SMS OTP, password reset, NECTA results lookup, prior NTA/NVA awards, profile, application, eligibility per programme with reasons, choices, submission with reference number |
+| Admissions | Admission windows with capacity and **NACTVET minimum entry rules (JSON rule engine)**, created and run by the Admissions Office or the administrator: published to open on their date (applicants see when applications open) or opened at once, closed early with a reason, reopened with a new closing date until selection starts, extended, and closed automatically when the closing date passes; applicants who have started but not submitted are told by SMS when a window closes early or reopens, and every change is kept in the window's opening and closing record; applicant sign-up with the **Form Four (CSEE) index number and year**: the candidate's names, sex, school and results are fetched from NECTA (the NECTA results API used by NOAS) and confirmed by the applicant, names are then fixed as NECTA has them, the CSEE results are stored as verified, one account per index number and year (an unconfirmed sign-up can be restarted), sign-in by phone, email or index number; SMS OTP, password reset, further NECTA sittings and ACSEE, prior NTA/NVA awards, profile, application, eligibility per programme with reasons, choices, submission with reference number |
 | Selection (BP-03) | Merit ranking, stable allocation of places across applicants' choices, Admissions Committee review (exclusions with reasons) and approval with segregation of duties, statistics, CSV for the committee pack |
 | NACTVET verification and offers (BP-04) | Pre-validation, submission by API or NACTVET-template file, outcome fetch or file import (all-or-nothing), query resolution and resubmission, offers with a deadline, acceptance with NACTVET confirmation code for multiple admissions (attempt-limited), decline, automatic lapse, released places re-filled by the next round |
 | Admission letters (FR-ADM-13, BP-16) | Joining instructions per window; PDF letter + joining instructions issued automatically on acceptance (or in bulk), QR code and 16-character verification code, public `/verify` page (rate-limited, minimal personal data), corrected editions (old code verifies as superseded), revocation, frozen snapshot so reprints match what was issued |
@@ -45,7 +45,7 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
     integration/   NECTA client
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V21 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation, V12 = student portal, V13 = messaging, V14 = curricula, calendar and semester registration, V15 = examinations and results, V16 = resits, amendments, transcripts and NACTVET results submissions, V17 = class sessions, attendance and examination eligibility, V18 = clearance offices, clearances, graduations, graduands and certificates, V19 = hostels, rooms, beds, windows, applications and allocations, V20 = placement organisations, IPT periods, placements, logbooks, visits and assessments, V21 = admission window opening and closing record)
+  src/main/resources/db/migration/   V1–V22 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation, V12 = student portal, V13 = messaging, V14 = curricula, calendar and semester registration, V15 = examinations and results, V16 = resits, amendments, transcripts and NACTVET results submissions, V17 = class sessions, attendance and examination eligibility, V18 = clearance offices, clearances, graduations, graduands and certificates, V19 = hostels, rooms, beds, windows, applications and allocations, V20 = placement organisations, IPT periods, placements, logbooks, visits and assessments, V21 = admission window opening and closing record, V22 = applicants registered by NECTA index number)
 frontend/   React 18 · TypeScript · Vite · MUI
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
@@ -133,7 +133,7 @@ npm run dev          # http://localhost:5173 (proxies /api to 127.0.0.1:8085; ov
 | Open window | 2027/2028 September Intake, fee TZS 10,000, four programmes |
 | Staff back-office | http://localhost:5173/staff |
 
-**Simulated NECTA index numbers** (any year):
+**Simulated NECTA index numbers** (any year; the simulated NECTA makes up names, sex and school from the index number):
 
 | Index | Result |
 |---|---|
@@ -164,7 +164,7 @@ cd backend
 Integration tests run against real PostgreSQL so that row-level security, triggers and constraints are exercised. They include:
 
 - `TenantIsolationIT` — one institution cannot read or write another's rows (repository, native SQL, and API token checks);
-- `ApplicantJourneyIT` — register → verify → NECTA → profile → GePG fee → choices → submit;
+- `ApplicantJourneyIT` — NECTA look-up by index number and year (dashes, lower case and the year typed with the index accepted) → registration under NECTA's names (names sent by the browser ignored) → verify → CSEE results already stored and locked → sign-in by index number → another sitting → profile (names unchanged) → GePG fee → choices → submit; one account per index number, invalid and unknown index numbers, restarting an unconfirmed sign-up, duplicate phones, privacy consent; `LiveNectaClientTest` — the NECTA results API request (dash index, exam id, key) and response mapping, unknown candidates, NECTA unreachable, the key required;
 - `AdmissionWindowsIT` — creating, publishing to open later (shown as upcoming), opening now, closing early with a reason (SMS to applicants who have not submitted, no new applications), reopening with a new closing date, extending, only the Admissions Office / administrator / Deputy Principal (Academic) opening and closing, no changes to a closed window, no reopening once selection has started, automatic closing at the closing date, the opening and closing record;
 - `GepgCallbackIT` — signature check and idempotent payment posting;
 - `EligibilityEngineTest` — NACTVET entry rule evaluation;
@@ -200,7 +200,9 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `CIMS_TEST_DB_URL` | `jdbc:postgresql://localhost:5434/cims_test` | Test database |
 | `CIMS_CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
 | `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter |
-| `CIMS_NECTA_MODE` | `simulated` | NECTA adapter |
+| `CIMS_NECTA_MODE` | `simulated` | NECTA results: `simulated` or `live` (the NECTA results API, `POST /api/results/individual`) |
+| `NECTA_API_KEY` | — | NECTA results API key; required when `CIMS_NECTA_MODE=live` (never stored in the code) |
+| `CIMS_NECTA_BASE_URL` | `https://api.necta.go.tz` | NECTA results API address |
 | `CIMS_NACTVET_MODE` | `simulated` | NACTVET admission verification adapter |
 | `CIMS_OFFER_EXPIRY_CRON` | `0 5 * * * *` | When expired offers are closed (`-` disables) |
 | `CIMS_VERIFICATION_URL` | `https://{host}/verify/{code}` (dev: `http://localhost:5173/verify/{code}`) | Link encoded in letter QR codes; `{host}` is the institution's primary domain |
@@ -222,7 +224,7 @@ Production notes: connect the application with a role that is **not** a superuse
 
 | Component | Now | Next |
 |---|---|---|
-| NECTA | `SimulatedNectaClient` | Live NECTA results API adapter |
+| NECTA | `SimulatedNectaClient`; `LiveNectaClient` for the NECTA results API (switch with `CIMS_NECTA_MODE=live` and `NECTA_API_KEY`) | Caching NECTA answers; matching the names on later sittings with the registered names |
 | GePG | `SimulatedGepgGateway`, HMAC-signed callback; daily reconciliation by file import | Live adapter: signed bill submission and RSA signature verification per the GePG specification; fetching the reconciliation file through GePG's API on a schedule |
 | SMS | `SimulatedSmsGateway` (log only; 000 = unreachable, 999 = refused), outbox, delivery-report callback | Aggregator adapter (`SmsGateway`) for the chosen provider; email channel |
 | NACTVET | `SimulatedNactvetGateway` (outcomes by index number) | Live NACTVET admission verification API adapter |

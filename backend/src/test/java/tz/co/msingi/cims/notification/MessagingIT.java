@@ -139,7 +139,8 @@ class MessagingIT {
                 "{\"group\":\"STUDENTS\",\"withFeeBalance\":true}");
         JsonNode p = s.body(s.call(post("/api/messaging/campaigns/preview"), registrar, studentsWithBalance).andExpect(status().isOk()));
         assertThat(p.get("recipients").asInt()).isEqualTo(1);
-        assertThat(p.at("/samples/0/text").asText()).isEqualTo("Dear Test, your fee balance is TZS 620,000. Please pay before 30 October.");
+        JsonNode asha = s.lookup("S0101/0001"); // the student who has not paid; names come from (simulated) NECTA
+        assertThat(p.at("/samples/0/text").asText()).isEqualTo("Dear " + asha.get("firstName").asText() + ", your fee balance is TZS 620,000. Please pay before 30 October.");
         assertThat(p.get("audienceLabel").asText()).isEqualTo("Students (admitted, registered), with a fee balance");
         assertThat(p.get("enoughBalance").asBoolean()).isFalse();
         s.call(post("/api/messaging/campaigns"), registrar, studentsWithBalance).andExpect(jsonPath("$.code").value("INSUFFICIENT_SMS_BALANCE"));
@@ -153,7 +154,7 @@ class MessagingIT {
         JsonNode c = s.body(s.call(post("/api/messaging/campaigns"), registrar, studentsWithBalance).andExpect(status().isOk()));
         JsonNode detail = s.body(s.call(get("/api/messaging/campaigns/" + c.get("id").asLong()), viewer, null));
         assertThat(detail.at("/campaign/byStatus/DELIVERED").asInt()).isEqualTo(1);
-        assertThat(detail.at("/messages/0/recipientName").asText()).isEqualTo("Test Applicant");
+        assertThat(detail.at("/messages/0/recipientName").asText()).isEqualTo(asha.get("fullName").asText());
         assertThat(s.body(s.call(get("/api/messaging/overview"), viewer, null)).get("balance").asLong()).isEqualTo(balance - 1);
 
         // all current students; placeholders must suit the group

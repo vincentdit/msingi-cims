@@ -118,6 +118,10 @@ export interface Profile {
   nextOfKinPhone?: string;
   nextOfKinRelation?: string;
   missingFields: string[];
+  /** The Form Four index number and year the applicant registered with; names then come from NECTA. */
+  nectaIndexNumber?: string;
+  nectaExamYear?: number;
+  namesFromNecta: boolean;
 }
 
 export interface Qualification {
@@ -132,6 +136,9 @@ export interface Qualification {
   source: string;
   verified: boolean;
   subjects: { code: string; name: string; grade: string }[];
+  candidateName?: string;
+  /** The Form Four results the applicant registered with; they cannot be removed. */
+  registration: boolean;
 }
 
 export interface Choice {

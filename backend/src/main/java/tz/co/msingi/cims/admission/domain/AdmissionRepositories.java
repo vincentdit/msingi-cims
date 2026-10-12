@@ -45,6 +45,12 @@ public final class AdmissionRepositories {
 
     public interface ApplicantRepository extends JpaRepository<Applicant, Long> {
         Optional<Applicant> findByUserId(Long userId);
+
+        @EntityGraph(attributePaths = "user")
+        Optional<Applicant> findByNectaIndexNumberAndNectaExamYear(String indexNumber, Short examYear);
+
+        @EntityGraph(attributePaths = "user")
+        List<Applicant> findByNectaIndexNumber(String indexNumber);
     }
 
     public interface ApplicantQualificationRepository extends JpaRepository<ApplicantQualification, Long> {

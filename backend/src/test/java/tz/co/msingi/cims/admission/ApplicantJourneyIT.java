@@ -16,13 +16,14 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** BP-02 end to end: register → verify → NECTA → profile → fee via GePG → choices → submit. */
+/** BP-02 end to end: NECTA look-up → register with the index number → verify → profile → fee via GePG → choices → submit. */
 @IntegrationTest
 class ApplicantJourneyIT {
 
@@ -41,10 +42,22 @@ class ApplicantJourneyIT {
 
     @Test
     void applicantCompletesAndSubmitsApplication() throws Exception {
-        // register and verify phone
+        // the applicant types the Form Four index number and year; NECTA supplies the names to confirm
+        JsonNode candidate = body(call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"s0101-0002","examYear":2025}""").andExpect(status().isOk()));
+        assertThat(candidate.get("indexNumber").asText()).isEqualTo("S0101/0002");
+        assertThat(candidate.get("firstName").asText()).isNotBlank();
+        assertThat(candidate.get("surname").asText()).isNotBlank();
+        assertThat(candidate.get("sex").asText()).isIn("M", "F");
+        assertThat(candidate.get("subjects").size()).isEqualTo(9);
+        assertThat(candidate.get("alreadyRegistered").asBoolean()).isFalse();
+        String fullName = candidate.get("fullName").asText();
+
+        // names typed by the browser are not accepted: they come from NECTA again on registration
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
-                {"firstName":"Neema","surname":"Kweka","phone":"0755 123 456","password":"Secret123","acceptPrivacyNotice":true}""")
+                {"indexNumber":"S0101/0002/2025","firstName":"Someone","surname":"Else","phone":"0755 123 456","password":"Secret123","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
+        assertThat(reg.get("fullName").asText()).isEqualTo(fullName);
         String otp = reg.get("devOtp").asText();
 
         call(post("/api/applicant-auth/login"), null, """
@@ -56,22 +69,43 @@ class ApplicantJourneyIT {
                 "{\"phone\":\"+255755123456\",\"code\":\"" + otp + "\"}").andExpect(status().isOk()))
                 .get("accessToken").asText();
 
-        // weak results first → not eligible
-        call(post("/api/applicant/qualifications/necta"), token, """
-                {"type":"CSEE","indexNumber":"S0101/0002","year":2024}""").andExpect(status().isCreated());
+        // the profile carries NECTA's names and sex, and the CSEE results are already there
+        JsonNode profile = body(call(get("/api/applicant/profile"), token, null));
+        assertThat(profile.get("fullName").asText()).isEqualTo(fullName);
+        assertThat(profile.get("sex").asText()).isEqualTo(candidate.get("sex").asText());
+        assertThat(profile.get("nectaIndexNumber").asText()).isEqualTo("S0101/0002");
+        assertThat(profile.get("namesFromNecta").asBoolean()).isTrue();
+        JsonNode quals = body(call(get("/api/applicant/qualifications"), token, null));
+        assertThat(quals.size()).isEqualTo(1);
+        assertThat(quals.get(0).get("registration").asBoolean()).isTrue();
+        assertThat(quals.get(0).get("verified").asBoolean()).isTrue();
+        assertThat(quals.get(0).get("candidateName").asText()).isEqualTo(fullName);
+        call(delete("/api/applicant/qualifications/" + quals.get(0).get("id").asLong()), token, null)
+                .andExpect(jsonPath("$.code").value("QUALIFICATION_LOCKED"));
+
+        // the applicant can also sign in with the index number
+        call(post("/api/applicant-auth/login"), null, """
+                {"login":"S0101/0002/2025","password":"Secret123"}""").andExpect(status().isOk());
+        call(post("/api/applicant-auth/login"), null, """
+                {"login":"s0101/0002","password":"Secret123"}""").andExpect(status().isOk());
+
+        // weak results → not eligible
         JsonNode elig = body(call(get("/api/applicant/eligibility?windowId=" + inst.windowId()), token, null));
         assertThat(elig.get(0).get("eligible").asBoolean()).isFalse();
 
-        // strong results → eligible
+        // another sitting with strong results → eligible
         call(post("/api/applicant/qualifications/necta"), token, """
                 {"type":"CSEE","indexNumber":"S0101/0001","year":2025}""").andExpect(status().isCreated());
         elig = body(call(get("/api/applicant/eligibility?windowId=" + inst.windowId()), token, null));
         assertThat(elig.get(0).get("eligible").asBoolean()).isTrue();
 
+        // names stay as NECTA has them; the rest of the profile is the applicant's
         call(put("/api/applicant/profile"), token, """
                 {"firstName":"Neema","surname":"Kweka","sex":"F","dateOfBirth":"2006-05-01","nationality":"Tanzanian",
                  "region":"Arusha","nextOfKinName":"Mama Kweka","nextOfKinPhone":"0713000111","nextOfKinRelation":"Mother"}""")
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value(fullName))
+                .andExpect(jsonPath("$.region").value("Arusha"));
 
         // start application; choices are blocked until the fee is paid (BRU-01)
         Long appId = body(call(post("/api/applicant/applications"), token, "{\"windowId\":" + inst.windowId() + "}"))
@@ -103,20 +137,60 @@ class ApplicantJourneyIT {
                 "{\"windowProgrammeIds\":[" + inst.windowProgrammeId() + "]}")
                 .andExpect(jsonPath("$.code").value("APPLICATION_LOCKED"));
 
-        // the Admissions Office sees it
+        // the Admissions Office sees it under NECTA's names
         String staff = body(call(post("/api/auth/login"), null,
                 "{\"username\":\"officer\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}")).get("accessToken").asText();
         call(get("/api/admission/applications?status=SUBMITTED"), staff, null)
                 .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.content[0].applicantName").value("Neema Kweka"));
+                .andExpect(jsonPath("$.content[0].applicantName").value(fullName));
+
+        // the index number now has an account
+        call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"S0101/0002","examYear":2025}""").andExpect(jsonPath("$.alreadyRegistered").value(true));
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0002","examYear":2025,"phone":"0755 999 888","password":"Secret123","acceptPrivacyNotice":true}""")
+                .andExpect(jsonPath("$.code").value("INDEX_REGISTERED"));
+    }
+
+    @Test
+    void indexNumbersAreCheckedAtNecta() throws Exception {
+        call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"12345","examYear":2025}""").andExpect(jsonPath("$.code").value("INVALID_INDEX_NUMBER"));
+        call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"S0101/0001"}""").andExpect(jsonPath("$.code").value("EXAM_YEAR_REQUIRED"));
+        call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"S0101/0001","examYear":1980}""").andExpect(jsonPath("$.code").value("INVALID_EXAM_YEAR"));
+        call(post("/api/applicant-auth/necta-lookup"), null, """
+                {"indexNumber":"S0101/0000","examYear":2025}""").andExpect(jsonPath("$.code").value("NECTA_NOT_FOUND"));
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0000","examYear":2025,"phone":"0688 444 555","password":"Secret123","acceptPrivacyNotice":true}""")
+                .andExpect(jsonPath("$.code").value("NECTA_NOT_FOUND"));
+    }
+
+    @Test
+    void anUnconfirmedRegistrationCanBeStartedAgain() throws Exception {
+        // registered with a phone the candidate never confirmed (e.g. a typing mistake)
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 999","password":"Secret123","acceptPrivacyNotice":true}""")
+                .andExpect(status().isCreated());
+        JsonNode again = body(call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 998","password":"Secret123","acceptPrivacyNotice":true}""")
+                .andExpect(status().isCreated()));
+        String token = body(call(post("/api/applicant-auth/verify"), null,
+                "{\"phone\":\"0688000998\",\"code\":\"" + again.get("devOtp").asText() + "\"}").andExpect(status().isOk())).get("accessToken").asText();
+        assertThat(body(call(get("/api/applicant/qualifications"), token, null)).size()).isEqualTo(1);
+        // the first number is free again
+        call(post("/api/applicant-auth/login"), null, """
+                {"login":"0688000999","password":"Secret123"}""").andExpect(status().isUnauthorized());
     }
 
     @Test
     void duplicatePhoneIsRejectedAndWrongOtpCounts() throws Exception {
-        String body = """
-                {"firstName":"Ali","surname":"Said","phone":"0688 000 111","password":"Secret123","acceptPrivacyNotice":true}""";
-        call(post("/api/applicant-auth/register"), null, body).andExpect(status().isCreated());
-        call(post("/api/applicant-auth/register"), null, body)
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0003","examYear":2025,"phone":"0688 000 111","password":"Secret123","acceptPrivacyNotice":true}""")
+                .andExpect(status().isCreated());
+        call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0004","examYear":2025,"phone":"0688 000 111","password":"Secret123","acceptPrivacyNotice":true}""")
                 .andExpect(jsonPath("$.code").value("PHONE_REGISTERED"));
         call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000111\",\"code\":\"000000\"}")
                 .andExpect(status().isUnprocessableEntity())
@@ -126,7 +200,7 @@ class ApplicantJourneyIT {
     @Test
     void privacyConsentIsRequired() throws Exception {
         call(post("/api/applicant-auth/register"), null, """
-                {"firstName":"Ali","surname":"Said","phone":"0688 222 333","password":"Secret123","acceptPrivacyNotice":false}""")
+                {"indexNumber":"S0101/0005","examYear":2025,"phone":"0688 222 333","password":"Secret123","acceptPrivacyNotice":false}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.acceptPrivacyNotice").exists());
     }

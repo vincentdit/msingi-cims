@@ -23,6 +23,14 @@ import tz.co.msingi.cims.platform.security.LoginService;
 import tz.co.msingi.cims.platform.security.TokenService;
 import tz.co.msingi.cims.platform.security.UserAccount;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.NectaCandidateView;
+import tz.co.msingi.cims.admission.service.AdmissionDtos.NectaLookupRequest;
+import tz.co.msingi.cims.common.exception.TooManyRequestsException;
+import tz.co.msingi.cims.common.web.RateLimiter;
+
+import java.time.Clock;
 import java.util.Map;
 
 @Tag(name = "Applicant accounts")
@@ -34,7 +42,23 @@ public class ApplicantAuthController {
     private final ApplicantAccountService accounts;
     private final LoginService loginService;
 
-    @Operation(summary = "Create an applicant account; a verification code is sent by SMS")
+    private RateLimiter lookupLimiter;
+
+    @Value("${cims.necta.lookup-rate-limit:20}")
+    void setLookupLimit(int perMinute) {
+        this.lookupLimiter = new RateLimiter(perMinute, 60_000, Clock.systemUTC());
+    }
+
+    @Operation(summary = "Look up a Form Four (CSEE) candidate at NECTA by index number and year, to confirm before registering")
+    @PostMapping("/necta-lookup")
+    public NectaCandidateView lookup(@Valid @RequestBody NectaLookupRequest req, HttpServletRequest http) {
+        if (!lookupLimiter.tryAcquire(http.getRemoteAddr())) {
+            throw new TooManyRequestsException("Too many look-ups. Please wait a minute and try again.");
+        }
+        return accounts.lookup(req);
+    }
+
+    @Operation(summary = "Create an applicant account from the NECTA index number and year; a verification code is sent by SMS")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public RegisterResponse register(@Valid @RequestBody RegisterRequest req) {
@@ -53,11 +77,10 @@ public class ApplicantAuthController {
         return accounts.resendVerification(req.phone());
     }
 
-    @Operation(summary = "Applicant sign-in with phone number (or email) and password")
+    @Operation(summary = "Applicant sign-in with phone number, email or Form Four index number, and password")
     @PostMapping("/login")
     public TokenService.TokenResponse login(@Valid @RequestBody LoginRequest req) {
-        String login = req.login().contains("@") ? req.login() : PhoneNumbers.normalise(req.login());
-        return loginService.login(login, req.password(), UserAccount.UserType.APPLICANT);
+        return loginService.login(accounts.resolveLogin(req.login()), req.password(), UserAccount.UserType.APPLICANT);
     }
 
     @Operation(summary = "Request a password reset code by SMS")

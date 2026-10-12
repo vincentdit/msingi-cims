@@ -36,17 +36,29 @@ public final class AdmissionDtos {
     public static final String PASSWORD_MESSAGE = "Use at least 8 characters with letters and numbers";
 
     // ------------------------------------------------------------------ applicant auth
+    /**
+     * Registration with the Form Four (CSEE) index number and year; names and sex are taken from NECTA, not typed.
+     * The year may also be typed with the index number (S0101/0001/2023).
+     */
     public record RegisterRequest(
-            @NotBlank @Size(max = 60) String firstName,
-            @Size(max = 60) String middleName,
-            @NotBlank @Size(max = 60) String surname,
+            @NotBlank @Size(max = 25) String indexNumber,
+            Integer examYear,
             @NotBlank String phone,
             @Email @Size(max = 120) String email,
             @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) String password,
             @AssertTrue(message = "You must accept the privacy notice to apply") boolean acceptPrivacyNotice) {
     }
 
-    public record RegisterResponse(Long userId, String maskedPhone, String message, String devOtp) {
+    public record NectaLookupRequest(@NotBlank @Size(max = 25) String indexNumber, Integer examYear) {
+    }
+
+    /** What NECTA holds for an index number, shown to the applicant to confirm before the account is created. */
+    public record NectaCandidateView(String indexNumber, int examYear, String firstName, String middleName, String surname, String fullName,
+                                     String sex, String centreName, String division, Integer points, List<SubjectView> subjects,
+                                     boolean alreadyRegistered) {
+    }
+
+    public record RegisterResponse(Long userId, String maskedPhone, String message, String devOtp, String fullName) {
     }
 
     public record VerifyRequest(@NotBlank String phone, @NotBlank @Pattern(regexp = "\\d{4,8}") String code) {
@@ -86,12 +98,13 @@ public final class AdmissionDtos {
     public record ProfileView(Long id, String firstName, String middleName, String surname, String fullName, String sex,
                               LocalDate dateOfBirth, String nationality, String phone, String email, String region,
                               String district, String postalAddress, String disability, String nextOfKinName,
-                              String nextOfKinPhone, String nextOfKinRelation, List<String> missingFields) {
+                              String nextOfKinPhone, String nextOfKinRelation, List<String> missingFields,
+                              String nectaIndexNumber, Short nectaExamYear, boolean namesFromNecta) {
         public static ProfileView of(Applicant a) {
             return new ProfileView(a.getId(), a.getFirstName(), a.getMiddleName(), a.getSurname(), a.fullName(), a.getSex(),
                     a.getDateOfBirth(), a.getNationality(), a.getPhone(), a.getEmail(), a.getRegion(), a.getDistrict(),
                     a.getPostalAddress(), a.getDisability(), a.getNextOfKinName(), a.getNextOfKinPhone(),
-                    a.getNextOfKinRelation(), a.missingProfileFields());
+                    a.getNextOfKinRelation(), a.missingProfileFields(), a.getNectaIndexNumber(), a.getNectaExamYear(), a.isNamesFromNecta());
         }
     }
 
@@ -114,11 +127,15 @@ public final class AdmissionDtos {
 
     public record QualificationView(Long id, String type, String indexNumber, Short examYear, Short awardLevel,
                                     String centreName, String division, Short points, String source, boolean verified,
-                                    List<SubjectView> subjects) {
+                                    List<SubjectView> subjects, String candidateName, boolean registration) {
         public static QualificationView of(ApplicantQualification q) {
+            Applicant a = q.getApplicant();
+            boolean registration = q.getType() == ApplicantQualification.Type.CSEE && a != null && q.getIndexNumber().equals(a.getNectaIndexNumber())
+                    && q.getExamYear() != null && q.getExamYear().equals(a.getNectaExamYear());
             return new QualificationView(q.getId(), q.getType().name(), q.getIndexNumber(), q.getExamYear(), q.getAwardLevel(),
                     q.getCentreName(), q.getDivision(), q.getPoints(), q.getSource().name(), q.isVerified(),
-                    q.getSubjects().stream().map(s -> new SubjectView(s.getSubjectCode(), s.getSubjectName(), s.getGrade())).toList());
+                    q.getSubjects().stream().map(s -> new SubjectView(s.getSubjectCode(), s.getSubjectName(), s.getGrade())).toList(),
+                    q.getCandidateName(), registration);
         }
     }
 

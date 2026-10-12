@@ -52,6 +52,13 @@ public class Applicant extends BaseEntity {
     private String nextOfKinPhone;
     private String nextOfKinRelation;
 
+    /** The Form Four (CSEE) index number and year the applicant registered with; names come from NECTA. */
+    private String nectaIndexNumber;
+    private Short nectaExamYear;
+
+    @Column(nullable = false)
+    private boolean namesFromNecta;
+
     @Column(nullable = false)
     private OffsetDateTime privacyConsentAt;
 

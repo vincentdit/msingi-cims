@@ -50,9 +50,11 @@ public class ApplicantProfileService {
     public ProfileView updateProfile(ProfileRequest req) {
         Applicant a = currentApplicant();
         requireNoSubmittedApplication(a);
-        a.setFirstName(req.firstName().trim());
-        a.setMiddleName(ApplicantAccountService.blankToNull(req.middleName()));
-        a.setSurname(req.surname().trim());
+        if (!a.isNamesFromNecta()) { // names registered from NECTA stay as NECTA has them
+            a.setFirstName(req.firstName().trim());
+            a.setMiddleName(ApplicantAccountService.blankToNull(req.middleName()));
+            a.setSurname(req.surname().trim());
+        }
         a.setSex(req.sex());
         a.setDateOfBirth(req.dateOfBirth());
         a.setNationality(ApplicantAccountService.blankToNull(req.nationality()));
@@ -89,11 +91,19 @@ public class ApplicantProfileService {
         NectaClient.NectaResult r = necta.fetchResults(NectaClient.ExamType.valueOf(req.type().name()), index, req.year())
                 .orElseThrow(() -> new BusinessRuleException("NECTA_NOT_FOUND",
                         "No NECTA results found for " + index + " (" + req.year() + "). Check the index number and year."));
+        ApplicantQualification q = fromNecta(a, req.type(), r);
+        qualifications.save(q);
+        audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
+        return QualificationView.of(q);
+    }
+
+    /** A verified CSEE/ACSEE qualification from NECTA's answer. */
+    static ApplicantQualification fromNecta(Applicant a, ApplicantQualification.Type type, NectaClient.NectaResult r) {
         ApplicantQualification q = new ApplicantQualification();
         q.setApplicant(a);
-        q.setType(req.type());
-        q.setIndexNumber(index);
-        q.setExamYear((short) req.year());
+        q.setType(type);
+        q.setIndexNumber(r.indexNumber());
+        q.setExamYear((short) r.year());
         q.setCentreName(r.centreName());
         q.setDivision(r.division());
         q.setPoints(r.points() == null ? null : r.points().shortValue());
@@ -101,10 +111,8 @@ public class ApplicantProfileService {
         q.setSource(ApplicantQualification.Source.NECTA);
         q.setVerified(true);
         q.setVerifiedAt(OffsetDateTime.now());
-        r.subjects().forEach(s -> q.addSubject(s.code(), s.name(), s.grade()));
-        qualifications.save(q);
-        audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
-        return QualificationView.of(q);
+        r.subjects().forEach(sub -> q.addSubject(sub.code(), sub.name(), sub.grade()));
+        return q;
     }
 
     /**
@@ -142,6 +150,9 @@ public class ApplicantProfileService {
         ApplicantQualification q = qualifications.findById(id)
                 .filter(x -> x.getApplicant().getId().equals(a.getId()))
                 .orElseThrow(() -> new NotFoundException("Qualification", id));
+        if (QualificationView.of(q).registration()) {
+            throw new BusinessRuleException("QUALIFICATION_LOCKED", "These are the Form Four results you registered with, so they cannot be removed");
+        }
         qualifications.delete(q);
         audit.record("QUALIFICATION_REMOVED", "Applicant", a.getId(), Map.of("index", q.getIndexNumber()));
     }

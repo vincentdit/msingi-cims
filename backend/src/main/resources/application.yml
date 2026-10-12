@@ -69,7 +69,14 @@ cims:
     callback-secret: ${CIMS_GEPG_CALLBACK_SECRET:change-me}
     control-number-validity: 7d
   necta:
+    # simulated (development) or live: the NECTA results API used by NOAS. Live needs NECTA_API_KEY.
     mode: ${CIMS_NECTA_MODE:simulated}
+    base-url: ${CIMS_NECTA_BASE_URL:https://api.necta.go.tz}
+    results-path: /api/results/individual
+    api-key: ${NECTA_API_KEY:}
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 30
+    lookup-rate-limit: 20       # public index-number look-ups per minute per client address
   nactvet:
     mode: ${CIMS_NACTVET_MODE:simulated}
   documents:

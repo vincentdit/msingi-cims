@@ -155,13 +155,14 @@ class StudentPortalIT {
         String url = "/api/student/profile/change-requests";
         s.call(post(url), token, change("\"registrationNo\":\"X\"")).andExpect(jsonPath("$.code").value("FIELD_NOT_EDITABLE"));
         s.call(post(url), token, change("\"phone\":\"12345\"")).andExpect(jsonPath("$.code").value("INVALID_VALUE"));
-        s.call(post(url), token, change("\"surname\":\"Applicant\"")).andExpect(jsonPath("$.code").value("NO_CHANGES"));
+        String surname = s.lookup("S0101/0001").get("surname").asText(); // registered under NECTA's names
+        s.call(post(url), token, change("\"surname\":\"" + surname + "\"")).andExpect(jsonPath("$.code").value("NO_CHANGES"));
         s.call(post(url), token, "{\"changes\":{\"region\":\"Arusha\"},\"reason\":\" \"}").andExpect(status().isBadRequest());
 
-        JsonNode r = s.body(s.call(post(url), token, change("\"surname\":\"Mushi\",\"phone\":\"0713 000 111\",\"region\":\"Arusha\"")).andExpect(status().isOk()));
+        JsonNode r = s.body(s.call(post(url), token, change("\"surname\":\"Kisanga\",\"phone\":\"0713 000 111\",\"region\":\"Arusha\"")).andExpect(status().isOk()));
         assertThat(r.get("status").asText()).isEqualTo("PENDING");
         assertThat(r.get("needsDocuments").asBoolean()).isTrue();
-        assertThat(r.get("changes").findValuesAsText("to")).containsExactly("Mushi", "255713000111", "Arusha");
+        assertThat(r.get("changes").findValuesAsText("to")).containsExactly("Kisanga", "255713000111", "Arusha");
         s.call(post(url), token, change("\"region\":\"Mwanza\"")).andExpect(jsonPath("$.code").value("PENDING_REQUEST_EXISTS"));
         assertThat(s.body(s.call(get("/api/student/dashboard"), token, null)).at("/pendingRequest/id").asLong()).isEqualTo(r.get("id").asLong());
 
@@ -175,11 +176,11 @@ class StudentPortalIT {
         s.call(post("/api/registry/change-requests/" + id + "/approve"), registrar, "{}").andExpect(jsonPath("$.code").value("NOT_PENDING"));
 
         JsonNode profile = s.body(s.call(get("/api/student/profile"), token, null));
-        assertThat(profile.get("surname").asText()).isEqualTo("Mushi");
+        assertThat(profile.get("surname").asText()).isEqualTo("Kisanga");
         assertThat(profile.get("phone").asText()).isEqualTo("255713000111");
         assertThat(profile.get("requests").get(0).get("decisionNote").asText()).isEqualTo("Birth certificate seen");
         s.call(post("/api/student-auth/login"), null, login("0713000111", "Secret123")).andExpect(status().isOk()); // sign-in follows the new number
-        assertThat(s.body(s.call(get("/api/registry/students/" + aStudentId), registrar, null)).at("/summary/fullName").asText()).endsWith("Mushi");
+        assertThat(s.body(s.call(get("/api/registry/students/" + aStudentId), registrar, null)).at("/summary/fullName").asText()).endsWith("Kisanga");
 
         // a request can be withdrawn by the student while pending, or turned down with a reason
         long second = s.body(s.call(post(url), token, change("\"district\":\"Meru\""))).get("id").asLong();

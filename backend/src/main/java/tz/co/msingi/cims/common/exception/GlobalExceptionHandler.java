@@ -60,6 +60,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have permission to perform this action");
     }
 
+    @ExceptionHandler(tz.co.msingi.cims.integration.necta.NectaUnavailableException.class)
+    public ProblemDetail nectaUnavailable(tz.co.msingi.cims.integration.necta.NectaUnavailableException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "NECTA_UNAVAILABLE", ex.getMessage());
+    }
+
     @ExceptionHandler(TooManyRequestsException.class)
     public ProblemDetail tooMany(TooManyRequestsException ex) {
         return problem(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage());

@@ -20,6 +20,9 @@ cims:
   gepg:
     mode: simulated
     callback-secret: test-secret
+  necta:
+    mode: simulated
+    lookup-rate-limit: 100000   # test helpers look up many simulated candidates
 logging:
   level:
     tz.co.msingi.cims: INFO

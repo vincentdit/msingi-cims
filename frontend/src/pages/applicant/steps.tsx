@@ -3,9 +3,10 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
+import LockIcon from '@mui/icons-material/LockOutlined';
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Collapse, Divider,
-  FormControlLabel, IconButton, MenuItem, Stack, Switch, TextField, Typography,
+  FormControlLabel, IconButton, MenuItem, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ export function ResultsStep({ onNext }: { onNext: () => void }) {
   const { t } = useTranslation();
   const invalidate = useInvalidate();
   const quals = useQuery({ queryKey: ['applicant', 'qualifications'], queryFn: () => api<Qualification[]>('/api/applicant/qualifications', { realm: 'applicant' }) });
-  const [type, setType] = useState<'CSEE' | 'ACSEE'>('CSEE');
+  const [type, setType] = useState<'CSEE' | 'ACSEE'>('ACSEE');
   const [index, setIndex] = useState('');
   const [year, setYear] = useState(String(new Date().getFullYear() - 1));
   const [prior, setPrior] = useState(false);
@@ -74,7 +75,9 @@ export function ResultsStep({ onNext }: { onNext: () => void }) {
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Chip size="small" color={q.verified ? 'success' : 'warning'} label={q.verified ? t('app.verified') : t('app.pending')} />
-                <IconButton size="small" onClick={() => remove.mutate(q.id)} aria-label={t('app.remove')}><DeleteIcon fontSize="small" /></IconButton>
+                {q.registration
+                  ? <Tooltip title={t('app.registrationResults')}><LockIcon fontSize="small" color="action" /></Tooltip>
+                  : <IconButton size="small" onClick={() => remove.mutate(q.id)} aria-label={t('app.remove')}><DeleteIcon fontSize="small" /></IconButton>}
               </Stack>
             </Stack>
             {q.subjects.length > 0 && (
@@ -130,10 +133,11 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
     <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          {field('firstName', t('auth.firstName'), { required: true })}
-          {field('middleName', t('auth.middleName'))}
-          {field('surname', t('auth.surname'), { required: true })}
+          {field('firstName', t('auth.firstName'), { required: true, disabled: f.namesFromNecta })}
+          {field('middleName', t('auth.middleName'), { disabled: f.namesFromNecta })}
+          {field('surname', t('auth.surname'), { required: true, disabled: f.namesFromNecta })}
         </Stack>
+        {f.namesFromNecta && <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>{t('auth.namesFromNecta')}</Typography>}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField select label="Sex" value={f.sex ?? ''} onChange={(e) => setF({ ...f, sex: e.target.value as 'M' | 'F' })} required>
             <MenuItem value="F">Female</MenuItem>

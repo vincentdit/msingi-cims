@@ -66,6 +66,7 @@ class LetterIT {
         Applicant a = acceptedApplicant("S0101/0001");
 
         JsonNode letter = app(a).get("letter");
+        String holder = s.lookup("S0101/0001").get("fullName").asText();
         assertThat(letter.get("letterNo").asText()).isEqualTo(s.tenant + "/ADM/2027/000001");
         String code = letter.get("verificationCode").asText();
         assertThat(code).matches("[0-9A-Z]{4}(-[0-9A-Z]{4}){3}");
@@ -78,7 +79,7 @@ class LetterIT {
                 .andReturn().getResponse().getContentAsByteArray();
         try (PDDocument doc = PDDocument.load(pdf)) {
             String text = new PDFTextStripper().getText(doc);
-            assertThat(text).contains("Test Applicant", "Basic Technician Certificate in IT (" + s.tenant + ")", code,
+            assertThat(text).contains(holder, "Basic Technician Certificate in IT (" + s.tenant + ")", code,
                     s.tenant + "/ADM/2027/000001", "Monday, 27 September 2027", "Main Hall", "Dr. Amina Salum", "Joining instructions");
             assertThat(text).containsPattern("NV/\\d{4}/\\d{6}");
             String qr = new QRCodeReader().decode(new BinaryBitmap(new HybridBinarizer(
@@ -90,7 +91,7 @@ class LetterIT {
         s.call(get("/api/public/verify/" + code.toLowerCase().replace("-", " ")), null, null)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("VALID"))
-                .andExpect(jsonPath("$.holderName").value("Test Applicant"))
+                .andExpect(jsonPath("$.holderName").value(holder))
                 .andExpect(jsonPath("$.institution").value(s.tenant + " Technical College"))
                 .andExpect(jsonPath("$.reportingDate").value("2027-09-27"))
                 .andExpect(jsonPath("$.phone").doesNotExist());

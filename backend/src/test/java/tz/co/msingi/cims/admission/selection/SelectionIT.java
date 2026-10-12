@@ -114,8 +114,8 @@ class SelectionIT {
 
     @Test
     void applicantSeesSelectedProgramme() throws Exception {
-        String token = applicantToken();
-        Long appId = applyWith(token, "S0101/0001");
+        String token = applicantToken("S0101/0001");
+        Long appId = finish(token);
         String officer = staffToken("officer");
         long roundId = body(call(post("/api/admission/windows/" + inst.windowId() + "/selection-rounds"), officer, null)).at("/round/id").asLong();
         call(post("/api/admission/selection-rounds/" + roundId + "/approve"), staffToken("chair"), "{\"committeeMinuteRef\":\"AC/1\"}")
@@ -134,29 +134,26 @@ class SelectionIT {
     // ------------------------------------------------------------------ helpers
 
     private Long apply(String index) throws Exception {
-        return applyWith(applicantToken(), index);
+        return finish(applicantToken(index));
     }
 
-    /** Applies with simulated NECTA results, trying index numbers until the applicant is eligible. */
+    /** Applies with simulated NECTA results, trying index numbers until one meets the window's rules. */
     private Long applyEligible(int start) throws Exception {
-        String token = applicantToken();
         for (int i = start; i < start + 200; i++) {
             String index = String.format("S0303/%04d", i);
-            JsonNode q = body(call(post("/api/applicant/qualifications/necta"), token,
-                    "{\"type\":\"CSEE\",\"indexNumber\":\"" + index + "\",\"year\":2025}"));
-            JsonNode elig = body(call(get("/api/applicant/eligibility?windowId=" + inst.windowId()), token, null));
-            if (elig.get(0).get("eligible").asBoolean()) {
-                return finish(token);
+            JsonNode c = body(call(post("/api/applicant-auth/necta-lookup"), null, "{\"indexNumber\":\"" + index + "\",\"examYear\":2025}"));
+            int passes = 0;
+            boolean maths = false;
+            for (JsonNode sub : c.get("subjects")) {
+                boolean pass = "ABCD".contains(sub.get("grade").asText());
+                if (pass) passes++;
+                if (pass && sub.get("name").asText().equals("BASIC MATHEMATICS")) maths = true;
             }
-            call(delete("/api/applicant/qualifications/" + q.get("id").asLong()), token, null);
+            if (passes >= 4 && maths) {
+                return apply(index);
+            }
         }
         throw new AssertionError("no eligible simulated index found");
-    }
-
-    private Long applyWith(String token, String index) throws Exception {
-        call(post("/api/applicant/qualifications/necta"), token, "{\"type\":\"CSEE\",\"indexNumber\":\"" + index + "\",\"year\":2025}")
-                .andExpect(status().isCreated());
-        return finish(token);
     }
 
     private Long finish(String token) throws Exception {
@@ -170,10 +167,10 @@ class SelectionIT {
         return appId;
     }
 
-    private String applicantToken() throws Exception {
+    private String applicantToken(String index) throws Exception {
         String phone = String.format("0744%06d", ++phoneSeq + (Math.abs(tenant.hashCode()) % 9000) * 100);
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null,
-                "{\"firstName\":\"Test\",\"surname\":\"Applicant\",\"phone\":\"" + phone + "\",\"password\":\"Secret123\",\"acceptPrivacyNotice\":true}")
+                "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Secret123\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
         return body(call(post("/api/applicant-auth/verify"), null,
                 "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")).get("accessToken").asText();

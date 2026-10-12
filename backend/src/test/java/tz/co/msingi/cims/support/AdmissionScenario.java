@@ -30,31 +30,43 @@ public class AdmissionScenario {
         this.inst = inst;
     }
 
-    /** A submitted application with the given CSEE index; returns [applicationId, applicant token]. */
+    /** A submitted application by an applicant registered with the given CSEE index number (2025). */
     public Applicant apply(String index) throws Exception {
-        String token = applicantToken();
-        call(post("/api/applicant/qualifications/necta"), token, "{\"type\":\"CSEE\",\"indexNumber\":\"" + index + "\",\"year\":2025}")
-                .andExpect(status().isCreated());
+        String token = applicantToken(index);
         return new Applicant(finish(token), token, index);
     }
 
     /**
      * A submitted, eligible application whose simulated index number ends in {@code lastDigit}
-     * (the simulated NACTVET decides its outcome by that digit).
+     * (the simulated NACTVET decides its outcome by that digit). Candidates are looked up at (simulated)
+     * NECTA first, and the first one meeting the test window's rules (four passes including Basic Mathematics) registers.
      */
     public Applicant applyEligibleEndingIn(int lastDigit, int start) throws Exception {
-        String token = applicantToken();
         for (int i = start - start % 10 + lastDigit; i < start + 3000; i += 10) {
             String index = String.format("S0404/%04d", i);
-            JsonNode q = body(call(post("/api/applicant/qualifications/necta"), token,
-                    "{\"type\":\"CSEE\",\"indexNumber\":\"" + index + "\",\"year\":2025}"));
-            JsonNode elig = body(call(get("/api/applicant/eligibility?windowId=" + inst.windowId()), token, null));
-            if (elig.get(0).get("eligible").asBoolean()) {
-                return new Applicant(finish(token), token, index);
+            if (meetsTestRules(index)) {
+                Applicant a = apply(index);
+                return a;
             }
-            call(delete("/api/applicant/qualifications/" + q.get("id").asLong()), token, null);
         }
         throw new AssertionError("no eligible simulated index ending in " + lastDigit);
+    }
+
+    /** What (simulated) NECTA holds for a 2025 CSEE index number. */
+    public JsonNode lookup(String index) throws Exception {
+        return body(call(post("/api/applicant-auth/necta-lookup"), null, "{\"indexNumber\":\"" + index + "\",\"examYear\":2025}")
+                .andExpect(status().isOk()));
+    }
+
+    private boolean meetsTestRules(String index) throws Exception {
+        int passes = 0;
+        boolean maths = false;
+        for (JsonNode sub : lookup(index).get("subjects")) {
+            boolean pass = "ABCD".contains(sub.get("grade").asText());
+            if (pass) passes++;
+            if (pass && sub.get("name").asText().equals("BASIC MATHEMATICS")) maths = true;
+        }
+        return passes >= 4 && maths;
     }
 
     private Long finish(String token) throws Exception {
@@ -89,10 +101,16 @@ public class AdmissionScenario {
         }
     }
 
+    /** A verified applicant registered with a made-up index number (any results). */
     public String applicantToken() throws Exception {
+        return applicantToken(String.format("S0909/%04d", phoneSeq + 1));
+    }
+
+    /** A verified applicant registered with the given CSEE index number (2025); names come from (simulated) NECTA. */
+    public String applicantToken(String index) throws Exception {
         String phone = String.format("0755%06d", ++phoneSeq + (Math.abs(tenant.hashCode()) % 9000) * 100);
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null,
-                "{\"firstName\":\"Test\",\"surname\":\"Applicant\",\"phone\":\"" + phone + "\",\"password\":\"Secret123\",\"acceptPrivacyNotice\":true}")
+                "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Secret123\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
         return body(call(post("/api/applicant-auth/verify"), null,
                 "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")).get("accessToken").asText();
