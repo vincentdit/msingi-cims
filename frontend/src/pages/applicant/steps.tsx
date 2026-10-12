@@ -278,7 +278,7 @@ function ProgrammeOption({ e, checked, disabled, onToggle }: { e: ProgrammeEligi
 }
 
 // ---------------------------------------------------------------- Review
-export function ReviewStep({ app }: { app: Application }) {
+export function ReviewStep({ app, onDone }: { app: Application; onDone?: () => void }) {
   const { t } = useTranslation();
   const invalidate = useInvalidate();
   const submit = useMutation({ mutationFn: () => api(`/api/applicant/applications/${app.id}/submit`, { method: 'POST', realm: 'applicant' }), onSuccess: invalidate });
@@ -301,7 +301,14 @@ export function ReviewStep({ app }: { app: Application }) {
         </Alert>
       )}
       <ErrorAlert error={submit.error} />
-      <Box><Button variant="contained" size="large" color="secondary" disabled={app.blockers.length > 0 || submit.isPending} onClick={() => submit.mutate()}>{t('app.submit')}</Button></Box>
+      {app.status === 'SUBMITTED' ? (
+        <>
+          <Alert severity="success">{t('amend.stillSubmitted', { ref: app.referenceNo })}</Alert>
+          {onDone && <Box><Button variant="contained" size="large" onClick={onDone}>{t('amend.done')}</Button></Box>}
+        </>
+      ) : (
+        <Box><Button variant="contained" size="large" color="secondary" disabled={app.blockers.length > 0 || submit.isPending} onClick={() => submit.mutate()}>{t('app.submit')}</Button></Box>
+      )}
     </Stack>
   );
 }

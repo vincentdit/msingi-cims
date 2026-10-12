@@ -268,16 +268,16 @@ public final class AdmissionDtos {
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
                                   List<String> blockers, String selectedProgramme, OfferView offer, LetterView letter,
-                                  StudentInfo student) {
+                                  StudentInfo student, boolean amendable, OffsetDateTime amendedAt) {
         public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode, LetterView letter,
-                                         StudentInfo student) {
+                                         StudentInfo student, boolean amendable) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
                     a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
                     a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName(),
-                    OfferView.of(a, devConfirmationCode), letter, student);
+                    OfferView.of(a, devConfirmationCode), letter, student, amendable, a.getAmendedAt());
         }
     }
 

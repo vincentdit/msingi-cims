@@ -1,5 +1,6 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DownloadIcon from '@mui/icons-material/Download';
+import EditIcon from '@mui/icons-material/EditOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SchoolIcon from '@mui/icons-material/School';
 import {
@@ -30,8 +31,10 @@ export default function ApplicationPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['applicant'] }),
   });
 
+  const [editing, setEditing] = useState(false);
   if (apps.isLoading || windows.isLoading) return <Loading />;
   const current = apps.data?.[0];
+  const amending = !!current && editing && current.amendable;
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 3, md: 5 } }}>
@@ -50,14 +53,14 @@ export default function ApplicationPage() {
           )) : <Alert severity="info">{upcoming ? t('home.opensOn', { window: upcoming.name, date: formatDateTime(upcoming.opensAt) }) : t('home.noWindow')}</Alert>}
         </>
       )}
-      {current && (current.status === 'DRAFT' || current.status === 'PAYMENT_PENDING'
-        ? <Wizard app={current} />
-        : <Submitted app={current} />)}
+      {current && (current.status === 'DRAFT' || current.status === 'PAYMENT_PENDING' || amending
+        ? <Wizard app={current} onDone={amending ? () => setEditing(false) : undefined} />
+        : <Submitted app={current} onEdit={() => setEditing(true)} />)}
     </Container>
   );
 }
 
-function Wizard({ app }: { app: Application }) {
+function Wizard({ app, onDone }: { app: Application; onDone?: () => void }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -72,7 +75,7 @@ function Wizard({ app }: { app: Application }) {
     app.choices.length > 0,
     false,
   ];
-  const firstOpen = Math.max(0, done.findIndex((d) => !d));
+  const firstOpen = onDone ? 1 : Math.max(0, done.findIndex((d) => !d)); // amending: start at the personal details
   const [active, setActive] = useState(firstOpen);
   useEffect(() => { setActive(firstOpen); }, [quals.isSuccess, profile.isSuccess]); // jump to first incomplete step on load
 
@@ -82,7 +85,7 @@ function Wizard({ app }: { app: Application }) {
     { label: t('app.steps.fee'), body: <FeeStep app={app} onNext={() => setActive(3)} /> },
     { label: t('app.steps.other'), body: <OtherQualificationsStep app={app} onNext={() => setActive(4)} /> },
     { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(5)} /> },
-    { label: t('app.steps.review'), body: <ReviewStep app={app} /> },
+    { label: t('app.steps.review'), body: <ReviewStep app={app} onDone={onDone} /> },
   ];
 
   return (
@@ -94,6 +97,11 @@ function Wizard({ app }: { app: Application }) {
         </Box>
         <Chip color={statusColour(app.status)} label={humanise(app.status)} />
       </Stack>
+      {onDone && (
+        <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" variant="outlined" onClick={onDone}>{t('amend.done')}</Button>}>
+          {t('amend.editing', { ref: app.referenceNo, date: formatDateTime(app.windowClosesAt) })}
+        </Alert>
+      )}
       {new Date(app.windowClosesAt) <= new Date() && (
         <Alert severity="warning" sx={{ mb: 2 }}>{t('home.windowClosed', { window: app.windowName, date: formatDateTime(app.windowClosesAt) })}</Alert>
       )}
@@ -116,7 +124,7 @@ function Wizard({ app }: { app: Application }) {
 
 const AWAITING_NACTVET = ['SELECTED', 'PENDING_VERIFICATION', 'QUERIED'];
 
-function Submitted({ app }: { app: Application }) {
+function Submitted({ app, onEdit }: { app: Application; onEdit: () => void }) {
   const { t } = useTranslation();
   const s = app.status;
   const icon = s === 'NACTVET_REJECTED' || s === 'OFFER_LAPSED' || s === 'DECLINED'
@@ -138,6 +146,13 @@ function Submitted({ app }: { app: Application }) {
           ))}
         </Stack>
         <Chip sx={{ mt: 3 }} color={AWAITING_NACTVET.includes(s) ? 'success' : statusColour(s)} label={chipLabel} />
+        {app.amendable && (
+          <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }}
+            action={<Button color="inherit" size="small" variant="outlined" startIcon={<EditIcon />} onClick={onEdit}>{t('amend.edit')}</Button>}>
+            {t('amend.canEdit', { date: formatDateTime(app.windowClosesAt) })}
+            {app.amendedAt && <Typography variant="caption" sx={{ display: 'block' }}>{t('amend.lastChanged', { date: formatDateTime(app.amendedAt) })}</Typography>}
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );

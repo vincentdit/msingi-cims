@@ -77,6 +77,7 @@ public class ApplicationService {
     private final OfferService offers;
     private final AdmissionLetterRepository letters;
     private final StudentRepository students;
+    private final ApplicationEditGuard editGuard;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -193,9 +194,13 @@ public class ApplicationService {
     public ApplicationView setChoices(Long applicationId, List<Long> windowProgrammeIds) {
         Applicant a = profiles.currentApplicant();
         Application app = own(applicationId, a);
-        requireEditableAndOpen(app);
+        boolean amending = editGuard.amendable(app);
+        if (!amending) requireEditableAndOpen(app);
         if (!app.isFeePaid()) {
             throw new BusinessRuleException("FEE_NOT_PAID", "Pay the application fee before choosing programmes");
+        }
+        if (amending && windowProgrammeIds.isEmpty()) {
+            throw new BusinessRuleException("CHOICE_REQUIRED", "A submitted application needs at least one programme");
         }
         AdmissionWindow w = app.getWindow();
         if (windowProgrammeIds.size() > w.getMaxChoices()) {
@@ -228,7 +233,8 @@ public class ApplicationService {
         app.getChoices().clear();
         applications.flush(); // delete old rows before inserting new ones (unique choice order)
         app.getChoices().addAll(newChoices);
-        audit.record("SET_CHOICES", "Application", app.getId(), Map.of("windowProgrammeIds", windowProgrammeIds));
+        audit.record(amending ? "AMEND_CHOICES" : "SET_CHOICES", "Application", app.getId(), Map.of("windowProgrammeIds", windowProgrammeIds));
+        editGuard.markAmended(app);
         return view(applications.saveAndFlush(app), a);
     }
 
@@ -277,7 +283,9 @@ public class ApplicationService {
 
     private void requireEditableAndOpen(Application app) {
         if (!app.isEditable()) {
-            throw new BusinessRuleException("APPLICATION_LOCKED", "This application has already been submitted");
+            throw new BusinessRuleException("APPLICATION_LOCKED", app.getStatus() == Application.Status.SUBMITTED
+                    ? "This application can no longer be changed: the window has closed or selection has started"
+                    : "This application has already been submitted");
         }
         if (!app.getWindow().isOpen(OffsetDateTime.now())) {
             throw new BusinessRuleException("WINDOW_NOT_OPEN", "The admission window is closed");
@@ -310,7 +318,7 @@ public class ApplicationService {
                 .map(l -> new LetterView(l.getLetterNo(), l.getEdition(), l.getVerificationCode(), l.getIssuedAt())).orElse(null);
         StudentInfo student = students.findByApplicationId(app.getId())
                 .map(st -> new StudentInfo(st.getRegistrationNo(), st.getStatus().name())).orElse(null);
-        return ApplicationView.of(app, blockers(app, a), devCode, letter, student);
+        return ApplicationView.of(app, blockers(app, a), devCode, letter, student, editGuard.amendable(app));
     }
 
     private FeeView feeView(Application app) {

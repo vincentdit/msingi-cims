@@ -43,6 +43,8 @@ public class ApplicantProfileService {
     private final NectaClient necta;
     private final NactvetAwardClient nactvetAwards;
     private final GeographyService geo;
+    private final ApplicationEditGuard editGuard;
+    private final tz.co.msingi.cims.admission.eligibility.EligibilityEngine engine;
     private final PrimarySchoolDirectory primarySchools;
     private final AuditService audit;
 
@@ -60,7 +62,7 @@ public class ApplicantProfileService {
     @Transactional
     public ProfileView updateProfile(ProfileRequest req) {
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         if (!a.isNamesFromNecta()) { // names registered from NECTA stay as NECTA has them
             a.setFirstName(req.firstName().trim());
             a.setMiddleName(ApplicantAccountService.blankToNull(req.middleName()));
@@ -96,7 +98,12 @@ public class ApplicantProfileService {
         if (!a.isOlevelFromNecta()) a.setOlevelSchool(upper(req.olevelSchool()));
         if (!a.isAlevelFromNecta()) a.setAlevelSchool(upper(req.alevelSchool()));
         a.getUser().setFullName(a.fullName());
-        audit.record("UPDATE", "Applicant", a.getId(), null);
+        if (!submitted.isEmpty() && !a.missingProfileFields().isEmpty()) {
+            throw new BusinessRuleException("PROFILE_INCOMPLETE", "Your application is submitted, so these details cannot be left empty: "
+                    + String.join(", ", a.missingProfileFields()));
+        }
+        audit.record(submitted.isEmpty() ? "UPDATE" : "AMEND_PROFILE", "Applicant", a.getId(), null);
+        amended(submitted);
         return ProfileView.of(a);
     }
 
@@ -112,7 +119,7 @@ public class ApplicantProfileService {
             throw new BusinessRuleException("INVALID_TYPE", "NECTA results are CSEE or ACSEE");
         }
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         String index = req.indexNumber().trim().toUpperCase();
         if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), req.type(), index)) {
             throw new BusinessRuleException("QUALIFICATION_EXISTS", "These results are already on your application");
@@ -124,6 +131,7 @@ public class ApplicantProfileService {
         takeSchool(a, req.type(), r);
         qualifications.save(q);
         audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
+        amended(submitted);
         return QualificationView.of(q);
     }
 
@@ -169,7 +177,7 @@ public class ApplicantProfileService {
     @Transactional
     public QualificationView lookupNtaAward(NtaAwardRequest req) {
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         String reg = req.registrationNumber().trim().toUpperCase().replaceAll("\\s+", "");
         if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), ApplicantQualification.Type.NTA, reg)) {
             throw new BusinessRuleException("QUALIFICATION_EXISTS", "This NTA award is already on your application");
@@ -201,6 +209,7 @@ public class ApplicantProfileService {
                 m.grade() == null ? "-" : m.grade(), m.credits() == null ? null : m.credits().shortValue()));
         qualifications.save(q);
         audit.record("NTA_AWARD_ADDED", "Applicant", a.getId(), Map.of("registrationNumber", reg, "level", award.ntaLevel()));
+        amended(submitted);
         return QualificationView.of(q);
     }
 
@@ -208,7 +217,7 @@ public class ApplicantProfileService {
     @Transactional
     public QualificationView addOtherAward(OtherAwardRequest req) {
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         String ref = ApplicantAccountService.blankToNull(req.reference());
         String index = ref != null ? ref.toUpperCase() : "OTH-" + Long.toString(System.nanoTime() % 2176782336L, 36).toUpperCase();
         if (qualifications.existsByApplicantIdAndTypeAndIndexNumber(a.getId(), ApplicantQualification.Type.OTHER, index)) {
@@ -227,6 +236,7 @@ public class ApplicantProfileService {
         q.setVerified(false);
         qualifications.save(q);
         audit.record("OTHER_AWARD_ADDED", "Applicant", a.getId(), Map.of("award", q.getAwardName(), "year", req.year()));
+        amended(submitted);
         return QualificationView.of(q);
     }
 
@@ -266,7 +276,7 @@ public class ApplicantProfileService {
             throw new BusinessRuleException("INVALID_AWARD_LEVEL", nva ? "NVA levels are 1–3" : "NTA levels are 4–8");
         }
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         ApplicantQualification q = new ApplicantQualification();
         q.setApplicant(a);
         q.setType(req.type());
@@ -277,20 +287,33 @@ public class ApplicantProfileService {
         q.setVerified(false);
         qualifications.save(q);
         audit.record("PRIOR_AWARD_ADDED", "Applicant", a.getId(), Map.of("type", req.type().name(), "number", q.getIndexNumber()));
+        amended(submitted);
         return QualificationView.of(q);
     }
 
     @Transactional
     public void removeQualification(Long id) {
         Applicant a = currentApplicant();
-        requireNoSubmittedApplication(a);
+        List<Application> submitted = requireNoSubmittedApplication(a);
         ApplicantQualification q = qualifications.findById(id)
                 .filter(x -> x.getApplicant().getId().equals(a.getId()))
                 .orElseThrow(() -> new NotFoundException("Qualification", id));
         if (QualificationView.of(q).registration()) {
             throw new BusinessRuleException("QUALIFICATION_LOCKED", "These are the Form Four results you registered with, so they cannot be removed");
         }
+        // a submitted application's programmes must stay within reach without it
+        List<tz.co.msingi.cims.admission.eligibility.EligibilityEngine.Qualification> rest = qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream()
+                .filter(x -> !x.getId().equals(q.getId())).map(ApplicantQualification::toEngine).toList();
+        for (Application app : submitted) {
+            for (var c : app.getChoices()) {
+                if (!engine.evaluate(c.getWindowProgramme().getEntryRules(), rest).eligible()) {
+                    throw new BusinessRuleException("NEEDED_FOR_CHOICES", "You need this qualification for "
+                            + c.getWindowProgramme().getProgramme().getName() + ". Change your programme choices first.");
+                }
+            }
+        }
         qualifications.delete(q);
+        amended(submitted);
         // the school came from these results: take it from another NECTA sitting, or let the applicant type it
         if (q.getSource() == ApplicantQualification.Source.NECTA && (q.getType() == ApplicantQualification.Type.CSEE || q.getType() == ApplicantQualification.Type.ACSEE)) {
             boolean olevel = q.getType() == ApplicantQualification.Type.CSEE;
@@ -308,12 +331,21 @@ public class ApplicantProfileService {
         audit.record("QUALIFICATION_REMOVED", "Applicant", a.getId(), Map.of("index", q.getIndexNumber()));
     }
 
-    private void requireNoSubmittedApplication(Applicant a) {
-        boolean submitted = applications.findByApplicantIdOrderByCreatedAtDesc(a.getId()).stream()
-                .anyMatch(app -> !app.isEditable() && app.getStatus() != Application.Status.WITHDRAWN);
-        if (submitted) {
+    private void amended(List<Application> submitted) {
+        submitted.forEach(editGuard::markAmended);
+    }
+
+    /**
+     * Details and qualifications can change while every application not in draft is still amendable (submitted,
+     * window open, no selection yet); returns those applications, whose choices must stay valid.
+     */
+    private List<Application> requireNoSubmittedApplication(Applicant a) {
+        List<Application> submitted = applications.findByApplicantIdOrderByCreatedAtDesc(a.getId()).stream()
+                .filter(app -> !app.isEditable() && app.getStatus() != Application.Status.WITHDRAWN).toList();
+        if (submitted.stream().anyMatch(app -> !editGuard.amendable(app))) {
             throw new BusinessRuleException("APPLICATION_SUBMITTED",
-                    "Your details are locked because an application has been submitted. Contact the Admissions Office for corrections.");
+                    "Your details are locked: the admission window has closed or selection has started. Contact the Admissions Office for corrections.");
         }
+        return submitted;
     }
 }

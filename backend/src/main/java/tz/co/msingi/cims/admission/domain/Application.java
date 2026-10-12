@@ -57,6 +57,9 @@ public class Application extends BaseEntity {
 
     private OffsetDateTime submittedAt;
 
+    /** Last change by the applicant after submitting (while the window was open). */
+    private OffsetDateTime amendedAt;
+
     /** Programme the applicant was selected for, set when the Admissions Committee approves a round. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "selected_window_programme_id")

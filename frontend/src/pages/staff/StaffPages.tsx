@@ -170,7 +170,10 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
       {d.isLoading && <Loading />}
       {a && (
         <Stack spacing={2} sx={{ mt: 2 }}>
-          <Chip sx={{ alignSelf: 'flex-start' }} color={statusColour(a.application.status)} label={humanise(a.application.status)} />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip color={statusColour(a.application.status)} label={humanise(a.application.status)} />
+            {a.application.amendedAt && <Typography variant="caption" color="text.secondary">Changed by the applicant after submitting · {formatDateTime(a.application.amendedAt)}</Typography>}
+          </Stack>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Applicant</Typography>
             <Typography sx={{ fontWeight: 700 }}>{a.applicant.fullName}</Typography>

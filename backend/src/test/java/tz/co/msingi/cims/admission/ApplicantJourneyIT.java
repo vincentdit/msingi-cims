@@ -132,10 +132,8 @@ class ApplicantJourneyIT {
         assertThat(submitted.get("status").asText()).isEqualTo("SUBMITTED");
         assertThat(submitted.get("referenceNo").asText()).isEqualTo(tenant + "/APP/2027/000001");
 
-        // locked after submission
-        call(put("/api/applicant/applications/" + appId + "/choices"), token,
-                "{\"windowProgrammeIds\":[" + inst.windowProgrammeId() + "]}")
-                .andExpect(jsonPath("$.code").value("APPLICATION_LOCKED"));
+        // still open to changes while the window is open (see AmendAfterSubmissionIT)
+        assertThat(submitted.get("amendable").asBoolean()).isTrue();
 
         // the Admissions Office sees it under NECTA's names
         String staff = body(call(post("/api/auth/login"), null,

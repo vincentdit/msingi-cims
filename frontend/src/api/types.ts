@@ -195,6 +195,9 @@ export interface Application {
   offer?: Offer;
   letter?: AdmissionLetterInfo;
   student?: { registrationNo: string; status: string };
+  /** Submitted but still open to changes: the window is open and selection has not started. */
+  amendable: boolean;
+  amendedAt?: string;
 }
 
 export interface AdmissionLetterInfo {

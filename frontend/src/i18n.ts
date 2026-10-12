@@ -59,7 +59,7 @@ const en = {
     feePaid: 'Application fee paid', simulate: 'Simulate payment (development)', checkPayment: 'I have paid — check status',
     programmesIntro: 'Choose up to {{n}} programmes in order of preference. Only programmes you qualify for can be selected.',
     eligible: 'You qualify', notEligible: 'Not eligible', why: 'Why?', choice: 'Choice {{n}}',
-    saveChoices: 'Save choices', reviewIntro: 'Check your application before submitting. You cannot change it afterwards.',
+    saveChoices: 'Save choices', reviewIntro: 'Check your application before submitting. After submitting you can still change it until the window closes or selection starts.',
     submit: 'Submit application', submitted: 'Application submitted', reference: 'Reference number',
     submittedText: 'We have received your application. You will be notified by SMS when selection results are out.',
     todo: 'Still to do',
@@ -237,6 +237,12 @@ const en = {
     awardName: 'Award name', awardNameHint: 'e.g. Certificate in Computer Applications', institution: 'Awarding institution', reference: 'Certificate number (optional)',
     level_CERTIFICATE: 'Certificate', level_DIPLOMA: 'Diploma', level_ADVANCED_DIPLOMA: 'Advanced diploma', level_DEGREE: 'Degree', level_MASTERS: "Master's", level_OTHER: 'Other',
   },
+  amend: {
+    canEdit: 'You can still change your personal details, programme choices and other qualifications until {{date}}, or until selection starts.',
+    edit: 'Edit application', done: 'Done editing', lastChanged: 'Last changed {{date}}',
+    editing: 'You are changing your submitted application {{ref}}. Changes are saved as you make them and the application stays submitted. You can make changes until {{date}}.',
+    stillSubmitted: 'Your application {{ref}} is submitted. The changes you made are already saved.',
+  },
   common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
 
@@ -297,7 +303,7 @@ const sw: typeof en = {
     feePaid: 'Ada ya maombi imelipwa', simulate: 'Iga malipo (majaribio)', checkPayment: 'Nimelipa — angalia hali',
     programmesIntro: 'Chagua hadi programu {{n}} kwa mpangilio wa upendeleo. Ni programu unazostahili tu zinazoweza kuchaguliwa.',
     eligible: 'Unastahili', notEligible: 'Hustahili', why: 'Kwa nini?', choice: 'Chaguo {{n}}',
-    saveChoices: 'Hifadhi machaguo', reviewIntro: 'Hakiki maombi yako kabla ya kuwasilisha. Huwezi kuyabadilisha baadaye.',
+    saveChoices: 'Hifadhi machaguo', reviewIntro: 'Hakiki maombi yako kabla ya kuwasilisha. Baada ya kuwasilisha bado unaweza kuyabadilisha hadi dirisha lifungwe au uchaguzi uanze.',
     submit: 'Wasilisha maombi', submitted: 'Maombi yamewasilishwa', reference: 'Namba ya kumbukumbu',
     submittedText: 'Tumepokea maombi yako. Utajulishwa kwa SMS matokeo ya uchaguzi yatakapotoka.',
     todo: 'Bado kukamilisha',
@@ -474,6 +480,12 @@ const sw: typeof en = {
     otherText: 'Cheti, stashahada au shahada isiyotolewa chini ya NTA. Ofisi ya Udahili huihakiki kwa cheti chako.',
     awardName: 'Jina la tuzo', awardNameHint: 'k.m. Cheti cha Matumizi ya Kompyuta', institution: 'Taasisi iliyotoa', reference: 'Namba ya cheti (si lazima)',
     level_CERTIFICATE: 'Cheti', level_DIPLOMA: 'Stashahada', level_ADVANCED_DIPLOMA: 'Stashahada ya juu', level_DEGREE: 'Shahada', level_MASTERS: 'Uzamili', level_OTHER: 'Nyingine',
+  },
+  amend: {
+    canEdit: 'Bado unaweza kubadilisha taarifa binafsi, programu ulizochagua na sifa nyingine hadi {{date}}, au hadi uchaguzi uanze.',
+    edit: 'Hariri maombi', done: 'Nimemaliza kuhariri', lastChanged: 'Ilibadilishwa mara ya mwisho {{date}}',
+    editing: 'Unabadilisha maombi yako uliyowasilisha {{ref}}. Mabadiliko yanahifadhiwa unapoyafanya na maombi yanabaki yamewasilishwa. Unaweza kubadilisha hadi {{date}}.',
+    stillSubmitted: 'Maombi yako {{ref}} yamewasilishwa. Mabadiliko uliyofanya tayari yamehifadhiwa.',
   },
   common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };
