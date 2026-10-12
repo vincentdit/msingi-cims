@@ -34,6 +34,9 @@ public class ApplicantQualification extends BaseEntity {
 
     public enum Source { NECTA, NACTVET, MANUAL }
 
+    /** The Admissions Office's check of a declared qualification; results from NECTA / NACTVET are VERIFIED at source. */
+    public enum CheckStatus { PENDING, VERIFIED, REJECTED }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "applicant_id")
     private Applicant applicant;
@@ -67,6 +70,19 @@ public class ApplicantQualification extends BaseEntity {
     private boolean verified;
 
     private OffsetDateTime verifiedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CheckStatus checkStatus = CheckStatus.PENDING;
+    private String checkNote;
+    private String checkedByName;
+
+    /** Verified at source (NECTA / NACTVET): no check by the office needed. */
+    public void verifiedAtSource() {
+        verified = true;
+        verifiedAt = OffsetDateTime.now();
+        checkStatus = CheckStatus.VERIFIED;
+    }
 
     @OneToMany(mappedBy = "qualification", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id")

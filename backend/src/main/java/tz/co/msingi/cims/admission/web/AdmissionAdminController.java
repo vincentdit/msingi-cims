@@ -1,5 +1,6 @@
 package tz.co.msingi.cims.admission.web;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class AdmissionAdminController {
     private static final String OPEN_CLOSE = "hasAnyRole('INSTITUTION_ADMIN','ADMISSIONS_OFFICER','DEPUTY_PRINCIPAL_ACADEMIC')";
 
     private final AdmissionWindowService windows;
+    private final tz.co.msingi.cims.admission.service.QualificationCheckService qualificationChecks;
     private final ApplicationService applications;
 
     @GetMapping("/windows")
@@ -119,6 +121,22 @@ public class AdmissionAdminController {
     @PreAuthorize(READ)
     public List<WindowEventView> events(@PathVariable Long id) {
         return windows.events(id);
+    }
+
+    @Operation(summary = "Declared qualifications of the window's applicants, by check status (PENDING by default)")
+    @GetMapping("/windows/{id}/qualification-checks")
+    @PreAuthorize(READ)
+    public List<tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationCheckView> qualificationChecks(@PathVariable Long id,
+            @RequestParam(defaultValue = "PENDING") tz.co.msingi.cims.admission.domain.ApplicantQualification.CheckStatus status) {
+        return qualificationChecks.list(id, status);
+    }
+
+    @Operation(summary = "Verify a declared qualification, or record that it is not accepted (with the reason)")
+    @PostMapping("/qualifications/{id}/check")
+    @PreAuthorize(WRITE)
+    public tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationCheckView checkQualification(@PathVariable Long id,
+            @Valid @RequestBody tz.co.msingi.cims.admission.service.AdmissionDtos.QualificationCheckRequest req) {
+        return qualificationChecks.decide(id, req);
     }
 
     @GetMapping("/applications")

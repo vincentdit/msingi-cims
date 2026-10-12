@@ -61,6 +61,12 @@ public final class AdmissionRepositories {
         List<ApplicantQualification> findByApplicantIdIn(java.util.Collection<Long> applicantIds);
 
         boolean existsByApplicantIdAndTypeAndIndexNumber(Long applicantId, ApplicantQualification.Type type, String indexNumber);
+
+        /** Declared qualifications of applicants with an application in the window, in a given check state. */
+        @EntityGraph(attributePaths = {"subjects", "applicant"})
+        @Query("select q from ApplicantQualification q where q.checkStatus = :status and q.source = 'MANUAL' and exists "
+                + "(select a.id from Application a where a.applicant = q.applicant and a.window.id = :windowId) order by q.createdAt")
+        List<ApplicantQualification> findForCheck(Long windowId, ApplicantQualification.CheckStatus status);
     }
 
     public interface ApplicationRepository extends JpaRepository<Application, Long> {

@@ -15,6 +15,7 @@ import { ClearancePage } from './pages/staff/ClearancePages';
 import { GraduationPage, GraduationsPage } from './pages/staff/GraduationPages';
 import { HostelPage } from './pages/staff/HostelPages';
 import { IptPage } from './pages/staff/IptPages';
+import { QualificationChecksPage } from './pages/staff/QualificationChecks';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="windows" element={<WindowsPage />} />
         <Route path="windows/:id" element={<WindowDetailPage />} />
         <Route path="windows/:id/selection" element={<SelectionPage />} />
+        <Route path="windows/:id/qualification-checks" element={<QualificationChecksPage />} />
         <Route path="windows/:id/verification" element={<VerificationPage />} />
         <Route path="windows/:id/handover" element={<HandoverPage />} />
         <Route path="students" element={<StudentsPage />} />

@@ -19,6 +19,7 @@ import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../co
 import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
 import JoiningInstructionsCard from './JoiningInstructionsCard';
+import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './QualificationChecks';
 import { WindowFormDialog, WindowHistoryCard, WindowLifecycle, WindowStateChip, useWindowRoles } from './WindowAdmin';
 
 const staff = { realm: 'staff' as const };
@@ -182,13 +183,16 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
             <Typography variant="subtitle2" color="text.secondary">Qualifications</Typography>
             {a.qualifications.map((q) => (
               <Box key={q.id} sx={{ mt: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                  {q.type}{q.awardLevel ? ` Level ${q.awardLevel}` : ''}{q.otherLevel ? ` (${humanise(q.otherLevel)})` : ''} {q.indexNumber} {q.examYear ?? ''} {q.verified ? '✓ verified' : '(unverified — check the certificate)'}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{describe(q).head}</Typography>
+                  <Chip size="small" color={CHECK_COLOUR[q.checkStatus]} label={q.source === 'MANUAL' ? CHECK_LABEL[q.checkStatus] : `Verified by ${q.source}`} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {[describe(q).rest, q.gpa != null ? `GPA ${q.gpa}` : null, q.classAward, q.division ? `Division ${q.division}` : null].filter(Boolean).join(' · ')}
                 </Typography>
-                {(q.awardName || q.institution) && (
-                  <Typography variant="body2">{[q.awardName, q.institution, q.gpa != null ? `GPA ${q.gpa}` : null, q.classAward].filter(Boolean).join(' · ')}</Typography>
-                )}
-                <Typography variant="body2" color="text.secondary">{q.subjects.map((s) => `${s.name} ${s.grade}`).join(', ')}</Typography>
+                {q.subjects.length > 0 && <Typography variant="caption" color="text.secondary">{q.subjects.map((s) => `${s.name} ${s.grade}`).join(', ')}</Typography>}
+                {q.checkNote && <Typography variant="caption" color="error.main" sx={{ display: 'block' }}>{q.checkNote}</Typography>}
+                <Box sx={{ mt: 0.5 }}><CheckButtons q={q} onDone={() => d.refetch()} /></Box>
               </Box>
             ))}
           </Box>
@@ -343,6 +347,7 @@ export function WindowDetailPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
+          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/qualification-checks`}>Qualification checks</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/handover`}>Registration hand-over</Button>

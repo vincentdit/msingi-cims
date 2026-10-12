@@ -65,10 +65,14 @@ export function OtherQualificationsStep({ app, onNext }: { app: Application; onN
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" color={q.verified ? 'success' : 'warning'} label={q.verified ? t('app.verified') : t('app.pending')} />
+                    <Chip size="small" color={q.checkStatus === 'VERIFIED' ? 'success' : q.checkStatus === 'REJECTED' ? 'error' : 'warning'}
+                      label={q.checkStatus === 'VERIFIED' ? t('app.verified') : q.checkStatus === 'REJECTED' ? t('other.notAccepted') : t('app.pending')} />
                     <IconButton size="small" onClick={() => remove.mutate(q.id)} aria-label={t('app.remove')}><DeleteIcon fontSize="small" /></IconButton>
                   </Stack>
                 </Stack>
+                {q.checkStatus === 'REJECTED' && q.checkNote && (
+                  <Alert severity="error" sx={{ mt: 1, py: 0 }}>{t('other.notAcceptedReason', { reason: q.checkNote })}</Alert>
+                )}
                 {q.subjects.length > 0 && (
                   <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mt: 1 }}>
                     {q.subjects.map((s, i) => <Chip key={i} size="small" variant="outlined" label={`${s.name} — ${s.grade}`} />)}

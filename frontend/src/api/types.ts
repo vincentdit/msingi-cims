@@ -158,6 +158,11 @@ export interface Qualification {
   gpa?: number;
   classAward?: string;
   otherLevel?: string;
+  /** The Admissions Office's check of a declared qualification (NECTA / NACTVET results are VERIFIED at source). */
+  checkStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  checkNote?: string;
+  checkedByName?: string;
+  checkedAt?: string;
 }
 
 export interface Choice {

@@ -55,6 +55,10 @@ public final class MessageTemplates {
                 List.of("window", "deadline", "institution"), Set.of("window", "deadline"),
                 "{institution}: applications for {window} are open again until {deadline}. Complete and submit your application before then.",
                 "{institution}: maombi ya {window} yamefunguliwa tena hadi {deadline}. Kamilisha na uwasilishe maombi yako kabla ya hapo.", s);
+        add("QUALIFICATION_NOT_ACCEPTED", "Qualification not accepted", "The Admissions Office does not accept a qualification an applicant declared", "Admission",
+                List.of("award", "reason", "institution"), Set.of("award"),
+                "{institution}: your qualification {award} was not accepted: {reason}. Sign in to see the details.",
+                "{institution}: sifa yako {award} haikukubaliwa: {reason}. Ingia kuona maelezo.", s);
         add("OFFER_MADE", "Admission offer", "NACTVET verifies an applicant and the offer is made", "Admission",
                 List.of("programme", "institution", "deadline"), Set.of(),
                 "Congratulations! NACTVET has verified your admission to {programme} at {institution}. Log in to accept your offer by {deadline}.",

@@ -156,8 +156,7 @@ public class ApplicantProfileService {
         q.setPoints(r.points() == null ? null : r.points().shortValue());
         q.setCandidateName(r.candidateName());
         q.setSource(ApplicantQualification.Source.NECTA);
-        q.setVerified(true);
-        q.setVerifiedAt(OffsetDateTime.now());
+        q.verifiedAtSource();
         r.subjects().forEach(sub -> q.addSubject(sub.code(), sub.name(), sub.grade()));
         return q;
     }
@@ -197,8 +196,7 @@ public class ApplicantProfileService {
                 .filter(x -> x != null && !x.isBlank()).toList()));
         if (q.getCandidateName().isEmpty()) q.setCandidateName(null);
         q.setSource(ApplicantQualification.Source.NACTVET);
-        q.setVerified(true);
-        q.setVerifiedAt(OffsetDateTime.now());
+        q.verifiedAtSource();
         award.modules().forEach(m -> q.addSubject(m.code() == null ? "" : m.code(), m.name() == null ? "" : m.name(),
                 m.grade() == null ? "-" : m.grade(), m.credits() == null ? null : m.credits().shortValue()));
         qualifications.save(q);

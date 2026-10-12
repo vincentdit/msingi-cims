@@ -144,6 +144,15 @@ public final class AdmissionDtos {
     public record SubjectView(String code, String name, String grade) {
     }
 
+    /** The Admissions Office's decision on a declared qualification; a reason is needed when it is not accepted. */
+    public record QualificationCheckRequest(boolean verified, @Size(max = 500) String note) {
+    }
+
+    /** A declared qualification waiting for (or given) the office's check, with whose application it is on. */
+    public record QualificationCheckView(QualificationView qualification, Long applicantId, String applicantName, String phone,
+                                         Long applicationId, String referenceNo, String applicationStatus) {
+    }
+
     /** An NTA award to look up at NACTVET, e.g. NS0816/0129/2015 graduating in 2018. */
     public record NtaAwardRequest(@NotBlank @Size(max = 40) String registrationNumber, @NotNull @Min(1990) @Max(2100) Integer graduationYear) {
     }
@@ -157,7 +166,8 @@ public final class AdmissionDtos {
     public record QualificationView(Long id, String type, String indexNumber, Short examYear, Short awardLevel,
                                     String centreName, String division, Short points, String source, boolean verified,
                                     List<SubjectView> subjects, String candidateName, boolean registration, String awardName,
-                                    String institution, java.math.BigDecimal gpa, String classAward, String otherLevel) {
+                                    String institution, java.math.BigDecimal gpa, String classAward, String otherLevel,
+                                    String checkStatus, String checkNote, String checkedByName, OffsetDateTime checkedAt) {
         public static QualificationView of(ApplicantQualification q) {
             Applicant a = q.getApplicant();
             boolean registration = q.getType() == ApplicantQualification.Type.CSEE && a != null && q.getIndexNumber().equals(a.getNectaIndexNumber())
@@ -166,7 +176,8 @@ public final class AdmissionDtos {
                     q.getCentreName(), q.getDivision(), q.getPoints(), q.getSource().name(), q.isVerified(),
                     q.getSubjects().stream().map(s -> new SubjectView(s.getSubjectCode(), s.getSubjectName(), s.getGrade())).toList(),
                     q.getCandidateName(), registration, q.getAwardName(), q.getInstitution(), q.getGpa(), q.getClassAward(),
-                    q.getOtherLevel() == null ? null : q.getOtherLevel().name());
+                    q.getOtherLevel() == null ? null : q.getOtherLevel().name(), q.getCheckStatus().name(), q.getCheckNote(),
+                    q.getCheckedByName(), q.getVerifiedAt());
         }
     }
 
