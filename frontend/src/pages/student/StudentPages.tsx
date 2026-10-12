@@ -20,6 +20,8 @@ import type { ChangeRequest, Clearance, Statement, StudentDashboard, StudentNoti
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import StudentAttendanceCard from './StudentAttendanceCard';
+import StudentClearanceCard from './StudentClearanceCard';
+import StudentHostelCard from './StudentHostelCard';
 import { useInstitution } from '../../components/InstitutionContext';
 
 const student = { realm: 'student' as const };
@@ -132,6 +134,8 @@ export function StudentHome() {
         </CardActionArea>
       </Card>
 
+      <StudentClearanceCard />
+      <StudentHostelCard />
       <StudentAttendanceCard />
 
       <Card sx={{ borderRadius: 3 }}>

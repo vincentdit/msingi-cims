@@ -18,6 +18,9 @@ import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import TeachingIcon from '@mui/icons-material/CoPresent';
 import EligibleIcon from '@mui/icons-material/VerifiedUser';
+import ClearanceIcon from '@mui/icons-material/TaskAlt';
+import GraduationIcon from '@mui/icons-material/WorkspacePremium';
+import HostelIcon from '@mui/icons-material/Bed';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -29,7 +32,8 @@ import { useInstitution } from './InstitutionContext';
 const WIDTH = 248;
 const TEACHING = ['LECTURER', 'ASSESSOR'];
 const EXAMS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'MANAGEMENT_VIEWER'];
-const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?: string[]; teaching?: boolean }[] = [
+const CLEARANCE = ['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER', 'HEAD_OF_DEPARTMENT', 'CLEARANCE_OFFICER', 'HOSTEL_WARDEN'];
+const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?: string[]; teaching?: boolean; officer?: boolean; officerRoles?: string[] }[] = [
   { to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
   { to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
   { to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
@@ -43,10 +47,13 @@ const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?
   { to: '/staff/results', label: 'Results', icon: <ResultsIcon />, roles: EXAMS },
   { to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon />, roles: ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'] },
   { to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon />, roles: EXAMS },
+  { to: '/staff/clearance', label: 'Clearance', icon: <ClearanceIcon />, roles: [...CLEARANCE], officer: true },
+  { to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon />, roles: ['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'] },
+  { to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon />, roles: ['INSTITUTION_ADMIN', 'HOSTEL_WARDEN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER'], officer: true },
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
-  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon /> },
+  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon />, officerRoles: ['HOSTEL_WARDEN'] },
   { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
 ];
 
@@ -62,7 +69,9 @@ export default function StaffLayout() {
   const roles = me?.roles ?? [];
   // Lecturers and assessors only see their teaching and marks; other menu items follow the roles that use them.
   const teachingOnly = roles.length > 0 && roles.every((r) => TEACHING.includes(r));
-  const nav = NAV.filter((n) => (teachingOnly ? n.teaching : !n.roles || n.roles.some((r) => roles.includes(r))));
+  // Clearance officers and wardens only see clearance (and, for wardens, hostels).
+  const officerOnly = roles.length > 0 && roles.every((r) => ['CLEARANCE_OFFICER', 'HOSTEL_WARDEN'].includes(r));
+  const nav = NAV.filter((n) => (teachingOnly ? n.teaching : officerOnly ? (n.officer && (!n.roles || n.roles.some((r) => roles.includes(r)))) || !!n.officerRoles?.some((r) => roles.includes(r)) : !n.roles || n.roles.some((r) => roles.includes(r))));
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>

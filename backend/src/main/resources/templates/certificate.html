@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!--
+  Award certificate (FR-GRD-03), one page per certificate.
+  Placeholders: double braces insert a value HTML-escaped; triple braces insert markup that CertificateRenderer builds from escaped
+  values. Must stay well-formed XHTML (the PDF renderer parses it as XML). CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Award certificates</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1f2937; margin: 0; }
+  .page { page-break-after: always; border: 3pt double {{primaryColor}}; padding: 12mm 16mm 8mm 16mm; height: 165mm; position: relative; }
+  .page.last { page-break-after: auto; }
+  .center { text-align: center; }
+  .badge { width: 50pt; height: 50pt; margin: 0 auto; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 13pt;
+           text-align: center; line-height: 50pt; border-radius: 25pt; }
+  .inst { font-size: 19pt; font-weight: bold; color: #111827; margin-top: 6pt; letter-spacing: 0.3pt; }
+  .reg { font-size: 8.5pt; color: #6b7280; margin-top: 2pt; }
+  .certify { font-size: 11pt; color: #4b5563; margin-top: 16pt; font-style: italic; }
+  .name { font-size: 26pt; font-weight: bold; color: {{primaryColor}}; margin-top: 8pt; }
+  .regno { font-size: 9pt; color: #6b7280; margin-top: 2pt; }
+  .having { font-size: 11pt; color: #4b5563; margin-top: 12pt; font-style: italic; }
+  .award { font-size: 18pt; font-weight: bold; color: #111827; margin-top: 6pt; }
+  .programme { font-size: 12pt; color: #374151; margin-top: 3pt; }
+  .classification { font-size: 12pt; font-weight: bold; color: #111827; margin-top: 6pt; }
+  .date { font-size: 10pt; color: #4b5563; margin-top: 10pt; }
+  table.foot { width: 100%; border-collapse: collapse; margin-top: 22pt; }
+  table.foot td { vertical-align: bottom; }
+  .line { border-top: 0.7pt solid #6b7280; width: 150pt; padding-top: 3pt; font-size: 9pt; color: #374151; margin: 0 auto; text-align: center; }
+  .verify { font-size: 7.5pt; color: #4b5563; line-height: 1.35; }
+  .code { font-family: Courier, monospace; font-size: 10pt; font-weight: bold; color: #111827; }
+  .no { font-size: 8pt; color: #6b7280; }
+  .copy { font-size: 8pt; font-weight: bold; color: #b45309; }
+</style>
+</head>
+<body>
+{{{pages}}}
+</body>
+</html>

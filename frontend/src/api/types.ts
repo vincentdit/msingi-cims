@@ -200,6 +200,9 @@ export interface LetterVerification {
   classification?: string;
   creditsEarned?: number;
   lastSemester?: string;
+  /** award certificates (documentType AWARD_CERTIFICATE) */
+  graduation?: string;
+  ceremonyDate?: string;
 }
 
 export interface Offer {
@@ -1623,4 +1626,235 @@ export interface MyAttendance {
   threshold: number;
   listPublished: boolean;
   modules: MyModuleAttendance[];
+}
+
+// ---------------------------------------------------------------- clearance and graduation
+
+export type ClearanceItemStatus = 'PENDING' | 'CLEARED' | 'HELD';
+export type OfficeKind = 'DEPARTMENT' | 'FINANCE' | 'STAFF';
+
+export interface ClearanceOffice {
+  id: number;
+  code: string;
+  name: string;
+  kind: OfficeKind;
+  instructions?: string;
+  sortOrder: number;
+  active: boolean;
+  staff: { id: number; fullName: string }[];
+  pending: number;
+  held: number;
+  canDecide: boolean;
+}
+
+export interface AwardOutcome {
+  finalist: boolean;
+  qualified: boolean;
+  reason?: string;
+  awardName?: string;
+  classification?: string;
+  cgpa?: number;
+  creditsEarned?: number;
+  completedSemester?: string;
+  semestersCompleted: number;
+  semestersRequired: number;
+}
+
+export interface ClearanceItem {
+  id: number;
+  officeId: number;
+  officeCode: string;
+  officeName: string;
+  kind: OfficeKind;
+  instructions?: string;
+  status: ClearanceItemStatus;
+  note?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  canDecide: boolean;
+}
+
+export interface ClearanceDetail {
+  id: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  programmeName: string;
+  status: 'IN_PROGRESS' | 'CLEARED';
+  startedByName: string;
+  startedAt: string;
+  clearedAt?: string;
+  cleared: number;
+  total: number;
+  items: ClearanceItem[];
+}
+
+export interface ClearanceSummary {
+  id: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  status: 'IN_PROGRESS' | 'CLEARED';
+  startedAt: string;
+  clearedAt?: string;
+  cleared: number;
+  held: number;
+  total: number;
+}
+
+export interface QueueLine {
+  itemId: number;
+  clearanceId: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  departmentName?: string;
+  status: ClearanceItemStatus;
+  note?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  startedAt: string;
+  canDecide: boolean;
+}
+
+export interface Finalist {
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  award: AwardOutcome;
+  clearanceStatus?: 'IN_PROGRESS' | 'CLEARED' | null;
+  clearanceId?: number | null;
+  graduation?: string | null;
+}
+
+export interface MyClearance {
+  award: AwardOutcome;
+  clearance?: ClearanceDetail | null;
+  graduation?: { name: string; ceremonyDate?: string; status: GraduationStatus; awardName: string; classification?: string } | null;
+}
+
+export type GraduationStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED';
+
+export interface GraduationSummary {
+  id: number;
+  name: string;
+  ceremonyDate?: string;
+  status: GraduationStatus;
+  graduands: number;
+  certificates: number;
+  nactvetStatus?: string;
+  createdAt: string;
+}
+
+export interface Graduand {
+  id: number;
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  sex?: string;
+  programmeCode: string;
+  programmeName: string;
+  awardName: string;
+  classification?: string;
+  cgpa?: number;
+  creditsEarned?: number;
+  completedSemester: string;
+  certificateNo?: string;
+  verificationCode?: string;
+  certificateIssuedAt?: string;
+  printCount: number;
+  lastPrintedAt?: string;
+}
+
+export interface NotReady {
+  studentId: number;
+  registrationNo: string;
+  studentName: string;
+  programmeCode: string;
+  reason: string;
+}
+
+export interface GraduationDetail {
+  id: number;
+  name: string;
+  ceremonyDate?: string;
+  status: GraduationStatus;
+  createdByName: string;
+  generatedByName?: string;
+  generatedAt?: string;
+  submittedByName?: string;
+  submittedAt?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  boardMinuteRef?: string;
+  returnedNote?: string;
+  returnedByName?: string;
+  nactvetStatus?: 'SUBMITTED' | 'ACCEPTED' | 'QUERIED';
+  nactvetReference?: string;
+  nactvetNote?: string;
+  nactvetSubmittedAt?: string;
+  graduands: Graduand[];
+  can: { edit: boolean; generate: boolean; submit: boolean; approve: boolean; issue: boolean; nactvet: boolean };
+}
+
+export interface GraduandGenerateResult {
+  added: number;
+  removed: number;
+  total: number;
+  notReady: NotReady[];
+}
+
+// ---------------------------------------------------------------- hostels
+
+export type RoomType = 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'DORMITORY';
+
+export interface HostelFeeCategory { id: number; code: string; name: string; amount: number; active: boolean }
+
+export interface HostelSummary {
+  id: number; code: string; name: string; gender: 'FEMALE' | 'MALE' | 'MIXED'; location?: string; active: boolean;
+  rooms: number; beds: number; available: number; occupied: number; allocatedUnpaid: number; outOfService: number;
+}
+
+export interface HostelBedView {
+  id: number; label: string; status: 'AVAILABLE' | 'MAINTENANCE'; allocationId?: number; occupantRegNo?: string; occupantName?: string;
+  allocationStatus?: 'ALLOCATED' | 'CHECKED_IN';
+}
+
+export interface HostelRoomView {
+  id: number; hostelId: number; hostelName: string; block: string; floor: number; roomNo: string; roomType: RoomType; gender: 'FEMALE' | 'MALE';
+  feeCategoryId: number; feeCategory: string; fee: number; accessible: boolean; status: 'AVAILABLE' | 'MAINTENANCE' | 'CLOSED'; beds: HostelBedView[];
+}
+
+export interface HostelDetail { hostel: HostelSummary; rooms: HostelRoomView[]; canEdit: boolean }
+
+export interface HostelWindow {
+  id: number; academicYearId: number; academicYear: string; name: string; opensOn: string; closesOn: string; occupancyStarts?: string;
+  occupancyEnds?: string; paymentDays: number; firstYearsFirst: boolean; specialNeedsFirst: boolean; paidFeesFirst: boolean; open: boolean;
+  applications: number; allocated: number; waitlisted: number; checkedIn: number;
+}
+
+export interface HostelAllocationView {
+  id: number; applicationId: number; studentId: number; registrationNo: string; studentName: string; sex?: string; bedId: number; hostel: string;
+  room: string; bed: string; status: 'ALLOCATED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'RELEASED' | 'CANCELLED'; fee: number; invoiceId?: number;
+  invoiceNo?: string; invoiceStatus?: string; balance: number; controlNo?: string; payBy: string; method: 'AUTO' | 'MANUAL'; allocatedByName: string;
+  allocatedAt: string; checkedInAt?: string; checkedInByName?: string; checkInCondition?: string; checkedOutAt?: string; checkedOutByName?: string;
+  checkOutCondition?: string; damages?: string; damageCharge?: number; damageInvoiceNo?: string; releasedAt?: string; releaseReason?: string;
+}
+
+export interface HostelApplicationView {
+  id: number; windowId: number; studentId: number; registrationNo: string; studentName: string; sex?: string; programmeCode: string;
+  yearOfStudy: number; preferences: string[]; roomType?: RoomType; specialNeeds: boolean; specialNeedsNote?: string;
+  status: 'SUBMITTED' | 'ALLOCATED' | 'WAITLISTED' | 'RELEASED' | 'CANCELLED'; submittedAt: string; feesCleared: boolean; priority: number;
+  allocation?: HostelAllocationView | null;
+}
+
+export interface FreeBed { bedId: number; hostel: string; room: string; bed: string; roomType: RoomType; gender: string; accessible: boolean; fee: number }
+
+export interface MyHostel {
+  sex?: string; openWindows: HostelWindow[]; hostels: { id: number; name: string; gender: string }[];
+  application?: HostelApplicationView | null; history: HostelAllocationView[]; blocker?: string | null;
 }

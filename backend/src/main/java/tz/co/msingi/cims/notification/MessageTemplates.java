@@ -33,7 +33,10 @@ public final class MessageTemplates {
                 Map.entry("venue", "Main Hall"), Map.entry("title", "Orientation week starts on Monday"),
                 Map.entry("semester", "Semester 1 2027/2028"), Map.entry("modules", "6"), Map.entry("gpa", "3.4"),
                 Map.entry("decision", "Pass"), Map.entry("module", "ITU 05102"), Map.entry("grade", "C"),
-                Map.entry("percent", "62%"), Map.entry("threshold", "75%"));
+                Map.entry("percent", "62%"), Map.entry("threshold", "75%"),
+                Map.entry("office", "Library"), Map.entry("award", "Ordinary Diploma (NTA Level 6)"), Map.entry("graduation", "27th Graduation 2029"),
+                Map.entry("date", "23 November 2029"), Map.entry("place", "Kilimanjaro Hostel, A · Room 12, bed B"),
+                Map.entry("window", "Hostel applications 2027/2028"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -129,6 +132,30 @@ public final class MessageTemplates {
                 List.of("module", "semester", "institution"), Set.of(),
                 "You have been allowed to sit the {module} examination for {semester}.",
                 "Umeruhusiwa kufanya mtihani wa {module} wa {semester}.", s);
+        add("CLEARANCE_HELD", "Clearance held", "A clearance office holds a finalist's clearance", "Graduation",
+                List.of("office", "reason", "institution"), Set.of("reason"),
+                "Your clearance is held by {office}: {reason}. Sort it out with the office, then check the student portal.",
+                "Kibali chako kimezuiliwa na {office}: {reason}. Shughulikia na ofisi hiyo, kisha angalia tovuti ya mwanafunzi.", s);
+        add("CLEARANCE_COMPLETE", "Clearance complete", "Every office has cleared a finalist", "Graduation",
+                List.of("institution"), Set.of(),
+                "Congratulations! Every office has cleared you. You will be listed for graduation.",
+                "Hongera! Ofisi zote zimekupa kibali. Utaorodheshwa kwa ajili ya mahafali.", s);
+        add("GRADUATION_APPROVED", "Graduation approved", "The Governing Board approves the graduand list", "Graduation",
+                List.of("award", "graduation", "date", "institution"), Set.of(),
+                "Congratulations! The Governing Board has approved your {award}. You graduate at the {graduation} on {date}.",
+                "Hongera! Bodi ya Uongozi imeidhinisha tuzo yako ya {award}. Utahitimu katika {graduation} tarehe {date}.", s);
+        add("HOSTEL_ALLOCATED", "Hostel bed allocated", "A hostel bed is allocated to a student", "Hostel",
+                List.of("place", "amount", "deadline", "controlNo", "institution"), Set.of(),
+                "You have been allocated {place}. Pay {amount} with control number {controlNo} by {deadline}, or the bed will be released.",
+                "Umepangiwa {place}. Lipa {amount} kwa namba ya malipo {controlNo} kabla ya {deadline}, la sivyo nafasi itatolewa kwa mwingine.", s);
+        add("HOSTEL_WAITLISTED", "Hostel waiting list", "No suitable bed is free for a hostel applicant", "Hostel",
+                List.of("window", "institution"), Set.of(),
+                "No hostel bed is free for you yet ({window}). You are on the waiting list and will get an SMS if one becomes free.",
+                "Bado hakuna nafasi ya hosteli kwako ({window}). Uko kwenye orodha ya kusubiri na utapata SMS nafasi ikipatikana.", s);
+        add("HOSTEL_RELEASED", "Hostel bed released", "A hostel allocation is released or cancelled", "Hostel",
+                List.of("reason", "institution"), Set.of(),
+                "Your hostel bed has been released: {reason}. Contact the hostel office if you still need accommodation.",
+                "Nafasi yako ya hosteli imetolewa: {reason}. Wasiliana na ofisi ya hosteli kama bado unahitaji malazi.", s);
         add("RESULTS_WITHHELD", "Results withheld", "Results are published but withheld until fees are cleared", "Examinations",
                 List.of("semester", "reason", "institution"), Set.of(),
                 "Your results for {semester} are ready but withheld: {reason}. They will show on the student portal once fees are cleared.",

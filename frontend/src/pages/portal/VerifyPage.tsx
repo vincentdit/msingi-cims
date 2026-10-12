@@ -56,11 +56,22 @@ function Result({ v }: { v: LetterVerification }) {
     ? <CancelIcon color="error" sx={{ fontSize: 40 }} /> : <ErrorOutlineIcon color="warning" sx={{ fontSize: 40 }} />;
   const title = v.status === 'VALID' ? t('verify.valid') : v.status === 'REVOKED' ? t('verify.revoked') : t('verify.superseded');
   const statement = v.documentType === 'STATEMENT_OF_RESULTS';
-  const text = statement
+  const certificate = v.documentType === 'AWARD_CERTIFICATE';
+  const text = certificate ? t('verify.certificateValid') : statement
     ? (v.status === 'VALID' ? t('verify.statementValid') : v.status === 'REVOKED' ? t('verify.revokedText') : t('verify.statementSuperseded'))
     : v.status === 'VALID' ? t('verify.validText') : v.status === 'REVOKED' ? t('verify.revokedText')
       : t('verify.supersededText', { n: v.currentEdition ?? '' });
-  const rows: [string, string | undefined][] = statement ? [
+  const rows: [string, string | undefined][] = certificate ? [
+    [t('verify.document'), t('verify.certificate')],
+    [t('verify.holder'), v.holderName],
+    [t('verify.regNo'), v.registrationNo],
+    [t('verify.award'), v.award],
+    [t('verify.programme'), v.programme],
+    [t('verify.awardClass'), v.classification],
+    [t('verify.graduation'), v.graduation ? `${v.graduation}${v.ceremonyDate ? `, ${formatDate(v.ceremonyDate)}` : ''}` : undefined],
+    [t('verify.certificateNo'), v.letterNo],
+    [t('verify.institution'), v.institutionNactvetNo ? `${v.institution} (${v.institutionNactvetNo})` : v.institution],
+  ] : statement ? [
     [t('verify.document'), t('verify.statement')],
     [t('verify.holder'), v.holderName],
     [t('verify.regNo'), v.registrationNo],

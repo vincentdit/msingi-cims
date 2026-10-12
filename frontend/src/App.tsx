@@ -11,6 +11,9 @@ import { RegulationsPage, ResultSheetPage, ResultSheetsPage } from './pages/staf
 import { AmendmentsPage } from './pages/staff/ExamRecordsPages';
 import { AttendancePage, TeachingPage } from './pages/staff/TeachingPages';
 import { EligibilityPage, OfferingEligibilityPage } from './pages/staff/EligibilityPages';
+import { ClearancePage } from './pages/staff/ClearancePages';
+import { GraduationPage, GraduationsPage } from './pages/staff/GraduationPages';
+import { HostelPage } from './pages/staff/HostelPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -70,6 +73,10 @@ export default function App() {
         <Route path="teaching/:id" element={<AttendancePage />} />
         <Route path="eligibility" element={<EligibilityPage />} />
         <Route path="eligibility/:id" element={<OfferingEligibilityPage />} />
+        <Route path="clearance" element={<ClearancePage />} />
+        <Route path="hostels" element={<HostelPage />} />
+        <Route path="graduations" element={<GraduationsPage />} />
+        <Route path="graduations/:id" element={<GraduationPage />} />
         <Route path="results" element={<ResultSheetsPage />} />
         <Route path="results/:id" element={<ResultSheetPage />} />
         <Route path="regulations" element={<RegulationsPage />} />

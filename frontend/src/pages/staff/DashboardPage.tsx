@@ -20,10 +20,12 @@ export default function DashboardPage() {
   const roles = user('staff')?.roles ?? [];
   // Lecturers and assessors have no dashboard: their work is their modules' marks.
   const teachingOnly = roles.length > 0 && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR');
-  const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
+  const officerOnly = roles.length > 0 && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN');
+  const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly && !officerOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
   const d = q.data;
   const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
   if (teachingOnly) return <Navigate to="/staff/marks" replace />;
+  if (officerOnly) return <Navigate to={roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance'} replace />;
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={first ? `Welcome, ${first}` : 'Dashboard'} subtitle="Today at a glance. Figures update every minute; full detail is under Reports."

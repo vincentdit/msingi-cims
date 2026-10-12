@@ -51,6 +51,15 @@ public class ExamAccess {
         return CurrentUser.requireId();
     }
 
+    /** Whether the signed-in user is Head of this department (department-scoped or institution-wide). */
+    public boolean headsDepartment(Long departmentId) {
+        if (!has(Role.HEAD_OF_DEPARTMENT)) return false;
+        UserAccount u = users.findById(me()).orElse(null);
+        if (u == null) return false;
+        return u.getRoles().stream().filter(r -> r.getRole() == Role.HEAD_OF_DEPARTMENT)
+                .anyMatch(r -> !"DEPARTMENT".equals(r.getScopeType()) || Objects.equals(r.getScopeId(), departmentId));
+    }
+
     /** Whether the signed-in Head of Department moderates this module (department-scoped or institution-wide). */
     public boolean moderates(Module module) {
         if (!has(Role.HEAD_OF_DEPARTMENT)) return false;

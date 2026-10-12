@@ -27,7 +27,7 @@ import java.util.List;
 public class ReportController {
 
     private static final String STAFF = "hasAnyRole('INSTITUTION_ADMIN','MANAGEMENT_VIEWER','DEPUTY_PRINCIPAL_ACADEMIC','ADMISSIONS_OFFICER','REGISTRAR',"
-            + "'HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','BURSAR','ACCOUNTANT','AUDITOR')";
+            + "'HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','BURSAR','ACCOUNTANT','HOSTEL_WARDEN','AUDITOR')";
 
     private final ReportService reports;
     private final DashboardService dashboards;
