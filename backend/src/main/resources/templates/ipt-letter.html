@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!--
+  IPT placement letter (BP-13 step 1). Double braces insert escaped values. Well-formed XHTML, CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Placement letter {{letterNo}}</title>
+<style>
+  @page { size: A4; margin: 18mm 20mm 20mm 20mm;
+    @bottom-left { content: "{{letterNo}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; } }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1f2937; line-height: 1.45; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2.5pt solid {{primaryColor}}; }
+  .head td { vertical-align: middle; padding-bottom: 8pt; }
+  .badge { width: 44pt; height: 44pt; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 12pt; text-align: center; line-height: 44pt; border-radius: 22pt; }
+  .inst { font-size: 14pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; font-size: 8.5pt; }
+  .meta { width: 100%; margin-top: 12pt; }
+  .meta td { vertical-align: top; }
+  h1 { font-size: 11.5pt; text-transform: uppercase; margin: 16pt 0 8pt 0; letter-spacing: 0.3pt; }
+  table.who { border-collapse: collapse; margin: 8pt 0; width: 100%; }
+  table.who th { text-align: left; width: 32%; color: #4b5563; font-weight: normal; padding: 3pt 5pt; background: #f3f4f6; border: 0.6pt solid #e5e7eb; }
+  table.who td { padding: 3pt 5pt; font-weight: bold; border: 0.6pt solid #e5e7eb; }
+  ol { margin: 4pt 0 0 0; padding-left: 16pt; }
+  .sign { margin-top: 34pt; border-top: 0.6pt solid #9ca3af; width: 180pt; padding-top: 3pt; }
+</style>
+</head>
+<body>
+<table class="head"><tr>
+  <td style="width: 54pt;"><div class="badge">{{shortName}}</div></td>
+  <td><div class="inst">{{institutionName}}</div><div class="muted">Registered by NACTVET: {{nactvetNo}} · {{contactLine}}</div></td>
+</tr></table>
+
+<table class="meta"><tr>
+  <td>{{contactName}}<br />{{contactTitle}}<br /><b>{{organisation}}</b><br />{{address}}</td>
+  <td style="text-align: right;">Ref. {{letterNo}}<br />{{issuedOn}}</td>
+</tr></table>
+
+<h1>Industrial practical training placement</h1>
+<p>Dear {{salutation}},</p>
+<p>Thank you for accepting our student for industrial practical training (field attachment). This letter introduces the student and
+confirms the arrangements below.</p>
+
+<table class="who">
+  <tr><th>Student</th><td>{{studentName}}</td></tr>
+  <tr><th>Registration number</th><td>{{registrationNo}}</td></tr>
+  <tr><th>Programme</th><td>{{programme}}</td></tr>
+  <tr><th>Period</th><td>{{startsOn}} to {{endsOn}}</td></tr>
+  <tr><th>Department / unit</th><td>{{unit}}</td></tr>
+  <tr><th>Workplace supervisor</th><td>{{workplaceSupervisor}}</td></tr>
+  <tr><th>Institution supervisor</th><td>{{institutionSupervisor}}</td></tr>
+</table>
+
+<p>We kindly ask the workplace supervisor to:</p>
+<ol>
+  <li>guide the student in work related to the programme and check the weekly logbook, which the student keeps online;</li>
+  <li>receive the institution supervisor for a supervision visit during the period;</li>
+  <li>complete the workplace assessment form at the end of the attachment and return it to the institution supervisor.</li>
+</ol>
+<p>The student is expected to follow the organisation's rules, working hours and safety requirements. Please contact us on {{contactLine}}
+about any matter concerning the student.</p>
+
+<p>Yours faithfully,</p>
+<div class="sign">IPT Coordinator<br />{{institutionName}}</div>
+</body>
+</html>

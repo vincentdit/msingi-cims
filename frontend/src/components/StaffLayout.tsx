@@ -21,6 +21,7 @@ import EligibleIcon from '@mui/icons-material/VerifiedUser';
 import ClearanceIcon from '@mui/icons-material/TaskAlt';
 import GraduationIcon from '@mui/icons-material/WorkspacePremium';
 import HostelIcon from '@mui/icons-material/Bed';
+import IptIcon from '@mui/icons-material/Engineering';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -50,10 +51,11 @@ const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?
   { to: '/staff/clearance', label: 'Clearance', icon: <ClearanceIcon />, roles: [...CLEARANCE], officer: true },
   { to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon />, roles: ['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'] },
   { to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon />, roles: ['INSTITUTION_ADMIN', 'HOSTEL_WARDEN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER'], officer: true },
+  { to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon />, roles: ['INSTITUTION_ADMIN', 'IPT_COORDINATOR', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'MANAGEMENT_VIEWER', 'PROGRAMME_COORDINATOR', ...TEACHING], teaching: true, officer: true },
   { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
   { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
-  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon />, officerRoles: ['HOSTEL_WARDEN'] },
+  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon />, officerRoles: ['HOSTEL_WARDEN', 'IPT_COORDINATOR'] },
   { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
 ];
 
@@ -69,8 +71,8 @@ export default function StaffLayout() {
   const roles = me?.roles ?? [];
   // Lecturers and assessors only see their teaching and marks; other menu items follow the roles that use them.
   const teachingOnly = roles.length > 0 && roles.every((r) => TEACHING.includes(r));
-  // Clearance officers and wardens only see clearance (and, for wardens, hostels).
-  const officerOnly = roles.length > 0 && roles.every((r) => ['CLEARANCE_OFFICER', 'HOSTEL_WARDEN'].includes(r));
+  // Clearance officers, wardens and the IPT coordinator only see the office they run.
+  const officerOnly = roles.length > 0 && roles.every((r) => ['CLEARANCE_OFFICER', 'HOSTEL_WARDEN', 'IPT_COORDINATOR'].includes(r));
   const nav = NAV.filter((n) => (teachingOnly ? n.teaching : officerOnly ? (n.officer && (!n.roles || n.roles.some((r) => roles.includes(r)))) || !!n.officerRoles?.some((r) => roles.includes(r)) : !n.roles || n.roles.some((r) => roles.includes(r))));
 
   const drawer = (

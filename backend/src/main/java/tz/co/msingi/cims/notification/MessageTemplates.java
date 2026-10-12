@@ -36,7 +36,8 @@ public final class MessageTemplates {
                 Map.entry("percent", "62%"), Map.entry("threshold", "75%"),
                 Map.entry("office", "Library"), Map.entry("award", "Ordinary Diploma (NTA Level 6)"), Map.entry("graduation", "27th Graduation 2029"),
                 Map.entry("date", "23 November 2029"), Map.entry("place", "Kilimanjaro Hostel, A · Room 12, bed B"),
-                Map.entry("window", "Hostel applications 2027/2028"));
+                Map.entry("window", "Hostel applications 2027/2028"), Map.entry("organisation", "Tanzania Ports Authority"),
+                Map.entry("start", "6 July 2028"), Map.entry("week", "3"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -156,6 +157,18 @@ public final class MessageTemplates {
                 List.of("reason", "institution"), Set.of(),
                 "Your hostel bed has been released: {reason}. Contact the hostel office if you still need accommodation.",
                 "Nafasi yako ya hosteli imetolewa: {reason}. Wasiliana na ofisi ya hosteli kama bado unahitaji malazi.", s);
+        add("IPT_PLACEMENT_CONFIRMED", "IPT placement confirmed", "The IPT Coordinator confirms a student's field placement", "IPT",
+                List.of("organisation", "start", "institution"), Set.of(),
+                "Your industrial practical training at {organisation} is confirmed from {start}. Download your placement letter on the student portal.",
+                "Mafunzo yako kwa vitendo katika {organisation} yamethibitishwa kuanzia {start}. Pakua barua yako ya utambulisho kwenye tovuti ya mwanafunzi.", s);
+        add("IPT_PLACEMENT_DECLINED", "IPT placement request declined", "The IPT Coordinator declines a student's placement request", "IPT",
+                List.of("organisation", "reason", "institution"), Set.of("reason"),
+                "Your IPT placement request for {organisation} was not approved: {reason}. Please see the IPT Coordinator.",
+                "Ombi lako la mafunzo kwa vitendo katika {organisation} halikukubaliwa: {reason}. Tafadhali onana na Mratibu wa Mafunzo kwa Vitendo.", s);
+        add("IPT_LOGBOOK_RETURNED", "IPT logbook week returned", "A supervisor returns a logbook week for correction", "IPT",
+                List.of("week", "reason", "institution"), Set.of("reason"),
+                "Your IPT logbook for week {week} was returned: {reason}. Correct it on the student portal and submit it again.",
+                "Daftari lako la mafunzo kwa vitendo la wiki {week} limerudishwa: {reason}. Rekebisha kwenye tovuti ya mwanafunzi na uwasilishe tena.", s);
         add("RESULTS_WITHHELD", "Results withheld", "Results are published but withheld until fees are cleared", "Examinations",
                 List.of("semester", "reason", "institution"), Set.of(),
                 "Your results for {semester} are ready but withheld: {reason}. They will show on the student portal once fees are cleared.",

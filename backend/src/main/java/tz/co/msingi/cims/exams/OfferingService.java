@@ -310,6 +310,45 @@ public class OfferingService {
         return view(o);
     }
 
+    /**
+     * Marks produced outside the marks sheet (e.g. industrial practical training, FR-IPT-03), out of 100 per student: every
+     * assessment item gets the same share of its maximum, so the module total equals the mark. The caller checks who may do this;
+     * results already submitted cannot change. Returns the number of students given marks.
+     */
+    @Transactional
+    public int transferMarks(Long offeringId, Map<Long, BigDecimal> marks, String source) {
+        ModuleOffering o = require(offeringId);
+        if (o.getStatus() != ModuleOffering.Status.DRAFT) {
+            throw new BusinessRuleException("RESULTS_SUBMITTED", "The results of " + o.getModule().getCode() + " have been submitted and can change only if returned");
+        }
+        Set<Long> regs = registrations.students(o.getSemester().getId(), o.getModule().getId(), APPROVED).stream().map(ModuleRegistration::getId)
+                .collect(Collectors.toSet());
+        Map<String, AssessmentScore> current = scores.findByOffering(o.getId()).stream()
+                .collect(Collectors.toMap(sc -> key(sc.getComponent().getId(), sc.getModuleRegistrationId()), Function.identity()));
+        Set<Long> touched = new HashSet<>();
+        for (Map.Entry<Long, BigDecimal> e : marks.entrySet()) {
+            if (!regs.contains(e.getKey())) continue;
+            for (AssessmentComponent c : o.getComponents()) {
+                AssessmentScore sc = current.get(key(c.getId(), e.getKey()));
+                if (sc == null) {
+                    sc = new AssessmentScore();
+                    sc.setComponent(c);
+                    sc.setModuleRegistrationId(e.getKey());
+                }
+                sc.setScore(e.getValue().multiply(c.getMaxScore()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+                sc.setAbsent(false);
+                sc.setEnteredByName(CurrentUser.name() + " (" + source + ")");
+                sc.setEnteredAt(OffsetDateTime.now());
+                scores.save(sc);
+            }
+            touched.add(e.getKey());
+        }
+        scores.flush();
+        recompute(o, touched);
+        audit.record("MARKS_TRANSFERRED", "ModuleOffering", o.getId(), Map.of("module", o.getModule().getCode(), "students", touched.size(), "source", source));
+        return touched.size();
+    }
+
     /** An Excel sheet with the class list and one column per assessment item; a hidden sheet identifies the module and items. */
     @Transactional(readOnly = true)
     public byte[] template(Long id) {

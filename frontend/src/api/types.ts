@@ -1858,3 +1858,50 @@ export interface MyHostel {
   sex?: string; openWindows: HostelWindow[]; hostels: { id: number; name: string; gender: string }[];
   application?: HostelApplicationView | null; history: HostelAllocationView[]; blocker?: string | null;
 }
+
+// ---------------------------------------------------------------- industrial practical training
+
+export interface IptOrganisation {
+  id: number; name: string; sector?: string; region?: string; district?: string; address?: string; contactName?: string; contactTitle?: string;
+  contactPhone?: string; contactEmail?: string; capacity?: number | null; active: boolean; proposedByStudent: boolean; placements: number;
+}
+
+export interface IptPeriod {
+  id: number; name: string; semesterId: number; semester: string; moduleId?: number | null; moduleCode?: string | null; moduleTitle?: string | null;
+  startsOn: string; endsOn: string; requestsClose?: string | null; workplaceWeight: number; institutionWeight: number; logbookWeight: number;
+  minLogbookWeeks: number; eligible: number; requested: number; confirmed: number; completed: number; resultsTransferredAt?: string | null;
+  resultsTransferredBy?: string | null; requestsOpen: boolean;
+}
+
+export interface IptEligibleStudent {
+  studentId: number; registrationNo: string; name: string; programmeCode: string; yearOfStudy: number; phone?: string;
+  placementId?: number | null; placementStatus?: string | null;
+}
+
+export type IptStatus = 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'DECLINED';
+
+export interface IptPlacementSummary {
+  id: number; periodId: number; studentId: number; registrationNo: string; studentName: string; programmeCode: string; organisationId: number;
+  organisation: string; region?: string; status: IptStatus; startsOn: string; endsOn: string; workplaceSupervisorName?: string;
+  institutionSupervisorId?: number | null; institutionSupervisorName?: string | null; logbookWeeks: number; logbookApproved: number;
+  logbookPending: number; scores: number; totalMark?: number | null; transferredAt?: string | null; letterNo?: string | null;
+}
+
+export interface IptLogbookEntry {
+  id: number; weekNo: number; weekStarting: string; activities: string; skills?: string; challenges?: string; hours?: number;
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'RETURNED'; submittedAt?: string; reviewerComment?: string; reviewedByName?: string; reviewedAt?: string;
+}
+
+export interface IptPlacementView {
+  summary: IptPlacementSummary; unit?: string; workplaceSupervisorTitle?: string; workplaceSupervisorPhone?: string; workplaceSupervisorEmail?: string;
+  studentNote?: string; decisionNote?: string; requestedAt: string; confirmedByName?: string; confirmedAt?: string; letterIssuedAt?: string;
+  organisationContact?: string; organisationPhone?: string; organisationAddress?: string; logbook: IptLogbookEntry[];
+  visits: { id: number; visitedOn: string; mode: 'VISIT' | 'PHONE' | 'ONLINE'; notes: string; recordedByName: string; recordedAt: string }[];
+  assessments: { kind: 'WORKPLACE' | 'INSTITUTION' | 'LOGBOOK'; score: number; comments?: string; assessedByName: string; assessedAt: string }[];
+  workplaceWeight: number; institutionWeight: number; logbookWeight: number;
+  can: { manage: boolean; supervise: boolean; writeLogbook: boolean };
+}
+
+export interface MyIpt {
+  periods: IptPeriod[]; organisations: { id: number; name: string; region?: string }[]; placement?: IptPlacementView | null; history: IptPlacementSummary[];
+}

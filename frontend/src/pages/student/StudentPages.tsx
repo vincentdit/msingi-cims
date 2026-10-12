@@ -22,6 +22,7 @@ import { ErrorAlert, Loading, humanise, statusColour } from '../../components/co
 import StudentAttendanceCard from './StudentAttendanceCard';
 import StudentClearanceCard from './StudentClearanceCard';
 import StudentHostelCard from './StudentHostelCard';
+import StudentIptCard from './StudentIptCard';
 import { useInstitution } from '../../components/InstitutionContext';
 
 const student = { realm: 'student' as const };
@@ -136,6 +137,7 @@ export function StudentHome() {
 
       <StudentClearanceCard />
       <StudentHostelCard />
+      <StudentIptCard />
       <StudentAttendanceCard />
 
       <Card sx={{ borderRadius: 3 }}>

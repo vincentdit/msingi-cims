@@ -41,7 +41,7 @@ import java.util.Map;
 
 /**
  * Creates a demo institution ("DEMO") for local development when cims.demo.seed=true.
- * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026. Safe to run repeatedly.
+ * Staff sign-in: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026. Safe to run repeatedly.
  */
 @Slf4j
 @Component
@@ -65,7 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {
@@ -114,6 +114,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         if (users.findByUsernameIgnoreCase("library").isEmpty()) {
             staff("library", "Ms. Rehema Librarian", "Library@2026", Role.CLEARANCE_OFFICER);
             staff("warden", "Mr. Hassan Warden", "Warden@2026", Role.HOSTEL_WARDEN);
+        }
+        if (users.findByUsernameIgnoreCase("ipt").isEmpty()) {
+            staff("ipt", "Ms. Zawadi IPT Coordinator", "Ipt@2026", Role.IPT_COORDINATOR);
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();

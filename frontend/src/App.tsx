@@ -14,6 +14,7 @@ import { EligibilityPage, OfferingEligibilityPage } from './pages/staff/Eligibil
 import { ClearancePage } from './pages/staff/ClearancePages';
 import { GraduationPage, GraduationsPage } from './pages/staff/GraduationPages';
 import { HostelPage } from './pages/staff/HostelPages';
+import { IptPage } from './pages/staff/IptPages';
 import NoticesPage from './pages/staff/NoticesPage';
 import MessagingPage from './pages/staff/MessagingPage';
 import DashboardPage from './pages/staff/DashboardPage';
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="eligibility/:id" element={<OfferingEligibilityPage />} />
         <Route path="clearance" element={<ClearancePage />} />
         <Route path="hostels" element={<HostelPage />} />
+        <Route path="ipt" element={<IptPage />} />
         <Route path="graduations" element={<GraduationsPage />} />
         <Route path="graduations/:id" element={<GraduationPage />} />
         <Route path="results" element={<ResultSheetsPage />} />
