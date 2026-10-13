@@ -97,6 +97,18 @@ public class InstitutionController {
         return service.resetAdministratorPassword(id, userId);
     }
 
+    @Operation(summary = "Link the institution to its NACTVET catalogue entry and import its programmes")
+    @PostMapping("/institutions/{id}/nactvet")
+    public InstitutionDtos.NactvetImport importFromNactvet(@PathVariable Long id,
+                                                         @RequestBody tz.co.msingi.cims.console.nactvet.CatalogueDtos.LinkRequest req) {
+        return service.importFromNactvet(id, req.nactvetInstitutionId(), req.programmeIds());
+    }
+
+    @DeleteMapping("/institutions/{id}/nactvet")
+    public InstitutionDetail unlinkNactvet(@PathVariable Long id) {
+        return service.unlinkNactvet(id);
+    }
+
     @PostMapping("/institutions/{id}/sms-credit")
     public InstitutionDetail creditSms(@PathVariable Long id, @Valid @RequestBody SmsCreditRequest req) {
         return service.creditSms(id, req);

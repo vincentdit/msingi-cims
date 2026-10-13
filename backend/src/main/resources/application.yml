@@ -97,6 +97,12 @@ cims:
       authorization: ${NACTE_AUTHORIZATION:}
       api-code: ${NACTE_API_CODE:}
       prefer-ip: ${NACTE_PREFER_IP:}
+    catalogue:
+      # Registered institutions and their programmes (NACTVET api-out-service/institutionprogrammeall, as in NOAS), for the
+      # platform console. Live by default whenever the awards service is live, with the same NACTE credentials.
+      mode: ${CIMS_NACTVET_CATALOGUE_MODE:${cims.nactvet.awards.mode}}
+      catalogue-path: /nacteapi/index.php/api-out-service/institutionprogrammeall
+      page-size: ${CIMS_NACTVET_CATALOGUE_PAGE_SIZE:200}
   documents:
     # Link printed in the QR code of admission letters; {host} is the institution's primary domain
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}

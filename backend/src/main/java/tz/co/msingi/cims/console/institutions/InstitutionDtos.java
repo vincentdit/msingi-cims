@@ -43,7 +43,9 @@ public final class InstitutionDtos {
                                  @Pattern(regexp = COLOUR_RULE, message = "A colour like #1F4E8C") String primaryColor,
                                  @NotEmpty @Size(max = 10) List<@NotBlank @Size(max = 190) String> domains,
                                  @NotNull @Valid AdminRequest admin,
-                                 @Size(max = 1000) String notes) {
+                                 @Size(max = 1000) String notes,
+                                 Long nactvetInstitutionId,
+                                 @Size(max = 500) List<Long> importProgrammeIds) {
     }
 
     public record UpdateRequest(@NotBlank @Size(max = 200) String name,
@@ -91,7 +93,15 @@ public final class InstitutionDtos {
                                     String contactEmail, String contactPhone, String primaryColor, String notes, String onboardedBy,
                                     OffsetDateTime createdAt, String staffSignInUrl, List<DomainView> domains, List<AdminView> administrators,
                                     Usage usage, List<SetupStep> setup, List<SystemHealth> health,
-                                    List<PlatformAuditService.Entry> recentActions) {
+                                    List<PlatformAuditService.Entry> recentActions, NactvetLink nactvet) {
+    }
+
+    /** The NACTVET catalogue entry the institution was onboarded from (or linked to), and its programmes not yet in CIMS. */
+    public record NactvetLink(Long id, String name, String registrationNumber, String region, String district, String ownership,
+                              boolean active, OffsetDateTime lastSeenAt, long programmesOnNactvet, long notImported) {
+    }
+
+    public record NactvetImport(InstitutionDetail institution, tz.co.msingi.cims.console.nactvet.CatalogueDtos.ImportResult result) {
     }
 
     /** A new institution, or a password issued to one of its administrators: the temporary password is shown once. */

@@ -1,4 +1,5 @@
 import ApartmentIcon from '@mui/icons-material/Apartment';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import DashboardIcon from '@mui/icons-material/SpaceDashboard';
 import HistoryIcon from '@mui/icons-material/History';
 import KeyIcon from '@mui/icons-material/Key';
@@ -20,6 +21,7 @@ const BG = '#0B2B2A';
 const NAV = [
   { to: '/platform', label: 'Overview', icon: <DashboardIcon />, end: true },
   { to: '/platform/institutions', label: 'Institutions', icon: <ApartmentIcon /> },
+  { to: '/platform/nactvet', label: 'NACTVET catalogue', icon: <AccountBalanceIcon /> },
   { to: '/platform/integrations', label: 'Integration health', icon: <MonitorHeartIcon /> },
   { to: '/platform/users', label: 'Platform users', icon: <PeopleIcon /> },
   { to: '/platform/audit', label: 'Audit trail', icon: <HistoryIcon /> },

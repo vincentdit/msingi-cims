@@ -271,6 +271,24 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
     - Its data is kept, scheduled jobs pause and GePG payments are still recorded.
     - **Reactivate** opens it again.
     - Other servers notice within 5 minutes.
+- **NACTVET catalogue** (as NOAS reads it):
+  - **Source:** every institution NACTVET has registered, with its accredited programmes, from NACTVET's `api-out-service/institutionprogrammeall` service. Each programme comes with its NTA level, duration, capacity (male, female and total), fee, entry requirements, selection criteria, specific CSEE/ACSEE subjects and NTA routes.
+  - **Sync from NACTVET:**
+    - Reads every page in the background, one sync at a time.
+    - Updates what changed and marks what NACTVET no longer lists, without deleting it.
+    - Each sync is recorded with its counts, and appears in the integration log and the platform audit trail.
+    - The sync is live whenever the NACTVET awards service is live, with the same NACTE credentials. Otherwise it uses a sample marked as simulated.
+  - **Browse:** search by name, code or registration number; filter by region, ownership and whether the institution is on CIMS. Each institution opens to its programmes.
+  - **Onboard from the catalogue:**
+    - The form is filled in from NACTVET: code, name, short name, registration number, ownership (government is public), phone, and region in the notes.
+    - Msingi chooses which programmes to bring in.
+    - Each programme is created with its award, duration (years × 2 semesters), entry level (holders of NTA 4 or 5 enter at the next level), capacity and NACTVET code.
+    - Its fee and entry requirements go in the programme's description.
+    - Each NACTVET board becomes a starting department, which the institution can rename or split.
+    - One catalogue entry can become only one institution.
+  - **On the institution page:**
+    - **Link:** an institution onboarded by hand can be linked to its catalogue entry, or unlinked.
+    - **Import:** programmes NACTVET lists that are not yet on CIMS can be imported at any time. Importing again adds only what is new.
 - **Integration health:**
   - **Coverage:** calls from every institution to NECTA, NACTVET, NACTVET awards, GePG and the SMS gateway, live or simulated.
   - **States:** working, some failures, failing or no calls.

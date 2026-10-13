@@ -36,6 +36,7 @@ import PlatformLayout from './pages/platform/PlatformLayout';
 import { PlatformLoginPage, PlatformPasswordPage } from './pages/platform/PlatformAuth';
 import { InstitutionDetailPage, InstitutionsPage, OnboardPage } from './pages/platform/InstitutionPages';
 import { IntegrationsPage, OverviewPage, PlatformAuditPage, PlatformUsersPage } from './pages/platform/PlatformPages';
+import { CataloguePage } from './pages/platform/CataloguePages';
 import FinancePage from './pages/staff/FinancePages';
 import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages/portal/AuthPages';
 import HomePage from './pages/portal/HomePage';
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="institutions" element={<InstitutionsPage />} />
         <Route path="institutions/new" element={<OnboardPage />} />
         <Route path="institutions/:id" element={<InstitutionDetailPage />} />
+        <Route path="nactvet" element={<CataloguePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="users" element={<PlatformUsersPage />} />
         <Route path="audit" element={<PlatformAuditPage />} />

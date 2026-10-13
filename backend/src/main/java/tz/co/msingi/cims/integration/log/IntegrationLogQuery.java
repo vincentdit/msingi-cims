@@ -27,7 +27,8 @@ public class IntegrationLogQuery {
 
     public static final Map<ExternalSystem, String> LABELS = Map.of(
             ExternalSystem.NECTA, "NECTA results", ExternalSystem.NACTVET, "NACTVET admission verification",
-            ExternalSystem.NACTVET_AWARDS, "NACTVET award verification", ExternalSystem.GEPG, "GePG payments",
+            ExternalSystem.NACTVET_AWARDS, "NACTVET award verification", ExternalSystem.NACTVET_CATALOGUE, "NACTVET institution catalogue",
+            ExternalSystem.GEPG, "GePG payments",
             ExternalSystem.SMS, "SMS gateway");
 
     private final JdbcTemplate jdbc;
@@ -165,6 +166,7 @@ public class IntegrationLogQuery {
             case NECTA -> NectaClient.class;
             case NACTVET -> NactvetGateway.class;
             case NACTVET_AWARDS -> NactvetAwardClient.class;
+            case NACTVET_CATALOGUE -> tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class;
             case GEPG -> null;
             case SMS -> SmsGateway.class;
         };

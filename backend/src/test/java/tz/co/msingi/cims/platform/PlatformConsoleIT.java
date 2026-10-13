@@ -191,7 +191,7 @@ class PlatformConsoleIT {
         assertThat(audit.findValuesAsText("action")).contains("INSTITUTION_ONBOARDED", "INSTITUTION_SUSPENDED", "INSTITUTION_REACTIVATED",
                 "INSTITUTION_ADMIN_PASSWORD_RESET", "DOMAIN_ADDED", "DOMAIN_REMOVED", "SMS_BUNDLE_CREDITED", "INSTITUTION_UPDATED");
         assertThat(audit.at("/content/0/actorName").asText()).isEqualTo("Platform ops" + suffix);
-        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(5));
+        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(6));
     }
 
     @Test

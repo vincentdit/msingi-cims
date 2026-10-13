@@ -39,6 +39,8 @@ export interface InstitutionDetail {
   domains: { id: number; host: string; purpose: string; createdAt: string }[];
   administrators: { id: number; username: string; fullName: string; email?: string; phone?: string; status: string; mustChangePassword: boolean; lastLoginAt?: string }[];
   usage: Usage; setup: { key: string; label: string; done: boolean; hint: string }[]; health: SystemHealth[]; recentActions: AuditEntry[];
+  nactvet?: { id: number; name: string; registrationNumber?: string; region?: string; district?: string; ownership?: string; active: boolean;
+    lastSeenAt: string; programmesOnNactvet: number; notImported: number };
 }
 
 export interface IssuedAdmin { institution: InstitutionDetail; username: string; temporaryPassword: string; signInUrl?: string }
@@ -90,6 +92,8 @@ export const ACTION_LABEL: Record<string, string> = {
   INSTITUTION_ADMIN_PASSWORD_RESET: 'Reset administrator password', DOMAIN_ADDED: 'Added address', DOMAIN_REMOVED: 'Removed address',
   SMS_BUNDLE_CREDITED: 'Credited SMS bundle', PLATFORM_USER_CREATED: 'Added platform user', PLATFORM_USER_PASSWORD_RESET: 'Reset platform user password',
   PLATFORM_USER_DISABLED: 'Disabled platform user', PLATFORM_USER_ENABLED: 'Enabled platform user',
+  NACTVET_CATALOGUE_SYNCED: 'Synced NACTVET catalogue', NACTVET_CATALOGUE_SYNC_FAILED: 'NACTVET catalogue sync failed',
+  NACTVET_LINKED: 'Linked to NACTVET entry', NACTVET_UNLINKED: 'Unlinked from NACTVET entry', PROGRAMMES_IMPORTED: 'Imported programmes from NACTVET',
 };
 
 export const actionLabel = (a: string) => ACTION_LABEL[a] ?? a.charAt(0) + a.slice(1).toLowerCase().replace(/_/g, ' ');
@@ -126,3 +130,39 @@ export function IssuedPasswordDialog({ open, title, username, password, note, on
     </Dialog>
   );
 }
+
+// ============================================================ NACTVET catalogue
+
+export interface SyncRun {
+  id: number; startedAt: string; finishedAt?: string; status: 'RUNNING' | 'DONE' | 'FAILED'; mode: 'LIVE' | 'SIMULATED';
+  offerings?: number; institutions?: number; programmes?: number; newInstitutions?: number; newProgrammes?: number; withdrawn?: number;
+  error?: string; startedBy: string;
+}
+
+export interface CatalogueStatus {
+  mode: 'LIVE' | 'SIMULATED'; institutions: number; programmes: number; onboarded: number; lastSyncedAt?: string; latest?: SyncRun;
+  regions: string[]; ownerships: string[];
+}
+
+export interface CatalogueInstitution {
+  id: number; nactvetId?: string; code?: string; name: string; registrationNumber?: string; region?: string; district?: string;
+  ownership?: string; mobileNumber?: string; active: boolean; programmes: number; minLevel?: number; maxLevel?: number;
+  tenantId?: number; tenantCode?: string; lastSeenAt: string;
+}
+
+export interface CatalogueProgramme {
+  id: number; nactvetProgrammeId?: string; courseCode?: string; name: string; ntaLevel?: number; board?: string; category?: string;
+  fee?: string; entryRequirement?: string; selectionCriteria?: string; nectaRequirement?: string; ntaRequirement?: string;
+  ntaEntryMinGpa?: number; ntaEntryHolderLevel?: number; durationYears?: number; maleCapacity?: number; femaleCapacity?: number;
+  totalCapacity?: number; active: boolean; imported: boolean;
+}
+
+export interface CatalogueDetail {
+  institution: CatalogueInstitution;
+  suggestion: { code: string; name: string; shortName?: string; nactvetRegNo?: string; ownership: 'PUBLIC' | 'PRIVATE'; contactPhone?: string };
+  programmes: CatalogueProgramme[];
+}
+
+export interface ImportResult { created: number; skipped: number; departmentsCreated: string[]; programmes: string[] }
+
+export const levels = (min?: number, max?: number) => (min == null ? '—' : min === max ? `NTA ${min}` : `NTA ${min}–${max}`);

@@ -37,6 +37,8 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (NectaClient.class.isAssignableFrom(type)) return wrap(bean, NectaClient.class, ExternalSystem.NECTA);
         if (NactvetGateway.class.isAssignableFrom(type)) return wrap(bean, NactvetGateway.class, ExternalSystem.NACTVET);
         if (NactvetAwardClient.class.isAssignableFrom(type)) return wrap(bean, NactvetAwardClient.class, ExternalSystem.NACTVET_AWARDS);
+        if (tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class, ExternalSystem.NACTVET_CATALOGUE);
         if (GepgGateway.class.isAssignableFrom(type)) return wrap(bean, GepgGateway.class, ExternalSystem.GEPG);
         if (SmsGateway.class.isAssignableFrom(type)) return wrap(bean, SmsGateway.class, ExternalSystem.SMS);
         return bean;
@@ -88,6 +90,7 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
             return switch (system) {
                 case NECTA -> args.length >= 3 ? args[0] + " " + args[1] + " " + args[2] : null;
                 case NACTVET_AWARDS -> args.length >= 2 ? args[0] + " " + args[1] : null;
+                case NACTVET_CATALOGUE -> "institutions and programmes";
                 case NACTVET -> switch (op) {
                     case "submit" -> args.length >= 2 && args[1] instanceof Collection<?> c ? c.size() + " candidates" : null;
                     case "fetchOutcomes" -> args.length >= 1 ? "batch " + args[0] : null;

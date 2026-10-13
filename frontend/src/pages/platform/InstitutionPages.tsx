@@ -12,13 +12,14 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ProgrammeTable } from './CataloguePages';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import {
   HealthChip, IssuedPasswordDialog, MODE_LABEL, StatusChip, actionLabel, detailsText, n, platform,
-  type InstitutionDetail, type InstitutionRow, type IssuedAdmin,
+  type CatalogueDetail, type CatalogueInstitution, type ImportResult, type InstitutionDetail, type InstitutionRow, type IssuedAdmin, type PageOf,
 } from './shared';
 
 // ============================================================ list
@@ -102,8 +103,25 @@ const EMPTY = {
 export function OnboardPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const nactvetId = params.get('nactvet');
   const [f, setF] = useState(EMPTY);
   const [issued, setIssued] = useState<IssuedAdmin | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const source = useQuery({ queryKey: ['platform', 'nactvet', 'institution', nactvetId], enabled: !!nactvetId,
+    queryFn: () => api<CatalogueDetail>(`/api/platform/nactvet/institutions/${nactvetId}`, platform) });
+  useEffect(() => {
+    const d = source.data;
+    if (!d) return;
+    const sg = d.suggestion;
+    setF((x) => ({ ...x, code: sg.code, name: sg.name, shortName: sg.shortName ?? '', nactvetRegNo: sg.nactvetRegNo ?? '', ownership: sg.ownership,
+      contactPhone: sg.contactPhone ?? '',
+      notes: x.notes || [d.institution.region && `Region: ${[d.institution.district, d.institution.region].filter(Boolean).join(', ')}`,
+        d.institution.ownership && `NACTVET ownership: ${d.institution.ownership}`].filter(Boolean).join('. ') }));
+    setSelected(new Set(d.programmes.filter((p) => p.active && !p.imported).map((p) => p.id)));
+  }, [source.data]);
+  const toggle = (id: number) => setSelected((x) => { const y = new Set(x); if (y.has(id)) y.delete(id); else y.add(id); return y; });
+  const toggleAll = (ids: number[], on: boolean) => setSelected(on ? new Set(ids) : new Set());
   const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const domains = f.domains.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean);
   const m = useMutation({
@@ -111,6 +129,7 @@ export function OnboardPage() {
       ...platform, method: 'POST', body: {
         code: f.code.trim(), name: f.name, shortName: f.shortName || null, nactvetRegNo: f.nactvetRegNo || null, ownership: f.ownership,
         contactEmail: f.contactEmail || null, contactPhone: f.contactPhone || null, primaryColor: f.primaryColor || null, domains, notes: f.notes || null,
+        nactvetInstitutionId: nactvetId ? Number(nactvetId) : null, importProgrammeIds: nactvetId ? [...selected] : null,
         admin: { username: f.adminUsername.trim(), fullName: f.adminName, email: f.adminEmail || null, phone: f.adminPhone || null },
       },
     }),
@@ -122,6 +141,20 @@ export function OnboardPage() {
     <>
       <Button component={RouterLink} to="/platform/institutions" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Institutions</Button>
       <PageTitle title="Onboard an institution" subtitle="Creates the institution, the web address(es) its portals answer on, and its first administrator. The administrator then sets up the rest." />
+      {!nactvetId && (
+        <Alert severity="info" sx={{ mb: 2.5 }} action={<Button color="inherit" component={RouterLink} to="/platform/nactvet">NACTVET catalogue</Button>}>
+          Registered with NACTVET? Start from the NACTVET catalogue: its details and programmes are filled in for you.
+        </Alert>
+      )}
+      {nactvetId && source.isLoading && <Loading />}
+      <ErrorAlert error={source.error} />
+      {source.data && (
+        <Alert severity="success" sx={{ mb: 2.5 }}>
+          From the NACTVET catalogue: <strong>{source.data.institution.name}</strong> ({source.data.institution.registrationNumber ?? 'no registration number'}).
+          Check the details, add its web address and first administrator, and choose the programmes to bring in.
+          {source.data.institution.tenantId && <> It is already on CIMS as <strong>{source.data.institution.tenantCode}</strong>.</>}
+        </Alert>
+      )}
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 7 }}>
           <Card sx={{ mb: 2.5 }}>
@@ -177,6 +210,21 @@ export function OnboardPage() {
           <Button variant="contained" size="large" fullWidth disabled={!ready || m.isPending} onClick={() => m.mutate()}>Onboard institution</Button>
         </Grid>
       </Grid>
+      {source.data && (
+        <Card sx={{ mt: 2.5 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
+              <Typography variant="h6">Programmes from NACTVET</Typography>
+              <Typography color="text.secondary">{selected.size} of {source.data.programmes.filter((p) => p.active).length} chosen</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              The chosen programmes are created with their NTA level, duration, capacity and NACTVET code; each NACTVET board becomes a starting department.
+              Fees and entry requirements are kept in each programme's description. More can be imported later from the institution's page.
+            </Typography>
+            <ProgrammeTable programmes={source.data.programmes} selected={selected} onToggle={toggle} onToggleAll={toggleAll} />
+          </CardContent>
+        </Card>
+      )}
       {issued && (
         <IssuedPasswordDialog open title={`${issued.institution.name} is on CIMS`} username={issued.username} password={issued.temporaryPassword}
           note={issued.signInUrl && <Typography variant="body2">They sign in at <strong>{issued.signInUrl}</strong>.</Typography>}
@@ -321,6 +369,7 @@ export function InstitutionDetailPage() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
+          <NactvetCard d={d} onDone={done} />
           <Card sx={{ mb: 2.5 }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
@@ -554,6 +603,118 @@ function AdminDialog({ id, onClose, onDone }: { id: number; onClose: () => void;
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" disabled={f.username.trim().length < 3 || !f.fullName.trim() || m.isPending} onClick={() => m.mutate()}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ============================================================ NACTVET link on the institution page
+
+/** The institution's entry in the NACTVET catalogue: link it, and import programmes NACTVET lists that are not yet on CIMS. */
+function NactvetCard({ d, onDone }: { d: InstitutionDetail; onDone: (d: InstitutionDetail) => void }) {
+  const [linking, setLinking] = useState(false);
+  const [importing, setImporting] = useState<number | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const qc = useQueryClient();
+  const unlink = useMutation({ mutationFn: () => api<InstitutionDetail>(`/api/platform/institutions/${d.id}/nactvet`, { ...platform, method: 'DELETE' }), onSuccess: onDone });
+  const x = d.nactvet;
+  return (
+    <Card sx={{ mb: 2.5 }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1 }}>NACTVET</Typography>
+        {x ? (
+          <>
+            <Typography fontWeight={600}>{x.name}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {[x.registrationNumber, x.ownership, [x.district, x.region].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+            </Typography>
+            {!x.active && <Alert severity="warning" sx={{ mt: 1 }}>NACTVET no longer lists this institution (last seen {formatDate(x.lastSeenAt)}).</Alert>}
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {n(x.programmesOnNactvet)} programmes on NACTVET · {x.notImported ? <strong>{n(x.notImported)} not yet on CIMS</strong> : 'all on CIMS'}
+            </Typography>
+            {result && <Alert severity="success" sx={{ mt: 1 }} onClose={() => setResult(null)}>
+              {result.created} programme{result.created === 1 ? '' : 's'} imported{result.departmentsCreated.length ? `; new department${result.departmentsCreated.length === 1 ? '' : 's'}: ${result.departmentsCreated.join(', ')}` : ''}.
+            </Alert>}
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+              <Button size="small" variant="contained" disabled={!x.notImported} onClick={() => setImporting(x.id)}>Import programmes</Button>
+              <Button size="small" component={RouterLink} to={`/platform/nactvet`}>Catalogue</Button>
+              <Button size="small" color="inherit" disabled={unlink.isPending} onClick={() => unlink.mutate()}>Unlink</Button>
+            </Stack>
+          </>
+        ) : (
+          <>
+            <Typography variant="body2" color="text.secondary">Not linked to an entry in the NACTVET catalogue. Link it to import the programmes NACTVET has accredited.</Typography>
+            <Button size="small" variant="outlined" sx={{ mt: 1.5 }} onClick={() => setLinking(true)}>Link to NACTVET</Button>
+          </>
+        )}
+      </CardContent>
+      {linking && <LinkDialog name={d.name} onClose={() => setLinking(false)} onPick={(id) => { setLinking(false); setImporting(id); }} />}
+      {importing != null && (
+        <ImportDialog institutionId={d.id} nactvetId={importing} linked={!!x} onClose={() => setImporting(null)}
+          onDone={(r) => { setImporting(null); setResult(r.result); onDone(r.institution); qc.invalidateQueries({ queryKey: ['platform', 'nactvet'] }); }} />
+      )}
+    </Card>
+  );
+}
+
+function LinkDialog({ name, onClose, onPick }: { name: string; onClose: () => void; onPick: (id: number) => void }) {
+  const [q, setQ] = useState(name.split(' ').slice(0, 2).join(' '));
+  const list = useQuery({ queryKey: ['platform', 'nactvet', 'institutions', 'link', q], enabled: q.trim().length >= 2,
+    queryFn: () => api<PageOf<CatalogueInstitution>>(`/api/platform/nactvet/institutions?onboarded=no&size=20&q=${encodeURIComponent(q.trim())}`, platform) });
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Link to the NACTVET catalogue</DialogTitle>
+      <DialogContent>
+        <TextField autoFocus fullWidth size="small" sx={{ mt: 0.5 }} label="Search the catalogue" value={q} onChange={(e) => setQ(e.target.value)}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }} />
+        <ErrorAlert error={list.error} />
+        <Box sx={{ mt: 1 }}>
+          {(list.data?.content ?? []).map((r) => (
+            <Stack key={r.id} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 1, borderTop: 1, borderColor: 'divider' }}>
+              <Box>
+                <Typography fontWeight={600}>{r.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{[r.registrationNumber, r.region, `${r.programmes} programmes`].filter(Boolean).join(' · ')}</Typography>
+              </Box>
+              <Button size="small" onClick={() => onPick(r.id)}>Choose</Button>
+            </Stack>
+          ))}
+          {list.data && list.data.content.length === 0 && <Typography color="text.secondary" sx={{ py: 2 }}>No institution that is not yet on CIMS matches. Sync the catalogue if it is new.</Typography>}
+        </Box>
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function ImportDialog({ institutionId, nactvetId, linked, onClose, onDone }: {
+  institutionId: number; nactvetId: number; linked: boolean; onClose: () => void;
+  onDone: (r: { institution: InstitutionDetail; result: ImportResult }) => void;
+}) {
+  const q = useQuery({ queryKey: ['platform', 'nactvet', 'institution', nactvetId, 'for', institutionId],
+    queryFn: () => api<CatalogueDetail>(`/api/platform/nactvet/institutions/${nactvetId}`, platform) });
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  useEffect(() => { if (q.data) setSelected(new Set(q.data.programmes.filter((p) => p.active && !p.imported).map((p) => p.id))); }, [q.data]);
+  const m = useMutation({
+    mutationFn: () => api<{ institution: InstitutionDetail; result: ImportResult }>(`/api/platform/institutions/${institutionId}/nactvet`,
+      { ...platform, method: 'POST', body: { nactvetInstitutionId: linked ? null : nactvetId, programmeIds: [...selected] } }),
+    onSuccess: onDone,
+  });
+  const toggle = (id: number) => setSelected((x) => { const y = new Set(x); if (y.has(id)) y.delete(id); else y.add(id); return y; });
+  return (
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth>
+      <DialogTitle>Import programmes from NACTVET{q.data ? `: ${q.data.institution.name}` : ''}</DialogTitle>
+      <DialogContent>
+        {!linked && <Alert severity="info" sx={{ mb: 2 }}>The institution will be linked to this NACTVET entry.</Alert>}
+        {q.isLoading ? <Loading /> : q.data && (
+          <ProgrammeTable programmes={q.data.programmes} selected={selected} onToggle={toggle} onToggleAll={(ids, on) => setSelected(on ? new Set(ids) : new Set())} />
+        )}
+        <ErrorAlert error={q.error ?? m.error} />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={m.isPending || (linked && selected.size === 0)} onClick={() => m.mutate()}>
+          {selected.size ? `Import ${selected.size}` : 'Link only'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

@@ -82,6 +82,8 @@ public class InstitutionService {
     private final PlatformAuditService platformAudit;
     private final IntegrationLogQuery integrations;
     private final MessagingAdminService messaging;
+    private final tz.co.msingi.cims.console.nactvet.CatalogueService catalogue;
+    private final tz.co.msingi.cims.console.nactvet.ProgrammeImporter importer;
 
     @Value("${cims.platform.staff-login-url:https://{host}/staff/login}")
     private String staffLoginUrl;
@@ -132,7 +134,59 @@ public class InstitutionService {
         return tx.execute(s -> new InstitutionDetail(t.getId(), t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getOwnership(),
                 t.getStatus(), t.getStatusReason(), t.getStatusChangedAt(), t.getStatusChangedBy(), t.getContactEmail(), t.getContactPhone(),
                 colour(t), t.getNotes(), t.getOnboardedBy(), t.getCreatedAt(), signInUrl(ds), ds, admins, u, setup(t, u, !ds.isEmpty()),
-                integrations.health(t.getId(), 168), platformAudit.page(t.getId(), null, 0, 10).content()));
+                integrations.health(t.getId(), 168), platformAudit.page(t.getId(), null, 0, 10).content(), nactvetLink(t)));
+    }
+
+    private InstitutionDtos.NactvetLink nactvetLink(Tenant t) {
+        Long nid = catalogue.linkedTo(t.getId());
+        if (nid == null) return null;
+        var d = catalogue.institution(nid);
+        var r = d.institution();
+        long notImported = d.programmes().stream().filter(p -> p.active() && !p.imported()).count();
+        return new InstitutionDtos.NactvetLink(r.id(), r.name(), r.registrationNumber(), r.region(), r.district(), r.ownership(), r.active(),
+                r.lastSeenAt(), r.programmes(), notImported);
+    }
+
+    /**
+     * Links the institution to its NACTVET catalogue entry (if not linked yet) and imports the chosen programmes (all not yet
+     * imported when none are chosen).
+     */
+    public InstitutionDtos.NactvetImport importFromNactvet(Long id, Long nactvetInstitutionId, List<Long> programmeIds) {
+        Tenant t = tx.execute(s -> tenant(id));
+        Long linked = catalogue.linkedTo(t.getId());
+        Long nid = linked != null ? linked : nactvetInstitutionId;
+        if (nid == null) throw new BusinessRuleException("CHOOSE_NACTVET_INSTITUTION", "Choose the institution's entry in the NACTVET catalogue.");
+        if (linked != null && nactvetInstitutionId != null && !linked.equals(nactvetInstitutionId)) {
+            throw new BusinessRuleException("ALREADY_LINKED", "This institution is linked to another NACTVET entry. Unlink it first.");
+        }
+        if (linked == null) {
+            tx.executeWithoutResult(s -> link(t, nid));
+        }
+        var result = work.call(t, () -> importer.importInto(nid, programmeIds == null || programmeIds.isEmpty() ? null : programmeIds));
+        tx.executeWithoutResult(s -> platformAudit.record("PROGRAMMES_IMPORTED", t.getId(), "Tenant", t.getId(),
+                Map.of("nactvetInstitution", nid, "created", result.created(), "skipped", result.skipped(), "departments", result.departmentsCreated())));
+        return new InstitutionDtos.NactvetImport(detail(id), result);
+    }
+
+    public InstitutionDetail unlinkNactvet(Long id) {
+        tx.executeWithoutResult(s -> {
+            Tenant t = tenant(id);
+            int n = jdbc.update("update nactvet_institutions set tenant_id = null where tenant_id = ?", t.getId());
+            if (n > 0) platformAudit.record("NACTVET_UNLINKED", t.getId(), "Tenant", t.getId(), null);
+        });
+        return detail(id);
+    }
+
+    /** Links a NACTVET catalogue entry to the institution; one entry belongs to at most one institution. */
+    private void link(Tenant t, Long nactvetInstitutionId) {
+        Map<String, Object> n = jdbc.queryForList("select id, name, tenant_id from nactvet_institutions where id = ? for update", nactvetInstitutionId)
+                .stream().findFirst().orElseThrow(() -> new NotFoundException("NACTVET institution not found"));
+        Object owner = n.get("tenant_id");
+        if (owner != null && ((Number) owner).longValue() != t.getId()) {
+            throw new BusinessRuleException("ALREADY_ONBOARDED", n.get("name") + " is already on CIMS as another institution.");
+        }
+        jdbc.update("update nactvet_institutions set tenant_id = ? where id = ?", t.getId(), nactvetInstitutionId);
+        platformAudit.record("NACTVET_LINKED", t.getId(), "Tenant", t.getId(), Map.of("nactvetInstitution", nactvetInstitutionId, "name", n.get("name")));
     }
 
     // ------------------------------------------------------------------ onboarding
@@ -165,10 +219,14 @@ public class InstitutionService {
             t.setBranding(branding);
             tenants.saveAndFlush(t);
             for (String h : hosts) addDomain(t, h, "ALL");
+            if (req.nactvetInstitutionId() != null) link(t, req.nactvetInstitutionId());
             Long adminId = work.within(t, () -> {
                 UserAccount u = newAdmin(username, a, temporary);
                 audit.record("INSTITUTION_ONBOARDED", "Tenant", t.getId(), Map.of("code", code, "domains", hosts));
                 audit.record("CREATE", "StaffUser", u.getId(), Map.of("username", username, "roles", List.of(Role.INSTITUTION_ADMIN.name())));
+                if (req.nactvetInstitutionId() != null && req.importProgrammeIds() != null && !req.importProgrammeIds().isEmpty()) {
+                    importer.importInto(req.nactvetInstitutionId(), req.importProgrammeIds());
+                }
                 return u.getId();
             });
             Map<String, Object> d = new LinkedHashMap<>();
@@ -176,6 +234,10 @@ public class InstitutionService {
             d.put("name", t.getName());
             d.put("domains", hosts);
             d.put("administrator", username);
+            if (req.nactvetInstitutionId() != null) {
+                d.put("fromNactvet", req.nactvetInstitutionId());
+                d.put("programmesImported", req.importProgrammeIds() == null ? 0 : req.importProgrammeIds().size());
+            }
             platformAudit.record("INSTITUTION_ONBOARDED", t.getId(), "Tenant", t.getId(), d);
             platformAudit.record("INSTITUTION_ADMIN_CREATED", t.getId(), "StaffUser", adminId, Map.of("username", username));
             return t.getId();
