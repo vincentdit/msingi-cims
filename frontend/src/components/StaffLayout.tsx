@@ -23,43 +23,71 @@ import GraduationIcon from '@mui/icons-material/WorkspacePremium';
 import HostelIcon from '@mui/icons-material/Bed';
 import IptIcon from '@mui/icons-material/Engineering';
 import InstitutionIcon from '@mui/icons-material/AccountBalance';
+import UsersIcon from '@mui/icons-material/ManageAccounts';
+import KeyIcon from '@mui/icons-material/Key';
+import { Alert, Button } from '@mui/material';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { can, pageOf, ROLE_LABEL, type PageKey } from '../auth/access';
 import { useSession } from '../auth/session';
 import { useInstitution } from './InstitutionContext';
 
 const WIDTH = 248;
-const TEACHING = ['LECTURER', 'ASSESSOR'];
-const EXAMS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'MANAGEMENT_VIEWER'];
-const CLEARANCE = ['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER', 'HEAD_OF_DEPARTMENT', 'CLEARANCE_OFFICER', 'HOSTEL_WARDEN'];
-const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?: string[]; teaching?: boolean; officer?: boolean; officerRoles?: string[] }[] = [
-  { to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
-  { to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
-  { to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
-  { to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
-  { to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
-  { to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
-  { to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
-  { to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
-  { to: '/staff/marks', label: 'Marks', icon: <MarksIcon />, roles: [...EXAMS, ...TEACHING, 'PROGRAMME_COORDINATOR'], teaching: true },
-  { to: '/staff/eligibility', label: 'Exam eligibility', icon: <EligibleIcon />, roles: EXAMS },
-  { to: '/staff/results', label: 'Results', icon: <ResultsIcon />, roles: EXAMS },
-  { to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon />, roles: ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'] },
-  { to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon />, roles: EXAMS },
-  { to: '/staff/clearance', label: 'Clearance', icon: <ClearanceIcon />, roles: [...CLEARANCE], officer: true },
-  { to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon />, roles: ['INSTITUTION_ADMIN', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'] },
-  { to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon />, roles: ['INSTITUTION_ADMIN', 'HOSTEL_WARDEN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER'], officer: true },
-  { to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon />, roles: ['INSTITUTION_ADMIN', 'IPT_COORDINATOR', 'REGISTRAR', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'MANAGEMENT_VIEWER', 'PROGRAMME_COORDINATOR', ...TEACHING], teaching: true, officer: true },
-  { to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
-  { to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
-  { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
-  { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon />, officerRoles: ['HOSTEL_WARDEN', 'IPT_COORDINATOR'] },
-  { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
-  { to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon />, roles: ['INSTITUTION_ADMIN'] },
+
+type Item = { page: PageKey; to: string; label: string; icon: JSX.Element; end?: boolean };
+const GROUPS: { title?: string; items: Item[] }[] = [
+  { items: [
+    { page: 'dashboard', to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
+    { page: 'reports', to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon /> },
+  ] },
+  { title: 'Admissions', items: [
+    { page: 'windows', to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
+    { page: 'applications', to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
+    { page: 'programmes', to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
+  ] },
+  { title: 'Registry', items: [
+    { page: 'students', to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
+    { page: 'semesterRegistrations', to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
+    { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
+  ] },
+  { title: 'Teaching', items: [
+    { page: 'calendar', to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
+    { page: 'curricula', to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
+    { page: 'teaching', to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon /> },
+    { page: 'marks', to: '/staff/marks', label: 'Marks', icon: <MarksIcon /> },
+  ] },
+  { title: 'Examinations', items: [
+    { page: 'eligibility', to: '/staff/eligibility', label: 'Exam eligibility', icon: <EligibleIcon /> },
+    { page: 'results', to: '/staff/results', label: 'Results', icon: <ResultsIcon /> },
+    { page: 'amendments', to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon /> },
+    { page: 'regulations', to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon /> },
+  ] },
+  { title: 'Student services', items: [
+    { page: 'clearance', to: '/staff/clearance', label: 'Clearance', icon: <ClearanceIcon /> },
+    { page: 'hostels', to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon /> },
+    { page: 'ipt', to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon /> },
+  ] },
+  { title: 'Finance', items: [
+    { page: 'finance', to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
+  ] },
+  { title: 'Communication', items: [
+    { page: 'notices', to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
+    { page: 'messages', to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
+  ] },
+  { title: 'Administration', items: [
+    { page: 'users', to: '/staff/users', label: 'Users & roles', icon: <UsersIcon /> },
+    { page: 'institution', to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon /> },
+  ] },
 ];
+
+/** Where each person lands: their first page (the dashboard when they have one). */
+export function homeFor(roles: readonly string[] | undefined) {
+  for (const g of GROUPS) for (const i of g.items) if (can(roles, i.page)) return i.to;
+  return '/staff/password';
+}
 
 /** Back-office layout for institution staff. */
 export default function StaffLayout() {
@@ -71,11 +99,13 @@ export default function StaffLayout() {
   const navigate = useNavigate();
   const me = user('staff');
   const roles = me?.roles ?? [];
-  // Lecturers and assessors only see their teaching and marks; other menu items follow the roles that use them.
-  const teachingOnly = roles.length > 0 && roles.every((r) => TEACHING.includes(r));
-  // Clearance officers, wardens and the IPT coordinator only see the office they run.
-  const officerOnly = roles.length > 0 && roles.every((r) => ['CLEARANCE_OFFICER', 'HOSTEL_WARDEN', 'IPT_COORDINATOR'].includes(r));
-  const nav = NAV.filter((n) => (teachingOnly ? n.teaching : officerOnly ? (n.officer && (!n.roles || n.roles.some((r) => roles.includes(r)))) || !!n.officerRoles?.some((r) => roles.includes(r)) : !n.roles || n.roles.some((r) => roles.includes(r))));
+  const location = useLocation();
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
+  const page = pageOf(location.pathname);
+  const onPassword = location.pathname.startsWith('/staff/password');
+  if (me?.mustChangePassword && !onPassword) return <Navigate to="/staff/password" replace />;
+  if (location.pathname === '/staff' && !can(roles, 'dashboard')) return <Navigate to={homeFor(roles)} replace />;
+  const allowed = onPassword || !page || can(roles, page);
 
   const drawer = (
     <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>
@@ -84,29 +114,40 @@ export default function StaffLayout() {
         <Typography variant="caption" sx={{ opacity: 0.7 }}>CIMS · Back-office</Typography>
       </Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-      <List sx={{ px: 1, flexGrow: 1 }}>
-        {nav.map((n) => (
-          <ListItemButton
-            key={n.to}
-            component={NavLink}
-            to={n.to}
-            end={n.end}
-            onClick={() => setOpen(false)}
-            sx={{
-              borderRadius: 2, my: 0.25, color: 'inherit',
-              '&.active': { bgcolor: 'rgba(255,255,255,0.10)', color: '#fff' },
-              '& .MuiListItemIcon-root': { color: 'inherit', minWidth: 38, opacity: 0.85 },
-            }}
-          >
-            <ListItemIcon>{n.icon}</ListItemIcon>
-            <ListItemText primary={n.label} />
-          </ListItemButton>
+      <List sx={{ px: 1, flexGrow: 1 }} dense>
+        {groups.map((g, gi) => (
+          <Box key={g.title ?? gi} component="li" sx={{ listStyle: 'none', mt: gi ? 1.5 : 0.5 }}>
+            {g.title && <Typography component="div" sx={{ px: 1.5, pb: 0.5, fontSize: 12, fontWeight: 600, color: 'rgba(230,235,242,0.55)' }}>{g.title}</Typography>}
+            <Box component="ul" sx={{ p: 0, m: 0 }}>
+              {g.items.map((n) => (
+                <ListItemButton
+                  key={n.to}
+                  component={NavLink}
+                  to={n.to}
+                  end={n.end}
+                  onClick={() => setOpen(false)}
+                  sx={{
+                    borderRadius: 2, my: 0.25, py: 0.75, color: 'inherit',
+                    '&.active': { bgcolor: 'rgba(255,255,255,0.10)', color: '#fff' },
+                    '& .MuiListItemIcon-root': { color: 'inherit', minWidth: 38, opacity: 0.85 },
+                  }}
+                >
+                  <ListItemIcon>{n.icon}</ListItemIcon>
+                  <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 15 }} />
+                </ListItemButton>
+              ))}
+            </Box>
+          </Box>
         ))}
       </List>
       <Box sx={{ p: 2 }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{me?.fullName}</Typography>
-        <Typography variant="caption" sx={{ opacity: 0.7 }}>{me?.roles.map((r) => r.replace(/_/g, ' ').toLowerCase()).join(', ')}</Typography>
-        <ListItemButton sx={{ mt: 1, borderRadius: 2, px: 1 }} onClick={() => { signOut('staff'); navigate('/staff/login'); }}>
+        <Typography variant="caption" sx={{ opacity: 0.7 }}>{me?.roles.map((r) => ROLE_LABEL[r] ?? r).join(', ')}</Typography>
+        <ListItemButton component={NavLink} to="/staff/password" sx={{ mt: 1, borderRadius: 2, px: 1, color: 'inherit' }} onClick={() => setOpen(false)}>
+          <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><KeyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Change password" />
+        </ListItemButton>
+        <ListItemButton sx={{ borderRadius: 2, px: 1 }} onClick={() => { signOut('staff'); navigate('/staff/login'); }}>
           <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><LogoutIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Sign out" />
         </ListItemButton>
@@ -133,7 +174,11 @@ export default function StaffLayout() {
         {drawer}
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, mt: { xs: 8, md: 0 }, minWidth: 0 }}>
-        <Outlet />
+        {allowed ? <Outlet /> : (
+          <Alert severity="info" sx={{ maxWidth: 640 }} action={<Button color="inherit" onClick={() => navigate(homeFor(roles))}>Go to my pages</Button>}>
+            This page is not part of your role. Ask the institution administrator if you need it.
+          </Alert>
+        )}
       </Box>
     </Box>
   );

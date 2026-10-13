@@ -54,7 +54,7 @@ public class SecurityConfig {
     };
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionGuard sessionGuard) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable) // stateless bearer-token API
                 .cors(c -> {})
@@ -64,10 +64,19 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(new CimsJwtConverter())))
+                .addFilterAfter(sessionGuard, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
                 .headers(h -> h
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"))
                         .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)));
         return http.build();
+    }
+
+    /** The session guard runs inside the security chain only, after the token is read. */
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<SessionGuard> sessionGuardRegistration(SessionGuard guard) {
+        var reg = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(guard);
+        reg.setEnabled(false);
+        return reg;
     }
 
     @Bean

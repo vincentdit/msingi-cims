@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import CloseIcon from '@mui/icons-material/Close';
+import { homeFor } from '../../components/StaffLayout';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
@@ -33,7 +34,7 @@ export function StaffLoginPage() {
   const [password, setPassword] = useState('');
   const m = useMutation({
     mutationFn: () => api<TokenResponse>('/api/auth/login', { method: 'POST', body: { username, password } }),
-    onSuccess: (t) => { signIn('staff', t); navigate('/staff'); },
+    onSuccess: (t) => { signIn('staff', t); navigate(t.user.mustChangePassword ? '/staff/password' : homeFor(t.user.roles)); },
   });
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: '#0F1B2D', p: 2 }}>

@@ -59,6 +59,16 @@ public class UserAccount extends BaseEntity {
 
     private OffsetDateTime lastLoginAt;
 
+    /** Set when the administrator issues a temporary password; the user chooses their own at the next sign-in. */
+    @Column(nullable = false)
+    private boolean mustChangePassword;
+
+    /** Sessions (tokens) issued before this moment are no longer accepted: disabled, roles changed or password reset. */
+    private OffsetDateTime sessionsValidAfter;
+
+    private String jobTitle;
+    private String createdByName;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     private Set<RoleAssignment> roles = new HashSet<>();

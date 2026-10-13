@@ -22,4 +22,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
 
     boolean existsByEmailIgnoreCase(String email);
+
+    @Query("select distinct u from UserAccount u where u.userType = tz.co.msingi.cims.platform.security.UserAccount.UserType.STAFF order by u.fullName")
+    java.util.List<UserAccount> findStaff();
 }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { clearSession, getSessionUser, getToken, setSession, type Realm } from '../api/client';
 import type { TokenResponse } from '../api/types';
@@ -16,6 +16,8 @@ const Ctx = createContext<SessionCtx | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [, setVersion] = useState(0);
   const bump = () => setVersion((v) => v + 1);
+  // a session the server has ended (expired, or taken back by the administrator) sends the user to sign in
+  useEffect(() => { window.addEventListener('cims:signed-out', bump); return () => window.removeEventListener('cims:signed-out', bump); }, []);
 
   const user = useCallback((realm: Realm) => (getToken(realm) ? getSessionUser<User>(realm) : null), []);
   const signIn = useCallback((realm: Realm, t: TokenResponse) => {

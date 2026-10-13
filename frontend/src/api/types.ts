@@ -12,7 +12,7 @@ export interface TokenResponse {
   accessToken: string;
   tokenType: string;
   expiresIn: number;
-  user: { id: number; fullName: string; userType: string; roles: string[]; tenant: string };
+  user: { id: number; fullName: string; userType: string; roles: string[]; tenant: string; mustChangePassword?: boolean };
 }
 
 export interface Institution {
@@ -1970,3 +1970,14 @@ export interface IptPlacementView {
 export interface MyIpt {
   periods: IptPeriod[]; organisations: { id: number; name: string; region?: string }[]; placement?: IptPlacementView | null; history: IptPlacementSummary[];
 }
+
+export type RoleScope = 'INSTITUTION' | 'DEPARTMENT' | 'PROGRAMME';
+export interface RoleInfo { role: string; label: string; description: string; scopes: RoleScope[] }
+export interface RoleGrant { role: string; label?: string; scope: RoleScope; scopeId?: number | null; scopeName?: string }
+export interface StaffUser {
+  id: number; username: string; fullName: string; jobTitle?: string; email?: string; phone?: string;
+  status: 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'PENDING_VERIFICATION'; mustChangePassword: boolean; lastLoginAt?: string; createdAt: string;
+  createdByName?: string; roles: RoleGrant[]; self: boolean;
+}
+export interface IssuedPassword { user: StaffUser; temporaryPassword: string }
+export interface StaffUserSummary { total: number; active: number; disabled: number; locked: number; mustChangePassword: number }

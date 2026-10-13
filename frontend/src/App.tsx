@@ -4,6 +4,8 @@ import PortalLayout from './components/PortalLayout';
 import StaffLayout from './components/StaffLayout';
 import StudentLayout from './components/StudentLayout';
 import InstitutionPage from './pages/staff/InstitutionPage';
+import UsersPage from './pages/staff/UsersPage';
+import ChangePasswordPage from './pages/staff/ChangePasswordPage';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
 import StudentResultsPage from './pages/student/StudentResultsPage';
@@ -94,6 +96,8 @@ export default function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
         <Route path="institution" element={<InstitutionPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="password" element={<ChangePasswordPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

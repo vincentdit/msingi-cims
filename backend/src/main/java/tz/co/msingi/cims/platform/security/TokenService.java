@@ -23,6 +23,10 @@ public class TokenService {
     public static final String CLAIM_ROLES = "roles";
     public static final String CLAIM_USER_TYPE = "typ";
     public static final String CLAIM_NAME = "name";
+    /** Present (true) while the user must replace a temporary password; only the password change is allowed until then. */
+    public static final String CLAIM_MUST_CHANGE_PASSWORD = "mcp";
+    /** The account's session generation when the token was issued; older generations are refused once sessions are ended. */
+    public static final String CLAIM_SESSION = "sv";
 
     private final JwtEncoder encoder;
     private final CimsSecurityProperties props;
@@ -43,15 +47,17 @@ public class TokenService {
                 .claim(CLAIM_ROLES, roles)
                 .claim(CLAIM_USER_TYPE, user.getUserType().name())
                 .claim(CLAIM_NAME, user.getFullName())
+                .claim(CLAIM_MUST_CHANGE_PASSWORD, user.isMustChangePassword())
+                .claim(CLAIM_SESSION, user.getSessionsValidAfter() == null ? 0L : user.getSessionsValidAfter().toInstant().toEpochMilli())
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new TokenResponse(token, "Bearer", props.accessTokenTtl().toSeconds(),
-                new TokenResponse.UserSummary(user.getId(), user.getFullName(), user.getUserType().name(), roles, tenant.code()));
+                new TokenResponse.UserSummary(user.getId(), user.getFullName(), user.getUserType().name(), roles, tenant.code(), user.isMustChangePassword()));
     }
 
     public record TokenResponse(String accessToken, String tokenType, long expiresIn, UserSummary user) {
-        public record UserSummary(Long id, String fullName, String userType, List<String> roles, String tenant) {
+        public record UserSummary(Long id, String fullName, String userType, List<String> roles, String tenant, boolean mustChangePassword) {
         }
     }
 }

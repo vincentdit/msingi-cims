@@ -89,7 +89,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     throw new ApiError(UNREACHABLE);
   }
   if (!res.ok) {
-    if (res.status === 401 && options.realm) clearSession(options.realm);
+    if (res.status === 401 && options.realm) { clearSession(options.realm); window.dispatchEvent(new Event('cims:signed-out')); }
     throw new ApiError((data as Problem) ?? { status: res.status, title: res.statusText });
   }
   return data as T;

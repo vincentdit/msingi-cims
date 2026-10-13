@@ -65,7 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
-        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026 (header X-Tenant: DEMO)");
+        log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026, principal / Principal@2026, auditor / Auditor@2026, assessor / Assessor@2026, coordinator / Coordinator@2026 (header X-Tenant: DEMO)");
     }
 
     private Tenant createTenant() {
@@ -117,6 +117,12 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
         if (users.findByUsernameIgnoreCase("ipt").isEmpty()) {
             staff("ipt", "Ms. Zawadi IPT Coordinator", "Ipt@2026", Role.IPT_COORDINATOR);
+        }
+        if (users.findByUsernameIgnoreCase("principal").isEmpty()) {
+            staff("principal", "Dr. Amina Principal", "Principal@2026", Role.MANAGEMENT_VIEWER);
+            staff("auditor", "Mr. Baraka Auditor", "Auditor@2026", Role.AUDITOR);
+            staff("assessor", "Ms. Neema Assessor", "Assessor@2026", Role.ASSESSOR);
+            staff("coordinator", "Mr. Daudi Coordinator", "Coordinator@2026", Role.PROGRAMME_COORDINATOR);
         }
         if (!years.findAll().isEmpty()) {
             backfillNactvetCodes();
