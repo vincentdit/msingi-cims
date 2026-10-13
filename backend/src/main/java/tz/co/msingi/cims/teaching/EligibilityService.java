@@ -317,8 +317,7 @@ public class EligibilityService {
     // ------------------------------------------------------------------ access and views
 
     private boolean canRead(ModuleOffering o) {
-        return o != null && (access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC, Role.MANAGEMENT_VIEWER)
-                || access.moderates(o.getModule()));
+        return o != null && access.follows(o.getModule());
     }
 
     private boolean canRequest(ModuleOffering o) {

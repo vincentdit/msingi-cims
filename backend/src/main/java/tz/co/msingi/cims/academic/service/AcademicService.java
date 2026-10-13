@@ -35,6 +35,7 @@ public class AcademicService {
     private final DepartmentRepository departments;
     private final ProgrammeRepository programmes;
     private final AuditService audit;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
 
     // ---- academic years
     @Transactional(readOnly = true)
@@ -98,11 +99,13 @@ public class AcademicService {
     // ---- programmes
     @Transactional(readOnly = true)
     public List<ProgrammeView> listProgrammes() {
-        return programmes.findAllByOrderByAwardFamilyAscAwardLevelAscNameAsc().stream().map(ProgrammeView::of).toList();
+        var mine = scope.current();
+        return programmes.findAllByOrderByAwardFamilyAscAwardLevelAscNameAsc().stream().filter(mine::programme).map(ProgrammeView::of).toList();
     }
 
     @Transactional(readOnly = true)
     public ProgrammeView getProgramme(Long id) {
+        scope.requireProgramme(id);
         return ProgrammeView.of(programmes.findById(id).orElseThrow(() -> new NotFoundException("Programme", id)));
     }
 

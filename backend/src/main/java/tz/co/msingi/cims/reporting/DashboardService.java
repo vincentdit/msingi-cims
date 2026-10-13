@@ -48,7 +48,10 @@ public class DashboardService {
     private final NamedParameterJdbcTemplate jdbc;
     private final FinanceReportService financeReports;
 
-    public DashboardService(NamedParameterJdbcTemplate jdbc, FinanceReportService financeReports) {
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
+
+    public DashboardService(NamedParameterJdbcTemplate jdbc, FinanceReportService financeReports, tz.co.msingi.cims.platform.security.DataScope scope) {
+        this.scope = scope;
         this.jdbc = jdbc;
         this.financeReports = financeReports;
     }
@@ -116,21 +119,26 @@ public class DashboardService {
     // ------------------------------------------------------------------ registry
 
     private Registry registry() {
+        // a Head of Department or Programme Coordinator sees the students of their own programmes
+        var mine = scope.current();
+        MapSqlParameterSource p = new MapSqlParameterSource("ids", mine.programmeIds().isEmpty() ? List.of(-1L) : mine.programmeIds());
+        String in = mine.all() ? "" : " and s.programme_id in (:ids)";
         Map<String, Long> byStatus = new HashMap<>();
-        jdbc.query("select status, count(*) as c from students group by status", Map.of(), rs -> { byStatus.put(rs.getString("status"), rs.getLong("c")); });
+        jdbc.query("select status, count(*) as c from students s where true" + in + " group by status", p,
+                rs -> { byStatus.put(rs.getString("status"), rs.getLong("c")); });
         Map<String, Object> sex = jdbc.queryForMap("""
                 select count(*) filter (where sex = 'F') as f, count(*) filter (where sex = 'M') as m
-                from students where status in ('ADMITTED', 'ACTIVE')""", Map.of());
+                from students s where status in ('ADMITTED', 'ACTIVE')\s""" + in, p);
         List<Point> statuses = new ArrayList<>();
-        for (String s : List.of("ADMITTED", "ACTIVE", "POSTPONED", "SUSPENDED", "DISCONTINUED", "WITHDRAWN", "COMPLETED", "GRADUATED", "DECEASED")) {
-            if (byStatus.containsKey(s)) statuses.add(new Point(s, AdmissionReports.label(s), byStatus.get(s)));
+        for (String st : List.of("ADMITTED", "ACTIVE", "POSTPONED", "SUSPENDED", "DISCONTINUED", "WITHDRAWN", "COMPLETED", "GRADUATED", "DECEASED")) {
+            if (byStatus.containsKey(st)) statuses.add(new Point(st, AdmissionReports.label(st), byStatus.get(st)));
         }
         List<ProgrammeRow> programmes = jdbc.query("""
                 select p.code, p.name, count(*) as c, count(*) filter (where s.status = 'ACTIVE') as registered
-                from students s join programmes p on p.id = s.programme_id where s.status in ('ADMITTED', 'ACTIVE')
-                group by p.code, p.name order by c desc, p.name limit 8""", Map.of(),
+                from students s join programmes p on p.id = s.programme_id where s.status in ('ADMITTED', 'ACTIVE')""" + in + " group by p.code, p.name order by c desc, p.name limit 8", p,
                 (rs, i) -> new ProgrammeRow(rs.getString("code"), rs.getString("name"), rs.getLong("c"), 0, rs.getLong("registered")));
-        long pending = n(jdbc.queryForObject("select count(*) from student_change_requests where status = 'PENDING'", Map.of(), Long.class));
+        long pending = n(jdbc.queryForObject("select count(*) from student_change_requests r join students s on s.id = r.student_id where r.status = 'PENDING'"
+                + in, p, Long.class));
         long admitted = byStatus.getOrDefault("ADMITTED", 0L), active = byStatus.getOrDefault("ACTIVE", 0L);
         return new Registry(admitted + active, active, admitted, n(sex.get("f")), n(sex.get("m")), statuses, programmes, pending);
     }

@@ -48,6 +48,7 @@ import java.util.Set;
 public class CurriculumService {
 
     private final ModuleRepository modules;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final CurriculumRepository curricula;
     private final CurriculumModuleRepository curriculumModules;
     private final ProgrammeRepository programmes;
@@ -66,6 +67,7 @@ public class CurriculumService {
     @Transactional
     public ModuleView createModule(ModuleRequest req) {
         String code = req.code().trim().toUpperCase();
+        requireOwnDepartment(req.departmentId());
         if (modules.findByCodeIgnoreCase(code).isPresent()) throw new BusinessRuleException("DUPLICATE_CODE", "Module " + code + " already exists");
         Module m = new Module();
         m.setCode(code);
@@ -78,6 +80,8 @@ public class CurriculumService {
     @Transactional
     public ModuleView updateModule(Long id, ModuleRequest req) {
         Module m = modules.findById(id).orElseThrow(() -> new NotFoundException("Module", id));
+        requireOwnDepartment(m.getDepartment() == null ? null : m.getDepartment().getId());
+        requireOwnDepartment(req.departmentId());
         String code = req.code().trim().toUpperCase();
         boolean inApproved = curricula.findAll().stream().filter(c -> c.getStatus() != Curriculum.Status.DRAFT)
                 .anyMatch(c -> c.getModules().stream().anyMatch(cm -> cm.getModule().getId().equals(id)));
@@ -92,6 +96,17 @@ public class CurriculumService {
         apply(m, req);
         audit.record("MODULE_UPDATED", "Module", m.getId(), Map.of("code", code));
         return view(m);
+    }
+
+    /** A Head of Department or Programme Coordinator limited to part of the institution keeps to their departments' modules. */
+    private void requireOwnDepartment(Long departmentId) {
+        var mine = scope.current();
+        if (mine.all()) return;
+        java.util.Set<Long> depts = new java.util.HashSet<>(mine.departmentIds());
+        programmes.findAllById(mine.programmeIds()).forEach(p -> { if (p.getDepartment() != null) depts.add(p.getDepartment().getId()); });
+        if (departmentId == null || !depts.contains(departmentId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Modules can be added or changed only for " + mine.describe() + "'s department");
+        }
     }
 
     private void apply(Module m, ModuleRequest req) {
@@ -115,20 +130,25 @@ public class CurriculumService {
 
     @Transactional(readOnly = true)
     public List<CurriculumSummary> curricula(Long programmeId) {
+        var mine = scope.current();
+        if (programmeId != null) scope.requireProgramme(programmeId);
         List<Curriculum> list = programmeId == null ? curricula.findAllByOrderByProgrammeIdAscCurriculumVersionDesc()
                 : curricula.findByProgrammeIdOrderByCurriculumVersionDesc(programmeId);
-        return list.stream().map(c -> new CurriculumSummary(c.getId(), c.getProgramme().getId(), c.getProgramme().getCode(), c.getProgramme().getName(),
+        return list.stream().filter(c -> mine.programme(c.getProgramme())).map(c -> new CurriculumSummary(c.getId(), c.getProgramme().getId(), c.getProgramme().getCode(), c.getProgramme().getName(),
                 c.getCurriculumVersion(), c.getEffectiveYear().getCode(), c.getStatus().name(), c.getModules().size(),
                 c.getModules().stream().map(cm -> cm.getModule().getCredits()).reduce(BigDecimal.ZERO, BigDecimal::add), c.getApprovedAt())).toList();
     }
 
     @Transactional(readOnly = true)
     public CurriculumView get(Long id) {
-        return view(require(id));
+        Curriculum c = require(id);
+        scope.requireProgramme(c.getProgramme().getId());
+        return view(c);
     }
 
     @Transactional
     public CurriculumView create(CurriculumRequest req) {
+        scope.requireProgramme(req.programmeId());
         Programme p = programmes.findById(req.programmeId()).orElseThrow(() -> new NotFoundException("Programme", req.programmeId()));
         if (curricula.existsByProgrammeIdAndStatus(p.getId(), Curriculum.Status.DRAFT)) {
             throw new BusinessRuleException("DRAFT_EXISTS", "There is already a draft curriculum for " + p.getCode() + ": continue that one");
@@ -148,6 +168,7 @@ public class CurriculumService {
     @Transactional
     public CurriculumView update(Long id, CurriculumRequest req) {
         Curriculum c = require(id);
+        scope.requireProgramme(c.getProgramme().getId());
         if (c.getStatus() != Curriculum.Status.DRAFT) throw new BusinessRuleException("NOT_A_DRAFT", "Only a draft curriculum can be changed: revise it instead");
         if (!c.getProgramme().getId().equals(req.programmeId())) throw new BusinessRuleException("WRONG_PROGRAMME", "A curriculum cannot move to another programme");
         apply(c, req);
@@ -176,6 +197,7 @@ public class CurriculumService {
     @Transactional
     public CurriculumView revise(Long id) {
         Curriculum src = require(id);
+        scope.requireProgramme(src.getProgramme().getId());
         if (src.getStatus() == Curriculum.Status.DRAFT) throw new BusinessRuleException("IS_A_DRAFT", "This is already a draft");
         if (curricula.existsByProgrammeIdAndStatus(src.getProgramme().getId(), Curriculum.Status.DRAFT)) {
             throw new BusinessRuleException("DRAFT_EXISTS", "There is already a draft curriculum for " + src.getProgramme().getCode());

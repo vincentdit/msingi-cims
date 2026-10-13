@@ -108,6 +108,8 @@ public class OfferingService {
             List<ModuleRegistration> regs = registrations.students(semesterId, moduleId, APPROVED);
             if (regs.isEmpty()) continue;
             Module m = regs.get(0).getModule();
+            // a Head of Department limited to a department sets up only that department's modules
+            if (!access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC) && !access.moderates(m)) continue;
             if (m.getAssessmentType() == Module.AssessmentType.COMPETENCE) {
                 skipped.add(m.getCode() + ": competence-based (NVA) assessment is recorded separately");
                 continue;
@@ -195,12 +197,10 @@ public class OfferingService {
     @Transactional(readOnly = true)
     public List<OfferingSummary> list(Long semesterId, boolean mineOnly) {
         Long me = access.me();
-        boolean wide = access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC, Role.HEAD_OF_DEPARTMENT,
-                Role.MANAGEMENT_VIEWER);
         List<ModuleOffering> all = offerings.findBySemesterIdOrderByIdAsc(semesterId);
         Map<Long, String> names = staffNames(all.stream().flatMap(o -> o.getStaff().stream().map(OfferingStaff::getUserId)).collect(Collectors.toSet()));
         return all.stream()
-                .filter(o -> isMine(o, me) || (!mineOnly && wide))
+                .filter(o -> isMine(o, me) || (!mineOnly && access.follows(o.getModule())))
                 .sorted(Comparator.comparing((ModuleOffering o) -> o.getModule().getCode()))
                 .map(o -> {
                     List<ModuleRegistration> regs = registrations.students(semesterId, o.getModule().getId(), APPROVED);
@@ -744,9 +744,7 @@ public class OfferingService {
     }
 
     private void requireRead(ModuleOffering o) {
-        if (isMine(o, access.me())) return;
-        if (access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC, Role.MANAGEMENT_VIEWER)) return;
-        if (access.moderates(o.getModule())) return;
+        if (isMine(o, access.me()) || access.follows(o.getModule())) return;
         throw new AccessDeniedException("Not your module");
     }
 

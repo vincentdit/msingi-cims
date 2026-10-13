@@ -66,6 +66,7 @@ public class RegistryService {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
     private final StudentRepository students;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final FirstRegistrationRepository firstRegistrations;
     private final ApplicationRepository applications;
     private final AdmissionWindowRepository windows;
@@ -276,8 +277,12 @@ public class RegistryService {
 
     @Transactional(readOnly = true)
     public PageResponse<StudentSummary> search(Long programmeId, Student.Status status, String q, int page, int size) {
-        Page<Student> p = students.search(programmeId, status, q == null || q.isBlank() ? null : q.trim(),
-                PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100), Sort.by("registrationNo")));
+        var mine = scope.current();
+        if (programmeId != null) scope.requireProgramme(programmeId);
+        String text = q == null || q.isBlank() ? null : q.trim();
+        PageRequest paging = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100), Sort.by("registrationNo"));
+        Page<Student> p = mine.all() || programmeId != null ? students.search(programmeId, status, text, paging)
+                : students.searchIn(mine.programmeIds().isEmpty() ? java.util.List.of(-1L) : mine.programmeIds(), status, text, paging);
         return PageResponse.of(p, StudentSummary::of);
     }
 
@@ -285,13 +290,17 @@ public class RegistryService {
     public Map<String, Long> stats() {
         Map<String, Long> out = new LinkedHashMap<>();
         for (Student.Status s : Student.Status.values()) out.put(s.name(), 0L);
-        students.countByStatus().forEach(r -> out.put(((Student.Status) r[0]).name(), ((Number) r[1]).longValue()));
+        var mine = scope.current();
+        (mine.all() ? students.countByStatus() : students.countByStatusIn(mine.programmeIds().isEmpty() ? java.util.List.of(-1L) : mine.programmeIds()))
+                .forEach(r -> out.put(((Student.Status) r[0]).name(), ((Number) r[1]).longValue()));
         return out;
     }
 
     @Transactional(readOnly = true)
     public StudentDetail detail(Long studentId) {
-        return detail(requireStudent(studentId));
+        Student s = requireStudent(studentId);
+        scope.requireProgramme(s.getProgramme().getId());
+        return detail(s);
     }
 
     private StudentDetail detail(Student s) {
@@ -306,6 +315,7 @@ public class RegistryService {
     /** Class list for a programme (CSV): registered (active) students, or all non-exited ones. */
     @Transactional
     public String classList(Long programmeId, boolean activeOnly) {
+        scope.requireProgramme(programmeId);
         Set<Student.Status> statuses = activeOnly ? Set.of(Student.Status.ACTIVE) : Set.of(Student.Status.ADMITTED, Student.Status.ACTIVE);
         StringBuilder sb = new StringBuilder(Csv.line("S/N", "Registration No", "Name", "Sex", "Programme", "Year of study", "Phone", "Status"));
         int n = 0;

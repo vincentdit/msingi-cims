@@ -97,6 +97,7 @@ public class IptService {
     private static final Set<IptPlacement.Status> LIVE = EnumSet.of(IptPlacement.Status.REQUESTED, IptPlacement.Status.CONFIRMED, IptPlacement.Status.COMPLETED);
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
 
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final OrganisationRepository organisations;
     private final PeriodRepository periods;
     private final PlacementRepository placements;
@@ -192,7 +193,8 @@ public class IptService {
         IptPeriod p = period(periodId);
         Map<Long, IptPlacement> live = placements.findByPeriodIdOrderByRequestedAtAsc(p.getId()).stream().filter(IptPlacement::live)
                 .collect(Collectors.toMap(IptPlacement::getStudentId, Function.identity(), (a, b) -> a));
-        return eligibleStudents(p).stream().sorted(Comparator.comparing(Student::getRegistrationNo)).map(s -> {
+        var mine = scope.current();
+        return eligibleStudents(p).stream().filter(s -> mine.programme(s.getProgramme())).sorted(Comparator.comparing(Student::getRegistrationNo)).map(s -> {
             IptPlacement pl = live.get(s.getId());
             return new EligibleStudent(s.getId(), s.getRegistrationNo(), s.fullName(), s.getProgramme().getCode(), s.getYearOfStudy(), s.getPhone(),
                     pl == null ? null : pl.getId(), pl == null ? null : pl.getStatus().name());
@@ -212,7 +214,14 @@ public class IptService {
     @Transactional(readOnly = true)
     public List<PlacementSummary> placements(Long periodId) {
         access.require("see IPT placements", VIEWERS);
-        return summaries(placements.findByPeriodIdOrderByRequestedAtAsc(period(periodId).getId()));
+        var mine = scope.current();
+        List<IptPlacement> list = placements.findByPeriodIdOrderByRequestedAtAsc(period(periodId).getId());
+        if (!mine.all()) {
+            Map<Long, Student> ss = students.findAllById(list.stream().map(IptPlacement::getStudentId).collect(Collectors.toSet())).stream()
+                    .collect(Collectors.toMap(Student::getId, Function.identity()));
+            list = list.stream().filter(pl -> mine.programme(ss.get(pl.getStudentId()).getProgramme())).toList();
+        }
+        return summaries(list);
     }
 
     /** The placements the signed-in staff member supervises for the institution. */
@@ -329,7 +338,7 @@ public class IptService {
     @Transactional(readOnly = true)
     public PlacementView get(Long id) {
         IptPlacement pl = placement(id);
-        if (!access.has(VIEWERS) && !supervises(pl)) throw new AccessDeniedException("Not your placement");
+        if (!(access.has(VIEWERS) && inScope(pl)) && !supervises(pl)) throw new AccessDeniedException("Not your placement");
         return view(pl);
     }
 
@@ -337,7 +346,7 @@ public class IptService {
     @Transactional(readOnly = true)
     public PlacementLetter.Download letter(Long id) {
         IptPlacement pl = placement(id);
-        if (!access.has(VIEWERS) && !supervises(pl)) throw new AccessDeniedException("Not your placement");
+        if (!(access.has(VIEWERS) && inScope(pl)) && !supervises(pl)) throw new AccessDeniedException("Not your placement");
         return letterOf(pl);
     }
 
@@ -652,6 +661,12 @@ public class IptService {
                 (int) ps.stream().filter(x -> x.getStatus() == IptPlacement.Status.CONFIRMED).count(),
                 (int) ps.stream().filter(x -> x.getStatus() == IptPlacement.Status.COMPLETED).count(), p.getResultsTransferredAt(), p.getResultsTransferredBy(),
                 (p.getRequestsClose() == null || !today.isAfter(p.getRequestsClose())) && !today.isAfter(p.getEndsOn()));
+    }
+
+    /** A Head of Department sees the placements of their department's students. */
+    private boolean inScope(IptPlacement pl) {
+        var mine = scope.current();
+        return mine.all() || students.findById(pl.getStudentId()).map(st -> mine.programme(st.getProgramme())).orElse(false);
     }
 
     private List<PlacementSummary> summaries(List<IptPlacement> list) {

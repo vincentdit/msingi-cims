@@ -31,6 +31,7 @@ public class ExamAccess {
     public static final Role[] ALLOCATORS = {Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.HEAD_OF_DEPARTMENT, Role.DEPUTY_PRINCIPAL_ACADEMIC};
 
     private final UserAccountRepository users;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
 
     public Set<String> roles() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -58,6 +59,16 @@ public class ExamAccess {
         if (u == null) return false;
         return u.getRoles().stream().filter(r -> r.getRole() == Role.HEAD_OF_DEPARTMENT)
                 .anyMatch(r -> !"DEPARTMENT".equals(r.getScopeType()) || Objects.equals(r.getScopeId(), departmentId));
+    }
+
+    /**
+     * Whether the signed-in person follows this module's teaching, marks and results (reading only): the offices that see the
+     * whole institution, and a Head of Department or Programme Coordinator for modules of their department or programmes.
+     */
+    public boolean follows(Module module) {
+        if (has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC, Role.MANAGEMENT_VIEWER)) return true;
+        if (!has(Role.HEAD_OF_DEPARTMENT, Role.PROGRAMME_COORDINATOR)) return false;
+        return scope.current().module(module) || moderates(module);
     }
 
     /** Whether the signed-in Head of Department moderates this module (department-scoped or institution-wide). */

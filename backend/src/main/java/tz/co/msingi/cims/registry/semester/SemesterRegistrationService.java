@@ -54,6 +54,7 @@ public class SemesterRegistrationService {
     static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
 
     private final SemesterRegistrationRepository registrations;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final SemesterRepository semesters;
     private final CurriculumService curricula;
     private final CurriculumModuleRepository curriculumModules;
@@ -203,15 +204,23 @@ public class SemesterRegistrationService {
     public SemesterSummary summary(Long semesterId) {
         Semester sem = semesters.findById(semesterId).orElseThrow(() -> new NotFoundException("Semester", semesterId));
         Map<String, Long> by = new TreeMap<>();
-        for (Object[] row : registrations.countByStatus(semesterId)) by.put(((SemesterRegistration.Status) row[0]).name(), (Long) row[1]);
-        long active = students.findByStatusIn(EnumSet.of(Student.Status.ACTIVE)).size();
+        var mine = scope.current();
+        if (mine.all()) {
+            for (Object[] row : registrations.countByStatus(semesterId)) by.put(((SemesterRegistration.Status) row[0]).name(), (Long) row[1]);
+        } else {
+            registrations.findBySemesterIdOrderBySubmittedAtAsc(semesterId).stream().filter(r -> mine.programme(r.getStudent().getProgramme()))
+                    .forEach(r -> by.merge(r.getStatus().name(), 1L, Long::sum));
+        }
+        long active = students.findByStatusIn(EnumSet.of(Student.Status.ACTIVE)).stream().filter(st -> mine.programme(st.getProgramme())).count();
         long registered = by.getOrDefault("SUBMITTED", 0L) + by.getOrDefault("APPROVED", 0L);
         return new SemesterSummary(sem.getId(), sem.getName(), sem.window(LocalDate.now(ZONE)).name(), active, Math.max(0, active - registered), by);
     }
 
     @Transactional(readOnly = true)
     public List<RegistrationView> list(Long semesterId, String status) {
+        var mine = scope.current();
         return registrations.findBySemesterIdOrderBySubmittedAtAsc(semesterId).stream()
+                .filter(r -> mine.programme(r.getStudent().getProgramme()))
                 .filter(r -> status == null || status.isBlank() || r.getStatus().name().equals(status))
                 .sorted(Comparator.comparing((SemesterRegistration r) -> r.getStatus() == SemesterRegistration.Status.SUBMITTED ? 0 : 1)
                         .thenComparing(SemesterRegistration::getSubmittedAt))
@@ -220,7 +229,9 @@ public class SemesterRegistrationService {
 
     @Transactional(readOnly = true)
     public RegistrationView get(Long id) {
-        return view(require(id));
+        SemesterRegistration r = require(id);
+        scope.requireProgramme(r.getStudent().getProgramme().getId());
+        return view(r);
     }
 
     /** Approval re-checks fee clearance as it is now. */

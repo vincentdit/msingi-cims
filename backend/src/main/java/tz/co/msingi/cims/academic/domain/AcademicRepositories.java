@@ -43,5 +43,8 @@ public final class AcademicRepositories {
         Optional<Programme> findByCode(String code);
 
         boolean existsByCode(String code);
+
+        @org.springframework.data.jpa.repository.Query("select p.id from Programme p where p.department.id in :departmentIds")
+        List<Long> idsInDepartments(java.util.Collection<Long> departmentIds);
     }
 }

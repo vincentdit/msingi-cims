@@ -65,6 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
+        TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> scopeDemoHeads()));
         log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026, principal / Principal@2026, auditor / Auditor@2026, assessor / Assessor@2026, coordinator / Coordinator@2026 (header X-Tenant: DEMO)");
     }
 
@@ -178,6 +179,22 @@ public class DemoDataSeeder implements ApplicationRunner {
         addProgramme(w, elec, 60, EntryRules.openEntry("Completed Standard Seven or Form Four"));
         w.setJoiningInstructions(demoJoiningInstructions());
         windows.save(w);
+    }
+
+    /** The demo Head of Department heads ICT and the demo Programme Coordinator coordinates ODIT (data scope). */
+    private void scopeDemoHeads() {
+        departments.findByCode("ICT").ifPresent(d -> users.findByUsernameIgnoreCase("hod").ifPresent(u -> {
+            if (u.getRoles().stream().anyMatch(r -> r.getRole() == Role.HEAD_OF_DEPARTMENT && "INSTITUTION".equals(r.getScopeType()))) {
+                u.getRoles().removeIf(r -> r.getRole() == Role.HEAD_OF_DEPARTMENT);
+                u.grant(Role.HEAD_OF_DEPARTMENT, "DEPARTMENT", d.getId());
+            }
+        }));
+        programmes.findByCode("ODIT").ifPresent(p -> users.findByUsernameIgnoreCase("coordinator").ifPresent(u -> {
+            if (u.getRoles().stream().anyMatch(r -> r.getRole() == Role.PROGRAMME_COORDINATOR && "INSTITUTION".equals(r.getScopeType()))) {
+                u.getRoles().removeIf(r -> r.getRole() == Role.PROGRAMME_COORDINATOR);
+                u.grant(Role.PROGRAMME_COORDINATOR, "PROGRAMME", p.getId());
+            }
+        }));
     }
 
     private void staff(String username, String name, String password, Role... roles) {

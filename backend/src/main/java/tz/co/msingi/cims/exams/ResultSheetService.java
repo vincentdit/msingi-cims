@@ -75,6 +75,7 @@ public class ResultSheetService {
     private static final SemesterRegistration.Status APPROVED = SemesterRegistration.Status.APPROVED;
     static final Set<ResultSheet.Status> FINAL = EnumSet.of(ResultSheet.Status.CONFIRMED, ResultSheet.Status.PUBLISHED);
 
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final ResultSheetRepository sheets;
     private final SemesterResultRepository semesterResults;
     private final ModuleResultRepository moduleResults;
@@ -125,6 +126,8 @@ public class ResultSheetService {
                 out.add(summary(existing.get(programmeId + "/" + year + "/RESIT"), semesterId, p, year, Round.RESIT, (int) count, waiting));
             }
         }
+        var mine = scope.current();
+        out.removeIf(x -> !mine.programme(x.programmeId()));
         out.sort(Comparator.comparing(SheetSummary::programmeCode).thenComparing(SheetSummary::yearOfStudy).thenComparing(SheetSummary::round));
         return out;
     }
@@ -137,7 +140,9 @@ public class ResultSheetService {
 
     @Transactional(readOnly = true)
     public SheetView get(Long id) {
-        return view(require(id));
+        ResultSheet rs = require(id);
+        scope.requireProgramme(rs.getProgramme().getId());
+        return view(rs);
     }
 
     // ------------------------------------------------------------------ BP-08 step 6: computation

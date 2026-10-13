@@ -33,6 +33,9 @@ public class StaffUserController {
     private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','AUDITOR')";
 
     private final StaffUserService service;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
+    private final tz.co.msingi.cims.academic.domain.AcademicRepositories.DepartmentRepository departments;
+    private final tz.co.msingi.cims.academic.domain.AcademicRepositories.ProgrammeRepository programmes;
 
     @Operation(summary = "Roles that can be given to staff, with what each is for and how it can be limited")
     @GetMapping("/api/admin/roles")
@@ -92,6 +95,19 @@ public class StaffUserController {
     @PreAuthorize(ADMIN)
     public StaffUserView enable(@PathVariable Long id) {
         return service.enable(id);
+    }
+
+    public record ScopeView(boolean all, List<String> departments, List<String> programmes) {
+    }
+
+    @Operation(summary = "The part of the institution the signed-in person works in (department or programme limits)")
+    @GetMapping("/api/auth/scope")
+    @PreAuthorize("isAuthenticated()")
+    public ScopeView scope() {
+        var s = scope.current();
+        if (s.all()) return new ScopeView(true, List.of(), List.of());
+        return new ScopeView(false, departments.findAllById(s.departmentIds()).stream().map(d -> d.getName()).sorted().toList(),
+                programmes.findAllById(s.programmeIds()).stream().map(p -> p.getCode() + " · " + p.getName()).sorted().toList());
     }
 
     @Operation(summary = "Change your own password (staff); returns a fresh session")

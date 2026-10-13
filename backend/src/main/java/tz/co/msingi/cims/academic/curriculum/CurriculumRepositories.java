@@ -50,6 +50,10 @@ public final class CurriculumRepositories {
         List<CurriculumModule> findByCurriculumIdAndYearOfStudyAndSemesterNo(Long curriculumId, short yearOfStudy, short semesterNo);
 
         long countByModuleId(Long moduleId);
+
+        /** Modules taught in any curriculum of these programmes (what a Programme Coordinator or Head of Department follows). */
+        @org.springframework.data.jpa.repository.Query("select distinct cm.module.id from CurriculumModule cm where cm.curriculum.programme.id in :programmeIds")
+        List<Long> moduleIdsOfProgrammes(java.util.Collection<Long> programmeIds);
     }
 
     public interface ElectiveRuleRepository extends JpaRepository<ElectiveRule, Long> {

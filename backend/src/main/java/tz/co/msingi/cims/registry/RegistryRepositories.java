@@ -50,6 +50,21 @@ public final class RegistryRepositories {
 
         @Query("select s.status, count(s) from Student s group by s.status")
         List<Object[]> countByStatus();
+
+        @Query("select s.status, count(s) from Student s where s.programme.id in :programmeIds group by s.status")
+        List<Object[]> countByStatusIn(Collection<Long> programmeIds);
+
+        /** As {@link #search} within a set of programmes (a Head of Department's or Programme Coordinator's). */
+        @EntityGraph(attributePaths = {"programme", "entryAcademicYear", "intake"})
+        @Query("""
+                select s from Student s
+                where s.programme.id in :programmeIds
+                  and (:status is null or s.status = :status)
+                  and (:q is null or lower(s.firstName) like lower(concat('%', cast(:q as string), '%'))
+                       or lower(s.surname) like lower(concat('%', cast(:q as string), '%'))
+                       or lower(s.registrationNo) like lower(concat('%', cast(:q as string), '%'))
+                       or s.phone like concat('%', cast(:q as string), '%'))""")
+        Page<Student> searchIn(Collection<Long> programmeIds, Student.Status status, String q, Pageable pageable);
     }
 
     public interface FirstRegistrationRepository extends JpaRepository<FirstRegistration, Long> {

@@ -372,8 +372,7 @@ public class AttendanceService {
 
     /** Whether the signed-in person oversees a module: the Examinations Office, academic management, or its Head of Department. */
     boolean oversees(ModuleOffering o) {
-        return access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC, Role.MANAGEMENT_VIEWER)
-                || access.moderates(o.getModule());
+        return access.follows(o.getModule());
     }
 
     private void requireRead(ModuleOffering o) {

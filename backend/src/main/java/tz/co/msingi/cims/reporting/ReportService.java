@@ -57,11 +57,14 @@ public class ReportService {
     private final ProgrammeRepository programmes;
     private final tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.SemesterRepository semesters;
     private final tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules;
+    private final tz.co.msingi.cims.platform.security.DataScope scope;
 
     public ReportService(List<ReportProvider> providers, AuditService audit, TenantRepository tenants, AcademicYearRepository years,
                          IntakeRepository intakes, AdmissionWindowRepository windows, ProgrammeRepository programmes,
                          tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.SemesterRepository semesters,
-                         tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules) {
+                         tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules,
+                         tz.co.msingi.cims.platform.security.DataScope scope) {
+        this.scope = scope;
         List<String> areaOrder = List.of("Admissions", "Registry", "Examinations", "Finance", "Governance");
         providers.stream().flatMap(p -> p.definitions().stream())
                 .sorted((a, b) -> Integer.compare(areaOrder.indexOf(a.area()), areaOrder.indexOf(b.area())) * 1000 + a.code().compareTo(b.code()))
@@ -78,7 +81,9 @@ public class ReportService {
 
     public List<CatalogueEntry> catalogue() {
         Set<Role> mine = currentRoles();
+        boolean limited = !scope.current().all();
         return definitions.values().stream().filter(d -> allowed(d, mine))
+                .filter(d -> !limited || d.filters().contains(ReportModel.PROGRAMME))
                 .map(d -> new CatalogueEntry(d.code(), d.area(), d.title(), d.description(), d.personalData(), d.filters())).toList();
     }
 
@@ -115,7 +120,7 @@ public class ReportService {
         Definition d = definitions.get(code);
         if (d == null) throw new NotFoundException("Report", code);
         if (!allowed(d, currentRoles())) throw new AccessDeniedException("Not allowed to run " + code);
-        Filter f = honoured(d, raw == null ? new Filter(null, null, null, null, null, null, null, null, null, null, null, null, null, null) : raw);
+        Filter f = withinScope(d, honoured(d, raw == null ? new Filter(null, null, null, null, null, null, null, null, null, null, null, null, null, null) : raw));
         Data data = d.run().apply(f);
         int count = data.rows().size();
         if (count > MAX_ROWS) {
@@ -124,6 +129,27 @@ public class ReportService {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow();
         return new Report(d.code(), d.area(), d.title(), d.description(), describe(d, f), data.columns(), data.rows(), data.totals(),
                 data.notes(), count, false, t.getName(), OffsetDateTime.now(), CurrentUser.name());
+    }
+
+    /**
+     * A Head of Department or Programme Coordinator runs reports for one of their own programmes: reports without a programme
+     * filter are not offered, a programme outside their scope is refused, and with a single programme it is chosen for them.
+     */
+    private Filter withinScope(Definition d, Filter f) {
+        var mine = scope.current();
+        if (mine.all()) return f;
+        if (!d.filters().contains(ReportModel.PROGRAMME)) throw new AccessDeniedException("This report covers the whole institution");
+        Long programmeId = f.programmeId();
+        if (programmeId == null) {
+            if (mine.programmeIds().size() != 1) {
+                throw new BusinessRuleException("CHOOSE_PROGRAMME", "Choose one of your programmes for this report.");
+            }
+            programmeId = mine.programmeIds().iterator().next();
+        }
+        scope.requireProgramme(programmeId);
+        if (f.moduleId() != null) modules.findById(f.moduleId()).ifPresent(scope::requireModule);
+        return new Filter(f.academicYearId(), f.intakeId(), f.windowId(), programmeId, f.awardFamily(), f.level(), f.sex(), f.status(),
+                f.yearOfStudy(), f.from(), f.to(), f.text(), f.semesterId(), f.moduleId());
     }
 
     /** Only the filters the report honours, with the period defaulting to this month. */

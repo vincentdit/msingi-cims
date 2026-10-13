@@ -224,6 +224,8 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
 // ---------------------------------------------------------------- Programmes
 export function ProgrammesPage() {
   const qc = useQueryClient();
+  const { user } = useSession();
+  const canEdit = !!user('staff')?.roles.some((r) => r === 'INSTITUTION_ADMIN' || r === 'DEPUTY_PRINCIPAL_ACADEMIC');
   const list = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const depts = useQuery({ queryKey: ['staff', 'departments'], queryFn: () => api<Department[]>('/api/academic/departments', staff) });
   const empty = { id: 0, departmentId: '', code: '', nactvetCode: '', name: '', awardFamily: 'NTA', awardLevel: '4', durationSemesters: '2', accreditedCapacity: '', entryLevel: '' };
@@ -241,14 +243,14 @@ export function ProgrammesPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Programmes" subtitle="NVA and NTA programmes accredited by NACTVET. Applicants see only programmes that admit at the level their highest qualification leads to."
-        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>New programme</Button>} />
+        action={canEdit && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>New programme</Button>} />
       <ErrorAlert error={list.error} />
       <Card><TableContainer>
         <Table size="small">
           <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell>Admits at</TableCell><TableCell>Department</TableCell><TableCell align="right">Capacity</TableCell></TableRow></TableHead>
           <TableBody>
             {list.data?.map((p) => (
-              <TableRow key={p.id} hover sx={{ cursor: 'pointer' }} onClick={() => edit(p)}>
+              <TableRow key={p.id} hover={canEdit} sx={{ cursor: canEdit ? 'pointer' : 'default' }} onClick={() => canEdit && edit(p)}>
                 <TableCell>{p.code}</TableCell><TableCell>{p.name}</TableCell><TableCell>{p.awardName}</TableCell>
                 <TableCell>{p.awardFamily} Level {p.entryLevel}</TableCell>
                 <TableCell>{p.departmentName}</TableCell><TableCell align="right">{p.accreditedCapacity ?? '—'}</TableCell>

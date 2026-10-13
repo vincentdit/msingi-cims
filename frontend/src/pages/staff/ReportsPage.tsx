@@ -80,8 +80,21 @@ function ReportView({ entry }: { entry: ReportCatalogueEntry }) {
   const [applied, setApplied] = useState<Filters>({});
   const [dlError, setDlError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // a Head of Department or Programme Coordinator runs reports for one of their programmes at a time: start with the first
+  const scope = useQuery({ queryKey: ['staff', 'scope'], staleTime: 300_000,
+    queryFn: () => api<{ all: boolean }>('/api/auth/scope', staff) });
+  const limited = !!scope.data && !scope.data.all;
+  const progs = useQuery({ queryKey: ['staff', 'programmes'], enabled: limited, queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  useEffect(() => {
+    if (limited && progs.data?.length && !applied.programmeId) {
+      const id = String(progs.data[0].id);
+      setFilters((f) => ({ ...f, programmeId: id }));
+      setApplied((a) => ({ ...a, programmeId: id }));
+    }
+  }, [limited, progs.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const qs = new URLSearchParams(Object.entries(applied).filter(([, v]) => v !== '')).toString();
   const report = useQuery({
+    enabled: scope.isSuccess && (!limited || !!applied.programmeId),
     queryKey: ['staff', 'report', entry.code, qs],
     queryFn: () => api<ReportResult>(`/api/reports/${entry.code}${qs ? `?${qs}` : ''}`, staff),
   });
@@ -110,7 +123,7 @@ function ReportView({ entry }: { entry: ReportCatalogueEntry }) {
         </Stack>
         {!!entry.filters.length && (
           <>
-            <FilterBar entry={entry} filters={filters} onChange={setFilters} />
+            <FilterBar entry={entry} filters={filters} onChange={setFilters} limited={limited} />
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
               <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => setApplied({ ...filters })}>Run</Button>
               {Object.values(filters).some(Boolean) && <Button onClick={() => { setFilters({}); setApplied({}); }}>Clear filters</Button>}
@@ -166,7 +179,7 @@ function ReportView({ entry }: { entry: ReportCatalogueEntry }) {
   );
 }
 
-function FilterBar({ entry, filters, onChange }: { entry: ReportCatalogueEntry; filters: Filters; onChange: (f: Filters) => void }) {
+function FilterBar({ entry, filters, onChange, limited }: { entry: ReportCatalogueEntry; filters: Filters; onChange: (f: Filters) => void; limited?: boolean }) {
   const has = (f: string) => entry.filters.includes(f);
   const years = useQuery({ queryKey: ['staff', 'years'], enabled: has('academicYear'), queryFn: () => api<AcademicYear[]>('/api/academic/years', staff) });
   const intakes = useQuery({ queryKey: ['staff', 'intakes'], enabled: has('intake'), queryFn: () => api<{ id: number; name: string }[]>('/api/academic/intakes', staff) });
@@ -175,10 +188,10 @@ function FilterBar({ entry, filters, onChange }: { entry: ReportCatalogueEntry; 
   const semesters = useQuery({ queryKey: ['staff', 'semesters'], enabled: has('semester'), queryFn: () => api<Semester[]>('/api/academic/semesters', staff) });
   const modules = useQuery({ queryKey: ['staff', 'modules'], enabled: has('module'), queryFn: () => api<CourseModule[]>('/api/academic/modules', staff) });
   const set = (k: string, v: string) => onChange({ ...filters, [k]: v });
-  const sel = (key: string, label: string, options: { value: string | number; label: string }[], all = 'All') => (
+  const sel = (key: string, label: string, options: { value: string | number; label: string }[], all: string | null = 'All') => (
     <Grid size={{ xs: 12, sm: 6, md: 3 }} key={key}>
       <TextField select size="small" label={label} value={filters[key] ?? ''} onChange={(e) => set(key, e.target.value)}>
-        <MenuItem value="">{all}</MenuItem>
+        {all !== null && <MenuItem value="">{all}</MenuItem>}
         {options.map((o) => <MenuItem key={o.value} value={String(o.value)}>{o.label}</MenuItem>)}
       </TextField>
     </Grid>
@@ -190,7 +203,7 @@ function FilterBar({ entry, filters, onChange }: { entry: ReportCatalogueEntry; 
       {has('academicYear') && sel('academicYearId', 'Academic year', years.data?.map((y) => ({ value: y.id, label: y.code })) ?? [], 'All years')}
       {has('intake') && sel('intakeId', 'Intake', intakes.data?.map((i) => ({ value: i.id, label: i.name })) ?? [], 'All intakes')}
       {has('window') && windows.data && sel('windowId', 'Admission window', windows.data.map((w) => ({ value: w.id, label: w.name })), 'All windows')}
-      {has('programme') && sel('programmeId', 'Programme', programmes.data?.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` })) ?? [], 'All programmes')}
+      {has('programme') && sel('programmeId', 'Programme', programmes.data?.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` })) ?? [], limited ? null : 'All programmes')}
       {has('awardFamily') && sel('awardFamily', 'Award family', [{ value: 'NTA', label: 'NTA' }, { value: 'NVA', label: 'NVA' }])}
       {has('level') && sel('level', 'Level', [1, 2, 3, 4, 5, 6, 7, 8].map((l) => ({ value: l, label: `Level ${l}` })), 'All levels')}
       {has('sex') && sel('sex', 'Sex', [{ value: 'F', label: 'Female' }, { value: 'M', label: 'Male' }])}

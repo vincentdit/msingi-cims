@@ -18,8 +18,8 @@ This is the working list of who uses CIMS, what each person should see and do, a
 | academic (Academic@2026) | Deputy Principal (Academic) |
 | admissions (Admissions@2026) | Admissions Officer |
 | registry (Registry@2026) | Registrar |
-| hod (Hod@2026) | Head of Department |
-| coordinator (Coordinator@2026) | Programme Coordinator |
+| hod (Hod@2026) | Head of Department (ICT) |
+| coordinator (Coordinator@2026) | Programme Coordinator (ODIT) |
 | lecturer (Lecturer@2026) | Lecturer |
 | assessor (Assessor@2026) | Assessor (NVA) |
 | exams (Exams@2026) | Examinations Officer |
@@ -108,17 +108,26 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Does:** keeps student records, approves detail changes, runs semester registration and prepares graduation lists.
 - **Next:** student status changes (suspension, deferment, withdrawal) and ID cards.
 
-### 8. Head of Department: Working (scope gap)
+### 8. Head of Department: Done
 
-- **Sees:** programmes, students, semester registration, calendar, curricula, teaching, marks, eligibility, results and regulations.
-- **Does:** allocates modules, moderates marks and approves for the department.
-- **Gap:** the department limit is applied to marks moderation only. Lists and dashboards still show the whole institution. They should show only the department's programmes, modules and students.
+- **Sees:** programmes, students, semester registration, calendar, curricula, teaching, marks, eligibility, results, regulations, clearance, IPT, dashboard and reports.
+- **Does:** allocates lecturers and sets up the department's module offerings, moderates marks, requests examination exemptions, prepares curricula and clears finalists for the department.
+- **When limited to a department** (the usual set-up; give the role "limited to" a department on Users & roles):
+  - **Lists:** programmes, students, the student's record and class lists, semester registrations, curricula, result sheets and IPT placements show only the department's programmes.
+  - **Modules:** teaching, marks and eligibility show the department's modules and the modules taught in its programmes. Moderation stays limited to the department's own modules.
+  - **Dashboard and reports:** the dashboard counts only the department's students. Reports are run for one of its programmes, and reports that only cover the whole institution are not offered.
+  - **Changes:** modules and curricula can be created or changed only for the department.
+  - **Direct links:** a record outside the department is refused, even by a direct link.
+- **Sidebar:** shows "Department: …" under the person's name.
+- **Demo:** `hod` heads ICT.
 
-### 9. Programme Coordinator: Working (scope gap)
+### 9. Programme Coordinator: Done
 
 - **Sees:** calendar, curricula, teaching, marks and IPT for their programme.
-- **Does:** prepares the programme's curriculum and follows its classes.
-- **Gap:** the programme limit is not yet applied to lists.
+- **Does:** prepares the programme's curriculum and adds its modules, and follows its classes, attendance and marks (read-only unless also a lecturer).
+- **When limited to a programme:** the same rules as above, with the programme in place of the department.
+- **Demo:** `coordinator` coordinates ODIT.
+- **Next:** a coordinator dashboard (class sizes, attendance below the threshold, marks not yet submitted).
 
 ### 10. Lecturer / Tutor: Working
 
@@ -197,9 +206,8 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Head of Department and Programme Coordinator: apply their department or programme limits to lists and dashboards.
-2. Principal / Management: a decision-focused dashboard.
-3. Deputy Principal: one approvals inbox.
-4. Admissions Officer: NOAS-style applicant search and file.
-5. Registrar: status changes and ID cards.
-6. Platform Administrator: the platform console and onboarding.
+1. Principal / Management: a decision-focused dashboard.
+2. Deputy Principal: one approvals inbox.
+3. Admissions Officer: NOAS-style applicant search and file.
+4. Registrar: status changes and ID cards.
+5. Platform Administrator: the platform console and onboarding.

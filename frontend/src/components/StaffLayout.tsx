@@ -31,6 +31,8 @@ import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { can, pageOf, ROLE_LABEL, type PageKey } from '../auth/access';
 import { useSession } from '../auth/session';
@@ -100,6 +102,9 @@ export default function StaffLayout() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const me = user('staff');
+  // a Head of Department or Programme Coordinator limited to part of the institution sees it named under their roles
+  const scope = useQuery({ queryKey: ['staff', 'scope', me?.id], enabled: !!me && !me.mustChangePassword, staleTime: 300_000,
+    queryFn: () => api<{ all: boolean; departments: string[]; programmes: string[] }>('/api/auth/scope', { realm: 'staff' }) }).data;
   const roles = me?.roles ?? [];
   const location = useLocation();
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
@@ -145,6 +150,11 @@ export default function StaffLayout() {
       <Box sx={{ p: 2 }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{me?.fullName}</Typography>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>{me?.roles.map((r) => ROLE_LABEL[r] ?? r).join(', ')}</Typography>
+        {scope && !scope.all && (
+          <Typography variant="caption" component="div" sx={{ mt: 0.5, px: 1, py: 0.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.08)' }}>
+            {scope.departments.length ? `Department: ${scope.departments.join(', ')}` : `Programme: ${scope.programmes.join(', ')}`}
+          </Typography>
+        )}
         <ListItemButton component={NavLink} to="/staff/password" sx={{ mt: 1, borderRadius: 2, px: 1, color: 'inherit' }} onClick={() => setOpen(false)}>
           <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><KeyIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Change password" />
