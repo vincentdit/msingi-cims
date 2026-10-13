@@ -78,7 +78,7 @@ export default function StaffLayout() {
   const nav = NAV.filter((n) => (teachingOnly ? n.teaching : officerOnly ? (n.officer && (!n.roles || n.roles.some((r) => roles.includes(r)))) || !!n.officerRoles?.some((r) => roles.includes(r)) : !n.roles || n.roles.some((r) => roles.includes(r))));
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>
+    <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>
       <Box sx={{ p: 2.5 }}>
         <Typography sx={{ fontFamily: 'Sora', fontWeight: 700 }}>{inst.shortName ?? inst.name}</Typography>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>CIMS · Back-office</Typography>
@@ -128,7 +128,7 @@ export default function StaffLayout() {
         variant={desktop ? 'permanent' : 'temporary'}
         open={desktop || open}
         onClose={() => setOpen(false)}
-        sx={{ width: WIDTH, flexShrink: 0, '& .MuiDrawer-paper': { width: WIDTH, border: 0 } }}
+        sx={{ width: WIDTH, flexShrink: 0, '& .MuiDrawer-paper': { width: WIDTH, border: 0, bgcolor: '#0F1B2D', color: '#E6EBF2', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.25) transparent' } }}
       >
         {drawer}
       </Drawer>
