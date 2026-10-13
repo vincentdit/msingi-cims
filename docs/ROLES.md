@@ -80,11 +80,17 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - Every change is in the audit trail.
 - **Next:** institution settings page (name, contacts, colours, logo, registration number pattern) and integration settings.
 
-### 4. Principal / Management Viewer: Working
+### 4. Principal / Management Viewer: Done
 
-- **Sees:** the dashboard, reports and read-only views of every area.
+- **Sees:** the dashboard, reports and read-only views of every area. The dashboard opens on the **Institution overview** for the chosen academic year.
+- **Institution overview:**
+  - **Headline figures:** current students (female and male); new students against accredited places; the share of the year's annual fees collected (amounts and what is outstanding); the pass rate from published results; and first-choice applicants per place in the year's admission window.
+  - **Needs attention:** the programmes below stated thresholds (intake under 50% of places, fees collected under 60%, pass rate under 60%, fewer applicants than places). Each is marked with an icon and words, not colour alone.
+  - **Charts:** new students by year of entry (last five years) and payments received by month (last twelve months).
+  - **By programme table:** students, new intake against places, fees collected and outstanding, pass rate, and applicants per place, with a total row.
+  - The administrator and the Deputy Principal (Academic) see the same overview as a tab beside "Today's work".
 - **Does:** nothing that changes data.
-- **Next:** a management dashboard focused on decisions (enrolment, fee collection, pass rates, by programme and intake) rather than office queues.
+- **Next:** make the thresholds settable per institution; export the overview as PDF for board papers.
 
 ### 5. Deputy Principal (Academic): Working
 
@@ -206,8 +212,7 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Principal / Management: a decision-focused dashboard.
-2. Deputy Principal: one approvals inbox.
-3. Admissions Officer: NOAS-style applicant search and file.
-4. Registrar: status changes and ID cards.
-5. Platform Administrator: the platform console and onboarding.
+1. Deputy Principal: one approvals inbox.
+2. Admissions Officer: NOAS-style applicant search and file.
+3. Registrar: status changes and ID cards.
+4. Platform Administrator: the platform console and onboarding.

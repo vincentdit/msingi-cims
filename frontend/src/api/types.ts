@@ -1992,3 +1992,22 @@ export interface AuditSummary {
   from: string; to: string; actions: number; people: number; signIns: number; failedSignIns: number; lockedAccounts: number;
   accountChanges: number; days: { date: string; count: number }[]; topActors: AuditCount[]; topAreas: AuditCount[];
 }
+
+export interface OverviewProgramme {
+  id: number; code: string; name: string; award: string; students: number; female: number; male: number; newStudents: number;
+  places?: number; intakeRate?: number; billed: number; collected: number; outstanding: number; collectionRate?: number;
+  assessed: number; passed: number; passRate?: number; applicants: number; windowPlaces: number; applicantsPerPlace?: number; attention: string[];
+}
+export interface Overview {
+  year?: { id: number; code: string; current: boolean };
+  years: { id: number; code: string; current: boolean }[];
+  totals: {
+    students: number; female: number; male: number; newStudents: number; places: number; intakeRate?: number; billed: number; collected: number;
+    outstanding: number; collectionRate?: number; assessed: number; passed: number; passRate?: number; applicants: number; windowPlaces: number;
+    applicantsPerPlace?: number; windowName?: string;
+  };
+  programmes: OverviewProgramme[];
+  intakeByYear: { key: string; label: string; value: number }[];
+  collectionsByMonth: { key: string; label: string; value: number }[];
+  thresholds: { lowIntake: number; lowCollection: number; lowPass: number; lowDemand: number };
+}

@@ -31,6 +31,7 @@ public class ReportController {
 
     private final ReportService reports;
     private final DashboardService dashboards;
+    private final OverviewService overview;
 
     @Operation(summary = "The reports this user may run")
     @GetMapping("/api/reports")
@@ -80,5 +81,12 @@ public class ReportController {
     @PreAuthorize(STAFF)
     public DashboardService.Dashboard dashboard() {
         return dashboards.dashboard();
+    }
+
+    @Operation(summary = "Institution overview for the Principal and management: enrolment, intake, fees, results and demand by programme")
+    @GetMapping("/api/dashboard/overview")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','MANAGEMENT_VIEWER','DEPUTY_PRINCIPAL_ACADEMIC')")
+    public OverviewService.Overview overview(@org.springframework.web.bind.annotation.RequestParam(required = false) Long academicYearId) {
+        return overview.overview(academicYearId);
     }
 }

@@ -1,9 +1,10 @@
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import WarningIcon from '@mui/icons-material/WarningAmber';
-import { Alert, Box, Button, Card, CardContent, Container, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Container, Stack, Tab, Tabs, Typography } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { OverviewSection } from './OverviewSection';
 import { Navigate, Link as RouterLink } from 'react-router-dom';
 import { api, formatDate, formatTzs } from '../../api/client';
 import type { DashboardData } from '../../api/types';
@@ -23,6 +24,9 @@ export default function DashboardPage() {
   const officerOnly = roles.length > 0 && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN' || r === 'IPT_COORDINATOR');
   const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly && !officerOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
   const d = q.data;
+  // the Principal, administrator and Deputy Principal (Academic) also have the institution overview; management starts there
+  const overview = roles.some((r) => r === 'MANAGEMENT_VIEWER' || r === 'INSTITUTION_ADMIN' || r === 'DEPUTY_PRINCIPAL_ACADEMIC');
+  const [tab, setTab] = useState<'overview' | 'today'>(roles.includes('MANAGEMENT_VIEWER') ? 'overview' : 'today');
   const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
   if (teachingOnly) return <Navigate to="/staff/marks" replace />;
   if (officerOnly) return <Navigate to={roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance'} replace />;
@@ -30,14 +34,24 @@ export default function DashboardPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={first ? `Welcome, ${first}` : 'Dashboard'} subtitle="Today at a glance. Figures update every minute; full detail is under Reports."
         action={<Button component={RouterLink} to="/staff/reports" endIcon={<ArrowForwardIcon />}>Reports</Button>} />
-      <ErrorAlert error={q.error} />
-      {q.isLoading && <Loading />}
-      {d && !d.admissions && !d.registry && !d.finance && <Alert severity="info">Your role has no dashboard figures. Use the menu to reach your work.</Alert>}
-      <Stack spacing={4}>
-        {d?.admissions && <AdmissionsSection a={d.admissions} />}
-        {d?.registry && <RegistrySection r={d.registry} />}
-        {d?.finance && <FinanceSection f={d.finance} />}
-      </Stack>
+      {overview && (
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Tab value="overview" label="Institution overview" />
+          <Tab value="today" label="Today's work" />
+        </Tabs>
+      )}
+      {overview && tab === 'overview' ? <OverviewSection /> : (
+        <>
+          <ErrorAlert error={q.error} />
+          {q.isLoading && <Loading />}
+          {d && !d.admissions && !d.registry && !d.finance && <Alert severity="info">Your role has no dashboard figures. Use the menu to reach your work.</Alert>}
+          <Stack spacing={4}>
+            {d?.admissions && <AdmissionsSection a={d.admissions} />}
+            {d?.registry && <RegistrySection r={d.registry} />}
+            {d?.finance && <FinanceSection f={d.finance} />}
+          </Stack>
+        </>
+      )}
     </Container>
   );
 }
