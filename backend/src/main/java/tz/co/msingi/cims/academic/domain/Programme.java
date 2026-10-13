@@ -46,6 +46,10 @@ public class Programme extends BaseEntity {
     @Column(nullable = false)
     private short durationSemesters;
 
+    /** The level the programme admits at; empty means {@link #entryLevel()} works it out. */
+    @Column(name = "entry_level")
+    private Short entryLevelSet;
+
     private Integer accreditedCapacity;
 
     @Column(columnDefinition = "text")
@@ -67,5 +71,17 @@ public class Programme extends BaseEntity {
             case 8 -> "Bachelor Degree (NTA Level 8)";
             default -> "NTA Level " + level;
         };
+    }
+
+    /**
+     * The level the programme admits at: as set, or else the award level for NVA, and for NTA the award level less the
+     * years of study after the first (an Ordinary Diploma at NTA 6 over six semesters admits at NTA 4), at least NTA 4,
+     * and NTA 7 for awards at NTA 7–8.
+     */
+    public int entryLevel() {
+        if (entryLevelSet != null) return entryLevelSet;
+        if (awardFamily == AwardFamily.NVA) return awardLevel;
+        if (awardLevel >= 7) return 7;
+        return Math.min(awardLevel, Math.max(4, awardLevel - durationSemesters / 2 + 1));
     }
 }

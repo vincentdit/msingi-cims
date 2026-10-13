@@ -131,6 +131,7 @@ public class ApplicantProfileService {
         takeSchool(a, req.type(), r);
         qualifications.save(q);
         audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
+        requireChoicesStillOpen(a, submitted, "With this qualification");
         amended(submitted);
         return QualificationView.of(q);
     }
@@ -209,6 +210,7 @@ public class ApplicantProfileService {
                 m.grade() == null ? "-" : m.grade(), m.credits() == null ? null : m.credits().shortValue()));
         qualifications.save(q);
         audit.record("NTA_AWARD_ADDED", "Applicant", a.getId(), Map.of("registrationNumber", reg, "level", award.ntaLevel()));
+        requireChoicesStillOpen(a, submitted, "With this qualification");
         amended(submitted);
         return QualificationView.of(q);
     }
@@ -236,6 +238,7 @@ public class ApplicantProfileService {
         q.setVerified(false);
         qualifications.save(q);
         audit.record("OTHER_AWARD_ADDED", "Applicant", a.getId(), Map.of("award", q.getAwardName(), "year", req.year()));
+        requireChoicesStillOpen(a, submitted, "With this qualification");
         amended(submitted);
         return QualificationView.of(q);
     }
@@ -287,6 +290,7 @@ public class ApplicantProfileService {
         q.setVerified(false);
         qualifications.save(q);
         audit.record("PRIOR_AWARD_ADDED", "Applicant", a.getId(), Map.of("type", req.type().name(), "number", q.getIndexNumber()));
+        requireChoicesStillOpen(a, submitted, "With this qualification");
         amended(submitted);
         return QualificationView.of(q);
     }
@@ -304,14 +308,7 @@ public class ApplicantProfileService {
         // a submitted application's programmes must stay within reach without it
         List<tz.co.msingi.cims.admission.eligibility.EligibilityEngine.Qualification> rest = qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream()
                 .filter(x -> !x.getId().equals(q.getId())).map(ApplicantQualification::toEngine).toList();
-        for (Application app : submitted) {
-            for (var c : app.getChoices()) {
-                if (!engine.evaluate(c.getWindowProgramme().getEntryRules(), rest).eligible()) {
-                    throw new BusinessRuleException("NEEDED_FOR_CHOICES", "You need this qualification for "
-                            + c.getWindowProgramme().getProgramme().getName() + ". Change your programme choices first.");
-                }
-            }
-        }
+        checkChoices(submitted, rest, "Without this qualification");
         qualifications.delete(q);
         amended(submitted);
         // the school came from these results: take it from another NECTA sitting, or let the applicant type it
@@ -329,6 +326,26 @@ public class ApplicantProfileService {
             }
         }
         audit.record("QUALIFICATION_REMOVED", "Applicant", a.getId(), Map.of("index", q.getIndexNumber()));
+    }
+
+    /** After adding a qualification: a submitted application's choices must still be open to the applicant (entry level, requirements). */
+    private void requireChoicesStillOpen(Applicant a, List<Application> submitted, String what) {
+        if (submitted.isEmpty()) return;
+        qualifications.flush();
+        checkChoices(submitted, qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream().map(ApplicantQualification::toEngine).toList(), what);
+    }
+
+    private void checkChoices(List<Application> submitted, List<tz.co.msingi.cims.admission.eligibility.EligibilityEngine.Qualification> quals, String what) {
+        for (Application app : submitted) {
+            for (var c : app.getChoices()) {
+                var p = c.getWindowProgramme().getProgramme();
+                var r = engine.evaluate(p.getAwardFamily().name(), p.entryLevel(), c.getWindowProgramme().getEntryRules(), quals);
+                if (!r.eligible()) {
+                    throw new BusinessRuleException("NEEDED_FOR_CHOICES", what + " you would no longer qualify for " + p.getName()
+                            + " (" + r.summary() + "). Change your programme choices first.");
+                }
+            }
+        }
     }
 
     private void amended(List<Application> submitted) {

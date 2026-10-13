@@ -243,7 +243,7 @@ public class SelectionService {
             List<Long> eligibleChoices = a.getChoices().stream()
                     .sorted(Comparator.comparing(ApplicationChoice::getChoiceOrder))
                     .map(c -> wpById.get(c.getWindowProgramme().getId()))
-                    .filter(wp -> wp != null && eligibility.evaluate(wp.getEntryRules(), quals).eligible())
+                    .filter(wp -> wp != null && eligibility.evaluate(wp.getProgramme().getAwardFamily().name(), wp.getProgramme().entryLevel(), wp.getEntryRules(), quals).eligible())
                     .map(WindowProgramme::getId).toList();
             java.math.BigDecimal score = merit.score(quals);
             candidates.add(new SelectionAllocator.Candidate(a.getId(), score, a.getSubmittedAt(), eligibleChoices));

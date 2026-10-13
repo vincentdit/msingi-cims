@@ -214,6 +214,7 @@ export function ProgrammesStep({ app, onNext }: { app: Application; onNext: () =
   const { t } = useTranslation();
   const invalidate = useInvalidate();
   const elig = useQuery({ queryKey: ['applicant', 'eligibility', app.windowId], queryFn: () => api<ProgrammeEligibility[]>(`/api/applicant/eligibility?windowId=${app.windowId}`, { realm: 'applicant' }) });
+  const level = useQuery({ queryKey: ['applicant', 'entry-level'], queryFn: () => api<{ label: string; basis: string }>('/api/applicant/entry-level', { realm: 'applicant' }) });
   const [chosen, setChosen] = useState<number[]>(app.choices.map((c) => c.windowProgrammeId));
   const save = useMutation({
     mutationFn: () => api(`/api/applicant/applications/${app.id}/choices`, { method: 'PUT', realm: 'applicant', body: { windowProgrammeIds: chosen } }),
@@ -229,6 +230,7 @@ export function ProgrammesStep({ app, onNext }: { app: Application; onNext: () =
   return (
     <Stack spacing={2.5}>
       <Typography color="text.secondary">{t('app.programmesIntro', { n: app.maxChoices })}</Typography>
+      {level.data && <Alert severity="info" icon={false}>{t('app.entryLevel', { basis: level.data.basis, label: level.data.label })}</Alert>}
       {chosen.length > 0 && (
         <Card sx={{ borderColor: 'secondary.main' }}>
           <CardContent>
@@ -243,13 +245,17 @@ export function ProgrammesStep({ app, onNext }: { app: Application; onNext: () =
           </CardContent>
         </Card>
       )}
-      {elig.data?.map((e) => (
+      {elig.data?.filter((e) => e.atEntryLevel || chosen.includes(e.windowProgrammeId)).map((e) => (
         <ProgrammeOption key={e.windowProgrammeId} e={e} checked={chosen.includes(e.windowProgrammeId)}
-          disabled={!e.eligible || (!chosen.includes(e.windowProgrammeId) && chosen.length >= app.maxChoices)}
+          disabled={!chosen.includes(e.windowProgrammeId) && (!e.eligible || chosen.length >= app.maxChoices)}
           onToggle={() => toggle(e.windowProgrammeId)} />
       ))}
+      {!!elig.data?.filter((e) => !e.atEntryLevel && !chosen.includes(e.windowProgrammeId)).length && (
+        <Typography variant="caption" color="text.secondary">{t('app.otherLevels', { n: elig.data.filter((e) => !e.atEntryLevel && !chosen.includes(e.windowProgrammeId)).length })}</Typography>
+      )}
       <ErrorAlert error={save.error} />
-      <Box><Button variant="contained" onClick={() => save.mutate()} disabled={!chosen.length || save.isPending}>{t('app.saveChoices')}</Button></Box>
+      <Box><Button variant="contained" onClick={() => save.mutate()} disabled={!chosen.length || save.isPending
+        || chosen.some((id) => byId.get(id) && !byId.get(id)!.eligible)}>{t('app.saveChoices')}</Button></Box>
     </Stack>
   );
 }

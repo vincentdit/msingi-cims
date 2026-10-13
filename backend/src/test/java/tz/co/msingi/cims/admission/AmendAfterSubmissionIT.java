@@ -120,4 +120,33 @@ class AmendAfterSubmissionIT {
         s.call(post("/api/applicant/qualifications/other"), a.token(), """
                 {"awardName":"X","institution":"Y","year":2021,"level":"OTHER"}""").andExpect(jsonPath("$.code").value("APPLICATION_SUBMITTED"));
     }
+
+    @Test
+    void programmesFollowTheEntryLevelOfTheHighestQualification() throws Exception {
+        // a Form Four leaver may apply for the NTA 4 programme of the test window
+        String token = s.applicantToken("S0101/0011");
+        JsonNode elig = s.body(s.call(get("/api/applicant/eligibility?windowId=" + s.inst.windowId()), token, null));
+        assertThat(elig.get(0).get("eligible").asBoolean()).isTrue();
+
+        // with a verified NTA 4 award the next level is NTA 5, so the NTA 4 programme is no longer open
+        long nta = s.body(s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS4111/0001/2020\",\"graduationYear\":2022}")
+                .andExpect(status().isCreated())).get("id").asLong();
+        elig = s.body(s.call(get("/api/applicant/eligibility?windowId=" + s.inst.windowId()), token, null));
+        assertThat(elig.get(0).get("eligible").asBoolean()).isFalse();
+        assertThat(elig.get(0).at("/eligibility/summary").asText()).isEqualTo(
+                "Not at your entry level: with your NTA Level 4 award you can apply for NTA Level 5 programmes");
+        s.call(put("/api/applicant/profile"), token, PROFILE.formatted("Arusha")).andExpect(status().isOk());
+        long id = s.body(s.call(post("/api/applicant/applications"), token, "{\"windowId\":" + s.inst.windowId() + "}")).get("id").asLong();
+        s.call(put("/api/applicant/applications/" + id + "/choices"), token, "{\"windowProgrammeIds\":[" + s.inst.windowProgrammeId() + "]}")
+                .andExpect(jsonPath("$.code").value("NOT_ELIGIBLE"));
+
+        // without the award the NTA 4 programme opens again; after submitting, adding the award back is refused
+        s.call(delete("/api/applicant/qualifications/" + nta), token, null).andExpect(status().isNoContent());
+        s.call(put("/api/applicant/applications/" + id + "/choices"), token, "{\"windowProgrammeIds\":[" + s.inst.windowProgrammeId() + "]}")
+                .andExpect(status().isOk());
+        s.call(post("/api/applicant/applications/" + id + "/submit"), token, null).andExpect(jsonPath("$.status").value("SUBMITTED"));
+        s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS4111/0001/2020\",\"graduationYear\":2022}")
+                .andExpect(jsonPath("$.code").value("NEEDED_FOR_CHOICES"));
+        assertThat(s.body(s.call(get("/api/applicant/qualifications"), token, null)).findValuesAsText("type")).containsExactly("CSEE");
+    }
 }

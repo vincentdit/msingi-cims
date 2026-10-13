@@ -18,6 +18,7 @@ import tz.co.msingi.cims.admission.domain.Application;
 import tz.co.msingi.cims.admission.domain.ApplicationChoice;
 import tz.co.msingi.cims.admission.domain.WindowProgramme;
 import tz.co.msingi.cims.admission.eligibility.EligibilityEngine;
+import tz.co.msingi.cims.admission.eligibility.EntryLevel;
 import tz.co.msingi.cims.admission.eligibility.EligibilityResult;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationDetailView;
 import tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicationSummaryView;
@@ -181,12 +182,20 @@ public class ApplicationService {
     public List<ProgrammeEligibilityView> eligibility(Long windowId) {
         Applicant a = profiles.currentApplicant();
         List<EligibilityEngine.Qualification> quals = engineQualifications(a);
+        EntryLevel level = EntryLevel.of(quals);
         return windowProgrammes.findByWindowIdOrderByIdAsc(windowId).stream().map(wp -> {
-            EligibilityResult r = engine.evaluate(wp.getEntryRules(), quals);
+            EligibilityResult r = engine.evaluate(wp.getProgramme().getAwardFamily().name(), wp.getProgramme().entryLevel(), wp.getEntryRules(), quals);
             var p = wp.getProgramme();
             return new ProgrammeEligibilityView(wp.getId(), p.getCode(), p.getName(), p.getAwardName(),
-                    p.getDepartment().getName(), wp.getCapacity(), r.eligible(), r);
+                    p.getDepartment().getName(), wp.getCapacity(), r.eligible(), r, p.getAwardFamily().name(), p.entryLevel(),
+                    level.allows(p.getAwardFamily().name(), p.entryLevel(), wp.getEntryRules()));
         }).toList();
+    }
+
+    /** The level the current applicant may apply at, from their highest verified qualification (as in NOAS). */
+    @Transactional(readOnly = true)
+    public EntryLevel entryLevel() {
+        return EntryLevel.of(engineQualifications(profiles.currentApplicant()));
     }
 
     /** Replaces the programme choices. Requires the fee to be paid and every choice to be eligible (BRU-01, BRU-02). */
@@ -217,7 +226,7 @@ public class ApplicationService {
             WindowProgramme wp = windowProgrammes.findById(wpId)
                     .filter(x -> x.getWindow().getId().equals(w.getId()))
                     .orElseThrow(() -> new BusinessRuleException("INVALID_CHOICE", "Programme " + wpId + " is not offered in this window"));
-            EligibilityResult r = engine.evaluate(wp.getEntryRules(), quals);
+            EligibilityResult r = engine.evaluate(wp.getProgramme().getAwardFamily().name(), wp.getProgramme().entryLevel(), wp.getEntryRules(), quals);
             if (!r.eligible()) {
                 throw new BusinessRuleException("NOT_ELIGIBLE",
                         "You do not meet the minimum entry requirements for " + wp.getProgramme().getName() + ". " + r.summary());
@@ -309,6 +318,13 @@ public class ApplicationService {
         }
         if (!app.isFeePaid()) b.add("Pay the application fee");
         if (app.getChoices().isEmpty()) b.add("Choose at least one programme");
+        // qualifications added since choosing may have changed the entry level (as in NOAS)
+        List<EligibilityEngine.Qualification> quals = engineQualifications(a);
+        for (ApplicationChoice c : app.getChoices()) {
+            var p = c.getWindowProgramme().getProgramme();
+            EligibilityResult r = engine.evaluate(p.getAwardFamily().name(), p.entryLevel(), c.getWindowProgramme().getEntryRules(), quals);
+            if (!r.eligible()) b.add("Change your choice of " + p.getName() + ": " + r.summary());
+        }
         return b;
     }
 

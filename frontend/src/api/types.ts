@@ -280,6 +280,11 @@ export interface ProgrammeEligibility {
   capacity: number;
   eligible: boolean;
   eligibility: EligibilityResult;
+  awardFamily: 'NTA' | 'NVA';
+  /** The level the programme admits at. */
+  entryLevel: number;
+  /** At the level the applicant's highest qualification leads to (as in NOAS). */
+  atEntryLevel: boolean;
 }
 
 export interface Page<T> {
@@ -324,6 +329,9 @@ export interface Programme {
   active: boolean;
   departmentId: number;
   departmentName: string;
+  /** The level the programme admits at (as set, or worked out from the award level and duration). */
+  entryLevel: number;
+  entryLevelSet: boolean;
 }
 
 export interface Department {

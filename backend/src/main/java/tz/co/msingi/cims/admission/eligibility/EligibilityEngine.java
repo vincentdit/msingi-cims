@@ -32,6 +32,18 @@ public class EligibilityEngine {
         }
     }
 
+    /**
+     * Eligibility for a programme: the applicant's entry level first (as in NOAS, only the level their highest
+     * qualification leads to), then the programme's minimum entry requirements.
+     */
+    public EligibilityResult evaluate(String awardFamily, int awardLevel, EntryRules rules, List<Qualification> qualifications) {
+        EntryLevel level = EntryLevel.of(qualifications);
+        if (!level.allows(awardFamily, awardLevel, rules)) {
+            return new EligibilityResult(false, null, level.reason(), List.of());
+        }
+        return evaluate(rules, qualifications);
+    }
+
     public EligibilityResult evaluate(EntryRules rules, List<Qualification> qualifications) {
         List<Qualification> verified = qualifications.stream().filter(Qualification::verified).toList();
         if (rules.pathways().isEmpty()) {

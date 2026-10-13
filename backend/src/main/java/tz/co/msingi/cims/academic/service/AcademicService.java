@@ -120,6 +120,10 @@ public class AcademicService {
         p.setAwardName(req.awardName() == null || req.awardName().isBlank()
                 ? Programme.defaultAwardName(req.awardFamily(), req.awardLevel()) : req.awardName());
         p.setDurationSemesters(req.durationSemesters());
+        if (req.entryLevel() != null && req.entryLevel() > req.awardLevel()) {
+            throw new BusinessRuleException("INVALID_ENTRY_LEVEL", "The entry level cannot be above the award level");
+        }
+        p.setEntryLevelSet(req.entryLevel());
         p.setAccreditedCapacity(req.accreditedCapacity());
         p.setDescription(req.description());
         p.setActive(req.active());

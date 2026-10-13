@@ -307,7 +307,8 @@ public final class AdmissionDtos {
     }
 
     public record ProgrammeEligibilityView(Long windowProgrammeId, String programmeCode, String programmeName, String awardName,
-                                           String department, int capacity, boolean eligible, EligibilityResult eligibility) {
+                                           String department, int capacity, boolean eligible, EligibilityResult eligibility,
+                                           String awardFamily, int entryLevel, boolean atEntryLevel) {
     }
 
     public record ApplicationSummaryView(Long id, String referenceNo, String status, String applicantName, String phone,

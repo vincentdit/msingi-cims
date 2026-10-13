@@ -225,25 +225,31 @@ export function ProgrammesPage() {
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const depts = useQuery({ queryKey: ['staff', 'departments'], queryFn: () => api<Department[]>('/api/academic/departments', staff) });
-  const empty = { departmentId: '', code: '', nactvetCode: '', name: '', awardFamily: 'NTA', awardLevel: '4', durationSemesters: '2', accreditedCapacity: '' };
+  const empty = { id: 0, departmentId: '', code: '', nactvetCode: '', name: '', awardFamily: 'NTA', awardLevel: '4', durationSemesters: '2', accreditedCapacity: '', entryLevel: '' };
   const [form, setForm] = useState<typeof empty | null>(null);
+  const edit = (p: Programme) => setForm({ id: p.id, departmentId: String(p.departmentId), code: p.code, nactvetCode: p.nactvetCode ?? '', name: p.name,
+    awardFamily: p.awardFamily, awardLevel: String(p.awardLevel), durationSemesters: String(p.durationSemesters),
+    accreditedCapacity: p.accreditedCapacity ? String(p.accreditedCapacity) : '', entryLevel: p.entryLevelSet ? String(p.entryLevel) : '' });
   const save = useMutation({
-    mutationFn: (f: typeof empty) => api('/api/academic/programmes', { method: 'POST', realm: 'staff', body: {
-      ...f, departmentId: Number(f.departmentId), awardLevel: Number(f.awardLevel), durationSemesters: Number(f.durationSemesters),
-      accreditedCapacity: f.accreditedCapacity ? Number(f.accreditedCapacity) : null, active: true } }),
+    mutationFn: (f: typeof empty) => api(f.id ? `/api/academic/programmes/${f.id}` : '/api/academic/programmes', { method: f.id ? 'PUT' : 'POST', realm: 'staff', body: {
+      ...f, id: undefined, departmentId: Number(f.departmentId), awardLevel: Number(f.awardLevel), durationSemesters: Number(f.durationSemesters),
+      accreditedCapacity: f.accreditedCapacity ? Number(f.accreditedCapacity) : null, entryLevel: f.entryLevel ? Number(f.entryLevel) : null, active: true } }),
     onSuccess: () => { setForm(null); qc.invalidateQueries({ queryKey: ['staff', 'programmes'] }); },
   });
+  const levels = (f: typeof empty) => (f.awardFamily === 'NVA' ? [1, 2, 3] : [4, 5, 6, 7, 8]).filter((l) => l <= Number(f.awardLevel));
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Programmes" subtitle="NVA and NTA programmes accredited by NACTVET." action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>New programme</Button>} />
+      <PageTitle title="Programmes" subtitle="NVA and NTA programmes accredited by NACTVET. Applicants see only programmes that admit at the level their highest qualification leads to."
+        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>New programme</Button>} />
       <ErrorAlert error={list.error} />
       <Card><TableContainer>
         <Table size="small">
-          <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell>Department</TableCell><TableCell align="right">Capacity</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell>Admits at</TableCell><TableCell>Department</TableCell><TableCell align="right">Capacity</TableCell></TableRow></TableHead>
           <TableBody>
             {list.data?.map((p) => (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} hover sx={{ cursor: 'pointer' }} onClick={() => edit(p)}>
                 <TableCell>{p.code}</TableCell><TableCell>{p.name}</TableCell><TableCell>{p.awardName}</TableCell>
+                <TableCell>{p.awardFamily} Level {p.entryLevel}</TableCell>
                 <TableCell>{p.departmentName}</TableCell><TableCell align="right">{p.accreditedCapacity ?? '—'}</TableCell>
               </TableRow>
             ))}
@@ -251,7 +257,7 @@ export function ProgrammesPage() {
         </Table>
       </TableContainer></Card>
       <Dialog open={!!form} onClose={() => setForm(null)} fullWidth maxWidth="sm">
-        <DialogTitle>New programme</DialogTitle>
+        <DialogTitle>{form?.id ? form.name : 'New programme'}</DialogTitle>
         {form && (
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
@@ -264,15 +270,21 @@ export function ProgrammesPage() {
               </Stack>
               <TextField label="Programme name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <Stack direction="row" spacing={2}>
-                <TextField select label="Award" value={form.awardFamily} onChange={(e) => setForm({ ...form, awardFamily: e.target.value, awardLevel: e.target.value === 'NVA' ? '1' : '4' })}>
+                <TextField select label="Award" value={form.awardFamily} onChange={(e) => setForm({ ...form, awardFamily: e.target.value, awardLevel: e.target.value === 'NVA' ? '1' : '4', entryLevel: '' })}>
                   <MenuItem value="NTA">NTA</MenuItem><MenuItem value="NVA">NVA</MenuItem>
                 </TextField>
-                <TextField select label="Level" value={form.awardLevel} onChange={(e) => setForm({ ...form, awardLevel: e.target.value })}>
+                <TextField select label="Level" value={form.awardLevel} onChange={(e) => setForm({ ...form, awardLevel: e.target.value, entryLevel: '' })}>
                   {(form.awardFamily === 'NVA' ? [1, 2, 3] : [4, 5, 6, 7, 8]).map((l) => <MenuItem key={l} value={String(l)}>{l}</MenuItem>)}
                 </TextField>
                 <TextField label="Semesters" value={form.durationSemesters} onChange={(e) => setForm({ ...form, durationSemesters: e.target.value })} />
                 <TextField label="Capacity" value={form.accreditedCapacity} onChange={(e) => setForm({ ...form, accreditedCapacity: e.target.value })} />
               </Stack>
+              <TextField select label="Admits at" value={form.entryLevel} onChange={(e) => setForm({ ...form, entryLevel: e.target.value })}
+                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+                helperText="The level applicants enter at, e.g. an Ordinary Diploma (NTA 4–6) admits Form Four leavers at NTA 4. Leave on automatic to work it out from the level and semesters.">
+                <MenuItem value="">Automatic</MenuItem>
+                {levels(form).map((l) => <MenuItem key={l} value={String(l)}>{form.awardFamily} Level {l}</MenuItem>)}
+              </TextField>
               <ErrorAlert error={save.error} />
             </Stack>
           </DialogContent>

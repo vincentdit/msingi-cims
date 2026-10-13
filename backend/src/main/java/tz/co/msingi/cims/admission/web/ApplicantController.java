@@ -61,6 +61,12 @@ public class ApplicantController {
         return profiles.myQualifications();
     }
 
+    @Operation(summary = "The level the applicant may apply at, from their highest verified qualification")
+    @GetMapping("/entry-level")
+    public tz.co.msingi.cims.admission.eligibility.EntryLevel entryLevel() {
+        return applications.entryLevel();
+    }
+
     @Operation(summary = "Fetch CSEE/ACSEE results from NECTA by index number")
     @PostMapping("/qualifications/necta")
     @ResponseStatus(HttpStatus.CREATED)

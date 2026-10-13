@@ -61,16 +61,18 @@ public final class AcademicDtos {
             @Min(1) @Max(16) short durationSemesters,
             @Positive Integer accreditedCapacity,
             String description,
-            boolean active) {
+            boolean active,
+            @Min(1) @Max(8) Short entryLevel) {
     }
 
     public record ProgrammeView(Long id, String code, String nactvetCode, String name, String awardFamily, short awardLevel,
                                 String awardName, short durationSemesters, Integer accreditedCapacity, String description,
-                                boolean active, Long departmentId, String departmentName) {
+                                boolean active, Long departmentId, String departmentName, int entryLevel, boolean entryLevelSet) {
         public static ProgrammeView of(Programme p) {
             return new ProgrammeView(p.getId(), p.getCode(), p.getNactvetCode(), p.getName(), p.getAwardFamily().name(),
                     p.getAwardLevel(), p.getAwardName(), p.getDurationSemesters(), p.getAccreditedCapacity(),
-                    p.getDescription(), p.isActive(), p.getDepartment().getId(), p.getDepartment().getName());
+                    p.getDescription(), p.isActive(), p.getDepartment().getId(), p.getDepartment().getName(), p.entryLevel(),
+                    p.getEntryLevelSet() != null);
         }
     }
 }
