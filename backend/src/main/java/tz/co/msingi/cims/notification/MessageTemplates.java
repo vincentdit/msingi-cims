@@ -37,7 +37,7 @@ public final class MessageTemplates {
                 Map.entry("office", "Library"), Map.entry("award", "Ordinary Diploma (NTA Level 6)"), Map.entry("graduation", "27th Graduation 2029"),
                 Map.entry("date", "23 November 2029"), Map.entry("place", "Kilimanjaro Hostel, A · Room 12, bed B"),
                 Map.entry("window", "Hostel applications 2027/2028"), Map.entry("organisation", "Tanzania Ports Authority"),
-                Map.entry("start", "6 July 2028"), Map.entry("week", "3"));
+                Map.entry("start", "6 July 2028"), Map.entry("week", "3"), Map.entry("change", "postponed until 1 March 2028"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -117,6 +117,10 @@ public final class MessageTemplates {
                 List.of("institution", "registrationNo"), Set.of(),
                 "Your registration at {institution} is complete. Registration number: {registrationNo}. Welcome!",
                 "Usajili wako {institution} umekamilika. Namba ya usajili: {registrationNo}. Karibu!", s);
+        add("STUDENT_STATUS_CHANGED", "Student status changed", "An approved status change (postponement, suspension, resumption, withdrawal...) takes effect", "Registry",
+                List.of("change", "date", "institution", "registrationNo"), Set.of("change"),
+                "{institution}: your studies are {change} from {date} ({registrationNo}). Contact Registry if you have questions.",
+                "{institution}: hali ya masomo yako imebadilika ({change}) kuanzia {date} ({registrationNo}). Wasiliana na Ofisi ya Usajili kwa maswali.", s);
         add("SEMESTER_REGISTRATION_APPROVED", "Semester registration approved", "Registry approves a student's semester registration", "Registry",
                 List.of("semester", "modules", "institution"), Set.of(),
                 "Your registration for {semester} is approved: {modules} modules. See them on the student portal.",

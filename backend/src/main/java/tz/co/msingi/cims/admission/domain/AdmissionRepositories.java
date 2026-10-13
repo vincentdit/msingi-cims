@@ -86,6 +86,35 @@ public final class AdmissionRepositories {
                        or a.applicant.phone like concat('%', cast(:q as string), '%'))""")
         Page<Application> search(Long windowId, Application.Status status, String q, Pageable pageable);
 
+        /**
+         * The applicant search of the Admissions Office (as NOAS): by window, status, a programme among the choices, sex,
+         * fee paid, declared qualifications still to check, submission date and free text (names, reference, phone, email,
+         * NECTA index number).
+         */
+        @EntityGraph(attributePaths = {"applicant", "window"})
+        @Query("""
+                select a from Application a
+                where (:windowId is null or a.window.id = :windowId)
+                  and (:status is null or a.status = :status)
+                  and (:sex is null or a.applicant.sex = :sex)
+                  and (:feePaid is null or a.feePaid = :feePaid)
+                  and (cast(:fromTs as timestamp) is null or a.submittedAt >= :fromTs)
+                  and (cast(:toTs as timestamp) is null or a.submittedAt < :toTs)
+                  and (:programmeId is null or exists (select 1 from ApplicationChoice c where c.application = a
+                       and c.windowProgramme.programme.id = :programmeId and (:firstChoice = false or c.choiceOrder = 1)))
+                  and (:checksPending = false or exists (select 1 from ApplicantQualification q where q.applicant = a.applicant
+                       and q.source = tz.co.msingi.cims.admission.domain.ApplicantQualification.Source.MANUAL
+                       and q.checkStatus = tz.co.msingi.cims.admission.domain.ApplicantQualification.CheckStatus.PENDING))
+                  and (:q is null or lower(a.applicant.firstName) like lower(concat('%', cast(:q as string), '%'))
+                       or lower(a.applicant.middleName) like lower(concat('%', cast(:q as string), '%'))
+                       or lower(a.applicant.surname) like lower(concat('%', cast(:q as string), '%'))
+                       or lower(a.applicant.email) like lower(concat('%', cast(:q as string), '%'))
+                       or upper(a.applicant.nectaIndexNumber) like upper(concat('%', cast(:q as string), '%'))
+                       or a.referenceNo like concat('%', cast(:q as string), '%')
+                       or a.applicant.phone like concat('%', cast(:q as string), '%'))""")
+        Page<Application> find(Long windowId, Application.Status status, String sex, Boolean feePaid, java.time.OffsetDateTime fromTs,
+                               java.time.OffsetDateTime toTs, Long programmeId, boolean firstChoice, boolean checksPending, String q, Pageable pageable);
+
         @EntityGraph(attributePaths = {"applicant", "choices", "choices.windowProgramme"})
         List<Application> findByWindowIdAndStatus(Long windowId, Application.Status status);
 

@@ -44,6 +44,7 @@ public class LetterController {
     private final AdmissionLetterService service;
     private final tz.co.msingi.cims.exams.TranscriptService transcripts;
     private final tz.co.msingi.cims.graduation.GraduationService graduations;
+    private final tz.co.msingi.cims.registry.idcard.IdCardService idCards;
     private RateLimiter verifyLimiter;
 
     @Value("${cims.documents.verify-rate-limit:30}")
@@ -114,6 +115,7 @@ public class LetterController {
         }
         // admission letters, statements of results / provisional transcripts (FR-EXM-13), award certificates (FR-GRD-03)
         Object v = service.verify(code).<Object>map(x -> x).or(() -> transcripts.verify(code)).or(() -> graduations.verify(code))
+                .or(() -> idCards.verify(code))
                 .orElseThrow(() -> new NotFoundException("No document was found with this verification code"));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(v);
     }

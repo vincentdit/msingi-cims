@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 public final class AdmissionDtos {
 
@@ -322,6 +323,16 @@ public final class AdmissionDtos {
     }
 
     public record ApplicationDetailView(ApplicationView application, ProfileView applicant, List<QualificationView> qualifications,
-                                        FeeView fee) {
+                                        FeeView fee, List<HistoryEntry> history) {
+    }
+
+    /** One step in an application's history, from the audit trail of the application and its applicant. */
+    public record HistoryEntry(OffsetDateTime at, String action, String label, String by, Map<String, Object> details) {
+    }
+
+    /** A row of the Admissions Office's applicant search. */
+    public record ApplicantRow(Long id, String referenceNo, String status, Long applicantId, String applicantName, String sex, String phone,
+                               String indexNumber, String region, Long windowId, String windowName, boolean feePaid, String firstChoice,
+                               int choices, long checksPending, OffsetDateTime submittedAt, OffsetDateTime createdAt, OffsetDateTime amendedAt) {
     }
 }

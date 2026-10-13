@@ -97,6 +97,7 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Sees:** admissions, registry, teaching, examinations, graduation and notices, plus **Approvals**.
 - **Approvals:** everything waiting for their decision in one list, grouped by the body it is decided for, oldest first.
   - **Academic Committee:** proposed selection rounds, draft curricula, computed class results to recommend, and examination exemptions.
+  - **Student status changes:** requests from Registry, with or without the Head of Department's recommendation.
   - **Using the list:** each item says who put it forward and when, and opens the page where it is decided; the usual checks apply there.
   - **Own items:** items the person put forward themselves are shown but marked for someone else to decide (segregation of duties). So are drafts still being prepared.
   - **Count:** the menu shows how many decisions wait, and "Today's work" on the dashboard says so too.
@@ -105,22 +106,46 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - **Administrator:** Governing Board confirmation of results, result amendments and graduand lists.
   - **Head of Department:** module results to moderate and resit marks for their department.
   - **Head of Department and Examinations Officer:** recording the Department Board's approval.
+  - **Student status changes:** the Head of the student's department recommends; the Deputy Principal decides.
 
-### 6. Admissions Officer: Working (refined most)
+### 6. Admissions Officer: Done
 
-- **Sees:** admission windows, applications, programmes, students (read), notices and messages.
+- **Sees:** admission windows, **Applicants**, programmes, students (read), notices and messages.
+- **Applicants** (as NOAS "Applicants": search, view submissions, print files):
+  - **Search:** by name, NECTA index number, phone, email or reference.
+  - **Filters:** window, status, programme chosen (or first choice only), sex, fee paid, declared qualifications still to check, and submission dates.
+  - **List:** shows index number, first choice and a "to check" count. It can be sorted by name or by submission date.
+  - **Export CSV:** the list, with all three choices and contact details. Each export is recorded in the audit trail.
+  - **Application view:** opens with the applicant's details, qualifications (with their checks), fee, choices with eligibility, and the application's **history** from the audit trail.
+  - **Print file:** a PDF with every section and the history. Printing is recorded in the application's history.
 - **Does:**
-  - Opens and closes windows.
-  - Checks declared qualifications.
+  - Opens and closes windows and checks declared qualifications.
   - Runs selection, NACTVET verification and letters.
   - Hands selected applicants over to Registry.
-- **Next:** an applicant search and file view like NOAS (print an application file); eligibility reports per programme and subject.
+- **Next:** eligibility reports per programme and subject (NOAS "Eligibility Reports").
 
-### 7. Registrar / Registry Officer: Working
+### 7. Registrar / Registry Officer: Done
 
-- **Sees:** admissions (read), students, semester registration, graduation, clearance, hostels (read), IPT (read), notices and messages.
+- **Sees:** admissions (read), students, status changes, semester registration, graduation, clearance, hostels (read), IPT (read), notices and messages.
 - **Does:** keeps student records, approves detail changes, runs semester registration and prepares graduation lists.
-- **Next:** student status changes (suspension, deferment, withdrawal) and ID cards.
+- **Status changes (FR-REG-04, BP-14):**
+  - **Request:** from the student's record, Registry requests a postponement, resumption, suspension, discontinuation, withdrawal or death, with a reason, a reference (letter, minute or case number) and an effective date. A postponement also needs the date the student is expected back.
+  - **Allowed changes:** only those that fit the student's status. For example, only a postponed or suspended student can resume. A student has one request in progress at a time. The effective date can be at most 90 days in the past.
+  - **Recommend:** the Head of the student's department recommends the request from Approvals or the Status changes page.
+  - **Decide:** the Deputy Principal (Academic) approves or rejects it. A rejection needs a reason. They may decide before the Head has recommended. Whoever requested a change cannot decide it.
+  - **Apply:** an approved change applies at once if its date has come; otherwise a morning job applies it on the date. The student's status changes and they get an SMS (`STUDENT_STATUS_CHANGED`, English or Swahili). Discontinuation, withdrawal and death also revoke the student's ID card.
+  - **Safety check:** if the student's status changed in the meantime, the change is not applied and is marked cancelled with a note.
+  - **Cancel:** Registry can cancel a request before it is decided.
+  - **Record:** every step is in the audit trail.
+- **Status changes page:** what is in progress and the latest decisions. Registry, the Deputy Principal, Heads of Department (their department only) and the Principal see it.
+- **Photo and ID card (FR-REG-06):**
+  - **Photo:** Registry uploads the student's passport-style photo (JPEG or PNG, upright, at least 200 pixels, up to 2 MB).
+  - **Issue:** a card is issued to a registered (active) student with a photo. Each card has a card number (ID2026-00001), a validity date and a QR code. The validity date is the end of the student's expected final academic year.
+  - **Print:** each card prints at card size (85.6 × 54 mm), front and back.
+  - **Replace:** a lost or damaged card is replaced with a reason. The old card then shows as superseded.
+  - **Revoke:** a card can be revoked with a reason.
+  - **Batch:** "ID cards" on the Students page issues and prints cards for a whole programme (or one year of study). It lists who still needs a photo.
+  - **Verify:** anyone can scan the QR code or enter the code at /verify. The page shows whether the card is valid, expired, superseded or revoked, and the holder's current status. For example, it warns when the card is in force but the holder is suspended.
 
 ### 8. Head of Department: Done
 
@@ -220,6 +245,4 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Admissions Officer: NOAS-style applicant search and file.
-2. Registrar: status changes and ID cards.
-3. Platform Administrator: the platform console and onboarding.
+1. Platform Administrator: the platform console and onboarding.

@@ -3,17 +3,19 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
   IconButton, InputAdornment, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow,
-  TextField, Typography,
+  TextField, Typography, Checkbox, FormControlLabel, TableSortLabel,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import CloseIcon from '@mui/icons-material/Close';
+import DownloadIcon from '@mui/icons-material/Download';
+import PrintIcon from '@mui/icons-material/Print';
 import { homeFor } from '../../components/StaffLayout';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
-import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
+import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
-  AdmissionWindow, ApplicationDetail, ApplicationSummary, Department, EntryRules, Page, Programme, TokenResponse, WindowStats,
+  AdmissionWindow, ApplicantRow, ApplicationDetail, ApplicationSummary, Department, EntryRules, Page, Programme, TokenResponse, WindowStats,
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
@@ -125,34 +127,131 @@ function ApplicationsTable({ rows, onOpen }: { rows: ApplicationSummary[]; onOpe
 }
 
 // ---------------------------------------------------------------- Applications
+const STATUSES = ['DRAFT', 'PAYMENT_PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'SELECTED', 'NOT_SELECTED', 'PENDING_VERIFICATION', 'QUERIED',
+  'NACTVET_REJECTED', 'OFFERED', 'ACCEPTED', 'DECLINED', 'OFFER_LAPSED', 'WITHDRAWN'];
+
+/** The Admissions Office's applicant search (as NOAS): filters, the list, CSV export, and each application's file. */
 export function ApplicationsPage() {
-  const [status, setStatus] = useState('');
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const empty = { windowId: '', status: '', programmeId: '', firstChoice: false, sex: '', feePaid: '', checksPending: false, from: '', to: '', q: '' };
+  const [f, setF] = useState(empty);
+  const [text, setText] = useState('');
+  const [sort, setSort] = useState('created');
   const [page, setPage] = useState(0);
-  const [size, setSize] = useState(20);
+  const [size, setSize] = useState(25);
   const [open, setOpen] = useState<number | null>(null);
-  const params = new URLSearchParams({ page: String(page), size: String(size), ...(status && { status }), ...(search && { q: search }) });
-  const list = useQuery({ queryKey: ['staff', 'applications', params.toString()], queryFn: () => api<Page<ApplicationSummary>>(`/api/admission/applications?${params}`, staff) });
+  const windows = useQuery({ queryKey: ['staff', 'windows'], queryFn: () => api<AdmissionWindow[]>('/api/admission/windows', staff) });
+  const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  const filters = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== '' && v !== false).map(([k, v]) => [k, String(v)]));
+  const list = useQuery({ queryKey: ['staff', 'applicants', filters.toString(), sort, page, size],
+    queryFn: () => api<Page<ApplicantRow>>(`/api/admission/applicants?${filters}&sort=${sort}&page=${page}&size=${size}`, staff) });
+  const exportCsv = useMutation({ mutationFn: () => download(`/api/admission/applicants.csv?${filters}`, 'staff', 'applicants.csv') });
+  const set = (patch: Partial<typeof empty>) => { setF({ ...f, ...patch }); setPage(0); };
+  const any = filters.toString() !== '';
   return (
-    <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Applications" subtitle="Search and review applications received through the admission portal." />
-      <Card>
+    <Container maxWidth="xl" disableGutters>
+      <PageTitle title="Applicants" subtitle="Find applicants by name, index number, phone, email or reference, filter the list, export it, and print an application file."
+        action={<Button variant="outlined" startIcon={<DownloadIcon />} sx={{ whiteSpace: 'nowrap' }} disabled={exportCsv.isPending || !list.data?.totalElements}
+          onClick={() => exportCsv.mutate()}>{exportCsv.isPending ? 'Exporting…' : 'Export CSV'}</Button>} />
+      <ErrorAlert error={exportCsv.error} />
+      <Card sx={{ mb: 2 }}>
         <CardContent>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-            <TextField size="small" placeholder="Name, phone or reference" value={q} onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { setSearch(q); setPage(0); } }}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }} />
-            <TextField size="small" select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} sx={{ minWidth: 200 }}>
-              <MenuItem value="">All</MenuItem>
-              {['DRAFT', 'PAYMENT_PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'SELECTED', 'NOT_SELECTED'].map((s) => <MenuItem key={s} value={s}>{humanise(s)}</MenuItem>)}
-            </TextField>
-          </Stack>
-          <ErrorAlert error={list.error} />
-          {list.isLoading ? <Loading /> : <ApplicationsTable rows={list.data?.content ?? []} onOpen={setOpen} />}
-          <TablePagination component="div" count={list.data?.totalElements ?? 0} page={page} rowsPerPage={size}
-            onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => { setSize(Number(e.target.value)); setPage(0); }} rowsPerPageOptions={[20, 50, 100]} />
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField size="small" fullWidth placeholder="Name, index number (S0101/0001), phone, email or reference" value={text}
+                onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') set({ q: text.trim() }); }}
+                onBlur={() => text.trim() !== f.q && set({ q: text.trim() })}
+                slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField size="small" fullWidth select label="Admission window" value={f.windowId} onChange={(e) => set({ windowId: e.target.value })}>
+                <MenuItem value="">All windows</MenuItem>
+                {windows.data?.map((w) => <MenuItem key={w.id} value={String(w.id)}>{w.name}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField size="small" fullWidth select label="Status" value={f.status} onChange={(e) => set({ status: e.target.value })}>
+                <MenuItem value="">Any status</MenuItem>
+                {STATUSES.map((st) => <MenuItem key={st} value={st}>{humanise(st)}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField size="small" fullWidth select label="Programme chosen" value={f.programmeId} onChange={(e) => set({ programmeId: e.target.value })}>
+                <MenuItem value="">Any programme</MenuItem>
+                {programmes.data?.map((p) => <MenuItem key={p.id} value={String(p.id)}>{p.code} · {p.name}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+              <TextField size="small" fullWidth select label="Sex" value={f.sex} onChange={(e) => set({ sex: e.target.value })}>
+                <MenuItem value="">Both</MenuItem><MenuItem value="F">Female</MenuItem><MenuItem value="M">Male</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+              <TextField size="small" fullWidth select label="Fee" value={f.feePaid} onChange={(e) => set({ feePaid: e.target.value })}>
+                <MenuItem value="">Paid or not</MenuItem><MenuItem value="true">Paid</MenuItem><MenuItem value="false">Not paid</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+              <TextField size="small" fullWidth type="date" label="Submitted from" value={f.from} onChange={(e) => set({ from: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+              <TextField size="small" fullWidth type="date" label="to" value={f.to} onChange={(e) => set({ to: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 3 }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ height: '100%' }} flexWrap="wrap" useFlexGap>
+                {f.programmeId && <FormControlLabel control={<Checkbox size="small" checked={f.firstChoice} onChange={(e) => set({ firstChoice: e.target.checked })} />} label="1st choice only" />}
+                <FormControlLabel control={<Checkbox size="small" checked={f.checksPending} onChange={(e) => set({ checksPending: e.target.checked })} />} label="Qualifications to check" />
+                {any && <Button size="small" onClick={() => { setF(empty); setText(''); setPage(0); }}>Clear</Button>}
+              </Stack>
+            </Grid>
+          </Grid>
         </CardContent>
+      </Card>
+      <Card>
+        <ErrorAlert error={list.error} />
+        {list.isLoading ? <Loading /> : (
+          <TableContainer>
+            <Table size="small" sx={{ minWidth: 900 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Reference</TableCell>
+                  <TableCell sortDirection={sort === 'name' ? 'asc' : false}>
+                    <TableSortLabel active={sort === 'name'} onClick={() => setSort('name')}>Applicant</TableSortLabel>
+                  </TableCell>
+                  <TableCell>Index number</TableCell><TableCell>First choice</TableCell><TableCell>Fee</TableCell><TableCell>Status</TableCell>
+                  <TableCell sortDirection={sort === 'submitted' ? 'desc' : false}>
+                    <TableSortLabel active={sort === 'submitted'} direction="desc" onClick={() => setSort('submitted')}>Submitted</TableSortLabel>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {list.data?.content.map((a) => (
+                  <TableRow key={a.id} hover onClick={() => setOpen(a.id)} sx={{ cursor: 'pointer' }}>
+                    <TableCell>{a.referenceNo ?? <Typography variant="body2" color="text.secondary">Not submitted</Typography>}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{a.applicantName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{[a.sex === 'F' ? 'Female' : a.sex === 'M' ? 'Male' : null, a.phone, a.region].filter(Boolean).join(' · ')}</Typography>
+                    </TableCell>
+                    <TableCell>{a.indexNumber ?? '—'}</TableCell>
+                    <TableCell>{a.firstChoice ?? '—'}{a.choices > 1 && <Typography component="span" variant="caption" color="text.secondary"> +{a.choices - 1}</Typography>}</TableCell>
+                    <TableCell>{a.feePaid ? <Chip size="small" color="success" label="Paid" /> : <Chip size="small" label="Not paid" />}</TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        <Chip size="small" color={statusColour(a.status)} label={humanise(a.status)} />
+                        {a.checksPending > 0 && <Chip size="small" color="warning" variant="outlined" label={`${a.checksPending} to check`} />}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{a.submittedAt ? formatDateTime(a.submittedAt) : '—'}</TableCell>
+                  </TableRow>
+                ))}
+                {!list.data?.content.length && (
+                  <TableRow><TableCell colSpan={7}><Typography color="text.secondary" sx={{ py: 2 }}>{any ? 'No applicants match these filters.' : 'No applications yet.'}</Typography></TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+        <TablePagination component="div" count={list.data?.totalElements ?? 0} page={page} rowsPerPage={size}
+          onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => { setSize(Number(e.target.value)); setPage(0); }} rowsPerPageOptions={[25, 50, 100]} />
       </Card>
       <ApplicationDrawer id={open} onClose={() => setOpen(null)} />
     </Container>
@@ -162,11 +261,17 @@ export function ApplicationsPage() {
 function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => void }) {
   const d = useQuery({ queryKey: ['staff', 'application', id], enabled: id != null, queryFn: () => api<ApplicationDetail>(`/api/admission/applications/${id}`, staff) });
   const a = d.data;
+  const [printing, setPrinting] = useState(false);
   return (
     <Drawer anchor="right" open={id != null} onClose={onClose} sx={{ '& .MuiDrawer-paper': { width: { xs: '100%', sm: 560 }, p: 3 } }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h6">{a?.application.referenceNo ?? 'Application'}</Typography>
-        <IconButton onClick={onClose}><CloseIcon /></IconButton>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {a && <Button size="small" variant="outlined" startIcon={<PrintIcon />} disabled={printing}
+            onClick={() => { setPrinting(true); download(`/api/admission/applications/${id}/file`, 'staff', `application-${a.application.referenceNo ?? id}.pdf`)
+              .finally(() => { setPrinting(false); d.refetch(); }); }}>{printing ? 'Preparing…' : 'Print file'}</Button>}
+          <IconButton onClick={onClose} aria-label="Close"><CloseIcon /></IconButton>
+        </Stack>
       </Stack>
       {d.isLoading && <Loading />}
       {a && (
@@ -214,6 +319,19 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
                 <Box sx={{ mt: 1 }}><EligibilityDetail result={c.eligibility} /></Box>
               </CardContent></Card>
             ))}
+          </Box>
+          <Divider />
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">History</Typography>
+            <Box component="ol" sx={{ listStyle: 'none', p: 0, m: 0, mt: 1, borderLeft: 2, borderColor: 'divider' }}>
+              {a.history.map((h, i) => (
+                <Box component="li" key={i} sx={{ pl: 1.5, pb: 1, position: 'relative' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{h.label}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatDateTime(h.at)}{h.by ? ` · ${h.by}` : ''}</Typography>
+                </Box>
+              ))}
+              {!a.history.length && <Typography variant="body2" color="text.secondary" sx={{ pl: 1.5 }}>No history recorded.</Typography>}
+            </Box>
           </Box>
         </Stack>
       )}

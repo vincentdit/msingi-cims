@@ -48,7 +48,9 @@ public class ApprovalsService {
         GRADUATION("Graduand list", "Governing Board"),
         MODULE_MODERATION("Module results", "Head of Department"),
         MODULE_BOARD("Module results", "Department Board"),
-        RESIT_MODERATION("Resit marks", "Head of Department");
+        RESIT_MODERATION("Resit marks", "Head of Department"),
+        STATUS_RECOMMEND("Student status change", "Head of Department"),
+        STATUS_DECISION("Student status change", "Deputy Principal (Academic)");
 
         public final String label;
         public final String body;
@@ -152,6 +154,30 @@ public class ApprovalsService {
                 if ("SUBMITTED".equals(rs.getString("resit_status")) && moderates) {
                     out.add(item(Kind.RESIT_MODERATION, rs.getLong("id"), title, "Resit marks submitted · " + rs.getString("semester"),
                             null, null, link, true, null));
+                }
+            });
+        }
+        if (hod.any() || committee) {
+            jdbc.query("""
+                    select c.id, c.change_type, c.status, c.effective_date, c.requested_by_id, c.requested_by_name, c.requested_at,
+                           c.recommended_by_name, c.recommended_at, s.registration_no, s.first_name, s.surname, p.department_id
+                    from student_status_changes c join students s on s.id = c.student_id join programmes p on p.id = s.programme_id
+                    where c.status in ('REQUESTED', 'RECOMMENDED')""", p, rs -> {
+                Long dept = rs.getObject("department_id") == null ? null : rs.getLong("department_id");
+                String type = rs.getString("change_type");
+                String title = type.charAt(0) + type.substring(1).toLowerCase() + " · " + rs.getString("registration_no") + " "
+                        + rs.getString("first_name") + " " + rs.getString("surname");
+                String detail = "Effective " + rs.getObject("effective_date", java.time.LocalDate.class);
+                boolean requested = "REQUESTED".equals(rs.getString("status"));
+                if (committee) {
+                    boolean own = Objects.equals(rs.getObject("requested_by_id") == null ? null : rs.getLong("requested_by_id"), me);
+                    out.add(item(Kind.STATUS_DECISION, rs.getLong("id"), title,
+                            detail + (requested ? " · not yet recommended by the Head of Department" : " · recommended by " + rs.getString("recommended_by_name")),
+                            rs.getString("requested_by_name"), rs.getObject("requested_at", OffsetDateTime.class), "/staff/status-changes", !own,
+                            own ? "You requested this change; someone else decides it." : null));
+                } else if (requested && hod.covers(dept)) {
+                    out.add(item(Kind.STATUS_RECOMMEND, rs.getLong("id"), title, detail + " · requested by Registry",
+                            rs.getString("requested_by_name"), rs.getObject("requested_at", OffsetDateTime.class), "/staff/status-changes", true, null));
                 }
             });
         }

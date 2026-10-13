@@ -1,4 +1,5 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import BadgeIcon from '@mui/icons-material/Badge';
 import DownloadIcon from '@mui/icons-material/Download';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import NumbersIcon from '@mui/icons-material/Numbers';
@@ -21,6 +22,7 @@ import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../co
 import { StudentExamCard } from './ExamRecordsPages';
 import { useRoles } from './MarksPages';
 import { ChangeRequestsButton } from './ChangeRequests';
+import { IdCardBatchDialog, StudentIdCard, StudentStatusCard } from './StatusAndCards';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -209,6 +211,7 @@ export function StudentsPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
   const [numbering, setNumbering] = useState(false);
+  const [cards, setCards] = useState(false);
   const [dlError, setDlError] = useState<unknown>(null);
   const canRegister = useCanRegister();
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(0); }, 300); return () => clearTimeout(t); }, [q]);
@@ -227,6 +230,7 @@ export function StudentsPage() {
       <PageTitle title="Students" subtitle="One record per student from admission to graduation."
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
           {seesRequests && <ChangeRequestsButton canDecide={canRegister} />}
+          {canRegister && <Button variant="outlined" startIcon={<BadgeIcon />} onClick={() => setCards(true)}>ID cards</Button>}
           <Button variant="outlined" startIcon={<NumbersIcon />} onClick={() => setNumbering(true)}>Numbering</Button>
           <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!programmeId}
             onClick={() => download(`/api/registry/programmes/${programmeId}/class-list`, 'staff', `class-list-${programmeName}.csv`).catch(setDlError)}>
@@ -298,6 +302,7 @@ export function StudentsPage() {
         )}
       </Card>
       <NumberingDialog open={numbering} onClose={() => setNumbering(false)} canEdit={canRegister} />
+      {canRegister && <IdCardBatchDialog open={cards} onClose={() => setCards(false)} programmes={programmes.data ?? []} />}
     </Container>
   );
 }
@@ -397,6 +402,7 @@ export function StudentDetailPage() {
               </CardContent>
             </Card>
           )}
+          <StudentStatusCard studentId={s.id} />
           <Section title="Personal details">
             <Field label="Full name" value={[d.firstName, d.middleName, d.surname].filter(Boolean).join(' ')} />
             <Field label="Sex" value={s.sex === 'F' ? 'Female' : 'Male'} />
@@ -410,6 +416,7 @@ export function StudentDetailPage() {
           </Section>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
+          <StudentIdCard studentId={s.id} regNo={s.registrationNo} />
           {canSeeFees && <StudentFeesCard studentId={s.id} />}
           <StudentExamCard studentId={s.id} regNo={s.registrationNo} />
           <Section title="Programme">

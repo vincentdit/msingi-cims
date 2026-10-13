@@ -1,6 +1,7 @@
 import AssignmentIcon from '@mui/icons-material/AssignmentInd';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SmsIcon from '@mui/icons-material/Sms';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
@@ -51,11 +52,12 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   ] },
   { title: 'Admissions', items: [
     { page: 'windows', to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },
-    { page: 'applications', to: '/staff/applications', label: 'Applications', icon: <AssignmentIcon /> },
+    { page: 'applications', to: '/staff/applications', label: 'Applicants', icon: <AssignmentIcon /> },
     { page: 'programmes', to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
   ] },
   { title: 'Registry', items: [
     { page: 'students', to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
+    { page: 'statusChanges', to: '/staff/status-changes', label: 'Status changes', icon: <SwapHorizIcon /> },
     { page: 'semesterRegistrations', to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
     { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
   ] },

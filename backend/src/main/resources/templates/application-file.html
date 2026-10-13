@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!--
+  The application file printed by the Admissions Office (as in NOAS): the applicant's details, results, other
+  qualifications, choices with eligibility, fee and history on A4.
+  Double braces insert an escaped value; triple braces insert markup built by ApplicantFileService from escaped values.
+  Must stay well-formed XHTML (parsed as XML). CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Application {{referenceNo}}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm 14mm;
+    @bottom-left { content: "{{institutionName}} · Application {{referenceNo}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+    @bottom-right { content: "Printed {{printedAt}} by {{printedBy}} · page " counter(page) " of " counter(pages); font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8.8pt; color: #1f2937; line-height: 1.35; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2pt solid {{primaryColor}}; }
+  .head td { vertical-align: middle; padding-bottom: 6pt; }
+  .badge { width: 36pt; height: 36pt; background: {{primaryColor}}; color: #ffffff; font-weight: bold; font-size: 10pt; text-align: center; line-height: 36pt; border-radius: 18pt; }
+  .inst { font-size: 13pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; }
+  .small { font-size: 7.5pt; }
+  h1 { font-size: 14pt; margin: 10pt 0 0 0; color: {{primaryColor}}; }
+  h2 { font-size: 10pt; margin: 12pt 0 3pt 0; padding-bottom: 2pt; border-bottom: 0.6pt solid #d1d5db; color: #111827; page-break-after: avoid; }
+  table.kv { width: 100%; border-collapse: collapse; }
+  table.kv th { text-align: left; width: 24%; color: #4b5563; font-weight: normal; padding: 2pt 6pt 2pt 0; vertical-align: top; }
+  table.kv td { width: 26%; padding: 2pt 6pt 2pt 0; font-weight: bold; vertical-align: top; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 3pt; page-break-inside: auto; }
+  table.lines th { text-align: left; background: #f3f4f6; color: #4b5563; font-weight: normal; padding: 3pt 5pt; border: 0.6pt solid #e5e7eb; }
+  table.lines td { padding: 3pt 5pt; border: 0.6pt solid #e5e7eb; vertical-align: top; }
+  table.lines tr { page-break-inside: avoid; }
+  .status { display: inline; padding: 1pt 5pt; border: 0.8pt solid {{primaryColor}}; color: {{primaryColor}}; font-weight: bold; }
+  .ok { color: #166534; font-weight: bold; }
+  .no { color: #991b1b; font-weight: bold; }
+  .wait { color: #92400e; font-weight: bold; }
+</style>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td style="width: 44pt;"><div class="badge">{{institutionShortName}}</div></td>
+    <td>
+      <div class="inst">{{institutionName}}</div>
+      <div class="muted small">{{contactLine}}</div>
+    </td>
+    <td style="text-align: right;" class="small muted">APPLICATION FILE</td>
+  </tr>
+</table>
+
+<h1>{{applicantName}}</h1>
+<div>Application <strong>{{referenceNo}}</strong> · {{windowName}} ({{academicYear}}) · <span class="status">{{status}}</span></div>
+<div class="muted small">{{submittedLine}}</div>
+
+<h2>Personal details</h2>
+<table class="kv">
+  <tr><th>Form Four index number</th><td>{{indexNumber}}</td><th>Sex</th><td>{{sex}}</td></tr>
+  <tr><th>Date of birth</th><td>{{dateOfBirth}}</td><th>Nationality</th><td>{{nationality}}</td></tr>
+  <tr><th>Mobile number</th><td>{{phone}}</td><th>Email</th><td>{{email}}</td></tr>
+  <tr><th>Address</th><td colspan="3">{{address}}</td></tr>
+  <tr><th>Impairment</th><td colspan="3">{{disability}}</td></tr>
+</table>
+
+<h2>Next of kin</h2>
+<table class="kv">
+  <tr><th>Name</th><td>{{kinName}}</td><th>Relationship</th><td>{{kinRelation}}</td></tr>
+  <tr><th>Mobile number</th><td>{{kinPhone}}</td><th>Email</th><td>{{kinEmail}}</td></tr>
+  <tr><th>Address</th><td colspan="3">{{kinAddress}}</td></tr>
+</table>
+
+<h2>Education</h2>
+<table class="kv">
+  <tr><th>Primary school</th><td colspan="3">{{primarySchool}}</td></tr>
+  <tr><th>O-level school</th><td colspan="3">{{olevelSchool}}</td></tr>
+  <tr><th>A-level school</th><td colspan="3">{{alevelSchool}}</td></tr>
+</table>
+
+<h2>Results and qualifications</h2>
+{{{qualifications}}}
+
+<h2>Programme choices</h2>
+<table class="lines">
+  <tr><th style="width: 7%;">Choice</th><th>Programme</th><th style="width: 18%;">Eligibility</th><th style="width: 36%;">Reason</th></tr>
+  {{{choices}}}
+</table>
+{{{outcome}}}
+
+<h2>Application fee</h2>
+<table class="kv">
+  <tr><th>Fee</th><td>{{feeAmount}}</td><th>Paid</th><td>{{feePaid}}</td></tr>
+  <tr><th>Invoice</th><td>{{invoiceNo}}</td><th>Control number</th><td>{{controlNo}}</td></tr>
+</table>
+
+<h2>History</h2>
+<table class="lines">
+  <tr><th style="width: 22%;">When</th><th>What</th><th style="width: 26%;">By</th></tr>
+  {{{history}}}
+</table>
+</body>
+</html>

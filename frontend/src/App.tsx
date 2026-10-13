@@ -31,6 +31,7 @@ import ApplicationPage from './pages/applicant/ApplicationPage';
 import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
 import { HandoverPage, StudentDetailPage, StudentsPage } from './pages/staff/RegistryPages';
+import { StatusChangesPage } from './pages/staff/StatusAndCards';
 import FinancePage from './pages/staff/FinancePages';
 import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages/portal/AuthPages';
 import HomePage from './pages/portal/HomePage';
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="windows/:id/handover" element={<HandoverPage />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:id" element={<StudentDetailPage />} />
+        <Route path="status-changes" element={<StatusChangesPage />} />
         <Route path="semester-registrations" element={<SemesterRegistrationsPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="marks" element={<MarksPage />} />

@@ -79,6 +79,7 @@ public class ApplicationService {
     private final AdmissionLetterRepository letters;
     private final StudentRepository students;
     private final ApplicationEditGuard editGuard;
+    private final tz.co.msingi.cims.platform.audit.AuditLogRepository auditLogs;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -279,7 +280,17 @@ public class ApplicationService {
         Application app = applications.findById(id).orElseThrow(() -> new NotFoundException("Application", id));
         Applicant a = app.getApplicant();
         List<QualificationView> quals = qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream().map(QualificationView::of).toList();
-        return new ApplicationDetailView(view(app, a), ProfileView.of(a), quals, feeView(app));
+        return new ApplicationDetailView(view(app, a), ProfileView.of(a), quals, feeView(app), history(app));
+    }
+
+    /** The application's history: its own audit entries and its applicant's, oldest first. */
+    @Transactional(readOnly = true)
+    public List<AdmissionDtos.HistoryEntry> history(Application app) {
+        List<tz.co.msingi.cims.platform.audit.AuditLog> all = new java.util.ArrayList<>(auditLogs.findByEntityAndEntityIdOrderByOccurredAtAsc("Application", app.getId()));
+        all.addAll(auditLogs.findByEntityAndEntityIdOrderByOccurredAtAsc("Applicant", app.getApplicant().getId()));
+        return all.stream().sorted(java.util.Comparator.comparing(tz.co.msingi.cims.platform.audit.AuditLog::getOccurredAt))
+                .map(l -> new AdmissionDtos.HistoryEntry(l.getOccurredAt(), l.getAction(), HistoryLabels.of(l.getAction()), l.getActorName(), l.getDetails()))
+                .toList();
     }
 
     // ------------------------------------------------------------------ helpers

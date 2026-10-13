@@ -51,17 +51,32 @@ export default function VerifyPage() {
 
 function Result({ v }: { v: LetterVerification }) {
   const { t } = useTranslation();
-  const tone = v.status === 'VALID' ? 'success' : v.status === 'REVOKED' ? 'error' : 'warning';
-  const icon = v.status === 'VALID' ? <VerifiedIcon color="success" sx={{ fontSize: 40 }} /> : v.status === 'REVOKED'
+  const idCard = v.documentType === 'STUDENT_ID_CARD';
+  const notStudying = idCard && v.status === 'VALID' && v.studentStatus !== 'ACTIVE';
+  const tone = notStudying ? 'warning' : v.status === 'VALID' ? 'success' : v.status === 'REVOKED' ? 'error' : 'warning';
+  const icon = notStudying ? <ErrorOutlineIcon color="warning" sx={{ fontSize: 40 }} /> : v.status === 'VALID' ? <VerifiedIcon color="success" sx={{ fontSize: 40 }} /> : v.status === 'REVOKED'
     ? <CancelIcon color="error" sx={{ fontSize: 40 }} /> : <ErrorOutlineIcon color="warning" sx={{ fontSize: 40 }} />;
-  const title = v.status === 'VALID' ? t('verify.valid') : v.status === 'REVOKED' ? t('verify.revoked') : t('verify.superseded');
+  const title = notStudying ? t('verify.cardNotStudyingTitle') : v.status === 'EXPIRED' ? t('verify.cardExpired') : v.status === 'VALID' ? t('verify.valid') : v.status === 'REVOKED' ? t('verify.revoked') : t('verify.superseded');
   const statement = v.documentType === 'STATEMENT_OF_RESULTS';
   const certificate = v.documentType === 'AWARD_CERTIFICATE';
-  const text = certificate ? t('verify.certificateValid') : statement
+  const statusLabel = v.studentStatus ? t(`verify.status_${v.studentStatus}`) : undefined;
+  const text = idCard ? (notStudying ? t('verify.cardNotStudying', { status: statusLabel }) : v.status === 'VALID' ? t('verify.cardValid')
+      : v.status === 'EXPIRED' ? t('verify.cardExpiredText') : v.status === 'REVOKED' ? t('verify.cardRevoked') : t('verify.cardSuperseded'))
+    : certificate ? t('verify.certificateValid') : statement
     ? (v.status === 'VALID' ? t('verify.statementValid') : v.status === 'REVOKED' ? t('verify.revokedText') : t('verify.statementSuperseded'))
     : v.status === 'VALID' ? t('verify.validText') : v.status === 'REVOKED' ? t('verify.revokedText')
       : t('verify.supersededText', { n: v.currentEdition ?? '' });
-  const rows: [string, string | undefined][] = certificate ? [
+  const rows: [string, string | undefined][] = idCard ? [
+    [t('verify.document'), t('verify.card')],
+    [t('verify.holder'), v.holderName],
+    [t('verify.regNo'), v.registrationNo],
+    [t('verify.programme'), v.programme],
+    [t('verify.studentStatus'), statusLabel],
+    [t('verify.cardNo'), v.letterNo],
+    [t('verify.validUntil'), formatDate(v.validUntil)],
+    [t('verify.issued'), formatDate(v.issuedAt)],
+    [t('verify.institution'), v.institutionNactvetNo ? `${v.institution} (${v.institutionNactvetNo})` : v.institution],
+  ] : certificate ? [
     [t('verify.document'), t('verify.certificate')],
     [t('verify.holder'), v.holderName],
     [t('verify.regNo'), v.registrationNo],

@@ -47,6 +47,7 @@ public class AdmissionAdminController {
     private final AdmissionWindowService windows;
     private final tz.co.msingi.cims.admission.service.QualificationCheckService qualificationChecks;
     private final ApplicationService applications;
+    private final tz.co.msingi.cims.admission.service.ApplicantFileService files;
 
     @GetMapping("/windows")
     @PreAuthorize(READ)
@@ -153,5 +154,46 @@ public class AdmissionAdminController {
     @PreAuthorize(READ)
     public ApplicationDetailView application(@PathVariable Long id) {
         return applications.detail(id);
+    }
+
+    @Operation(summary = "Applicant search (as NOAS): window, status, programme, sex, fee, checks pending, submission dates and text")
+    @GetMapping("/applicants")
+    @PreAuthorize(READ)
+    public tz.co.msingi.cims.common.web.PageResponse<tz.co.msingi.cims.admission.service.AdmissionDtos.ApplicantRow> applicants(
+            @RequestParam(required = false) Long windowId, @RequestParam(required = false) Application.Status status,
+            @RequestParam(required = false) String sex, @RequestParam(required = false) Boolean feePaid,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) Long programmeId, @RequestParam(defaultValue = "false") boolean firstChoice,
+            @RequestParam(defaultValue = "false") boolean checksPending, @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size, @RequestParam(required = false) String sort) {
+        return files.search(new tz.co.msingi.cims.admission.service.ApplicantFileService.Filter(windowId, status, sex, feePaid, from, to, programmeId,
+                firstChoice, checksPending, q), page, size, sort);
+    }
+
+    @Operation(summary = "The applicant search as CSV (recorded in the audit trail)")
+    @GetMapping(value = "/applicants.csv", produces = "text/csv")
+    @PreAuthorize(READ)
+    public org.springframework.http.ResponseEntity<byte[]> applicantsCsv(
+            @RequestParam(required = false) Long windowId, @RequestParam(required = false) Application.Status status,
+            @RequestParam(required = false) String sex, @RequestParam(required = false) Boolean feePaid,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) Long programmeId, @RequestParam(defaultValue = "false") boolean firstChoice,
+            @RequestParam(defaultValue = "false") boolean checksPending, @RequestParam(required = false) String q) {
+        byte[] csv = files.export(new tz.co.msingi.cims.admission.service.ApplicantFileService.Filter(windowId, status, sex, feePaid, from, to,
+                programmeId, firstChoice, checksPending, q));
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"applicants.csv\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8")).body(csv);
+    }
+
+    @Operation(summary = "The printable application file (PDF); printing is recorded in the application's history")
+    @GetMapping(value = "/applications/{id}/file", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize(READ)
+    public org.springframework.http.ResponseEntity<byte[]> applicationFile(@PathVariable Long id) {
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"application-" + id + ".pdf\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF).body(files.file(id));
     }
 }

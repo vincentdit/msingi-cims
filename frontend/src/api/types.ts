@@ -236,7 +236,9 @@ export interface JoiningInstructions {
 
 export interface LetterVerification {
   documentType: string;
-  status: 'VALID' | 'SUPERSEDED' | 'REVOKED';
+  status: 'VALID' | 'SUPERSEDED' | 'REVOKED' | 'EXPIRED';
+  validUntil?: string;
+  studentStatus?: string;
   institution: string;
   institutionNactvetNo?: string;
   letterNo: string;
@@ -327,6 +329,13 @@ export interface ApplicationDetail {
   applicant: Profile;
   qualifications: Qualification[];
   fee: Fee;
+  history: { at: string; action: string; label: string; by?: string; details?: Record<string, unknown> }[];
+}
+
+export interface ApplicantRow {
+  id: number; referenceNo?: string; status: string; applicantId: number; applicantName: string; sex?: string; phone?: string;
+  indexNumber?: string; region?: string; windowId: number; windowName: string; feePaid: boolean; firstChoice?: string; choices: number;
+  checksPending: number; submittedAt?: string; createdAt: string; amendedAt?: string;
 }
 
 export interface Programme {

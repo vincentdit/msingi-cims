@@ -26,7 +26,7 @@ const EXAMS_READERS = [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS, R.MANAGEMENT];
 const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 
 export type PageKey =
-  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'semesterRegistrations' | 'graduations'
+  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'semesterRegistrations' | 'graduations'
   | 'calendar' | 'curricula' | 'teaching' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
   | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
 
@@ -38,6 +38,7 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   applications: [R.ADMIN, R.ADMISSIONS, R.ACADEMIC, R.REGISTRAR, R.MANAGEMENT, R.AUDITOR],
   programmes: [R.ADMIN, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   students: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.ADMISSIONS, R.HOD, R.EXAMS, R.MANAGEMENT],
+  statusChanges: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   semesterRegistrations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   graduations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
   calendar: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.ADMISSIONS, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
@@ -63,7 +64,7 @@ export const can = (roles: readonly string[] | undefined, page: PageKey) => !!ro
 
 /** The page a path belongs to (the first segment after /staff). */
 const PATH_PAGE: Record<string, PageKey> = {
-  '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students',
+  '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
   teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',

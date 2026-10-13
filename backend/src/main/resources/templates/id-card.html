@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!--
+  Student ID card (FR-REG-06) at ID-1 / CR80 size, front then back for each card.
+  Double braces insert an escaped value; triple braces insert markup built by IdCardRenderer from escaped values.
+  Must stay well-formed XHTML (parsed as XML). CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Student ID cards</title>
+<style>
+  @page { size: 85.6mm 54mm; margin: 0; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #111827; margin: 0; }
+  .card { width: 85.6mm; height: 53.6mm; overflow: hidden; page-break-after: always; position: relative; }
+  .card.last { page-break-after: auto; }
+  table { border-collapse: collapse; }
+  .band { width: 100%; background: {{primaryColor}}; color: #ffffff; }
+  .band td { padding: 4pt 6pt; vertical-align: middle; }
+  .badge { width: 22pt; height: 22pt; background: #ffffff; color: {{primaryColor}}; font-weight: bold; font-size: 6.5pt; text-align: center;
+           line-height: 22pt; border-radius: 11pt; }
+  .inst { font-size: 7.5pt; font-weight: bold; line-height: 1.15; }
+  .kind { font-size: 5.5pt; letter-spacing: 0.8pt; margin-top: 1pt; }
+  .body { width: 100%; margin-top: 5pt; }
+  .body td { vertical-align: top; padding: 0 6pt 0 7pt; }
+  .photo { width: 56pt; height: 70pt; border: 0.8pt solid #d1d5db; }
+  .nophoto { width: 56pt; height: 70pt; border: 0.8pt dashed #9ca3af; color: #9ca3af; font-size: 6pt; text-align: center; line-height: 70pt; }
+  .name { font-size: 9pt; font-weight: bold; color: {{primaryColor}}; margin-bottom: 2pt; line-height: 1.1; }
+  .label { font-size: 5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4pt; margin-top: 2.5pt; }
+  .value { font-size: 7pt; font-weight: bold; }
+  .value.small { font-size: 6pt; line-height: 1.15; }
+  .pair td { padding: 0 8pt 0 0; }
+  .foot { position: absolute; left: 0; right: 0; bottom: 0; height: 13pt; background: {{primaryColor}}; color: #ffffff; font-size: 5.5pt;
+          line-height: 13pt; padding: 0 7pt; letter-spacing: 0.3pt; }
+  .foot .right { float: right; }
+  .back { background: #ffffff; }
+  .backt { width: 100%; margin-top: 8pt; }
+  .backt td { vertical-align: top; padding: 0 6pt 0 8pt; }
+  .qr { width: 62pt; height: 62pt; }
+  .terms { font-size: 5.6pt; color: #374151; line-height: 1.3; }
+  .strong { font-weight: bold; color: #111827; }
+  .gap { margin-top: 3pt; }
+  .code { font-family: Courier, monospace; font-size: 7pt; font-weight: bold; color: #111827; }
+  .sign { width: 100%; position: absolute; left: 0; bottom: 14pt; }
+  .sign td { width: 50%; padding: 0 8pt; }
+  .line { border-top: 0.6pt solid #6b7280; padding-top: 1.5pt; font-size: 5.2pt; color: #4b5563; text-align: center; }
+</style>
+</head>
+<body>
+{{{cards}}}
+</body>
+</html>

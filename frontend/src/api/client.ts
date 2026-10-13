@@ -126,6 +126,17 @@ export async function publicImageUrl(path: string): Promise<string> {
   return URL.createObjectURL(await res.blob());
 }
 
+/** An image the API serves only to signed-in users (e.g. a student's photo), as an address for an <img>. */
+export async function privateImageUrl(path: string, realm: Realm): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (TENANT) headers['X-Tenant'] = TENANT;
+  const token = getToken(realm);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) throw new Error('Image not available');
+  return URL.createObjectURL(await res.blob());
+}
+
 /** Downloads a file from the API with the session token (e.g. CSV exports); method POST for documents issued on request. */
 export async function download(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET', body?: unknown) {
   const headers: Record<string, string> = {};
