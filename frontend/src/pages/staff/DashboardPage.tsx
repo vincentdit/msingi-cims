@@ -27,6 +27,9 @@ export default function DashboardPage() {
   // the Principal, administrator and Deputy Principal (Academic) also have the institution overview; management starts there
   const overview = roles.some((r) => r === 'MANAGEMENT_VIEWER' || r === 'INSTITUTION_ADMIN' || r === 'DEPUTY_PRINCIPAL_ACADEMIC');
   const [tab, setTab] = useState<'overview' | 'today'>(roles.includes('MANAGEMENT_VIEWER') ? 'overview' : 'today');
+  const approver = roles.some((r) => ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER'].includes(r));
+  const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: approver, refetchInterval: 60_000,
+    queryFn: () => api<{ actionable: number }>('/api/approvals/count', staff) }).data?.actionable ?? 0;
   const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
   if (teachingOnly) return <Navigate to="/staff/marks" replace />;
   if (officerOnly) return <Navigate to={roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance'} replace />;
@@ -42,6 +45,11 @@ export default function DashboardPage() {
       )}
       {overview && tab === 'overview' ? <OverviewSection /> : (
         <>
+          {waiting > 0 && (
+            <Alert severity="warning" sx={{ mb: 3 }} action={<Button color="inherit" component={RouterLink} to="/staff/approvals" endIcon={<ArrowForwardIcon />}>Approvals</Button>}>
+              {waiting === 1 ? '1 decision waits for you.' : `${waiting} decisions wait for you.`}
+            </Alert>
+          )}
           <ErrorAlert error={q.error} />
           {q.isLoading && <Loading />}
           {d && !d.admissions && !d.registry && !d.finance && <Alert severity="info">Your role has no dashboard figures. Use the menu to reach your work.</Alert>}

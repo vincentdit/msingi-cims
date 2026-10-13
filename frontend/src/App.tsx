@@ -6,6 +6,7 @@ import StudentLayout from './components/StudentLayout';
 import InstitutionPage from './pages/staff/InstitutionPage';
 import UsersPage from './pages/staff/UsersPage';
 import AuditPage from './pages/staff/AuditPage';
+import ApprovalsPage from './pages/staff/ApprovalsPage';
 import ChangePasswordPage from './pages/staff/ChangePasswordPage';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="institution" element={<InstitutionPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="audit" element={<AuditPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="password" element={<ChangePasswordPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

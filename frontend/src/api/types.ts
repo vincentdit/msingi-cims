@@ -2011,3 +2011,9 @@ export interface Overview {
   collectionsByMonth: { key: string; label: string; value: number }[];
   thresholds: { lowIntake: number; lowCollection: number; lowPass: number; lowDemand: number };
 }
+
+export interface ApprovalItem {
+  kind: string; label: string; body: string; id: number; title: string; detail: string; submittedBy?: string; submittedAt?: string;
+  link: string; canAct: boolean; note?: string;
+}
+export interface ApprovalInbox { items: ApprovalItem[]; total: number; actionable: number }

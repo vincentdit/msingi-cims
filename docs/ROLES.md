@@ -92,11 +92,19 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Does:** nothing that changes data.
 - **Next:** make the thresholds settable per institution; export the overview as PDF for board papers.
 
-### 5. Deputy Principal (Academic): Working
+### 5. Deputy Principal (Academic): Done
 
-- **Sees:** admissions, registry, teaching, examinations, graduation and notices.
-- **Does:** approves selection (Academic Committee), the academic calendar, curricula and results; revokes letters.
-- **Next:** one "waiting for my approval" list across selection, curricula, results and amendments.
+- **Sees:** admissions, registry, teaching, examinations, graduation and notices, plus **Approvals**.
+- **Approvals:** everything waiting for their decision in one list, grouped by the body it is decided for, oldest first.
+  - **Academic Committee:** proposed selection rounds, draft curricula, computed class results to recommend, and examination exemptions.
+  - **Using the list:** each item says who put it forward and when, and opens the page where it is decided; the usual checks apply there.
+  - **Own items:** items the person put forward themselves are shown but marked for someone else to decide (segregation of duties). So are drafts still being prepared.
+  - **Count:** the menu shows how many decisions wait, and "Today's work" on the dashboard says so too.
+- **Does:** approves selection, curricula, class results and exemptions for the Academic Committee; keeps the academic calendar; revokes letters.
+- **Other approvers:** the same Approvals page serves them.
+  - **Administrator:** Governing Board confirmation of results, result amendments and graduand lists.
+  - **Head of Department:** module results to moderate and resit marks for their department.
+  - **Head of Department and Examinations Officer:** recording the Department Board's approval.
 
 ### 6. Admissions Officer: Working (refined most)
 
@@ -212,7 +220,6 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Deputy Principal: one approvals inbox.
-2. Admissions Officer: NOAS-style applicant search and file.
-3. Registrar: status changes and ID cards.
-4. Platform Administrator: the platform console and onboarding.
+1. Admissions Officer: NOAS-style applicant search and file.
+2. Registrar: status changes and ID cards.
+3. Platform Administrator: the platform console and onboarding.

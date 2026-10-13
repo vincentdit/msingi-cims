@@ -25,6 +25,8 @@ import IptIcon from '@mui/icons-material/Engineering';
 import InstitutionIcon from '@mui/icons-material/AccountBalance';
 import UsersIcon from '@mui/icons-material/ManageAccounts';
 import AuditIcon from '@mui/icons-material/Policy';
+import ApprovalsIcon from '@mui/icons-material/Inbox';
+import { Badge } from '@mui/material';
 import KeyIcon from '@mui/icons-material/Key';
 import { Alert, Button } from '@mui/material';
 import {
@@ -44,6 +46,7 @@ type Item = { page: PageKey; to: string; label: string; icon: JSX.Element; end?:
 const GROUPS: { title?: string; items: Item[] }[] = [
   { items: [
     { page: 'dashboard', to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
+    { page: 'approvals', to: '/staff/approvals', label: 'Approvals', icon: <ApprovalsIcon /> },
     { page: 'reports', to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon /> },
   ] },
   { title: 'Admissions', items: [
@@ -107,6 +110,9 @@ export default function StaffLayout() {
     queryFn: () => api<{ all: boolean; departments: string[]; programmes: string[] }>('/api/auth/scope', { realm: 'staff' }) }).data;
   const roles = me?.roles ?? [];
   const location = useLocation();
+  // how many decisions wait for this person, shown on the Approvals menu item
+  const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: can(roles, 'approvals') && !me?.mustChangePassword,
+    refetchInterval: 60_000, queryFn: () => api<{ actionable: number }>('/api/approvals/count', { realm: 'staff' }) }).data?.actionable ?? 0;
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
   const page = pageOf(location.pathname);
   const onPassword = location.pathname.startsWith('/staff/password');
@@ -141,6 +147,7 @@ export default function StaffLayout() {
                 >
                   <ListItemIcon>{n.icon}</ListItemIcon>
                   <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 15 }} />
+                  {n.page === 'approvals' && waiting > 0 && <Badge badgeContent={waiting} color="warning" sx={{ mr: 1.5 }} aria-label={`${waiting} waiting`} />}
                 </ListItemButton>
               ))}
             </Box>
