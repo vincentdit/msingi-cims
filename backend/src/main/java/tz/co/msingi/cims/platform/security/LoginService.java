@@ -32,16 +32,20 @@ public class LoginService {
                 .orElseThrow(() -> new BadCredentialsException(GENERIC_ERROR));
 
         if (user.getStatus() == UserAccount.Status.LOCKED) {
+            audit.recordAs(user.getId(), user.getFullName(), "LOGIN_FAILED", "UserAccount", user.getId(), Map.of("reason", "account locked"));
             throw new LockedException("Account locked after repeated failed logins. Contact the institution.");
         }
         if (user.getStatus() == UserAccount.Status.DISABLED) {
+            audit.recordAs(user.getId(), user.getFullName(), "LOGIN_FAILED", "UserAccount", user.getId(), Map.of("reason", "account disabled"));
             throw new BadCredentialsException(GENERIC_ERROR);
         }
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             user.setFailedLogins(user.getFailedLogins() + 1);
+            audit.recordAs(user.getId(), user.getFullName(), "LOGIN_FAILED", "UserAccount", user.getId(),
+                    Map.of("reason", "wrong password", "failedLogins", user.getFailedLogins()));
             if (user.getFailedLogins() >= props.maxFailedLogins()) {
                 user.setStatus(UserAccount.Status.LOCKED);
-                audit.record("ACCOUNT_LOCKED", "UserAccount", user.getId(), Map.of("failedLogins", user.getFailedLogins()));
+                audit.recordAs(user.getId(), user.getFullName(), "ACCOUNT_LOCKED", "UserAccount", user.getId(), Map.of("failedLogins", user.getFailedLogins()));
             }
             throw new BadCredentialsException(GENERIC_ERROR);
         }

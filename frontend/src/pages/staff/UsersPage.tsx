@@ -8,6 +8,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { Department, IssuedPassword, Programme, RoleGrant, RoleInfo, RoleScope, StaffUser, StaffUserSummary } from '../../api/types';
 import { useSession } from '../../auth/session';
@@ -204,6 +205,8 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
       </DialogContent>
       <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
         <Stack direction="row" spacing={1}>
+          {user && <Button component={RouterLink} to={`/staff/audit?actorId=${user.id}`}>Their activity</Button>}
+          {user && <Button component={RouterLink} to={`/staff/audit?entity=StaffUser&entityId=${user.id}`}>Account history</Button>}
           {user && !readOnly && !user.self && (
             <>
               <Button disabled={reset.isPending} onClick={() => reset.mutate()}>Reset password</Button>

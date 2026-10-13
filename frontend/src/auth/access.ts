@@ -28,7 +28,7 @@ const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 export type PageKey =
   | 'dashboard' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'semesterRegistrations' | 'graduations'
   | 'calendar' | 'curricula' | 'teaching' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'institution';
+  | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
@@ -54,6 +54,7 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   notices: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.BURSAR, R.ACCOUNTANT, R.EXAMS, R.WARDEN, R.ADMISSIONS, R.MANAGEMENT],
   messages: [R.ADMIN, R.REGISTRAR, R.ADMISSIONS, R.BURSAR, R.ACADEMIC, R.AUDITOR, R.MANAGEMENT],
   users: [R.ADMIN, R.AUDITOR],
+  audit: [R.AUDITOR, R.ADMIN],
   institution: [R.ADMIN],
 };
 
@@ -64,7 +65,7 @@ const PATH_PAGE: Record<string, PageKey> = {
   '': 'dashboard', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
   teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
-  clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users',
+  clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution',
 };
 

@@ -68,7 +68,7 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ### 3. Institution Administrator: Done in this slice
 
-- **Sees:** everything in the institution, plus **Users & roles** and **Institution**.
+- **Sees:** everything in the institution, plus **Users & roles**, **Audit trail** and **Institution**.
 - **Does:**
   - Creates staff accounts with roles (department or programme limits where they apply) and hands over the temporary password.
   - Resets passwords, disables, enables and unlocks accounts.
@@ -168,11 +168,22 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Does:** clears or holds students.
 - **Next:** none planned.
 
-### 18. Auditor: Working (gap)
+### 18. Auditor: Done
 
-- **Sees:** dashboard, reports, admissions (read), programmes, calendar, curricula, fees (read), messages (read) and users (read).
+- **Sees:** dashboard, reports, admissions (read), programmes, calendar, curricula, fees (read), messages (read), users (read) and the **Audit trail**.
+- **Audit trail:**
+  - Every change in CIMS with who made it, when, the record it touched and the details, and the IP address it came from.
+  - Periods of today, 7 days, 30 days or chosen dates, up to a year at a time.
+  - Filters by area, person, action and free text, with a security-events switch.
+  - A summary of entries, sign-ins, failed sign-ins, locked accounts and staff account changes; each count can be clicked to filter.
+  - A record's full history and everything one person did. The Users & roles page links to both for each account.
+  - CSV export of up to 100,000 rows; each export is itself recorded.
+- **Safeguards:**
+  - Entries cannot be changed or deleted (database trigger).
+  - Each institution sees only its own trail (row-level security).
+  - Failed sign-ins and locked accounts are now recorded against the account they were for.
 - **Does:** nothing that changes data.
-- **Gap:** no audit-trail page yet. The SRS gives the Auditor read access to audit logs, and NOAS has System Logs and Integration Logs. Next: an audit trail page (who did what, when, from where; filters and export).
+- **Next:** NOAS also keeps integration logs (NECTA, NACTVET, GePG calls). CIMS does not record those calls yet; that belongs to the Platform Administrator slice.
 
 ### 19. Platform Administrator (Msingi): Not started
 
@@ -186,10 +197,9 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Auditor: the audit trail page (also useful to the administrator).
-2. Head of Department and Programme Coordinator: apply their department or programme limits to lists and dashboards.
-3. Principal / Management: a decision-focused dashboard.
-4. Deputy Principal: one approvals inbox.
-5. Admissions Officer: NOAS-style applicant search and file.
-6. Registrar: status changes and ID cards.
-7. Platform Administrator: the platform console and onboarding.
+1. Head of Department and Programme Coordinator: apply their department or programme limits to lists and dashboards.
+2. Principal / Management: a decision-focused dashboard.
+3. Deputy Principal: one approvals inbox.
+4. Admissions Officer: NOAS-style applicant search and file.
+5. Registrar: status changes and ID cards.
+6. Platform Administrator: the platform console and onboarding.

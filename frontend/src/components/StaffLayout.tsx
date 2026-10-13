@@ -24,6 +24,7 @@ import HostelIcon from '@mui/icons-material/Bed';
 import IptIcon from '@mui/icons-material/Engineering';
 import InstitutionIcon from '@mui/icons-material/AccountBalance';
 import UsersIcon from '@mui/icons-material/ManageAccounts';
+import AuditIcon from '@mui/icons-material/Policy';
 import KeyIcon from '@mui/icons-material/Key';
 import { Alert, Button } from '@mui/material';
 import {
@@ -79,6 +80,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   ] },
   { title: 'Administration', items: [
     { page: 'users', to: '/staff/users', label: 'Users & roles', icon: <UsersIcon /> },
+    { page: 'audit', to: '/staff/audit', label: 'Audit trail', icon: <AuditIcon /> },
     { page: 'institution', to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon /> },
   ] },
 ];

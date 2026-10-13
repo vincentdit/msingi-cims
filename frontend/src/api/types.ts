@@ -1981,3 +1981,14 @@ export interface StaffUser {
 }
 export interface IssuedPassword { user: StaffUser; temporaryPassword: string }
 export interface StaffUserSummary { total: number; active: number; disabled: number; locked: number; mustChangePassword: number }
+
+export interface AuditEntry {
+  id: number; occurredAt: string; actorUserId?: number; actorName?: string; action: string; entity: string; entityId?: number;
+  area: string; details?: Record<string, unknown>; ipAddress?: string;
+}
+export interface AuditCount { key: string; label: string; count: number }
+export interface AuditFacets { areas: string[]; entities: AuditCount[]; actions: AuditCount[]; actors: AuditCount[] }
+export interface AuditSummary {
+  from: string; to: string; actions: number; people: number; signIns: number; failedSignIns: number; lockedAccounts: number;
+  accountChanges: number; days: { date: string; count: number }[]; topActors: AuditCount[]; topAreas: AuditCount[];
+}
