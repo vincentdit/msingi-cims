@@ -18,6 +18,9 @@ import type {
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { OFFERING_STAGE, useRoles, useSemesterChoice } from './MarksPages';
+import { ClassListButton, StartCheckInDialog } from './MyTeachingPages';
+import PhoneIcon from '@mui/icons-material/PhoneAndroid';
+import QrIcon from '@mui/icons-material/QrCode2';
 
 const staff = { realm: 'staff' as const };
 const WIDE = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'];
@@ -269,9 +272,11 @@ function WorkloadTable({ query }: { query: { isLoading: boolean; data?: Workload
 
 export function AttendancePage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const can = useRoles();
   const [session, setSession] = useState<{ id?: number } | null>(null);
+  const [checkIn, setCheckIn] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const v = useQuery({ queryKey: ['staff', 'attendance', id], queryFn: () => api<AttendanceView>(`/api/teaching/offerings/${id}/attendance`, staff) });
   const refresh = useCallback(() => {
@@ -283,6 +288,7 @@ export function AttendancePage() {
     setNotice(`${n} session${n === 1 ? '' : 's'} saved on this device ${n === 1 ? 'has' : 'have'} been sent.`);
   }, [refresh]));
   const a = v.data;
+  const openCheckIn = a?.sessionList.find((x) => x.checkInOpen);
 
   return (
     <Container maxWidth="lg" disableGutters>
@@ -294,13 +300,21 @@ export function AttendancePage() {
           <PageTitle title={`${a.code} · ${a.title}`}
             subtitle={`${a.semesterName}${a.departmentName ? ` · ${a.departmentName}` : ''} · ${a.lecturers.length ? a.lecturers.join(', ') : 'no lecturer allocated'}`}
             action={(
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
                 {can(EXAMS) && <Button component={RouterLink} to={`/staff/eligibility/${a.offeringId}`} startIcon={<EligibilityIcon />}>Eligibility</Button>}
+                <ClassListButton offeringId={a.offeringId} code={a.code} />
+                {a.canRecord && !openCheckIn && <Button startIcon={<QrIcon />} onClick={() => setCheckIn(true)} sx={{ whiteSpace: 'nowrap' }}>Self check-in</Button>}
                 {a.canRecord && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setSession({})} sx={{ whiteSpace: 'nowrap' }}>Record session</Button>}
               </Stack>
             )} />
           <OutboxBanner outbox={outbox} />
           {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice(null)}>{notice}</Alert>}
+          {openCheckIn && (
+            <Alert severity="info" icon={<QrIcon />} sx={{ mb: 2 }}
+              action={<Button color="inherit" size="small" component={RouterLink} to={`/staff/teaching/check-in/${openCheckIn.id}`}>Show the code</Button>}>
+              Self check-in is open for the session of {formatDate(openCheckIn.sessionDate)} at {openCheckIn.startTime.slice(0, 5)}.
+            </Alert>
+          )}
           {!a.canRecord && a.status !== 'DRAFT' && (
             <Alert severity="info" sx={{ mb: 2 }}>Results are {OFFERING_STAGE[a.status].toLowerCase()}, so attendance can no longer change.</Alert>
           )}
@@ -360,14 +374,18 @@ export function AttendancePage() {
                     <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Session</TableCell><TableCell align="right">P / L / A / E</TableCell></TableRow></TableHead>
                     <TableBody>
                       {a.sessionList.map((s) => (
-                        <TableRow key={s.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSession({ id: s.id })}>
+                        <TableRow key={s.id} hover sx={{ cursor: 'pointer' }}
+                          onClick={() => (s.checkInOpen && a.canRecord ? navigate(`/staff/teaching/check-in/${s.id}`) : setSession({ id: s.id }))}>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>
                             <Typography variant="body2">{formatDate(s.sessionDate)}</Typography>
                             <Typography variant="caption" color="text.secondary">{s.startTime.slice(0, 5)} · {s.durationMinutes} min</Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2">{kindLabel(s.kind)}</Typography>
-                            {s.topic && <Typography variant="caption" color="text.secondary">{s.topic}</Typography>}
+                            <Typography variant="body2">{kindLabel(s.kind)}
+                              {s.checkInOpen && <Chip size="small" color="info" label="Check-in open" sx={{ ml: 0.75, height: 20 }} />}
+                            </Typography>
+                            {s.topic && <Typography variant="caption" color="text.secondary" display="block">{s.topic}</Typography>}
+                            {s.selfCheckIns > 0 && <Typography variant="caption" color="text.secondary" display="block">{s.selfCheckIns} checked in themselves</Typography>}
                           </TableCell>
                           <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{s.present} / {s.late} / {s.absent} / {s.excused}</TableCell>
                         </TableRow>
@@ -383,6 +401,7 @@ export function AttendancePage() {
               </Card>
             </Grid>
           </Grid>
+          {checkIn && <StartCheckInDialog offeringId={a.offeringId} code={a.code} onClose={() => setCheckIn(false)} />}
           {session && (
             <SessionDialog offeringId={a.offeringId} code={a.code} sessionId={session.id} canRecord={a.canRecord} onClose={() => setSession(null)}
               onSaved={(msg) => { setSession(null); setNotice(msg); refresh(); }}
@@ -484,6 +503,13 @@ function SessionDialog({ offeringId, code, sessionId, canRecord, onClose, onSave
         {loading && <Loading />}
         {!loading && (
           <Stack spacing={2}>
+            {existing.data?.checkIn?.open && (
+              <Alert severity="info">Self check-in for this session is open until {new Date(existing.data.checkIn.closesAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
+                Close it from the check-in screen, then correct the register here.</Alert>
+            )}
+            {existing.data?.checkIn && !existing.data.checkIn.open && existing.data.checkIn.sharedDevices > 0 && (
+              <Alert severity="warning" icon={<PhoneIcon />}>{existing.data.checkIn.sharedDevices} students checked in from a phone used for more than one student. Check whether they were in class.</Alert>
+            )}
             <Grid container spacing={1.5}>
               <Grid size={{ xs: 6, sm: 3 }}>
                 <TextField fullWidth size="small" type="date" label="Date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!editable}
@@ -526,7 +552,15 @@ function SessionDialog({ offeringId, code, sessionId, canRecord, onClose, onSave
                   sx={{ py: 0.75, borderBottom: 1, borderColor: 'divider' }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{l.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{l.registrationNo} · {l.programmeCode}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {l.registrationNo} · {l.programmeCode}
+                      {l.checkedInAt && <> · checked in {new Date(l.checkedInAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}{l.source === 'REGISTER' ? ' (corrected)' : ''}</>}
+                    </Typography>
+                    {l.sharedDevice && (
+                      <Typography variant="caption" color="warning.main" display="flex" alignItems="center" gap={0.5}>
+                        <PhoneIcon sx={{ fontSize: 14 }} /> Same phone as another student
+                      </Typography>
+                    )}
                   </Box>
                   <ToggleButtonGroup size="small" exclusive value={marks[l.moduleRegistrationId] ?? null} disabled={!editable}
                     onChange={(_, v: AttendanceStatus | null) => { if (v) setMarks((m) => ({ ...m, [l.moduleRegistrationId]: v })); }}

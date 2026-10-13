@@ -30,15 +30,45 @@ public final class TeachingDtos {
     }
 
     public record SessionSummary(Long id, LocalDate sessionDate, LocalTime startTime, int durationMinutes, String kind, String topic,
-                                 int present, int late, int absent, int excused, String recordedByName, OffsetDateTime recordedAt) {
+                                 int present, int late, int absent, int excused, String recordedByName, OffsetDateTime recordedAt,
+                                 int selfCheckIns, boolean checkInOpen) {
     }
 
+    /**
+     * A line of a session's register. {@code source} is SELF when the student checked in themselves; {@code sharedDevice} flags a
+     * check-in made from a phone that also checked in another student for the same session.
+     */
     public record RegisterLine(Long moduleRegistrationId, Long studentId, String registrationNo, String name, String programmeCode,
-                               String status, String note) {
+                               String status, String note, String source, OffsetDateTime checkedInAt, boolean sharedDevice) {
+    }
+
+    /** Self check-in of a session: open from {@code openedAt} until {@code closesAt}; checking in after {@code lateAfterMinutes} counts as late. */
+    public record CheckInState(boolean open, OffsetDateTime openedAt, OffsetDateTime closesAt, int lateAfterMinutes, OffsetDateTime closedAt,
+                               int checkedIn, int classSize, int sharedDevices) {
     }
 
     public record SessionView(Long id, Long offeringId, LocalDate sessionDate, LocalTime startTime, int durationMinutes, String kind,
-                              String topic, String recordedByName, OffsetDateTime recordedAt, boolean editable, List<RegisterLine> register) {
+                              String topic, String recordedByName, OffsetDateTime recordedAt, boolean editable, CheckInState checkIn,
+                              List<RegisterLine> register) {
+    }
+
+    // ------------------------------------------------------------------ self check-in (FR-TCH-03)
+
+    public record CheckInRequest(@NotNull ClassSession.Kind kind, @Size(max = 200) String topic,
+                                 @NotNull @Min(15) @Max(600) Integer durationMinutes,
+                                 @NotNull @Min(3) @Max(60) Integer openMinutes, @NotNull @Min(0) @Max(120) Integer lateAfterMinutes) {
+    }
+
+    /** What the lecturer's screen shows while check-in is open: the current code (and a QR code of the check-in link), refreshed often. */
+    public record CheckInScreen(Long sessionId, String moduleCode, String moduleTitle, String code, int secondsLeft, int stepSeconds,
+                                String checkInUrl, String qrPng, CheckInState state, List<RegisterLine> recent) {
+    }
+
+    public record StudentCheckIn(@NotBlank @Size(min = 6, max = 6) String code, @Size(max = 64) String deviceId) {
+    }
+
+    public record CheckInDone(Long sessionId, String moduleCode, String moduleTitle, String status, OffsetDateTime checkedInAt,
+                              boolean already) {
     }
 
     /** A student's attendance in one module so far. */
@@ -107,6 +137,33 @@ public final class TeachingDtos {
                                 String studentName, String reason, String status, String requestedByName, OffsetDateTime requestedAt,
                                 String decidedByName, OffsetDateTime decidedAt, String decisionNote, List<String> reasonsNotMet,
                                 boolean canDecide) {
+    }
+
+    // ------------------------------------------------------------------ the lecturer's own teaching (BP-07, BP-08 steps 1-3)
+
+    public record TeachingSemester(Long id, String name, String academicYear, LocalDate startDate, LocalDate endDate) {
+    }
+
+    public record MyModule(Long offeringId, String code, String title, BigDecimal credits, String departmentName, List<String> coLecturers,
+                           List<String> programmes, int students, int sessions, int minutesTaught, LocalDate lastSession,
+                           BigDecimal averagePercent, int below, String status, String returnedNote, String returnedByName, boolean planSet,
+                           BigDecimal caPercent, BigDecimal sePercent, int complete, boolean eligibilityGenerated, int notEligible,
+                           String resitStatus, int resitsToMark, String resitReturnedNote, Long openCheckInSessionId, boolean canRecord) {
+    }
+
+    public record AtRisk(Long offeringId, String moduleCode, Long studentId, String registrationNo, String name, BigDecimal percent, int attended,
+                         int counted, boolean warned) {
+    }
+
+    public record AssignedRemark(Long id, String moduleCode, String moduleTitle, String kind, OffsetDateTime assignedAt) {
+    }
+
+    public record Step(String severity, String text, String link) {
+    }
+
+    public record MyTeaching(List<TeachingSemester> semesters, TeachingSemester semester, LocalDate marksEntryOpens, LocalDate marksEntryCloses,
+                             String marksWindow, Integer daysToClose, BigDecimal threshold, int students, int sessions, BigDecimal hoursTaught,
+                             List<MyModule> modules, List<AtRisk> atRisk, List<AssignedRemark> remarks, List<Step> next) {
     }
 
     // ------------------------------------------------------------------ student portal

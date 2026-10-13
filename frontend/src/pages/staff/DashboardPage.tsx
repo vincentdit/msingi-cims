@@ -19,7 +19,7 @@ const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(n >= 1
 export default function DashboardPage() {
   const { user } = useSession();
   const roles = user('staff')?.roles ?? [];
-  // Lecturers and assessors have no dashboard: their work is their modules' marks.
+  // Lecturers and assessors have no dashboard: they start from their own modules.
   const teachingOnly = roles.length > 0 && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR');
   const officerOnly = roles.length > 0 && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN' || r === 'IPT_COORDINATOR');
   const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly && !officerOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: approver, refetchInterval: 60_000,
     queryFn: () => api<{ actionable: number }>('/api/approvals/count', staff) }).data?.actionable ?? 0;
   const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
-  if (teachingOnly) return <Navigate to="/staff/marks" replace />;
+  if (teachingOnly) return <Navigate to="/staff/my-teaching" replace />;
   if (officerOnly) return <Navigate to={roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance'} replace />;
   return (
     <Container maxWidth="lg" disableGutters>

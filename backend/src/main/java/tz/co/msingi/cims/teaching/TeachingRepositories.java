@@ -24,6 +24,10 @@ public final class TeachingRepositories {
 
         long countByOfferingId(Long offeringId);
 
+        /** Sessions whose self check-in is open (not yet closed), for matching a student's code and for closing on time. */
+        @Query("select s from ClassSession s join fetch s.offering o join fetch o.module where s.checkinOpenedAt is not null and s.checkinClosedAt is null")
+        List<ClassSession> findOpenCheckIns();
+
         @Query("select s.offering.id, count(s), coalesce(sum(s.durationMinutes), 0) from ClassSession s "
                 + "where s.offering.semester.id = :semesterId group by s.offering.id")
         List<Object[]> totalsBySemester(@Param("semesterId") Long semesterId);

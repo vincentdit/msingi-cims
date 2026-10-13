@@ -46,6 +46,52 @@ public class TeachingController {
 
     private final AttendanceService attendance;
     private final EligibilityService eligibility;
+    private final CheckInService checkIns;
+    private final MyTeachingService myTeaching;
+    private final ClassListService classLists;
+
+    // ------------------------------------------------------------------ the lecturer's own teaching
+
+    @GetMapping("/api/teaching/mine")
+    @PreAuthorize(STAFF)
+    public TeachingDtos.MyTeaching mine(@RequestParam(required = false) Long semesterId) {
+        return myTeaching.board(semesterId);
+    }
+
+    @GetMapping("/api/teaching/offerings/{id}/class-list")
+    @PreAuthorize(STAFF)
+    public org.springframework.http.ResponseEntity<byte[]> classList(@PathVariable Long id, @RequestParam(defaultValue = "pdf") String format) {
+        ClassListService.Document d = "xlsx".equalsIgnoreCase(format) ? classLists.excel(id) : classLists.pdf(id);
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + d.filename() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(d.contentType())).body(d.bytes());
+    }
+
+    // ------------------------------------------------------------------ self check-in (FR-TCH-03)
+
+    @PostMapping("/api/teaching/offerings/{id}/check-in")
+    @PreAuthorize(STAFF)
+    public SessionView openCheckIn(@PathVariable Long id, @Valid @RequestBody TeachingDtos.CheckInRequest req) {
+        return checkIns.open(id, req);
+    }
+
+    @GetMapping("/api/teaching/sessions/{id}/check-in")
+    @PreAuthorize(STAFF)
+    public TeachingDtos.CheckInScreen checkInScreen(@PathVariable Long id, @RequestParam(required = false) String base) {
+        return checkIns.screen(id, base);
+    }
+
+    @PostMapping("/api/teaching/sessions/{id}/check-in/close")
+    @PreAuthorize(STAFF)
+    public SessionView closeCheckIn(@PathVariable Long id) {
+        return checkIns.close(id);
+    }
+
+    @PostMapping("/api/student/check-in")
+    @PreAuthorize("hasRole('STUDENT')")
+    public TeachingDtos.CheckInDone checkIn(@Valid @RequestBody TeachingDtos.StudentCheckIn req) {
+        return checkIns.checkIn(req);
+    }
 
     // ------------------------------------------------------------------ attendance
 
@@ -146,7 +192,7 @@ public class TeachingController {
 
     @GetMapping("/api/student/attendance")
     @PreAuthorize("hasRole('STUDENT')")
-    public MyAttendance mine(@RequestParam(required = false) Long semesterId) {
+    public MyAttendance myAttendance(@RequestParam(required = false) Long semesterId) {
         return attendance.mine(semesterId);
     }
 }

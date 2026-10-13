@@ -17,6 +17,7 @@ import tz.co.msingi.cims.exams.ModuleOffering;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +58,17 @@ public class ClassSession extends BaseEntity {
 
     @Column(nullable = false)
     private String recordedByName;
+
+    // ---- self check-in (FR-TCH-03): open while checkinOpenedAt is set and checkinClosedAt is not
+    private String checkinSecret;
+    private OffsetDateTime checkinOpenedAt;
+    private OffsetDateTime checkinClosesAt;
+    private Short checkinLateAfter;
+    private OffsetDateTime checkinClosedAt;
+
+    public boolean checkInOpen() {
+        return checkinOpenedAt != null && checkinClosedAt == null;
+    }
 
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AttendanceRecord> records = new ArrayList<>();

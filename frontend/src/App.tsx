@@ -15,6 +15,8 @@ import { MarksPage, OfferingPage } from './pages/staff/MarksPages';
 import { RegulationsPage, ResultSheetPage, ResultSheetsPage } from './pages/staff/ResultsPages';
 import { AmendmentsPage } from './pages/staff/ExamRecordsPages';
 import { AttendancePage, TeachingPage } from './pages/staff/TeachingPages';
+import { CheckInScreenPage, MyTeachingPage } from './pages/staff/MyTeachingPages';
+import CheckInPage from './pages/student/CheckInPage';
 import { EligibilityPage, OfferingEligibilityPage } from './pages/staff/EligibilityPages';
 import { ClearancePage } from './pages/staff/ClearancePages';
 import { GraduationPage, GraduationsPage } from './pages/staff/GraduationPages';
@@ -64,6 +66,7 @@ export default function App() {
         <Route index element={<StudentHome />} />
         <Route path="register" element={<SemesterRegistrationPage />} />
         <Route path="results" element={<StudentResultsPage />} />
+        <Route path="check-in" element={<CheckInPage />} />
         <Route path="fees" element={<StudentFees />} />
         <Route path="notices" element={<StudentNotices />} />
         <Route path="profile" element={<StudentProfilePage />} />
@@ -99,6 +102,8 @@ export default function App() {
         <Route path="marks/:id" element={<OfferingPage />} />
         <Route path="teaching" element={<TeachingPage />} />
         <Route path="teaching/:id" element={<AttendancePage />} />
+        <Route path="teaching/check-in/:sessionId" element={<CheckInScreenPage />} />
+        <Route path="my-teaching" element={<MyTeachingPage />} />
         <Route path="eligibility" element={<EligibilityPage />} />
         <Route path="eligibility/:id" element={<OfferingEligibilityPage />} />
         <Route path="clearance" element={<ClearancePage />} />

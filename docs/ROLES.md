@@ -168,11 +168,21 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Demo:** `coordinator` coordinates ODIT.
 - **Next:** a coordinator dashboard (class sizes, attendance below the threshold, marks not yet submitted).
 
-### 10. Lecturer / Tutor: Working
+### 10. Lecturer / Tutor: Done
 
-- **Sees:** teaching and attendance, marks, and IPT (as institution supervisor).
-- **Does:** takes attendance and enters marks for allocated modules only.
-- **Next:** a "my modules this semester" landing page.
+- **Sees:** **My teaching** (where they land after signing in), teaching and attendance, marks, remarks assigned to them, and IPT (as institution supervisor). Only the modules allocated to them (BR-14).
+- **Does:** records attendance (one-tap register, works offline) or opens self check-in, enters CA and SE marks and supplementary marks, submits results to the Head of Department, prints class lists, re-marks scripts assigned by the Examinations Office.
+- **My teaching** (per semester, refreshed every minute):
+  - **Each module:** the class (students, programmes, co-lecturers), sessions and average attendance, whether the assessment plan is set and how much CA and SE is entered, students graded, where the results stand (with the Head of Department's comment if returned), examination eligibility, supplementary marks to enter, and an open check-in.
+  - **Also:** the marks entry window and days left, students below the attendance threshold across their modules, and remarks or appeals assigned to them.
+  - **Next:** for example, results returned with a comment, no assessment plan, no attendance yet or none for over a week, students below the threshold, marks entry closing with the CA/SE progress, all marks in and ready to submit, supplementary marks to enter, a remark to do.
+- **Class lists (FR-TCH-02):** per module, from approved registrations only. A printable PDF that doubles as a paper attendance register (blank session columns, the lecturer's and Head of Department's signatures) for classes without a device, and Excel with each student's attendance so far and eligibility. For the module's lecturers and those who oversee it; printing is audited.
+- **Self check-in (FR-TCH-03, optional in the SRS):**
+  - The lecturer starts check-in for a class in progress (type, topic, length, how long check-in stays open, when a student counts as late) and projects the screen: a six-digit code that changes every 20 seconds, its QR code, and who has checked in.
+  - Students check in from the student portal (English and Swahili) by scanning the QR code (it opens the portal and checks in after signing in) or typing the code. A code is accepted for up to a minute.
+  - **Safeguards:** a phone that checks in more than one student is flagged to the lecturer; five wrong codes in ten minutes stop a student trying; the register cannot be edited while check-in is open.
+  - **Closing:** by the lecturer, or on time by a job that runs every minute. Everyone in the class who did not check in is marked absent, low-attendance SMS warnings go out, and the lecturer can correct the register (a corrected line no longer counts as a self check-in).
+- **Next:** limiting check-in to the classroom (campus Wi-Fi or location) if institutions ask for it.
 
 ### 11. Assessor (NVA): Working
 
@@ -328,5 +338,5 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. The roles still marked Working, in this order: Lecturer, Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
+1. The roles still marked Working, in this order: Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
 2. Sponsor Officer (optional in the SRS).

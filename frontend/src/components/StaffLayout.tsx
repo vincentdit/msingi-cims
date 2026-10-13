@@ -18,6 +18,7 @@ import CalendarIcon from '@mui/icons-material/CalendarMonth';
 import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import TeachingIcon from '@mui/icons-material/CoPresent';
+import MyTeachingIcon from '@mui/icons-material/LocalLibrary';
 import EligibleIcon from '@mui/icons-material/VerifiedUser';
 import ClearanceIcon from '@mui/icons-material/TaskAlt';
 import GraduationIcon from '@mui/icons-material/WorkspacePremium';
@@ -64,6 +65,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
   ] },
   { title: 'Teaching', items: [
+    { page: 'myTeaching', to: '/staff/my-teaching', label: 'My teaching', icon: <MyTeachingIcon /> },
     { page: 'calendar', to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
     { page: 'curricula', to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
     { page: 'teaching', to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon /> },
@@ -100,6 +102,8 @@ const GROUPS: { title?: string; items: Item[] }[] = [
 export function homeFor(roles: readonly string[] | undefined) {
   // the Examinations Officer starts from the Examinations Office board
   if (roles?.includes('EXAMINATIONS_OFFICER') && !roles.includes('INSTITUTION_ADMIN')) return '/staff/exams-office';
+  // lecturers and assessors start from their own modules
+  if (roles?.length && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR')) return '/staff/my-teaching';
   for (const g of GROUPS) for (const i of g.items) if (can(roles, i.page)) return i.to;
   return '/staff/password';
 }

@@ -206,6 +206,12 @@ const en = {
     below: 'Below {{threshold}}: attend every class to be allowed to sit the examination.',
     eligible: 'May sit exam', exempted: 'Allowed (exemption)', notEligible: 'Not eligible', contact: 'Contact the Examinations Office.',
   },
+  checkIn: {
+    title: 'Check in to a class', button: 'Check in to a class', intro: 'Type the six-digit code on the lecturer\'s screen, or scan its QR code with your phone camera.',
+    code: 'Code', submit: 'Check in', checking: 'Checking in…', changes: 'The code changes every 20 seconds. If it is refused, type the new one.',
+    done: 'You are checked in to {{module}}', doneLate: 'You are checked in to {{module}}, marked late', already: 'You had already checked in to {{module}}',
+    at: 'at {{time}}', another: 'Check in to another class', back: 'Back to home',
+  },
   clearance: {
     title: 'Clearance and graduation', notYet: 'Clearance opens once your final results show your award.',
     award: 'Your award', start: 'Start my clearance', startHint: 'Every office below must clear you before you can graduate.',
@@ -474,6 +480,12 @@ const sw: typeof en = {
     attended: 'Vipindi {{attended}} kati ya {{counted}}', excused: '{{n}} kwa ruhusa', notYet: 'Bado hakuna vipindi',
     below: 'Chini ya {{threshold}}: hudhuria kila kipindi ili uruhusiwe kufanya mtihani.',
     eligible: 'Unaweza kufanya mtihani', exempted: 'Umeruhusiwa (msamaha)', notEligible: 'Hujakidhi vigezo', contact: 'Wasiliana na Ofisi ya Mitihani.',
+  },
+  checkIn: {
+    title: 'Jisajili kuhudhuria kipindi', button: 'Jisajili kuhudhuria kipindi', intro: 'Andika namba sita zilizo kwenye skrini ya mhadhiri, au skani msimbo wa QR kwa kamera ya simu yako.',
+    code: 'Namba', submit: 'Jisajili', checking: 'Inasajili…', changes: 'Namba hubadilika kila sekunde 20. Ikikataliwa, andika namba mpya.',
+    done: 'Umesajiliwa kuhudhuria {{module}}', doneLate: 'Umesajiliwa kuhudhuria {{module}}, umechelewa', already: 'Ulishajisajili kuhudhuria {{module}}',
+    at: 'saa {{time}}', another: 'Jisajili kipindi kingine', back: 'Rudi mwanzo',
   },
   clearance: {
     title: 'Kibali na mahafali', notYet: 'Kibali kinafunguliwa matokeo yako ya mwisho yakionyesha tuzo yako.',

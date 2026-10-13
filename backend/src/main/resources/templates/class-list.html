@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!--
+  Class list and paper attendance register (FR-TCH-02, BP-07 step 2): the module's class from approved registrations, the
+  attendance so far, and blank columns for sessions held without a device. Double braces insert escaped values; triple braces
+  insert markup ClassListService built from escaped values. Well-formed XHTML, CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{title}}</title>
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 11mm 10mm 13mm 10mm;
+    @bottom-left { content: "{{moduleCode}} class list · {{institution}} · printed {{printed}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #1f2937; }
+  .head { border-bottom: 2pt solid {{primaryColor}}; padding-bottom: 5pt; margin-bottom: 6pt; }
+  .head td { vertical-align: bottom; border: none; padding: 0; }
+  .inst { font-size: 9pt; color: #4b5563; }
+  h1 { font-size: 13pt; margin: 2pt 0 2pt 0; color: #111827; }
+  .meta { font-size: 8pt; color: #374151; }
+  .muted { color: #6b7280; font-size: 7.5pt; }
+  table.list { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; }
+  thead { display: table-header-group; }
+  .list th { background: #f3f4f6; color: #374151; font-weight: bold; padding: 3pt 3pt; border: 0.5pt solid #9ca3af; text-align: left; }
+  .list td { padding: 0 3pt; height: 15pt; border: 0.5pt solid #d1d5db; }
+  .list th.d { width: 34pt; font-weight: normal; color: #6b7280; font-size: 6.5pt; text-align: center; }
+  .list td.d { width: 34pt; }
+  .list tr { page-break-inside: avoid; }
+  .r { text-align: right; }
+  .c { text-align: center; }
+  .warn { color: #b45309; font-weight: bold; }
+  .sign { width: 100%; margin-top: 14pt; border-collapse: collapse; }
+  .sign td { width: 33%; padding: 0 10pt 0 0; border: none; }
+  .line { border-top: 0.6pt solid #6b7280; padding-top: 2pt; font-size: 7.5pt; color: #4b5563; margin-top: 18pt; }
+</style>
+</head>
+<body>
+<table class="head" style="width: 100%;"><tr>
+  <td>
+    <div class="inst">{{institution}}</div>
+    <h1>{{title}}</h1>
+    <div class="meta">{{moduleCode}} · {{moduleTitle}} · {{credits}} credits</div>
+    <div class="meta">{{semester}} · {{academicYear}}{{{department}}} · Lecturer(s): {{lecturers}}</div>
+  </td>
+  <td class="r">
+    <div class="meta"><strong>{{students}}</strong> students · {{sessions}} recorded</div>
+    <div class="muted">Attendance threshold for the examination: {{threshold}}</div>
+  </td>
+</tr></table>
+<table class="list">
+  <thead><tr>
+    <th style="width: 18pt;" class="r">No.</th><th style="width: 92pt;">Registration no.</th><th>Name</th><th style="width: 20pt;" class="c">Sex</th>
+    <th style="width: 44pt;">Programme</th><th style="width: 40pt;" class="r">So far</th>{{{dateHeads}}}
+  </tr></thead>
+  <tbody>{{{rows}}}</tbody>
+</table>
+<div class="muted" style="margin-top: 4pt;">"So far" is attendance recorded in CIMS up to printing (late counts as attended; excused is left out). Mark each session P (present), L (late), A (absent) or E (excused), then enter it in CIMS.</div>
+<table class="sign"><tr>
+  <td><div class="line">Lecturer's signature</div></td><td><div class="line">Date</div></td><td><div class="line">Head of Department</div></td>
+</tr></table>
+</body>
+</html>

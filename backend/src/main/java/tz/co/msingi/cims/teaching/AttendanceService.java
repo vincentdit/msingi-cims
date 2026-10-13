@@ -104,7 +104,11 @@ public class AttendanceService {
         Map<Long, ExamEligibility> elig = eligibility.findByOfferingId(o.getId()).stream()
                 .collect(Collectors.toMap(ExamEligibility::getModuleRegistrationId, Function.identity()));
         Map<Long, Map<AttendanceRecord.Status, Integer>> perSession = new HashMap<>();
-        for (AttendanceRecord r : recs) perSession.computeIfAbsent(r.getSession().getId(), k -> new HashMap<>()).merge(r.getStatus(), 1, Integer::sum);
+        Map<Long, Integer> selfPerSession = new HashMap<>();
+        for (AttendanceRecord r : recs) {
+            perSession.computeIfAbsent(r.getSession().getId(), k -> new HashMap<>()).merge(r.getStatus(), 1, Integer::sum);
+            if (r.getCheckedInAt() != null) selfPerSession.merge(r.getSession().getId(), 1, Integer::sum);
+        }
 
         List<StudentAttendance> rows = regs.stream().map(m -> {
             Student s = m.getRegistration().getStudent();
@@ -120,7 +124,7 @@ public class AttendanceService {
                 o.getModule().getDepartment() == null ? null : o.getModule().getDepartment().getName(), o.getStatus().name(), lecturerNames(o),
                 threshold, list.size(), list.stream().mapToInt(ClassSession::getDurationMinutes).sum(), Tally.average(classTallies),
                 (int) rows.stream().filter(StudentAttendance::below).count(), canRecord(o),
-                list.stream().map(cs -> summary(cs, perSession.getOrDefault(cs.getId(), Map.of()))).toList(), rows);
+                list.stream().map(cs -> summary(cs, perSession.getOrDefault(cs.getId(), Map.of()), selfPerSession.getOrDefault(cs.getId(), 0))).toList(), rows);
     }
 
     @Transactional(readOnly = true)
@@ -178,6 +182,9 @@ public class AttendanceService {
         ClassSession cs = require(sessionId);
         ModuleOffering o = cs.getOffering();
         requireRecorder(o);
+        if (cs.checkInOpen()) {
+            throw new BusinessRuleException("CHECKIN_OPEN", "Self check-in for this session is still open. Close it first, then correct the register.");
+        }
         checkDate(o.getSemester(), req.sessionDate());
         boolean slotChanged = !cs.getSessionDate().equals(req.sessionDate()) || !cs.getStartTime().equals(req.startTime());
         if (slotChanged && sessions.existsByOfferingIdAndSessionDateAndStartTime(o.getId(), req.sessionDate(), req.startTime())) {
@@ -229,12 +236,13 @@ public class AttendanceService {
                 r.setStudentId(regs.get(m.moduleRegistrationId()).getStudentId());
                 cs.getRecords().add(r);
             }
+            if (r.getStatus() != null && r.getStatus() != m.status()) r.setSource(AttendanceRecord.Source.REGISTER);   // corrected by the lecturer
             r.setStatus(m.status());
             r.setNote(m.note() == null || m.note().isBlank() ? null : m.note().trim());
         }
     }
 
-    private static void checkDate(Semester sem, LocalDate date) {
+    static void checkDate(Semester sem, LocalDate date) {
         LocalDate today = LocalDate.now(ZONE);
         if (date.isAfter(today)) throw new BusinessRuleException("FUTURE_SESSION", "Attendance can be recorded only for sessions that have taken place");
         if (sem.getEndDate() != null && date.isAfter(sem.getEndDate())) {
@@ -383,7 +391,7 @@ public class AttendanceService {
         return isMine(o, access.me()) && o.getStatus() == ModuleOffering.Status.DRAFT;
     }
 
-    private void requireRecorder(ModuleOffering o) {
+    void requireRecorder(ModuleOffering o) {
         if (!isMine(o, access.me())) throw new AccessDeniedException("Only the module's lecturers record its attendance");
         if (o.getStatus() != ModuleOffering.Status.DRAFT) {
             throw new BusinessRuleException("RESULTS_SUBMITTED", "This module's results have been submitted, so its attendance can no longer change");
@@ -392,11 +400,11 @@ public class AttendanceService {
 
     // ------------------------------------------------------------------ helpers
 
-    private ModuleOffering offering(Long id) {
+    ModuleOffering offering(Long id) {
         return offerings.findById(id).orElseThrow(() -> new NotFoundException("Module offering", id));
     }
 
-    private ClassSession require(Long id) {
+    ClassSession require(Long id) {
         return sessions.findById(id).orElseThrow(() -> new NotFoundException("Class session", id));
     }
 
@@ -408,26 +416,45 @@ public class AttendanceService {
         return sessions.totalsBySemester(semesterId).stream().collect(Collectors.toMap(r -> (Long) r[0], r -> r));
     }
 
-    private SessionView sessionView(ClassSession cs) {
-        Map<Long, AttendanceRecord> byReg = cs.getRecords().stream().collect(Collectors.toMap(AttendanceRecord::getModuleRegistrationId, Function.identity()));
-        List<RegisterLine> lines = new ArrayList<>(classList(cs.getOffering()).stream().map(m -> {
-            AttendanceRecord r = byReg.get(m.getId());
-            return line(m, r == null ? null : r.getStatus().name(), r == null ? null : r.getNote());
-        }).toList());
+    SessionView sessionView(ClassSession cs) {
+        List<ModuleRegistration> regs = classList(cs.getOffering());
+        List<RegisterLine> lines = registerOf(cs, regs);
         return new SessionView(cs.getId(), cs.getOffering().getId(), cs.getSessionDate(), cs.getStartTime(), cs.getDurationMinutes(), cs.getKind().name(),
-                cs.getTopic(), cs.getRecordedByName(), cs.getCreatedAt(), canRecord(cs.getOffering()), lines);
+                cs.getTopic(), cs.getRecordedByName(), cs.getCreatedAt(), canRecord(cs.getOffering()) && !cs.checkInOpen(), checkInState(cs, regs.size(), lines),
+                lines);
+    }
+
+    /** The session's register over the current class list, with self check-ins and phones used for more than one student flagged. */
+    List<RegisterLine> registerOf(ClassSession cs, List<ModuleRegistration> regs) {
+        Map<Long, AttendanceRecord> byReg = cs.getRecords().stream().collect(Collectors.toMap(AttendanceRecord::getModuleRegistrationId, Function.identity()));
+        Map<String, Long> perDevice = cs.getRecords().stream().filter(r -> r.getDeviceHash() != null)
+                .collect(Collectors.groupingBy(AttendanceRecord::getDeviceHash, Collectors.counting()));
+        return new ArrayList<>(regs.stream().map(m -> {
+            AttendanceRecord r = byReg.get(m.getId());
+            if (r == null) return line(m, null, null);
+            Student s = m.getRegistration().getStudent();
+            return new RegisterLine(m.getId(), s.getId(), s.getRegistrationNo(), s.fullName(), s.getProgramme().getCode(), r.getStatus().name(), r.getNote(),
+                    r.getSource().name(), r.getCheckedInAt(), r.getDeviceHash() != null && perDevice.getOrDefault(r.getDeviceHash(), 0L) > 1);
+        }).toList());
+    }
+
+    static TeachingDtos.CheckInState checkInState(ClassSession cs, int classSize, List<RegisterLine> lines) {
+        if (cs.getCheckinOpenedAt() == null) return null;
+        return new TeachingDtos.CheckInState(cs.checkInOpen(), cs.getCheckinOpenedAt(), cs.getCheckinClosesAt(),
+                cs.getCheckinLateAfter() == null ? 0 : cs.getCheckinLateAfter(), cs.getCheckinClosedAt(),
+                (int) lines.stream().filter(l -> l.checkedInAt() != null).count(), classSize, (int) lines.stream().filter(RegisterLine::sharedDevice).count());
     }
 
     private static RegisterLine line(ModuleRegistration m, String status, String note) {
         Student s = m.getRegistration().getStudent();
-        return new RegisterLine(m.getId(), s.getId(), s.getRegistrationNo(), s.fullName(), s.getProgramme().getCode(), status, note);
+        return new RegisterLine(m.getId(), s.getId(), s.getRegistrationNo(), s.fullName(), s.getProgramme().getCode(), status, note, null, null, false);
     }
 
-    private static SessionSummary summary(ClassSession cs, Map<AttendanceRecord.Status, Integer> counts) {
+    private static SessionSummary summary(ClassSession cs, Map<AttendanceRecord.Status, Integer> counts, int selfCheckIns) {
         return new SessionSummary(cs.getId(), cs.getSessionDate(), cs.getStartTime(), cs.getDurationMinutes(), cs.getKind().name(), cs.getTopic(),
                 counts.getOrDefault(AttendanceRecord.Status.PRESENT, 0), counts.getOrDefault(AttendanceRecord.Status.LATE, 0),
                 counts.getOrDefault(AttendanceRecord.Status.ABSENT, 0), counts.getOrDefault(AttendanceRecord.Status.EXCUSED, 0),
-                cs.getRecordedByName(), cs.getCreatedAt());
+                cs.getRecordedByName(), cs.getCreatedAt(), selfCheckIns, cs.checkInOpen());
     }
 
     private Map<Long, String> names(Collection<ModuleOffering> os) {

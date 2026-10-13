@@ -42,6 +42,9 @@ class AttendanceAndEligibilityIT {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired TestData data;
+    @Autowired tz.co.msingi.cims.platform.tenancy.TenantWork tenantWork;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired CheckInService checkIns;
 
     AdmissionScenario s;
     TestData.Institution inst;
@@ -287,6 +290,139 @@ class AttendanceAndEligibilityIT {
 
     record Setup(long semesterId, String a, String b, String c, String aToken, String bToken, String cToken, Applicant aApplicant,
                  Map<String, Long> offerings, Map<String, Long> moduleIds) {
+    }
+
+    @Test
+    void studentsCheckThemselvesInWithTheRotatingCodeAndAbsenteesAreRecordedOnClose() throws Exception {
+        Setup c = classWithOfferings();
+        long m1 = c.offerings.get("ITU 04101");
+        String open = "{\"kind\":\"LECTURE\",\"topic\":\"Networks\",\"durationMinutes\":60,\"openMinutes\":10,\"lateAfterMinutes\":10}";
+        s.call(post("/api/teaching/offerings/" + m1 + "/check-in"), lecturer2, open).andExpect(status().isForbidden());
+        JsonNode cs = s.body(s.call(post("/api/teaching/offerings/" + m1 + "/check-in"), lecturer, open).andExpect(status().isOk()));
+        long sid = cs.get("id").asLong();
+        assertThat(cs.at("/checkIn/open").asBoolean()).isTrue();
+        assertThat(cs.at("/checkIn/classSize").asInt()).isEqualTo(3);
+        assertThat(cs.get("editable").asBoolean()).isFalse();
+        assertThat(cs.get("register").findValuesAsText("registrationNo")).hasSize(3);
+        assertThat(cs.get("register").findValues("status")).isEmpty();
+        s.call(post("/api/teaching/offerings/" + m1 + "/check-in"), lecturer, open).andExpect(jsonPath("$.code").value("CHECKIN_ALREADY_OPEN"));
+
+        // the lecturer's screen: the code and a QR code of the check-in link on the institution's address
+        s.call(get("/api/teaching/sessions/" + sid + "/check-in"), lecturer2, null).andExpect(status().isForbidden());
+        s.call(get("/api/teaching/sessions/" + sid + "/check-in"), hod, null).andExpect(status().isForbidden());
+        JsonNode screen = s.body(s.call(get("/api/teaching/sessions/" + sid + "/check-in?base=http://college.localhost:5173"), lecturer, null));
+        String code = screen.get("code").asText();
+        assertThat(code).matches("\\d{6}");
+        assertThat(screen.get("checkInUrl").asText()).isEqualTo("http://college.localhost:5173/student/check-in?code=" + code);
+        assertThat(screen.get("qrPng").asText()).startsWith("data:image/png;base64,");
+        assertThat(s.body(s.call(get("/api/teaching/sessions/" + sid + "/check-in?base=javascript:alert(1)"), lecturer, null)).has("qrPng")).isFalse();
+
+        // a and b check in from the same phone; a twice
+        JsonNode done = s.body(s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}").andExpect(status().isOk()));
+        assertThat(done.get("moduleCode").asText()).isEqualTo("ITU 04101");
+        assertThat(done.get("status").asText()).isEqualTo("PRESENT");
+        assertThat(done.get("already").asBoolean()).isFalse();
+        assertThat(s.body(s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}")).get("already").asBoolean()).isTrue();
+        s.call(post("/api/student/check-in"), c.bToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}").andExpect(jsonPath("$.status").value("PRESENT"));
+        s.call(post("/api/student/check-in"), lecturer, "{\"code\":\"" + code + "\"}").andExpect(status().isForbidden());
+
+        // c types wrong codes: refused, then limited even with the right code
+        String wrong = String.format("%06d", (Integer.parseInt(code) + 500_000) % 1_000_000);
+        for (int i = 0; i < CheckInService.MAX_FAILED; i++) {
+            s.call(post("/api/student/check-in"), c.cToken, "{\"code\":\"" + wrong + "\"}").andExpect(jsonPath("$.code").value("CHECKIN_CODE_INVALID"));
+        }
+        s.call(post("/api/student/check-in"), c.cToken, "{\"code\":\"" + code + "\"}").andExpect(status().isTooManyRequests());
+
+        screen = s.body(s.call(get("/api/teaching/sessions/" + sid + "/check-in"), lecturer, null));
+        assertThat(screen.at("/state/checkedIn").asInt()).isEqualTo(2);
+        assertThat(screen.at("/state/sharedDevices").asInt()).isEqualTo(2);
+        assertThat(screen.get("recent")).hasSize(2);
+
+        // the register cannot be edited while check-in is open; closing records c absent
+        Map<String, Long> reg = new HashMap<>();
+        cs.get("register").forEach(x -> reg.put(x.get("registrationNo").asText(), x.get("moduleRegistrationId").asLong()));
+        String time = cs.get("startTime").asText().substring(0, 5);
+        s.call(put("/api/teaching/sessions/" + sid), lecturer, session(UUID.randomUUID(), TODAY, time, reg, c, new String[]{"PRESENT", "ABSENT", "ABSENT"}))
+                .andExpect(jsonPath("$.code").value("CHECKIN_OPEN"));
+        s.call(post("/api/teaching/sessions/" + sid + "/check-in/close"), lecturer2, null).andExpect(status().isForbidden());
+        JsonNode closed = s.body(s.call(post("/api/teaching/sessions/" + sid + "/check-in/close"), lecturer, null).andExpect(status().isOk()));
+        assertThat(closed.at("/checkIn/open").asBoolean()).isFalse();
+        assertThat(closed.get("editable").asBoolean()).isTrue();
+        Map<String, JsonNode> lines = byRegNo(closed.get("register"));
+        assertThat(lines.get(c.a).get("source").asText()).isEqualTo("SELF");
+        assertThat(lines.get(c.a).get("sharedDevice").asBoolean()).isTrue();
+        assertThat(lines.get(c.c).get("status").asText()).isEqualTo("ABSENT");
+        assertThat(lines.get(c.c).get("source").asText()).isEqualTo("REGISTER");
+        s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\"}").andExpect(jsonPath("$.code").value("CHECKIN_CODE_INVALID"));
+
+        // the lecturer corrects b (the shared phone): b becomes absent and the line no longer counts as a self check-in
+        JsonNode fixed = s.body(s.call(put("/api/teaching/sessions/" + sid), lecturer,
+                session(UUID.randomUUID(), TODAY, time, reg, c, new String[]{"PRESENT", "ABSENT", "ABSENT"})).andExpect(status().isOk()));
+        assertThat(byRegNo(fixed.get("register")).get(c.b).get("source").asText()).isEqualTo("REGISTER");
+        JsonNode view = s.body(s.call(get("/api/teaching/offerings/" + m1 + "/attendance"), lecturer, null));
+        assertThat(view.at("/sessionList/0/selfCheckIns").asInt()).isEqualTo(2);
+        assertThat(view.at("/sessionList/0/present").asInt()).isEqualTo(1);
+
+        // check-in left open closes on time, with absentees
+        long m2 = c.offerings.get("ITU 04102");
+        long sid2 = s.body(s.call(post("/api/teaching/offerings/" + m2 + "/check-in"), lecturer,
+                "{\"kind\":\"TUTORIAL\",\"durationMinutes\":60,\"openMinutes\":5,\"lateAfterMinutes\":0}")).get("id").asLong();
+        tenantWork.run(inst.tenant(), () -> jdbc.update("update class_sessions set checkin_closes_at = now() - interval '1 minute' where id = ?", sid2));
+        assertThat(tenantWork.call(inst.tenant(), () -> checkIns.closeExpired())).isEqualTo(1);
+        JsonNode s2 = s.body(s.call(get("/api/teaching/sessions/" + sid2), lecturer, null));
+        assertThat(s2.at("/checkIn/open").asBoolean()).isFalse();
+        assertThat(s2.get("register").findValuesAsText("status")).containsOnly("ABSENT");
+    }
+
+    @Test
+    void theLecturerSeesTheirModulesAndPrintsClassLists() throws Exception {
+        Setup c = classWithOfferings();
+        long m1 = c.offerings.get("ITU 04101");
+        JsonNode none = s.body(s.call(get("/api/teaching/mine"), lecturer2, null));
+        assertThat(none.get("modules")).isEmpty();
+        assertThat(none.at("/next/0/text").asText()).contains("No modules are allocated to you");
+
+        JsonNode b = s.body(s.call(get("/api/teaching/mine"), lecturer, null).andExpect(status().isOk()));
+        assertThat(b.at("/semester/id").asLong()).isEqualTo(c.semesterId);
+        assertThat(b.get("marksWindow").asText()).isEqualTo("OPEN");
+        assertThat(b.get("daysToClose").asInt()).isEqualTo(30);
+        assertThat(b.get("modules")).hasSize(3);
+        assertThat(b.get("students").asInt()).isEqualTo(9);
+        JsonNode mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        assertThat(mod.get("students").asInt()).isEqualTo(3);
+        assertThat(mod.get("planSet").asBoolean()).isTrue();
+        assertThat(mod.get("caPercent").decimalValue()).isEqualByComparingTo("0");
+        assertThat(mod.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(mod.get("canRecord").asBoolean()).isTrue();
+
+        // a session with b absent, a CA mark for a, then the board shows them
+        Map<String, Long> reg = new HashMap<>();
+        s.body(s.call(get("/api/teaching/offerings/" + m1 + "/register"), lecturer, null)).forEach(x -> reg.put(x.get("registrationNo").asText(),
+                x.get("moduleRegistrationId").asLong()));
+        s.call(post("/api/teaching/offerings/" + m1 + "/sessions"), lecturer, session(UUID.randomUUID(), TODAY.minusDays(1), "08:00", reg, c,
+                new String[]{"PRESENT", "ABSENT", "PRESENT"})).andExpect(status().isOk());
+        JsonNode o = s.body(s.call(get("/api/exams/offerings/" + m1), lecturer, null));
+        long ca = o.get("components").findParents("category").stream().filter(x -> x.get("category").asText().equals("CA")).findFirst().orElseThrow()
+                .get("id").asLong();
+        s.call(put("/api/exams/offerings/" + m1 + "/scores"), lecturer, scores(reg.get(c.a), ca, "12")).andExpect(status().isOk());
+        b = s.body(s.call(get("/api/teaching/mine?semesterId=" + c.semesterId), lecturer, null));
+        mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        assertThat(mod.get("sessions").asInt()).isEqualTo(1);
+        assertThat(mod.get("below").asInt()).isEqualTo(1);
+        assertThat(mod.get("caPercent").decimalValue()).isPositive();
+        assertThat(b.get("atRisk")).hasSize(1);
+        assertThat(b.at("/atRisk/0/registrationNo").asText()).isEqualTo(c.b);
+        assertThat(b.get("next").findValuesAsText("text")).anyMatch(t -> t.contains("below the attendance threshold in ITU 04101"));
+
+        // the class list: PDF register and Excel, for the module's lecturers and those who oversee it
+        var pdf = s.call(get("/api/teaching/offerings/" + m1 + "/class-list"), lecturer, null).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(pdf.getContentType()).isEqualTo("application/pdf");
+        assertThat(new String(pdf.getContentAsByteArray(), 0, 4)).isEqualTo("%PDF");
+        var xlsx = s.call(get("/api/teaching/offerings/" + m1 + "/class-list?format=xlsx"), hod, null).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(new String(xlsx.getContentAsByteArray(), 0, 2)).isEqualTo("PK");
+        assertThat(xlsx.getHeader("Content-Disposition")).contains("class-list-ITU-04101");
+        s.call(get("/api/teaching/offerings/" + m1 + "/class-list"), lecturer2, null).andExpect(status().isForbidden());
+        s.call(get("/api/teaching/offerings/" + m1 + "/class-list"), otherHod, null).andExpect(status().isForbidden());
     }
 
     /** Three registered students in three first-semester modules, offerings set up and allocated to one lecturer. */

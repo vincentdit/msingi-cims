@@ -1,4 +1,6 @@
-import { Alert, Box, Card, CardContent, Chip, LinearProgress, Stack, Typography } from '@mui/material';
+import QrIcon from '@mui/icons-material/QrCode2';
+import { Alert, Box, Button, Card, CardContent, Chip, LinearProgress, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
@@ -17,7 +19,10 @@ export default function StudentAttendanceCard() {
   return (
     <Card sx={{ borderRadius: 3 }}>
       <CardContent>
-        <Typography variant="h6">{t('attendance.title')}</Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+          <Typography variant="h6">{t('attendance.title')}</Typography>
+          <Button size="small" variant="outlined" startIcon={<QrIcon />} component={RouterLink} to="/student/check-in">{t('checkIn.button')}</Button>
+        </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{t('attendance.semester', { semester: a.semesterName, threshold })}</Typography>
         {!recorded && <Typography variant="body2" color="text.secondary">{t('attendance.none')}</Typography>}
         {recorded && (

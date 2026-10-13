@@ -1468,6 +1468,9 @@ export interface RegisterLine {
   programmeCode: string;
   status?: AttendanceStatus | null;
   note?: string | null;
+  source?: 'REGISTER' | 'SELF';
+  checkedInAt?: string;
+  sharedDevice?: boolean;
 }
 
 export interface SessionRequest {
@@ -1493,6 +1496,40 @@ export interface SessionSummary {
   excused: number;
   recordedByName: string;
   recordedAt: string;
+  selfCheckIns: number;
+  checkInOpen: boolean;
+}
+
+/** Self check-in of a session (FR-TCH-03). */
+export interface CheckInState {
+  open: boolean; openedAt: string; closesAt: string; lateAfterMinutes: number; closedAt?: string; checkedIn: number; classSize: number;
+  sharedDevices: number;
+}
+
+export interface CheckInScreen {
+  sessionId: number; moduleCode: string; moduleTitle: string; code?: string; secondsLeft: number; stepSeconds: number; checkInUrl?: string;
+  qrPng?: string; state: CheckInState; recent: RegisterLine[];
+}
+
+export interface CheckInDone { sessionId: number; moduleCode: string; moduleTitle: string; status: AttendanceStatus; checkedInAt: string; already: boolean }
+
+/** The lecturer's landing page: their modules this semester and what to do next. */
+export interface MyModule {
+  offeringId: number; code: string; title: string; credits: number; departmentName?: string; coLecturers: string[]; programmes: string[];
+  students: number; sessions: number; minutesTaught: number; lastSession?: string; averagePercent?: number; below: number; status: OfferingStatus;
+  returnedNote?: string; returnedByName?: string; planSet: boolean; caPercent?: number; sePercent?: number; complete: number;
+  eligibilityGenerated: boolean; notEligible: number; resitStatus?: string; resitsToMark: number; resitReturnedNote?: string;
+  openCheckInSessionId?: number; canRecord: boolean;
+}
+
+export interface MyTeaching {
+  semesters: { id: number; name: string; academicYear: string; startDate?: string; endDate?: string }[];
+  semester?: { id: number; name: string; academicYear: string; startDate?: string; endDate?: string };
+  marksEntryOpens?: string; marksEntryCloses?: string; marksWindow: 'NOT_SET' | 'UPCOMING' | 'OPEN' | 'CLOSED'; daysToClose?: number;
+  threshold: number; students: number; sessions: number; hoursTaught: number; modules: MyModule[];
+  atRisk: { offeringId: number; moduleCode: string; studentId: number; registrationNo: string; name: string; percent?: number; attended: number; counted: number; warned: boolean }[];
+  remarks: { id: number; moduleCode: string; moduleTitle: string; kind: 'REMARK' | 'APPEAL'; assignedAt: string }[];
+  next: { severity: 'success' | 'info' | 'warning' | 'error'; text: string; link?: string }[];
 }
 
 export interface ClassSessionView {
@@ -1506,6 +1543,7 @@ export interface ClassSessionView {
   recordedByName: string;
   recordedAt: string;
   editable: boolean;
+  checkIn?: CheckInState;
   register: RegisterLine[];
 }
 

@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.Setter;
 import tz.co.msingi.cims.common.TenantScopedEntity;
 
+import java.time.OffsetDateTime;
+
 /** One student's attendance at a class session. Late counts as attended; excused is left out of the percentage. */
 @Getter
 @Setter
@@ -20,6 +22,8 @@ import tz.co.msingi.cims.common.TenantScopedEntity;
 public class AttendanceRecord extends TenantScopedEntity {
 
     public enum Status { PRESENT, LATE, ABSENT, EXCUSED }
+
+    public enum Source { REGISTER, SELF }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "session_id")
@@ -36,4 +40,13 @@ public class AttendanceRecord extends TenantScopedEntity {
     private Status status;
 
     private String note;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Source source = Source.REGISTER;
+
+    /** When the student checked in themselves (kept even if the lecturer later corrects the status). */
+    private OffsetDateTime checkedInAt;
+
+    private String deviceHash;
 }
