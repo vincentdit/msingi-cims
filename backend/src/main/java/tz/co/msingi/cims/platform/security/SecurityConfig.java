@@ -42,6 +42,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/public/**",
             "/api/auth/login",
+            "/api/platform/auth/login",
             "/api/applicant-auth/**",
             "/api/student-auth/**",
             "/api/integrations/gepg/**",
@@ -90,6 +91,11 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(jwk)));
     }
 
+    /**
+     * Institution tokens are checked against the configured issuer (CIMS itself or Keycloak) and must belong to the
+     * institution of the request. Msingi platform tokens are always issued and checked by CIMS with its own key, carry no
+     * institution, and are chosen by their issuer; the signature is verified either way.
+     */
     @Bean
     public JwtDecoder jwtDecoder(CimsSecurityProperties props, JwtKeyProvider keys) {
         NimbusJwtDecoder decoder;
@@ -103,7 +109,18 @@ public class SecurityConfig {
         }
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(issuer), new TenantClaimValidator()));
-        return decoder;
+        String platformIssuer = props.issuer() + TokenService.PLATFORM_ISSUER_SUFFIX;
+        NimbusJwtDecoder platform = NimbusJwtDecoder.withPublicKey(keys.getPublicKey()).build();
+        platform.setJwtValidator(JwtValidators.createDefaultWithIssuer(platformIssuer));
+        return token -> {
+            String iss;
+            try {
+                iss = com.nimbusds.jwt.JWTParser.parse(token).getJWTClaimsSet().getIssuer();
+            } catch (java.text.ParseException e) {
+                throw new org.springframework.security.oauth2.jwt.BadJwtException("Malformed token", e);
+            }
+            return platformIssuer.equals(iss) ? platform.decode(token) : decoder.decode(token);
+        };
     }
 
     @Bean

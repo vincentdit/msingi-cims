@@ -24,6 +24,8 @@ import java.util.Optional;
 public class TenantResolutionFilter extends OncePerRequestFilter {
 
     public static final String TENANT_HEADER = "X-Tenant";
+    /** The Msingi platform console. */
+    public static final String PLATFORM_PREFIX = "/api/platform/";
 
     /** Paths that do not belong to a single institution. */
     private static final List<String> TENANTLESS_PREFIXES = List.of(
@@ -36,9 +38,18 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         try {
-            Optional<TenantContext.TenantInfo> tenant = resolve(request);
-            if (tenant.isPresent()) {
-                TenantContext.set(tenant.get());
+            if (path.startsWith(PLATFORM_PREFIX)) {
+                // the Msingi platform console belongs to no institution, whatever header or host the request carries
+                chain.doFilter(request, response);
+                return;
+            }
+            Optional<TenantLookupService.Resolution> tenant = resolve(request);
+            if (tenant.isPresent() && tenant.get().suspended() && !isTenantless(path)) {
+                writeSuspended(response, tenant.get().name());
+                return;
+            }
+            if (tenant.isPresent() && !tenant.get().suspended()) {
+                TenantContext.set(tenant.get().info());
             } else if (isTenantless(path) || "OPTIONS".equalsIgnoreCase(request.getMethod())) {
                 // allowed without a tenant
             } else {
@@ -51,17 +62,26 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
         }
     }
 
-    private Optional<TenantContext.TenantInfo> resolve(HttpServletRequest request) {
+    private Optional<TenantLookupService.Resolution> resolve(HttpServletRequest request) {
         String code = request.getHeader(TENANT_HEADER);
         if (StringUtils.hasText(code)) {
-            return lookup.byCode(code.trim());
+            return lookup.resolveCode(code.trim());
         }
         String host = request.getServerName();
-        return StringUtils.hasText(host) ? lookup.byHost(host) : Optional.empty();
+        return StringUtils.hasText(host) ? lookup.resolveHost(host) : Optional.empty();
     }
 
     private static boolean isTenantless(String path) {
         return TENANTLESS_PREFIXES.stream().anyMatch(path::startsWith);
+    }
+
+    private static void writeSuspended(HttpServletResponse response, String name) throws IOException {
+        response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        String safe = name == null ? "This institution" : name.replace("\\", "").replace("\"", "").replaceAll("\\p{Cntrl}", "");
+        response.getWriter().write("{\"title\":\"Service unavailable\",\"status\":503,\"code\":\"INSTITUTION_SUSPENDED\","
+                + "\"detail\":\"The CIMS service for " + safe + " is temporarily unavailable. Please contact the institution.\"}");
     }
 
     private static void writeUnknownTenant(HttpServletResponse response) throws IOException {

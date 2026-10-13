@@ -4,9 +4,9 @@ import type { Problem } from './types';
  * Minimal API client.
  * - The institution is resolved by the backend from the host name. For local testing of another
  *   institution set VITE_TENANT (sent as the X-Tenant header).
- * - Applicant, student and staff sessions are kept separately in sessionStorage.
+ * - Applicant, student, staff and Msingi platform sessions are kept separately in sessionStorage.
  */
-export type Realm = 'applicant' | 'staff' | 'student';
+export type Realm = 'applicant' | 'staff' | 'student' | 'platform';
 
 const TENANT = import.meta.env.VITE_TENANT as string | undefined;
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';

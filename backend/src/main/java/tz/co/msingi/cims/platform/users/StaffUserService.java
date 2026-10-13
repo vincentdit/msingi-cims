@@ -301,7 +301,8 @@ public class StaffUserService {
         return u.getRoles().stream().map(r -> r.getRole().name()).sorted().toList();
     }
 
-    static String temporaryPassword() {
+    /** A random 12-character password with each kind of character, shown once to hand to the person. */
+    public static String temporaryPassword() {
         List<Character> chars = new ArrayList<>();
         String all = ALPHABET_UPPER + ALPHABET_LOWER + DIGITS + SPECIAL;
         for (String set : List.of(ALPHABET_UPPER, ALPHABET_LOWER, DIGITS, SPECIAL)) chars.add(set.charAt(RANDOM.nextInt(set.length())));

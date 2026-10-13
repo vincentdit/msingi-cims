@@ -39,7 +39,7 @@ NOAS is the national admission system run by NACTVET. CIMS is one institution's 
 | ADMIN (System Admin) | Platform Administrator (Msingi), Institution Administrator | NOAS has one national admin; CIMS has the platform operator plus an administrator in each institution. |
 | ADMISSION_OFFICER | Admissions Officer | Same job, for one institution. |
 | JAC_MEMBER (Joint Admission Committee) | Deputy Principal (Academic) | Approves selection for the Academic Committee. |
-| TECHNICAL_TEAM | Platform Administrator | Integration logs and synchronisation, run by Msingi. |
+| TECHNICAL_TEAM | Platform Administrator | Integration health and logs in the platform console, run by Msingi. |
 | INSTITUTION_OFFICER | All institution staff roles | In NOAS this is the college's view of national admissions; in CIMS the whole college runs inside the system. |
 | APPLICANT | Applicant | Same, with NECTA/NACTVET lookups and the NOAS entry-level rule. |
 
@@ -231,13 +231,59 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - Each institution sees only its own trail (row-level security).
   - Failed sign-ins and locked accounts are now recorded against the account they were for.
 - **Does:** nothing that changes data.
-- **Next:** NOAS also keeps integration logs (NECTA, NACTVET, GePG calls). CIMS does not record those calls yet; that belongs to the Platform Administrator slice.
+- **Integration calls** (a tab on the Audit trail, as NOAS keeps integration logs):
+  - **What:** the institution's own calls to NECTA, NACTVET (admission and awards), GePG and the SMS gateway, and the GePG payment notifications it received.
+  - **Each call:** when, what, the outcome, how long it took and a reference: an index number, a bill id or a masked phone number. What was sent or received is never kept.
+  - **Health:** each outside system's health over the last 7 days, and whether it runs live or simulated.
+  - **Access:** the Auditor and the administrator.
 
-### 19. Platform Administrator (Msingi): Not started
+### 19. Platform Administrator (Msingi): Done
 
-- **Should see:** all institutions (tenants), their status, usage and integration health.
-- **Should do:** onboard a new institution (code, domains, first administrator) and suspend or reactivate one.
-- **Gap:** institutions are created by the demo seeder only. Next: a platform console.
+- **Who:** Msingi Technologies staff, in the **platform console** at `/platform`. They sign in separately from any institution.
+- **Keeping the two apart:**
+  - Platform accounts sit in their own table, with the same lock-out rules as institution accounts.
+  - A platform sign-in works only on the console, and an institution sign-in never works there.
+  - Platform tokens are always issued and checked by CIMS itself, so the console also works when institutions use Keycloak.
+- **Overview:**
+  - **Totals:** institutions (active and suspended), students studying, applications this year and staff accounts.
+  - **Integration health:** the last 24 hours, with a warning banner when an outside system is failing.
+  - **Needs attention:** suspended institutions, institutions with failed calls today, and setup still incomplete.
+  - **Recent actions:** the latest platform actions.
+- **Institutions:**
+  - **List:** status, students, staff, applications this year, SMS left, setup progress, last staff sign-in and failed calls.
+  - **Onboard:** in one step, all kept or none.
+    - The code (fixed), name, NACTVET number, ownership, contacts and colour.
+    - The web address(es) its portals answer on. Bare host names are checked and must be unique on the platform.
+    - Msingi's private notes.
+    - The first administrator, who gets a temporary password (shown once) and the staff sign-in address.
+  - **Detail page:**
+    - **Usage:** students, applications, staff, SMS left and sent this month.
+    - **Setup checklist:** web address, administrator signed in, staff accounts, programmes, academic year and intake, fee structure, admission window, campus photo and SMS bundle.
+    - **Also shown:** the administrators, the web addresses, integration health for the last 7 days, contacts, notes and recent platform actions.
+  - **Actions:**
+    - Edit the details.
+    - Add or remove web addresses. The last one cannot be removed.
+    - Credit an SMS bundle. It shows on the institution's Messages page as a top-up.
+    - Add an administrator, for example when the only one has left.
+    - Reset an administrator's password. The administrator is unlocked and signed out everywhere. Only administrators can be reset this way; the institution's own administrator resets other staff.
+  - **Suspend (with a reason; type the code to confirm):**
+    - Every portal of the institution answers "service temporarily unavailable" (English and Swahili), and everyone signed in is stopped.
+    - Its data is kept, scheduled jobs pause and GePG payments are still recorded.
+    - **Reactivate** opens it again.
+    - Other servers notice within 5 minutes.
+- **Integration health:**
+  - **Coverage:** calls from every institution to NECTA, NACTVET, NACTVET awards, GePG and the SMS gateway, live or simulated.
+  - **States:** working, some failures, failing or no calls.
+  - **Detail:** failure rate, average time, last success and last error.
+  - **Calls:** a paged list of calls by institution, system and outcome.
+  - **Retention:** entries are kept for 365 days (`CIMS_INTEGRATION_LOG_RETENTION_DAYS`).
+- **Platform users:** add, with a temporary password; reset; disable; enable. Nobody can disable themselves or the last active user.
+- **Audit trail:**
+  - The platform's own trail cannot be changed or deleted: who, what, which institution, the details and the IP address.
+  - What platform staff do inside an institution also appears in that institution's audit trail as "<name> (Msingi platform)".
+- **First account:**
+  - Created at start-up when none exists, from `CIMS_PLATFORM_BOOTSTRAP_USERNAME` (default `msingi`) and `CIMS_PLATFORM_BOOTSTRAP_PASSWORD`. That person must choose their own password at first sign-in.
+  - **Development:** `msingi` / `Msingi@2026`.
 
 ### 20. Sponsor Officer (optional in the SRS): Not started
 
@@ -245,4 +291,5 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. Platform Administrator: the platform console and onboarding.
+1. The roles still marked Working, in this order: Examinations Officer, Lecturer, Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
+2. Sponsor Officer (optional in the SRS).

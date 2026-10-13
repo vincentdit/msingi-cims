@@ -25,31 +25,46 @@ public class TenantLookupService {
 
     @Transactional(readOnly = true)
     public Optional<TenantContext.TenantInfo> byCode(String code) {
-        return cached("code:" + code.toLowerCase(), () -> tenants.findByCodeIgnoreCase(code));
+        return resolveCode(code).filter(r -> !r.suspended()).map(Resolution::info);
     }
 
     @Transactional(readOnly = true)
     public Optional<TenantContext.TenantInfo> byHost(String host) {
+        return resolveHost(host).filter(r -> !r.suspended()).map(Resolution::info);
+    }
+
+    /** The institution for a code, including a suspended one (so the caller can say it is suspended). */
+    @Transactional(readOnly = true)
+    public Optional<Resolution> resolveCode(String code) {
+        return cached("code:" + code.toLowerCase(), () -> tenants.findByCodeIgnoreCase(code));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Resolution> resolveHost(String host) {
         return cached("host:" + host.toLowerCase(), () -> tenants.findByHost(host));
     }
 
+    /**
+     * Forgets every cached lookup, e.g. after an institution is suspended or a domain changes. Other servers keep their
+     * cache for up to five minutes.
+     */
     public void evictAll() {
         cache.clear();
     }
 
-    private Optional<TenantContext.TenantInfo> cached(String key, java.util.function.Supplier<Optional<Tenant>> loader) {
+    private Optional<Resolution> cached(String key, java.util.function.Supplier<Optional<Tenant>> loader) {
         Cached c = cache.get(key);
         if (c != null && c.expires.isAfter(Instant.now())) {
-            return Optional.ofNullable(c.info);
+            return Optional.ofNullable(c.resolution);
         }
-        TenantContext.TenantInfo info = loader.get()
-                .filter(t -> !"SUSPENDED".equals(t.getStatus()))
-                .map(Tenant::toInfo)
-                .orElse(null);
-        cache.put(key, new Cached(info, Instant.now().plus(TTL)));
-        return Optional.ofNullable(info);
+        Resolution r = loader.get().map(t -> new Resolution(t.toInfo(), "SUSPENDED".equals(t.getStatus()), t.getName())).orElse(null);
+        cache.put(key, new Cached(r, Instant.now().plus(TTL)));
+        return Optional.ofNullable(r);
     }
 
-    private record Cached(TenantContext.TenantInfo info, Instant expires) {
+    public record Resolution(TenantContext.TenantInfo info, boolean suspended, String name) {
+    }
+
+    private record Cached(Resolution resolution, Instant expires) {
     }
 }

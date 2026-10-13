@@ -54,6 +54,12 @@ springdoc:
     path: /v3/api-docs
 
 cims:
+  platform:
+    # The first Msingi platform administrator, created at start-up when there is none (must change the password at first sign-in)
+    bootstrap-username: ${CIMS_PLATFORM_BOOTSTRAP_USERNAME:msingi}
+    bootstrap-password: ${CIMS_PLATFORM_BOOTSTRAP_PASSWORD:}
+    # Integration call log kept for this many days
+    integration-log-retention-days: ${CIMS_INTEGRATION_LOG_RETENTION_DAYS:365}
   security:
     mode: ${CIMS_SECURITY_MODE:local}
     issuer: ${CIMS_JWT_ISSUER:cims}

@@ -27,6 +27,10 @@ public class TokenService {
     public static final String CLAIM_MUST_CHANGE_PASSWORD = "mcp";
     /** The account's session generation when the token was issued; older generations are refused once sessions are ended. */
     public static final String CLAIM_SESSION = "sv";
+    /** The user type of Msingi platform staff; their tokens carry no institution and work only on /api/platform. */
+    public static final String TYPE_PLATFORM = "PLATFORM";
+    /** Appended to the issuer for platform tokens, so they are always checked with CIMS's own key. */
+    public static final String PLATFORM_ISSUER_SUFFIX = "-platform";
 
     private final JwtEncoder encoder;
     private final CimsSecurityProperties props;

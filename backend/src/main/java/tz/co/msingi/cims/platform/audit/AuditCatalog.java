@@ -27,7 +27,7 @@ public final class AuditCatalog {
         AREAS.put("Student services", List.of("Clearance", "Graduation", "Graduand", "HostelAllocation", "HostelApplication", "HostelWindow",
                 "Hostel", "IptPlacement", "LogbookEntry", "IptPeriod"));
         AREAS.put("Communication", List.of("Notice", "MessageCampaign", "MessageTemplate", "MessagingSettings"));
-        AREAS.put("Institution", List.of("InstitutionPhoto", "Report"));
+        AREAS.put("Institution", List.of("InstitutionPhoto", "Report", "Tenant"));
     }
 
     /** Sign-ins, failed sign-ins, locked accounts, password changes and staff account changes. */

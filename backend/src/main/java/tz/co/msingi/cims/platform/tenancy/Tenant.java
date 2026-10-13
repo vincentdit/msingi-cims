@@ -55,6 +55,14 @@ public class Tenant {
     private String contactEmail;
     private String contactPhone;
 
+    /** Why the institution was last suspended or reactivated, when and by whom (platform console). */
+    private String statusReason;
+    private OffsetDateTime statusChangedAt;
+    private String statusChangedBy;
+    private String onboardedBy;
+    /** Msingi's own notes on the institution (contract, contacts, support history); never shown to the institution. */
+    private String notes;
+
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

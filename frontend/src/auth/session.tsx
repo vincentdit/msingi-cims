@@ -42,7 +42,8 @@ export function RequireAuth({ realm, children }: { realm: Realm; children: React
   const { user } = useSession();
   const location = useLocation();
   if (!user(realm)) {
-    return <Navigate to={realm === 'staff' ? '/staff/login' : realm === 'student' ? '/student/login' : '/login'} replace state={{ from: location.pathname }} />;
+    const login = realm === 'staff' ? '/staff/login' : realm === 'student' ? '/student/login' : realm === 'platform' ? '/platform/login' : '/login';
+    return <Navigate to={login} replace state={{ from: location.pathname }} />;
   }
   return <>{children}</>;
 }

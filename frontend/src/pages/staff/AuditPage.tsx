@@ -3,7 +3,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert, Autocomplete, Box, Button, Card, Chip, Container, Divider, Drawer, FormControlLabel, IconButton, InputAdornment, MenuItem, Stack,
-  Switch, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  Switch, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
@@ -12,6 +12,8 @@ import { useSearchParams } from 'react-router-dom';
 import { api, download, formatDateTime } from '../../api/client';
 import type { AuditEntry, AuditFacets, AuditSummary, Page } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { CallsTable } from '../platform/PlatformPages';
+import { HealthChip, MODE_LABEL, n, type IntegrationCall, type PageOf, type SystemHealth } from '../platform/shared';
 
 const staff = { realm: 'staff' as const };
 
@@ -33,7 +35,7 @@ type Filters = { from: string; to: string; area: string; action: string; actorId
   entity?: string; entityId?: number };
 
 /** The audit trail: every change made in CIMS, who made it, when and from where. For the Auditor and the administrator. */
-export default function AuditPage() {
+function ChangesTrail({ tabs }: { tabs: React.ReactNode }) {
   const [period, setPeriod] = useState<'1' | '7' | '30' | 'custom'>('7');
   const [url] = useSearchParams();
   const [f, setF] = useState<Filters>({ from: daysAgo(6), to: iso(new Date()), area: '', action: '', q: '', security: false,
@@ -81,6 +83,7 @@ export default function AuditPage() {
         action={<Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} startIcon={<DownloadIcon />} disabled={exportCsv.isPending || !logs.data?.totalElements} onClick={() => exportCsv.mutate()}>
           {exportCsv.isPending ? 'Exporting…' : 'Export CSV'}
         </Button>} />
+      {tabs}
       <ErrorAlert error={exportCsv.error} />
 
       {history ? (
@@ -206,6 +209,63 @@ export default function AuditPage() {
           </Box>
         )}
       </Drawer>
+    </Container>
+  );
+}
+
+/** The audit trail page: changes made in CIMS, and the institution's calls to outside systems. */
+export default function AuditPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'integrations' ? 'integrations' : 'changes';
+  const tabs = (
+    <Tabs value={tab} sx={{ mb: 2 }} onChange={(_, v) => { const p = new URLSearchParams(params); if (v === 'changes') p.delete('tab'); else p.set('tab', v); setParams(p); }}>
+      <Tab value="changes" label="Changes" />
+      <Tab value="integrations" label="Integration calls" />
+    </Tabs>
+  );
+  return tab === 'changes' ? <ChangesTrail tabs={tabs} /> : <IntegrationLog tabs={tabs} />;
+}
+
+/** The institution's calls to NECTA, NACTVET, GePG and the SMS gateway (as NOAS keeps integration logs). */
+function IntegrationLog({ tabs }: { tabs: React.ReactNode }) {
+  const [system, setSystem] = useState('');
+  const [outcome, setOutcome] = useState('');
+  const [page, setPage] = useState(0);
+  const health = useQuery({ queryKey: ['audit', 'integrations', 'health'], queryFn: () => api<SystemHealth[]>('/api/audit/integrations/health?hours=168', staff) });
+  const qs = new URLSearchParams({ page: String(page), size: '50' });
+  if (system) qs.set('system', system);
+  if (outcome) qs.set('outcome', outcome);
+  const calls = useQuery({ queryKey: ['audit', 'integrations', qs.toString()], placeholderData: keepPreviousData,
+    queryFn: () => api<PageOf<IntegrationCall>>(`/api/audit/integrations?${qs}`, staff) });
+  return (
+    <Container maxWidth="xl" disableGutters>
+      <PageTitle title="Audit trail" subtitle="Calls CIMS made for this institution to NECTA, NACTVET, GePG and the SMS gateway, and GePG payment notifications received. Only references are kept, never what was sent." />
+      {tabs}
+      <ErrorAlert error={health.error ?? calls.error} />
+      <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+        {(health.data ?? []).map((h) => (
+          <Card key={h.system} sx={{ p: 1.5, minWidth: 210, flex: '1 1 210px' }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="body2" fontWeight={600}>{h.label}</Typography><HealthChip status={h.status} /></Stack>
+            <Typography variant="body2" color="text.secondary">{n(h.calls)} calls · {n(h.failures)} failed · 7 days</Typography>
+            <Typography variant="caption" color="text.secondary">{MODE_LABEL[h.mode] ?? h.mode}</Typography>
+          </Card>
+        ))}
+      </Stack>
+      <Card>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ p: 2, pb: 1 }}>
+          <TextField select size="small" label="System" value={system} onChange={(e) => { setSystem(e.target.value); setPage(0); }} sx={{ minWidth: 240 }}
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
+            <MenuItem value="">All systems</MenuItem>
+            {(health.data ?? []).map((h) => <MenuItem key={h.system} value={h.system}>{h.label}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Outcome" value={outcome} onChange={(e) => { setOutcome(e.target.value); setPage(0); }} sx={{ minWidth: 150 }}
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
+            <MenuItem value="">All</MenuItem><MenuItem value="FAILURE">Failed</MenuItem><MenuItem value="SUCCESS">Succeeded</MenuItem>
+          </TextField>
+        </Stack>
+        {calls.isLoading ? <Loading /> : <CallsTable rows={calls.data?.content ?? []} />}
+        <TablePagination component="div" count={calls.data?.totalElements ?? 0} page={page} onPageChange={(_, p) => setPage(p)} rowsPerPage={50} rowsPerPageOptions={[50]} />
+      </Card>
     </Container>
   );
 }

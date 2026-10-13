@@ -32,6 +32,10 @@ import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
 import { HandoverPage, StudentDetailPage, StudentsPage } from './pages/staff/RegistryPages';
 import { StatusChangesPage } from './pages/staff/StatusAndCards';
+import PlatformLayout from './pages/platform/PlatformLayout';
+import { PlatformLoginPage, PlatformPasswordPage } from './pages/platform/PlatformAuth';
+import { InstitutionDetailPage, InstitutionsPage, OnboardPage } from './pages/platform/InstitutionPages';
+import { IntegrationsPage, OverviewPage, PlatformAuditPage, PlatformUsersPage } from './pages/platform/PlatformPages';
 import FinancePage from './pages/staff/FinancePages';
 import { ForgotPasswordPage, LoginPage, RegisterPage, VerifyPage } from './pages/portal/AuthPages';
 import HomePage from './pages/portal/HomePage';
@@ -61,6 +65,17 @@ export default function App() {
         <Route path="fees" element={<StudentFees />} />
         <Route path="notices" element={<StudentNotices />} />
         <Route path="profile" element={<StudentProfilePage />} />
+      </Route>
+      <Route path="platform/login" element={<PlatformLoginPage />} />
+      <Route path="platform" element={<RequireAuth realm="platform"><PlatformLayout /></RequireAuth>}>
+        <Route index element={<OverviewPage />} />
+        <Route path="institutions" element={<InstitutionsPage />} />
+        <Route path="institutions/new" element={<OnboardPage />} />
+        <Route path="institutions/:id" element={<InstitutionDetailPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="users" element={<PlatformUsersPage />} />
+        <Route path="audit" element={<PlatformAuditPage />} />
+        <Route path="password" element={<PlatformPasswordPage />} />
       </Route>
       <Route path="staff/login" element={<StaffLoginPage />} />
       <Route path="staff" element={<RequireAuth realm="staff"><StaffLayout /></RequireAuth>}>

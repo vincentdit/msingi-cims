@@ -5,6 +5,11 @@ cims:
     expose-in-response: true
   demo:
     seed: true
+  platform:
+    # development only: the platform console sign-in msingi / Msingi@2026
+    bootstrap-password: ${CIMS_PLATFORM_BOOTSTRAP_PASSWORD:Msingi@2026}
+    bootstrap-must-change: false
+    staff-login-url: http://{host}:5173/staff/login
   documents:
     verification-url: ${CIMS_VERIFICATION_URL:http://localhost:5173/verify/{code}}   # the Vite dev portal
 

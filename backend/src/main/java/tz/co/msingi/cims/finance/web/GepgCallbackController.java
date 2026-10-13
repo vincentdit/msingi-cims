@@ -44,22 +44,39 @@ public class GepgCallbackController {
     private final TenantRepository tenants;
     private final GepgProperties props;
     private final ObjectMapper mapper;
+    private final tz.co.msingi.cims.integration.log.IntegrationCallRecorder calls;
 
     @Operation(summary = "GePG payment notification callback")
     @PostMapping("/payment-notification")
     public ResponseEntity<Map<String, String>> paymentNotification(@RequestBody String body,
                                                                    @RequestHeader(name = "X-Gepg-Signature", required = false) String signature) throws Exception {
+        long start = System.nanoTime();
         if (!verify(body, signature)) {
             log.warn("Rejected GePG notification with invalid signature");
+            inbound(null, null, false, start, "Rejected: invalid signature");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("status", "REJECTED", "reason", "invalid signature"));
         }
         BillingService.PaymentNotification n = mapper.readValue(body, BillingService.PaymentNotification.class);
         Optional<Tenant> tenant = tenantFromBillId(n.billId());
         if (tenant.isEmpty()) {
+            inbound(null, n.billId(), false, start, "Rejected: unknown bill");
             return ResponseEntity.badRequest().body(Map.of("status", "REJECTED", "reason", "unknown bill"));
         }
-        TenantContext.runAs(tenant.get().toInfo(), () -> billing.recordPayment(n));
+        try {
+            TenantContext.runAs(tenant.get().toInfo(), () -> billing.recordPayment(n));
+        } catch (RuntimeException e) {
+            inbound(tenant.get().getId(), n.billId(), false, start, "Not recorded: " + e.getMessage());
+            throw e;
+        }
+        inbound(tenant.get().getId(), n.billId(), true, start, "Payment recorded");
         return ResponseEntity.ok(Map.of("status", "ACCEPTED"));
+    }
+
+    private void inbound(Long tenantId, String billId, boolean ok, long start, String detail) {
+        calls.record(tenantId, tz.co.msingi.cims.integration.log.IntegrationCallRecorder.ExternalSystem.GEPG, "paymentNotification", true,
+                !props.isSimulated(), ok ? tz.co.msingi.cims.integration.log.IntegrationCallRecorder.Outcome.SUCCESS
+                        : tz.co.msingi.cims.integration.log.IntegrationCallRecorder.Outcome.FAILURE,
+                (System.nanoTime() - start) / 1_000_000, billId == null ? null : "bill " + billId, detail);
     }
 
     private Optional<Tenant> tenantFromBillId(String billId) {
