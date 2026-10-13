@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/session';
 import PortalLayout from './components/PortalLayout';
 import StaffLayout from './components/StaffLayout';
 import StudentLayout from './components/StudentLayout';
+import InstitutionPage from './pages/staff/InstitutionPage';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
 import StudentResultsPage from './pages/student/StudentResultsPage';
@@ -92,6 +93,7 @@ export default function App() {
         <Route path="messages" element={<MessagingPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="programmes" element={<ProgrammesPage />} />
+        <Route path="institution" element={<InstitutionPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

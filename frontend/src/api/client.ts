@@ -95,6 +95,37 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   return data as T;
 }
 
+/** Sends a file (multipart form) to the API, e.g. a photo upload. */
+export async function uploadForm<T>(path: string, realm: Realm, form: FormData, method: 'POST' | 'PUT' = 'PUT'): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (TENANT) headers['X-Tenant'] = TENANT;
+  const token = getToken(realm);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method, headers, body: form });
+  } catch {
+    throw new ApiError(UNREACHABLE);
+  }
+  const data = await res.json().catch(() => undefined);
+  if (!res.ok) {
+    if (res.status === 401) clearSession(realm);
+    throw new ApiError((data as Problem) ?? { status: res.status, title: res.statusText });
+  }
+  return data as T;
+}
+
+/**
+ * The address of a public image from the API for an <img>. With a single-institution address (the usual set-up) the
+ * path works as it is; when the institution is picked by header (development), the image is fetched with it.
+ */
+export async function publicImageUrl(path: string): Promise<string> {
+  if (!TENANT) return `${API_BASE}${path}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers: { 'X-Tenant': TENANT } });
+  if (!res.ok) throw new Error('Image not available');
+  return URL.createObjectURL(await res.blob());
+}
+
 /** Downloads a file from the API with the session token (e.g. CSV exports); method POST for documents issued on request. */
 export async function download(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET', body?: unknown) {
   const headers: Record<string, string> = {};

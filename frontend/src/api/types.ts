@@ -23,6 +23,20 @@ export interface Institution {
   contactEmail?: string;
   contactPhone?: string;
   branding: { primaryColor?: string; accentColor?: string; tagline?: string; logoUrl?: string };
+  /** The institution's own campus photo, when the administrator has uploaded one. */
+  campusPhoto?: InstitutionPhoto;
+}
+
+export interface InstitutionPhoto {
+  kind: string;
+  url: string;
+  caption?: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  uploadedByName: string;
+  updatedAt?: string;
 }
 
 export type ConditionType =

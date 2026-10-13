@@ -22,6 +22,7 @@ import ClearanceIcon from '@mui/icons-material/TaskAlt';
 import GraduationIcon from '@mui/icons-material/WorkspacePremium';
 import HostelIcon from '@mui/icons-material/Bed';
 import IptIcon from '@mui/icons-material/Engineering';
+import InstitutionIcon from '@mui/icons-material/AccountBalance';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -57,6 +58,7 @@ const NAV: { to: string; label: string; icon: JSX.Element; end?: boolean; roles?
   { to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
   { to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon />, officerRoles: ['HOSTEL_WARDEN', 'IPT_COORDINATOR'] },
   { to: '/staff/programmes', label: 'Programmes', icon: <SchoolIcon /> },
+  { to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon />, roles: ['INSTITUTION_ADMIN'] },
 ];
 
 /** Back-office layout for institution staff. */

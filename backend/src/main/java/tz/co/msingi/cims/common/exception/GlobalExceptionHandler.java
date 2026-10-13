@@ -83,6 +83,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage());
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ProblemDetail tooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", "The file is too large. Save it smaller and try again.");
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ProblemDetail conflict(ObjectOptimisticLockingFailureException ex) {
         return problem(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", "The record was changed by someone else. Reload and try again.");
