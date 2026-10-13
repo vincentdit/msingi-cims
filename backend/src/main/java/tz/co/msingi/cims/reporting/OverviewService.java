@@ -162,7 +162,7 @@ public class OverviewService {
         for (int i = 11; i >= 0; i--) perMonth.put(now.minusMonths(i), BigDecimal.ZERO);
         jdbc.query("""
                 select extract(year from paid_at at time zone 'Africa/Dar_es_Salaam'), extract(month from paid_at at time zone 'Africa/Dar_es_Salaam'),
-                       sum(amount) from payments where paid_at >= :since group by 1, 2""",
+                       sum(amount) from payments where paid_at >= :since and source <> 'INTERNAL' group by 1, 2""",
                 new MapSqlParameterSource("since", now.minusMonths(11).atDay(1).atStartOfDay(Sql.ZONE).toOffsetDateTime()),
                 rs -> { perMonth.put(YearMonth.of(rs.getInt(1), rs.getInt(2)), rs.getBigDecimal(3)); });
         List<Point> collections = perMonth.entrySet().stream().map(e -> new Point(e.getKey().toString(),

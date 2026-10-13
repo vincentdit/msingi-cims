@@ -43,6 +43,10 @@ public class InvoiceLine extends TenantScopedEntity {
     @Column(nullable = false)
     private short instalment = 1;
 
+    /** On a sponsor invoice: the student invoice this line pays the sponsor's share of. */
+    private Long beneficiaryInvoiceId;
+    private Long beneficiaryStudentId;
+
     public BigDecimal balance() {
         return amount.subtract(paidAmount);
     }

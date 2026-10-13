@@ -30,6 +30,20 @@ public final class FinanceRepositories {
                   and i.status not in (tz.co.msingi.cims.finance.domain.Invoice.Status.CANCELLED, tz.co.msingi.cims.finance.domain.Invoice.Status.CREDITED)
                 group by i.payerId""")
         List<Object[]> studentBalances();
+
+        /** What sponsors have been invoiced for a student invoice and not yet paid (counts towards the student's clearance). */
+        @org.springframework.data.jpa.repository.Query("""
+                select coalesce(sum(l.amount - l.paidAmount), 0) from InvoiceLine l
+                where l.beneficiaryInvoiceId = :invoiceId
+                  and l.invoice.status not in (tz.co.msingi.cims.finance.domain.Invoice.Status.CANCELLED, tz.co.msingi.cims.finance.domain.Invoice.Status.CREDITED)""")
+        java.math.BigDecimal sponsorPending(@org.springframework.data.repository.query.Param("invoiceId") Long invoiceId);
+
+        /** Everything sponsors have been invoiced for a student invoice (paid or not). */
+        @org.springframework.data.jpa.repository.Query("""
+                select coalesce(sum(l.amount), 0) from InvoiceLine l
+                where l.beneficiaryInvoiceId = :invoiceId
+                  and l.invoice.status not in (tz.co.msingi.cims.finance.domain.Invoice.Status.CANCELLED, tz.co.msingi.cims.finance.domain.Invoice.Status.CREDITED)""")
+        java.math.BigDecimal sponsorInvoiced(@org.springframework.data.repository.query.Param("invoiceId") Long invoiceId);
     }
 
     public interface ControlNumberRepository extends JpaRepository<ControlNumber, Long> {

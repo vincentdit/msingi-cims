@@ -162,6 +162,7 @@ public class IptService {
     @Transactional
     public PeriodView savePeriod(Long id, PeriodRequest req) {
         access.require("manage IPT periods", COORDINATORS);
+        requireWholeInstitution("set up IPT periods");
         if (req.endsOn().isBefore(req.startsOn())) throw new BusinessRuleException("INVALID_DATES", "The period must end after it starts");
         if (req.workplaceWeight().add(req.institutionWeight()).add(req.logbookWeight()).compareTo(BigDecimal.valueOf(100)) != 0) {
             throw new BusinessRuleException("INVALID_WEIGHTS", "The three weights must add up to 100");
@@ -235,6 +236,7 @@ public class IptService {
         access.require("place students", COORDINATORS);
         IptPeriod p = period(req.periodId());
         Student s = students.findById(req.studentId()).orElseThrow(() -> new NotFoundException("Student", req.studentId()));
+        if (!scope.current().programme(s.getProgramme())) throw new AccessDeniedException("That student is outside " + scope.current().describe());
         requireEligible(p, s);
         PlacementOrganisation o = organisations.findById(req.organisationId()).orElseThrow(() -> new NotFoundException("Organisation", req.organisationId()));
         IptPlacement pl = new IptPlacement();
@@ -259,6 +261,7 @@ public class IptService {
     public PlacementView update(Long id, PlacementUpdate req) {
         access.require("change placements", COORDINATORS);
         IptPlacement pl = placement(id);
+        if (!inScope(pl)) throw new AccessDeniedException("That placement is outside " + scope.current().describe());
         if (!pl.live()) throw new BusinessRuleException("PLACEMENT_CLOSED", "This placement was cancelled or declined");
         PlacementOrganisation o = organisations.findById(req.organisationId()).orElseThrow(() -> new NotFoundException("Organisation", req.organisationId()));
         boolean moved = !o.getId().equals(pl.getOrganisation().getId());
@@ -282,6 +285,7 @@ public class IptService {
     public PlacementView decide(Long id, DecisionRequest req) {
         access.require("decide placement requests", COORDINATORS);
         IptPlacement pl = placement(id);
+        if (!inScope(pl)) throw new AccessDeniedException("That placement is outside " + scope.current().describe());
         if (pl.getStatus() != IptPlacement.Status.REQUESTED) throw new BusinessRuleException("NOT_REQUESTED", "This placement is not waiting for a decision");
         Student s = students.findById(pl.getStudentId()).orElseThrow();
         if (Boolean.TRUE.equals(req.confirm())) {
@@ -301,6 +305,7 @@ public class IptService {
     public PlacementView cancel(Long id, String reason) {
         access.require("cancel placements", COORDINATORS);
         IptPlacement pl = placement(id);
+        if (!inScope(pl)) throw new AccessDeniedException("That placement is outside " + scope.current().describe());
         if (pl.getTransferredAt() != null) throw new BusinessRuleException("RESULT_TRANSFERRED", "The IPT mark has gone to the examination record");
         if (!pl.live()) throw new BusinessRuleException("PLACEMENT_CLOSED", "This placement is already closed");
         pl.setStatus(IptPlacement.Status.CANCELLED);
@@ -480,6 +485,7 @@ public class IptService {
     @Transactional
     public TransferResult transfer(Long periodId) {
         access.require("transfer IPT results", COORDINATORS);
+        requireWholeInstitution("transfer IPT results to the examination record");
         IptPeriod p = period(periodId);
         if (p.getModule() == null) throw new BusinessRuleException("NO_IPT_MODULE", "Link the period to its IPT module first");
         ModuleOffering o = offerings.findBySemesterIdAndModuleId(p.getSemester().getId(), p.getModule().getId()).orElseThrow(() ->
@@ -663,7 +669,12 @@ public class IptService {
                 (p.getRequestsClose() == null || !today.isAfter(p.getRequestsClose())) && !today.isAfter(p.getEndsOn()));
     }
 
-    /** A Head of Department sees the placements of their department's students. */
+    /** A department's IPT Coordinator places that department's students; periods and transfers are for the whole institution. */
+    private void requireWholeInstitution(String what) {
+        if (!scope.current().all()) throw new AccessDeniedException("Only an IPT Coordinator for the whole institution can " + what);
+    }
+
+    /** A Head of Department (or a department's IPT Coordinator) sees the placements of their department's students. */
     private boolean inScope(IptPlacement pl) {
         var mine = scope.current();
         return mine.all() || students.findById(pl.getStudentId()).map(st -> mine.programme(st.getProgramme())).orElse(false);

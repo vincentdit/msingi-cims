@@ -18,6 +18,7 @@ export const ROLES = {
   WARDEN: 'HOSTEL_WARDEN',
   IPT: 'IPT_COORDINATOR',
   CLEARANCE: 'CLEARANCE_OFFICER',
+  SPONSOR: 'SPONSOR_OFFICER',
   AUDITOR: 'AUDITOR',
 } as const;
 
@@ -27,12 +28,12 @@ const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 
 export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'semesterRegistrations' | 'graduations'
-  | 'calendar' | 'curricula' | 'myTeaching' | 'teaching' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
+  | 'calendar' | 'curricula' | 'myTeaching' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
+  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
-  approvals: [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS],
+  approvals: [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS, R.BURSAR, R.MANAGEMENT],
   reports: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.WARDEN, R.IPT, R.AUDITOR],
   windows: [R.ADMIN, R.ADMISSIONS, R.ACADEMIC, R.REGISTRAR, R.MANAGEMENT, R.AUDITOR],
   applications: [R.ADMIN, R.ADMISSIONS, R.ACADEMIC, R.REGISTRAR, R.MANAGEMENT, R.AUDITOR],
@@ -45,6 +46,7 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   curricula: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   myTeaching: [R.LECTURER, R.ASSESSOR, R.HOD, R.COORDINATOR, R.EXAMS],
   teaching: TEACHING,
+  competence: TEACHING,
   marks: TEACHING,
   examsOffice: [R.ADMIN, R.EXAMS, R.ACADEMIC, R.MANAGEMENT],
   appeals: [R.ADMIN, R.EXAMS, R.ACADEMIC, R.MANAGEMENT, R.HOD, R.LECTURER, R.ASSESSOR, R.COORDINATOR],
@@ -55,6 +57,9 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   clearance: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT, R.HOD, R.CLEARANCE, R.WARDEN],
   hostels: [R.ADMIN, R.WARDEN, R.REGISTRAR, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT],
   ipt: [R.ADMIN, R.IPT, R.REGISTRAR, R.ACADEMIC, R.HOD, R.EXAMS, R.MANAGEMENT, R.COORDINATOR, R.LECTURER, R.ASSESSOR],
+  financeOverview: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR],
+  sponsors: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR, R.SPONSOR],
+  waivers: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR],
   finance: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR],
   notices: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.BURSAR, R.ACCOUNTANT, R.EXAMS, R.WARDEN, R.ADMISSIONS, R.MANAGEMENT],
   messages: [R.ADMIN, R.REGISTRAR, R.ADMISSIONS, R.BURSAR, R.ACADEMIC, R.AUDITOR, R.MANAGEMENT],
@@ -69,8 +74,8 @@ export const can = (roles: readonly string[] | undefined, page: PageKey) => !!ro
 const PATH_PAGE: Record<string, PageKey> = {
   '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
-  'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
-  clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
+  'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
+  clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution',
 };
 
@@ -84,5 +89,5 @@ export const ROLE_LABEL: Record<string, string> = {
   INSTITUTION_ADMIN: 'Institution Administrator', MANAGEMENT_VIEWER: 'Principal / Management', DEPUTY_PRINCIPAL_ACADEMIC: 'Deputy Principal (Academic)',
   ADMISSIONS_OFFICER: 'Admissions Officer', REGISTRAR: 'Registrar', HEAD_OF_DEPARTMENT: 'Head of Department', PROGRAMME_COORDINATOR: 'Programme Coordinator',
   LECTURER: 'Lecturer', ASSESSOR: 'Assessor (NVA)', EXAMINATIONS_OFFICER: 'Examinations Officer', BURSAR: 'Bursar', ACCOUNTANT: 'Accountant',
-  HOSTEL_WARDEN: 'Hostel Warden', IPT_COORDINATOR: 'IPT Coordinator', CLEARANCE_OFFICER: 'Clearance Officer', AUDITOR: 'Auditor',
+  HOSTEL_WARDEN: 'Hostel Warden', IPT_COORDINATOR: 'IPT Coordinator', CLEARANCE_OFFICER: 'Clearance Officer', SPONSOR_OFFICER: 'Sponsor Officer', AUDITOR: 'Auditor',
 };

@@ -1,3 +1,4 @@
+import StudentRepairs from './StudentRepairs';
 import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, FormControlLabel, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -67,6 +68,7 @@ export default function StudentHostelCard() {
                 )}
                 {al.invoiceStatus === 'PAID' && al.status === 'ALLOCATED' && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>{t('hostel.paid')}</Typography>}
                 {al.checkedInAt && <Typography variant="caption" color="text.secondary">{t('hostel.checkedIn', { date: formatDate(al.checkedInAt) })}</Typography>}
+                {(al.status === 'ALLOCATED' || al.status === 'CHECKED_IN') && <StudentRepairs />}
               </Box>
             )}
             {current.status === 'SUBMITTED' && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t('hostel.submittedHint')}</Typography>}

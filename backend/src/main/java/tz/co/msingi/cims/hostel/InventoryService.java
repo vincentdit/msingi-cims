@@ -48,6 +48,9 @@ public class InventoryService {
     private final StudentRepository students;
     private final ExamAccess access;
     private final AuditService audit;
+    private final HostelScope scope;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final tz.co.msingi.cims.platform.security.UserAccountRepository users;
 
     // ------------------------------------------------------------------ fee categories
 
@@ -60,6 +63,7 @@ public class InventoryService {
     @Transactional
     public FeeCategoryView saveCategory(Long id, FeeCategoryRequest req) {
         access.require("set hostel fees", WARDENS);
+        scope.requireAll("set hostel fees");
         HostelFeeCategory c;
         if (id == null) {
             if (categories.findByCodeIgnoreCase(req.code()).isPresent()) throw new BusinessRuleException("DUPLICATE_CODE", "A fee category " + req.code() + " exists");
@@ -84,13 +88,15 @@ public class InventoryService {
         access.require("see hostels", VIEWERS);
         List<HostelRoom> all = rooms.findAllByOrderByIdAsc();
         Map<Long, HostelAllocation> active = activeByBed();
-        return hostels.findAllByOrderByNameAsc().stream()
+        return hostels.findAllByOrderByNameAsc().stream().filter(h -> scope.covers(h.getId()))
                 .map(h -> summary(h, all.stream().filter(r -> r.getHostel().getId().equals(h.getId())).toList(), active)).toList();
     }
 
     @Transactional
     public HostelSummary saveHostel(Long id, HostelRequest req) {
         access.require("manage hostels", WARDENS);
+        if (id == null) scope.requireAll("add hostels");
+        else scope.require(id);
         Hostel h;
         if (id == null) {
             if (hostels.findByCodeIgnoreCase(req.code()).isPresent()) throw new BusinessRuleException("DUPLICATE_CODE", "A hostel " + req.code() + " exists");
@@ -116,12 +122,36 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public HostelDetail hostel(Long id) {
         access.require("see hostels", VIEWERS);
+        scope.require(id);
         Hostel h = hostels.findById(id).orElseThrow(() -> new NotFoundException("Hostel", id));
         List<HostelRoom> rs = rooms.findByHostelIdOrderByBlockAscFloorAscRoomNoAsc(h.getId());
         Map<Long, HostelAllocation> active = activeByBed();
         Map<Long, Student> occupants = students.findAllById(active.values().stream().map(HostelAllocation::getStudentId).toList()).stream()
                 .collect(Collectors.toMap(Student::getId, Function.identity()));
-        return new HostelDetail(summary(h, rs, active), rs.stream().map(r -> roomView(r, active, occupants)).toList(), access.has(WARDENS));
+        List<Long> wardenIds = jdbc.queryForList("select user_id from hostel_wardens where hostel_id = ?", Long.class, h.getId());
+        List<tz.co.msingi.cims.hostel.HostelDtos.Warden> wardens = users.findAllById(wardenIds).stream()
+                .map(u -> new tz.co.msingi.cims.hostel.HostelDtos.Warden(u.getId(), u.getFullName()))
+                .sorted(java.util.Comparator.comparing(tz.co.msingi.cims.hostel.HostelDtos.Warden::fullName)).toList();
+        return new HostelDetail(summary(h, rs, active), rs.stream().map(r -> roomView(r, active, occupants)).toList(), access.has(WARDENS), wardens,
+                access.has(tz.co.msingi.cims.platform.security.Role.INSTITUTION_ADMIN));
+    }
+
+    /** The administrator assigns wardens to a hostel; an assigned warden then works only with their hostels. */
+    @Transactional
+    public HostelDetail assignWardens(Long hostelId, List<Long> userIds) {
+        access.require("assign hostel wardens", tz.co.msingi.cims.platform.security.Role.INSTITUTION_ADMIN);
+        Hostel h = hostels.findById(hostelId).orElseThrow(() -> new NotFoundException("Hostel", hostelId));
+        java.util.Set<Long> wanted = new java.util.HashSet<>(userIds);
+        var found = users.findAllById(wanted);
+        if (found.size() != wanted.size() || found.stream().anyMatch(u -> u.getRoles().stream()
+                .noneMatch(r -> r.getRole() == tz.co.msingi.cims.platform.security.Role.HOSTEL_WARDEN))) {
+            throw new BusinessRuleException("NOT_A_WARDEN", "Choose staff who hold the Hostel Warden role");
+        }
+        jdbc.update("delete from hostel_wardens where hostel_id = ?", hostelId);
+        for (Long uid : wanted) jdbc.update("insert into hostel_wardens (tenant_id, hostel_id, user_id) values (cims_current_tenant(), ?, ?)", hostelId, uid);
+        audit.record("HOSTEL_WARDENS_ASSIGNED", "Hostel", hostelId, Map.of("hostel", h.getCode(),
+                "wardens", found.stream().map(tz.co.msingi.cims.platform.security.UserAccount::getFullName).sorted().toList()));
+        return hostel(hostelId);
     }
 
     // ------------------------------------------------------------------ rooms and beds
@@ -129,6 +159,7 @@ public class InventoryService {
     @Transactional
     public RoomView saveRoom(Long id, RoomRequest req) {
         access.require("manage hostel rooms", WARDENS);
+        scope.require(req.hostelId());
         Hostel h = hostels.findById(req.hostelId()).orElseThrow(() -> new NotFoundException("Hostel", req.hostelId()));
         HostelFeeCategory fc = categories.findById(req.feeCategoryId()).orElseThrow(() -> new NotFoundException("Fee category", req.feeCategoryId()));
         HostelRoom.Gender gender = h.getGender() == Hostel.Gender.MIXED ? req.gender() : HostelRoom.Gender.valueOf(h.getGender().name());
@@ -184,6 +215,7 @@ public class InventoryService {
     public void bedStatus(Long bedId, HostelBed.Status status) {
         access.require("manage hostel beds", WARDENS);
         HostelBed b = beds.findById(bedId).orElseThrow(() -> new NotFoundException("Bed", bedId));
+        scope.require(b.getRoom().getHostel().getId());
         if (status == HostelBed.Status.MAINTENANCE && activeByBed().containsKey(b.getId())) {
             throw new BusinessRuleException("BED_OCCUPIED", "The bed is allocated. Move or check the student out first.");
         }

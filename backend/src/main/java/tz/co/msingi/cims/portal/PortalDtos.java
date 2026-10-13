@@ -80,6 +80,6 @@ public final class PortalDtos {
                             String awardName, int yearOfStudy, String academicYear, String status, String firstRegistrationStatus,
                             BigDecimal billed, BigDecimal paid, BigDecimal balance, BigDecimal credit, NextPayment nextPayment,
                             List<Clearance> clearance, long unreadNotices, List<StudentNotice> latestNotices,
-                            ChangeRequestView pendingRequest) {
+                            ChangeRequestView pendingRequest, List<StudentNextSteps.Step> next) {
     }
 }

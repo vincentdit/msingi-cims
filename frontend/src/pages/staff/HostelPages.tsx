@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api, formatDate, formatTzs } from '../../api/client';
 import type {
-  AcademicYear, FreeBed, HostelAllocationView, HostelApplicationView, HostelDetail, HostelFeeCategory, HostelRoomView, HostelSummary, HostelWindow,
+  AcademicYear, FreeBed, HostelAllocationView, HostelRepair, HostelApplicationView, HostelDetail, HostelFeeCategory, HostelRoomView, HostelSummary, HostelWindow,
   RoomType,
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
@@ -28,18 +28,20 @@ const ALLOC_COLOUR = { ALLOCATED: 'info', CHECKED_IN: 'success', CHECKED_OUT: 'd
 export function HostelPage() {
   const can = useRoles();
   const warden = can(WARDENS);
-  const [tab, setTab] = useState<'allocation' | 'inventory' | 'windows' | 'fees'>('allocation');
+  const [tab, setTab] = useState<'allocation' | 'inventory' | 'repairs' | 'windows' | 'fees'>('allocation');
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Hostels" subtitle="Applications and bed allocation by gender and priority, hostel invoices, check-in and check-out, and the bed inventory." />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable">
         <Tab value="allocation" label="Allocation" />
         <Tab value="inventory" label="Hostels and rooms" />
+        <Tab value="repairs" label="Repairs" />
         <Tab value="windows" label="Application windows" />
         <Tab value="fees" label="Fee categories" />
       </Tabs>
       {tab === 'allocation' && <AllocationTab warden={warden} />}
       {tab === 'inventory' && <InventoryTab warden={warden} />}
+      {tab === 'repairs' && <RepairsTab warden={warden} />}
       {tab === 'windows' && <WindowsTab warden={warden} />}
       {tab === 'fees' && <FeesTab warden={warden} />}
     </Container>
@@ -313,6 +315,7 @@ function HostelDialog({ id, onClose, onEditHostel }: { id: number; onClose: () =
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['staff', 'hostel', id], queryFn: () => api<HostelDetail>(`/api/hostel/hostels/${id}`, staff) });
   const [room, setRoom] = useState<HostelRoomView | 'new' | null>(null);
+  const [wardens, setWardens] = useState(false);
   const bed = useMutation({
     mutationFn: (p: { id: number; status: string }) => api(`/api/hostel/beds/${p.id}/status`, { ...staff, method: 'PUT', body: { status: p.status } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
@@ -329,6 +332,14 @@ function HostelDialog({ id, onClose, onEditHostel }: { id: number; onClose: () =
       <DialogContent dividers>
         <ErrorAlert error={q.error ?? bed.error} />
         {q.isLoading && <Loading />}
+        {d && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }} useFlexGap flexWrap="wrap">
+            <Typography variant="body2" color="text.secondary">Wardens:</Typography>
+            {d.wardens.length ? d.wardens.map((w) => <Chip key={w.id} size="small" label={w.fullName} />)
+              : <Typography variant="body2" color="text.secondary">none assigned (every warden can manage it)</Typography>}
+            {d.canAssignWardens && <Button size="small" onClick={() => setWardens(true)}>Assign wardens</Button>}
+          </Stack>
+        )}
         {d && !d.rooms.length && <Typography color="text.secondary">No rooms yet.</Typography>}
         <Stack spacing={1}>
           {d?.rooms.map((r) => (
@@ -356,6 +367,7 @@ function HostelDialog({ id, onClose, onEditHostel }: { id: number; onClose: () =
         </Stack>
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+      {wardens && d && <WardensDialog hostel={d} onClose={() => setWardens(false)} onDone={() => { setWardens(false); qc.invalidateQueries({ queryKey: ['staff'] }); }} />}
       {room && d && <RoomForm hostel={d.hostel} room={room === 'new' ? null : room} onClose={() => setRoom(null)}
         onDone={() => { setRoom(null); qc.invalidateQueries({ queryKey: ['staff'] }); }} />}
     </Dialog>
@@ -526,6 +538,142 @@ function FeeForm({ c, onClose, onDone }: { c: HostelFeeCategory | null; onClose:
         </Stack>
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={!code || !name || amount === '' || m.isPending} onClick={() => m.mutate()}>Save</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function WardensDialog({ hostel, onClose, onDone }: { hostel: HostelDetail; onClose: () => void; onDone: () => void }) {
+  const users = useQuery({ queryKey: ['staff', 'users'], queryFn: () => api<{ id: number; fullName: string; status: string; roles: { role: string }[] }[]>('/api/admin/users', staff) });
+  const wardens = (users.data ?? []).filter((u) => u.status === 'ACTIVE' && u.roles.some((r) => r.role === 'HOSTEL_WARDEN'));
+  const [chosen, setChosen] = useState<number[]>(hostel.wardens.map((w) => w.id));
+  const save = useMutation({ mutationFn: () => api(`/api/hostel/hostels/${hostel.hostel.id}/wardens`, { ...staff, method: 'PUT', body: { userIds: chosen } }), onSuccess: onDone });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Wardens of {hostel.hostel.name}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>An assigned warden sees and runs only their own hostels. A warden assigned to none (e.g. the Dean of Students) sees every hostel.</Typography>
+        <ErrorAlert error={users.error ?? save.error} />
+        {wardens.map((u) => (
+          <FormControlLabel key={u.id} sx={{ display: 'flex' }} label={u.fullName}
+            control={<Switch checked={chosen.includes(u.id)} onChange={(e) => setChosen(e.target.checked ? [...chosen, u.id] : chosen.filter((x) => x !== u.id))} />} />
+        ))}
+        {users.data && !wardens.length && <Typography color="text.secondary">No staff hold the Hostel Warden role.</Typography>}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>Save</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+// ============================================================ repairs (FR-HST-06)
+
+const REPAIR_CATEGORIES = ['ELECTRICAL', 'PLUMBING', 'FURNITURE', 'STRUCTURE', 'CLEANING', 'SECURITY', 'OTHER'];
+const REPAIR_STATUS = { OPEN: { label: 'Open', colour: 'warning' }, IN_PROGRESS: { label: 'Being fixed', colour: 'info' }, DONE: { label: 'Fixed', colour: 'success' },
+  CANCELLED: { label: 'Closed', colour: 'default' } } as const;
+
+function RepairsTab({ warden }: { warden: boolean }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(true);
+  const [logging, setLogging] = useState(false);
+  const [updating, setUpdating] = useState<HostelRepair | null>(null);
+  const q = useQuery({ queryKey: ['staff', 'hostel-repairs', open], queryFn: () => api<HostelRepair[]>(`/api/hostel/repairs${open ? '?open=true' : ''}`, staff) });
+  return (
+    <>
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }} alignItems="center">
+        <Chip clickable label="Waiting" color={open ? 'primary' : 'default'} variant={open ? 'filled' : 'outlined'} onClick={() => setOpen(true)} />
+        <Chip clickable label="All" color={!open ? 'primary' : 'default'} variant={!open ? 'filled' : 'outlined'} onClick={() => setOpen(false)} />
+        <Box sx={{ flexGrow: 1 }} />
+        {warden && <Button startIcon={<AddIcon />} onClick={() => setLogging(true)}>Log a repair</Button>}
+      </Stack>
+      <ErrorAlert error={q.error} />
+      {q.isLoading && <Loading />}
+      {q.data && (
+        <TableContainer component={Card}>
+          <Table size="small">
+            <TableHead><TableRow><TableCell>Repair</TableCell><TableCell>Where</TableCell><TableCell>Reported</TableCell><TableCell>Status</TableCell><TableCell /></TableRow></TableHead>
+            <TableBody>
+              {q.data.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell sx={{ maxWidth: 340 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{title(r.category)}{r.priority === 'URGENT' && <Chip size="small" color="error" label="Urgent" sx={{ ml: 1, height: 20 }} />}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">{r.description}</Typography>
+                    <Typography variant="caption" color="text.secondary">{r.repairNo}</Typography>
+                  </TableCell>
+                  <TableCell><Typography variant="body2">{r.hostel}</Typography><Typography variant="caption" color="text.secondary">{r.room ?? 'Common area'}</Typography></TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{r.studentName ?? r.reportedByName}</Typography>
+                    <Typography variant="caption" color="text.secondary">{r.registrationNo ? `${r.registrationNo} · ` : ''}{formatDate(r.reportedAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip size="small" color={REPAIR_STATUS[r.status].colour} label={REPAIR_STATUS[r.status].label} />
+                    {r.note && <Typography variant="caption" display="block" color="text.secondary">{r.note}{r.updatedByName ? ` · ${r.updatedByName}` : ''}</Typography>}
+                  </TableCell>
+                  <TableCell align="right">{r.canUpdate && <Button size="small" onClick={() => setUpdating(r)}>Update</Button>}</TableCell>
+                </TableRow>
+              ))}
+              {!q.data.length && <TableRow><TableCell colSpan={5}><Typography color="text.secondary" sx={{ py: 1 }}>{open ? 'No repairs waiting.' : 'No repairs reported.'}</Typography></TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+      {logging && <LogRepairDialog onClose={() => setLogging(false)} onDone={() => { setLogging(false); qc.invalidateQueries({ queryKey: ['staff', 'hostel-repairs'] }); }} />}
+      {updating && <UpdateRepairDialog r={updating} onClose={() => setUpdating(null)} onDone={() => { setUpdating(null); qc.invalidateQueries({ queryKey: ['staff', 'hostel-repairs'] }); }} />}
+    </>
+  );
+}
+
+function LogRepairDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const hostels = useQuery({ queryKey: ['staff', 'hostels'], queryFn: () => api<HostelSummary[]>('/api/hostel/hostels', staff) });
+  const [hostelId, setHostelId] = useState<number | ''>('');
+  const detail = useQuery({ queryKey: ['staff', 'hostel', hostelId], enabled: !!hostelId, queryFn: () => api<HostelDetail>(`/api/hostel/hostels/${hostelId}`, staff) });
+  const [roomId, setRoomId] = useState<number | ''>('');
+  const [category, setCategory] = useState('ELECTRICAL');
+  const [urgent, setUrgent] = useState(false);
+  const [description, setDescription] = useState('');
+  const save = useMutation({ mutationFn: () => api('/api/hostel/repairs', { ...staff, method: 'POST', body: { hostelId, roomId: roomId || undefined, category, priority: urgent ? 'URGENT' : 'NORMAL', description } }), onSuccess: onDone });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Log a repair</DialogTitle>
+      <DialogContent>
+        <ErrorAlert error={save.error} />
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField select size="small" label="Hostel" value={hostelId} onChange={(e) => { setHostelId(Number(e.target.value)); setRoomId(''); }}>
+            {(hostels.data ?? []).map((h) => <MenuItem key={h.id} value={h.id}>{h.name}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Room (optional)" value={roomId} onChange={(e) => setRoomId(e.target.value === '' ? '' : Number(e.target.value))} disabled={!detail.data}>
+            <MenuItem value="">Common area</MenuItem>
+            {(detail.data?.rooms ?? []).map((r) => <MenuItem key={r.id} value={r.id}>{r.block ? `${r.block} · ` : ''}Room {r.roomNo}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Kind" value={category} onChange={(e) => setCategory(e.target.value)}>
+            {REPAIR_CATEGORIES.map((c) => <MenuItem key={c} value={c}>{title(c)}</MenuItem>)}
+          </TextField>
+          <TextField multiline minRows={2} size="small" label="What is wrong" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <FormControlLabel control={<Switch checked={urgent} onChange={(e) => setUrgent(e.target.checked)} />} label="Urgent (safety, no water or power)" />
+        </Stack>
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={() => save.mutate()} disabled={!hostelId || description.trim().length < 5 || save.isPending}>Save</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function UpdateRepairDialog({ r, onClose, onDone }: { r: HostelRepair; onClose: () => void; onDone: () => void }) {
+  const [status, setStatus] = useState<'IN_PROGRESS' | 'DONE' | 'CANCELLED'>(r.status === 'OPEN' ? 'IN_PROGRESS' : 'DONE');
+  const [note, setNote] = useState('');
+  const save = useMutation({ mutationFn: () => api(`/api/hostel/repairs/${r.id}/status`, { ...staff, method: 'POST', body: { status, note: note || undefined } }), onSuccess: onDone });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{title(r.category)} · {r.hostel}{r.room ? `, ${r.room}` : ''}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ mb: 2 }}>{r.description}</Typography>
+        <ErrorAlert error={save.error} />
+        <Stack spacing={2}>
+          <TextField select size="small" label="Status" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+            <MenuItem value="IN_PROGRESS">Being fixed</MenuItem><MenuItem value="DONE">Fixed</MenuItem><MenuItem value="CANCELLED">Close without fixing</MenuItem>
+          </TextField>
+          <TextField multiline minRows={2} size="small" label={status === 'IN_PROGRESS' ? 'Note (optional)' : 'What was done'} value={note} onChange={(e) => setNote(e.target.value)} />
+        </Stack>
+        {r.studentName && <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>{r.studentName} is told by SMS.</Typography>}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={() => save.mutate()} disabled={(status !== 'IN_PROGRESS' && !note.trim()) || save.isPending}>Save</Button></DialogActions>
     </Dialog>
   );
 }

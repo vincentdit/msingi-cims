@@ -173,6 +173,27 @@ class IptIT {
     record Setup(long semesterId, long iptModuleId, long iptOffering, String a, String b, long cId, String aToken, String bToken) {
     }
 
+    @Test
+    void aDepartmentsCoordinatorPlacesOnlyThatDepartmentsStudents() throws Exception {
+        Setup c = setup();
+        JsonNode prog = s.body(s.call(get("/api/academic/programmes/" + inst.programmeId()), coordinator, null));
+        long dept = prog.get("departmentId").asLong();
+        data.staffScoped(inst.tenant(), "deptcoord", Role.IPT_COORDINATOR, "DEPARTMENT", dept);
+        data.staffScoped(inst.tenant(), "othercoord", Role.IPT_COORDINATOR, "DEPARTMENT", 999_999L);
+        String deptCoord = s.staffToken("deptcoord"), otherCoord = s.staffToken("othercoord");
+        long tcra = s.body(s.call(post("/api/ipt/organisations"), coordinator, "{\"name\":\"TCRA\",\"region\":\"Dar es Salaam\"}")).get("id").asLong();
+        s.call(post("/api/ipt/periods"), deptCoord, period(c, "40", "30", "30")).andExpect(status().isForbidden());
+        long pid = s.body(s.call(post("/api/ipt/periods"), coordinator, period(c, "40", "30", "30")).andExpect(status().isCreated())).get("id").asLong();
+        assertThat(s.body(s.call(get("/api/ipt/periods/" + pid + "/students"), deptCoord, null))).hasSize(3);
+        assertThat(s.body(s.call(get("/api/ipt/periods/" + pid + "/students"), otherCoord, null))).isEmpty();
+        String place = "{\"periodId\":" + pid + ",\"studentId\":" + c.cId + ",\"organisationId\":" + tcra + "}";
+        s.call(post("/api/ipt/placements"), otherCoord, place).andExpect(status().isForbidden());
+        long pl = s.body(s.call(post("/api/ipt/placements"), deptCoord, place).andExpect(status().isOk())).at("/summary/id").asLong();
+        assertThat(s.body(s.call(get("/api/ipt/periods/" + pid + "/placements"), otherCoord, null))).isEmpty();
+        s.call(post("/api/ipt/placements/" + pl + "/cancel"), otherCoord, "{\"reason\":\"Wrong department\"}").andExpect(status().isForbidden());
+        s.call(post("/api/ipt/periods/" + pid + "/transfer"), deptCoord, null).andExpect(status().isForbidden());
+    }
+
     private Setup setup() throws Exception {
         long m1 = module("ITU 04101", "Computing"), ipt = module("ITU 04199", "Industrial Practical Training"), m4 = module("ITU 04201", "Networks");
         long cid = s.body(s.call(post("/api/academic/curricula"), hod, "{\"programmeId\":" + inst.programmeId() + ",\"effectiveYearId\":" + yearId

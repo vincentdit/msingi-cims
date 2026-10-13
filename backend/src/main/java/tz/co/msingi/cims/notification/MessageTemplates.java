@@ -38,7 +38,8 @@ public final class MessageTemplates {
                 Map.entry("date", "23 November 2029"), Map.entry("place", "Kilimanjaro Hostel, A · Room 12, bed B"),
                 Map.entry("window", "Hostel applications 2027/2028"), Map.entry("organisation", "Tanzania Ports Authority"),
                 Map.entry("start", "6 July 2028"), Map.entry("week", "3"), Map.entry("change", "postponed until 1 March 2028"),
-                Map.entry("outcome", "your grade is now B"));
+                Map.entry("outcome", "your grade is now B"), Map.entry("kind", "Waiver"), Map.entry("status", "Fixed"),
+                Map.entry("sponsor", "Higher Education Students' Loans Board"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -142,6 +143,22 @@ public final class MessageTemplates {
                 List.of("module", "outcome", "institution"), Set.of("module", "outcome"),
                 "{institution}: your remark/appeal in {module} has been decided: {outcome}. See the student portal.",
                 "{institution}: ombi lako la kusahihishwa upya/rufaa katika {module} limeamuliwa: {outcome}. Angalia tovuti ya mwanafunzi.", s);
+        add("COMPETENCE_NYC", "Not yet competent", "A verified NVA unit shows a trainee not yet competent in one or more tasks", "Examinations",
+                List.of("module", "institution"), Set.of("module"),
+                "{institution}: you are not yet competent in {module}. You will be re-assessed; see the student portal for the tasks.",
+                "{institution}: bado hujafikia umahiri katika {module}. Utapimwa tena; angalia tovuti ya mwanafunzi kuona kazi husika.", s);
+        add("FIN_ADJUSTMENT_DECIDED", "Waiver or refund decided", "A waiver or refund requested for a student is approved or rejected", "Finance",
+                List.of("kind", "amount", "decision", "institution"), Set.of("kind", "amount", "decision"),
+                "{institution}: your {kind} of {amount} has been {decision}. See the student portal for your statement.",
+                "{institution}: ombi lako la {kind} la {amount}: {decision}. Angalia taarifa ya akaunti kwenye tovuti ya mwanafunzi.", s);
+        add("SPONSOR_ASSIGNED", "Sponsorship recorded", "The bursary records that a sponsor pays part of a student's fees", "Finance",
+                List.of("sponsor", "institution"), Set.of("sponsor"),
+                "{institution}: your fees are now sponsored by {sponsor}. Your statement shows the sponsor's share.",
+                "{institution}: ada yako sasa inadhaminiwa na {sponsor}. Taarifa ya akaunti yako inaonyesha sehemu ya mdhamini.", s);
+        add("HOSTEL_REPAIR_UPDATED", "Hostel repair updated", "The warden updates a repair a student reported", "Hostels",
+                List.of("place", "status", "institution"), Set.of("status"),
+                "{institution}: your repair request for {place} is now: {status}.",
+                "{institution}: ombi lako la matengenezo kwa {place} sasa ni: {status}.", s);
         add("ATTENDANCE_LOW", "Low attendance warning", "A student's attendance in a module falls below the examination threshold", "Teaching",
                 List.of("module", "percent", "threshold", "institution"), Set.of(),
                 "Your attendance in {module} is {percent}. You need at least {threshold} to sit the examination. Please attend all classes.",

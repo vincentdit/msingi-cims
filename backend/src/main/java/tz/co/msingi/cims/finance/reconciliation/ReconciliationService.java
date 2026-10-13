@@ -254,7 +254,8 @@ public class ReconciliationService {
     public MonthView month(YearMonth ym) {
         LocalDate first = ym.atDay(1), last = ym.atEndOfMonth();
         List<Payment> list = payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAtAsc(
-                first.atStartOfDay(ZONE).toOffsetDateTime(), last.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime());
+                first.atStartOfDay(ZONE).toOffsetDateTime(), last.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime()).stream()
+                .filter(p -> p.getSource() == Payment.Source.GEPG).toList();   // only GePG payments appear in GePG's files
         Map<LocalDate, List<Payment>> byDay = list.stream().collect(Collectors.groupingBy(
                 p -> p.getPaidAt().atZoneSameInstant(ZONE).toLocalDate(), TreeMap::new, Collectors.toList()));
         Map<LocalDate, GepgReconciliation> recs = reconciliations.findByReconDateBetweenOrderByReconDateAsc(first, last).stream()
@@ -445,7 +446,8 @@ public class ReconciliationService {
 
     private List<Payment> paymentsOn(LocalDate date) {
         return payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAtAsc(
-                date.atStartOfDay(ZONE).toOffsetDateTime(), date.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime());
+                date.atStartOfDay(ZONE).toOffsetDateTime(), date.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime()).stream()
+                .filter(p -> p.getSource() == Payment.Source.GEPG).toList();
     }
 
     private GepgReconciliation require(Long id) {

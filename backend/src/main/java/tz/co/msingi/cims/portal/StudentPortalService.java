@@ -49,6 +49,7 @@ public class StudentPortalService {
     private final ChangeRequestService changes;
     private final LoginService loginService;
     private final TenantRepository tenants;
+    private final StudentNextSteps nextSteps;
 
     /** Sign-in with registration number, phone or email; only accounts handed over to Registry are students. */
     public TokenService.TokenResponse login(String login, String password) {
@@ -78,11 +79,12 @@ public class StudentPortalService {
                 .map(i -> new NextPayment(i.id(), i.invoiceNo(), i.description(), i.balance(), i.dueDate(), i.controlNo())).orElse(null);
         List<StudentNotice> list = noticesFor(s);
         String fr = firstRegistrations.findByStudentId(s.getId()).map(f -> f.getStatus().name()).orElse(null);
+        List<tz.co.msingi.cims.finance.accounts.AccountDtos.Clearance> gates = Stream.of(ClearanceGate.Gate.REGISTRATION, ClearanceGate.Gate.EXAMINATION).map(g -> accounts.evaluate(s, g)).toList();
         return new Dashboard(tenants.findById(TenantContext.requireTenantId()).map(t -> t.getName()).orElse(""), s.getRegistrationNo(),
                 s.fullName(), s.getFirstName(), s.getProgramme().getName(), s.getProgramme().getAwardName(), s.getYearOfStudy(),
                 s.getEntryAcademicYear().getCode(), s.getStatus().name(), fr, st.billed(), st.paid(), st.balance(), st.credit(), next,
-                Stream.of(ClearanceGate.Gate.REGISTRATION, ClearanceGate.Gate.EXAMINATION).map(g -> accounts.evaluate(s, g)).toList(),
-                list.stream().filter(n -> !n.read()).count(), list.stream().limit(3).toList(), changes.pendingFor(s.getId()));
+                gates, list.stream().filter(n -> !n.read()).count(), list.stream().limit(3).toList(), changes.pendingFor(s.getId()),
+                nextSteps.forStudent(s, st, gates, fr));
     }
 
     /** Invoices, control numbers and payments; the account must belong to a student. */

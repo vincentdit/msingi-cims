@@ -22,8 +22,13 @@ public final class AccountDtos {
                               String pspName, String invoiceNo, String controlNo) {
     }
 
+    /** {@code sponsorPending}: invoiced to sponsors for this student and not yet paid by them; {@code sponsors}: who sponsors the student. */
     public record Statement(String holderName, String registrationNo, BigDecimal billed, BigDecimal paid, BigDecimal balance,
-                            BigDecimal credit, List<InvoiceView> invoices, List<PaymentView> payments) {
+                            BigDecimal credit, List<InvoiceView> invoices, List<PaymentView> payments, BigDecimal sponsorPending,
+                            List<SponsorShare> sponsors) {
+    }
+
+    public record SponsorShare(String sponsor, String academicYear, BigDecimal coveragePercent, BigDecimal capAmount, String reference) {
     }
 
     public record Clearance(String gate, boolean enabled, boolean cleared, String academicYear, BigDecimal invoiceTotal,

@@ -1,3 +1,4 @@
+import StudentCompetenceCard from './StudentCompetenceCard';
 import DownloadIcon from '@mui/icons-material/Download';
 import LockIcon from '@mui/icons-material/LockOutlined';
 import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, Divider, MenuItem, Stack, TextField, Typography } from '@mui/material';
@@ -28,6 +29,7 @@ export default function StudentResultsPage() {
       {!list.length && <Alert severity="info">{t('results.none')}</Alert>}
       <ResitsCard />
       <AppealsCard />
+      <StudentCompetenceCard />
       {list.map((r) => (
         <Card key={r.id} sx={{ borderRadius: 3 }}>
           <CardContent>

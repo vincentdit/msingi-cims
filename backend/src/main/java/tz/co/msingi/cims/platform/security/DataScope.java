@@ -21,7 +21,7 @@ import java.util.function.Function;
  * The part of the institution the signed-in person works in (Document 03: a Head of Department's data scope is the
  * department, a Programme Coordinator's the programme). It comes from their role assignments: anyone holding another
  * office role, or a Head of Department or Coordinator role for the whole institution, sees everything; otherwise they see
- * the programmes of their departments and their own programmes, and the modules taught in them or owned by their
+ * the programmes of their departments and their own programmes (an IPT Coordinator may also be limited to a department), and the modules taught in them or owned by their
  * departments. Lecturers, assessors and clearance officers are limited elsewhere (to their modules or office), so those
  * roles neither widen nor narrow what someone sees.
  */
@@ -29,7 +29,7 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class DataScope {
 
-    private static final Set<Role> NEUTRAL = EnumSet.of(Role.LECTURER, Role.ASSESSOR, Role.CLEARANCE_OFFICER, Role.APPLICANT, Role.STUDENT);
+    private static final Set<Role> NEUTRAL = EnumSet.of(Role.LECTURER, Role.ASSESSOR, Role.CLEARANCE_OFFICER, Role.SPONSOR_OFFICER, Role.APPLICANT, Role.STUDENT);
     private static final String ATTRIBUTE = DataScope.class.getName();
 
     private final UserAccountRepository users;
@@ -121,7 +121,7 @@ public class DataScope {
         boolean scoped = false;
         for (UserAccount.RoleAssignment r : u.getRoles()) {
             if (NEUTRAL.contains(r.getRole())) continue;
-            if (r.getRole() == Role.HEAD_OF_DEPARTMENT && "DEPARTMENT".equals(r.getScopeType()) && r.getScopeId() != null) {
+            if ((r.getRole() == Role.HEAD_OF_DEPARTMENT || r.getRole() == Role.IPT_COORDINATOR) && "DEPARTMENT".equals(r.getScopeType()) && r.getScopeId() != null) {
                 departments.add(r.getScopeId());
                 scoped = true;
             } else if (r.getRole() == Role.PROGRAMME_COORDINATOR && "PROGRAMME".equals(r.getScopeType()) && r.getScopeId() != null) {

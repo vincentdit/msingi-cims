@@ -25,6 +25,9 @@ public class Payment extends TenantScopedEntity {
 
     public enum Status { RECEIVED, ALLOCATED, UNMATCHED, REVERSED }
 
+    /** GEPG: paid through GePG (reconciled); BANK: a bank remittance recorded by the Accountant; INTERNAL: not cash (a sponsor's share moved to a student, a waiver). */
+    public enum Source { GEPG, BANK, INTERNAL }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "invoice_id")
     private Invoice invoice;
@@ -52,6 +55,16 @@ public class Payment extends TenantScopedEntity {
     private Status status = Status.RECEIVED;
 
     private String receiptNo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Source source = Source.GEPG;
+
+    private String recordedByName;
+
+    public boolean isCash() {
+        return source != Source.INTERNAL;
+    }
 
     /** Part of the payment beyond the invoice balance, held as credit (BP-06 exception: overpayment). */
     @Column(nullable = false, precision = 14, scale = 2)

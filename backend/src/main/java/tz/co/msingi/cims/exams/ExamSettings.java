@@ -41,4 +41,8 @@ public class ExamSettings extends BaseEntity {
     /** Students are warned once below the threshold after this many sessions. */
     @Column(nullable = false)
     private short attendanceAlertAfterSessions = 4;
+
+    /** NVA: how many times a task may be assessed (the first attempt and re-assessments). */
+    @Column(nullable = false)
+    private short nvaMaxAttempts = 3;
 }

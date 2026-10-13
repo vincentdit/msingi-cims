@@ -19,6 +19,10 @@ import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import TeachingIcon from '@mui/icons-material/CoPresent';
 import MyTeachingIcon from '@mui/icons-material/LocalLibrary';
+import CompetenceIcon from '@mui/icons-material/Construction';
+import FinanceIcon from '@mui/icons-material/QueryStats';
+import SponsorIcon from '@mui/icons-material/VolunteerActivism';
+import WaiverIcon from '@mui/icons-material/ReceiptLong';
 import EligibleIcon from '@mui/icons-material/VerifiedUser';
 import ClearanceIcon from '@mui/icons-material/TaskAlt';
 import GraduationIcon from '@mui/icons-material/WorkspacePremium';
@@ -70,6 +74,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'curricula', to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
     { page: 'teaching', to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon /> },
     { page: 'marks', to: '/staff/marks', label: 'Marks', icon: <MarksIcon /> },
+    { page: 'competence', to: '/staff/competence', label: 'Competence (NVA)', icon: <CompetenceIcon /> },
   ] },
   { title: 'Examinations', items: [
     { page: 'examsOffice', to: '/staff/exams-office', label: 'Examinations office', icon: <OfficeIcon /> },
@@ -85,7 +90,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'ipt', to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon /> },
   ] },
   { title: 'Finance', items: [
+    { page: 'financeOverview', to: '/staff/finance-overview', label: 'Finance overview', icon: <FinanceIcon /> },
     { page: 'finance', to: '/staff/finance', label: 'Fees', icon: <PaymentsIcon /> },
+    { page: 'sponsors', to: '/staff/sponsors', label: 'Sponsors', icon: <SponsorIcon /> },
+    { page: 'waivers', to: '/staff/waivers', label: 'Waivers & refunds', icon: <WaiverIcon /> },
   ] },
   { title: 'Communication', items: [
     { page: 'notices', to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
@@ -102,8 +110,14 @@ const GROUPS: { title?: string; items: Item[] }[] = [
 export function homeFor(roles: readonly string[] | undefined) {
   // the Examinations Officer starts from the Examinations Office board
   if (roles?.includes('EXAMINATIONS_OFFICER') && !roles.includes('INSTITUTION_ADMIN')) return '/staff/exams-office';
-  // lecturers and assessors start from their own modules
+  // lecturers and assessors start from their own modules; the bursary from the finance overview; a sponsor's officer from their sponsor
   if (roles?.length && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR')) return '/staff/my-teaching';
+  if (roles?.length && roles.every((r) => r === 'BURSAR' || r === 'ACCOUNTANT')) return '/staff/finance-overview';
+  if (roles?.length && roles.every((r) => r === 'SPONSOR_OFFICER')) return '/staff/sponsors';
+  // officers of one service start from that service
+  if (roles?.length && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN' || r === 'IPT_COORDINATOR')) {
+    return roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance';
+  }
   for (const g of GROUPS) for (const i of g.items) if (can(roles, i.page)) return i.to;
   return '/staff/password';
 }

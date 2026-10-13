@@ -195,6 +195,52 @@ public class BillingService {
         return p;
     }
 
+    /**
+     * Posts money that did not come through GePG (BP-17): a bank remittance recorded by the Accountant (cash), or an internal posting
+     * that is not cash, such as a sponsor's share moved onto the student's invoice or an approved waiver. Allocated to the invoice
+     * lines like any payment; anything beyond the balance is held as credit.
+     */
+    @Transactional
+    public Payment postDirect(Invoice inv, BigDecimal amount, Payment.Source source, String channel, String reference, String documentNo,
+                              OffsetDateTime paidAt) {
+        if (source == Payment.Source.GEPG) throw new IllegalArgumentException("GePG payments come through recordPayment");
+        if (amount == null || amount.signum() <= 0) throw new BusinessRuleException("INVALID_AMOUNT", "The amount must be positive");
+        String code = TenantContext.require().code();
+        Payment p = new Payment();
+        p.setInvoice(inv);
+        p.setControlNo(source.name());
+        p.setGepgReceiptNo(source.name() + "-" + NumberSequenceService.format("", sequences.next("DIRECT-PAYMENT"), 8));
+        p.setPspReceiptNo(reference == null ? null : reference.length() > 60 ? reference.substring(0, 60) : reference);
+        p.setPspName(source == Payment.Source.BANK ? "Bank" : null);
+        p.setChannel(channel);
+        p.setAmount(amount);
+        p.setPaidAt(paidAt == null ? OffsetDateTime.now() : paidAt);
+        p.setStatus(Payment.Status.ALLOCATED);
+        p.setSource(source);
+        p.setRecordedByName(tz.co.msingi.cims.platform.security.CurrentUser.id().isPresent() ? tz.co.msingi.cims.platform.security.CurrentUser.name() : "CIMS");
+        p.setReceiptNo(documentNo != null ? documentNo : NumberSequenceService.format(code + "/RCT/" + Year.now().getValue() + "/",
+                sequences.next("RECEIPT-" + Year.now().getValue()), 6));
+        boolean wasPaid = inv.isPaid();
+        PaymentAllocator.Result allocation = inv.applyPayment(amount);
+        p.setUnallocatedAmount(allocation.unallocated());
+        payments.save(p);
+        for (PaymentAllocator.Allocation a : allocation.allocations()) {
+            PaymentAllocation pa = new PaymentAllocation();
+            pa.setPayment(p);
+            pa.setInvoiceLine(a.line());
+            pa.setAmount(a.amount());
+            allocations.save(pa);
+        }
+        audit.record("PAYMENT_POSTED", "Invoice", inv.getId(), Map.of("receiptNo", p.getReceiptNo(), "source", source.name(), "channel", channel,
+                "amount", amount, "credit", allocation.unallocated()));
+        events.publishEvent(new PaymentPostedEvent(inv.getId(), inv.getPayerType().name(), inv.getPayerId(), p.getId()));
+        if (source == Payment.Source.BANK && inv.getPayerPhone() != null) {
+            messaging.event("PAYMENT_RECEIVED", inv.getPayerPhone(), Map.of("amount", amount, "receiptNo", p.getReceiptNo()));
+        }
+        if (!wasPaid && inv.isPaid()) events.publishEvent(new InvoicePaidEvent(inv.getId(), inv.getPurpose(), inv.getReferenceId()));
+        return p;
+    }
+
     @Transactional(readOnly = true)
     public Invoice get(Long invoiceId) {
         return invoices.findById(invoiceId).orElseThrow(() -> new NotFoundException("Invoice", invoiceId));

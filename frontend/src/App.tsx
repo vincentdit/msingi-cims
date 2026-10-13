@@ -17,6 +17,8 @@ import { AmendmentsPage } from './pages/staff/ExamRecordsPages';
 import { AttendancePage, TeachingPage } from './pages/staff/TeachingPages';
 import { CheckInScreenPage, MyTeachingPage } from './pages/staff/MyTeachingPages';
 import CheckInPage from './pages/student/CheckInPage';
+import { CompetencePage, CompetenceUnitPage } from './pages/staff/CompetencePages';
+import { FinanceOverviewPage, SponsorDetailPage, SponsorsPage, WaiversPage } from './pages/staff/FinanceOverviewPages';
 import { EligibilityPage, OfferingEligibilityPage } from './pages/staff/EligibilityPages';
 import { ClearancePage } from './pages/staff/ClearancePages';
 import { GraduationPage, GraduationsPage } from './pages/staff/GraduationPages';
@@ -104,6 +106,8 @@ export default function App() {
         <Route path="teaching/:id" element={<AttendancePage />} />
         <Route path="teaching/check-in/:sessionId" element={<CheckInScreenPage />} />
         <Route path="my-teaching" element={<MyTeachingPage />} />
+        <Route path="competence" element={<CompetencePage />} />
+        <Route path="competence/:id" element={<CompetenceUnitPage />} />
         <Route path="eligibility" element={<EligibilityPage />} />
         <Route path="eligibility/:id" element={<OfferingEligibilityPage />} />
         <Route path="clearance" element={<ClearancePage />} />
@@ -120,6 +124,10 @@ export default function App() {
         <Route path="curricula" element={<CurriculaPage />} />
         <Route path="curricula/:id" element={<CurriculumEditorPage />} />
         <Route path="finance" element={<FinancePage />} />
+        <Route path="finance-overview" element={<FinanceOverviewPage />} />
+        <Route path="sponsors" element={<SponsorsPage />} />
+        <Route path="sponsors/:id" element={<SponsorDetailPage />} />
+        <Route path="waivers" element={<WaiversPage />} />
         <Route path="notices" element={<NoticesPage />} />
         <Route path="messages" element={<MessagingPage />} />
         <Route path="reports" element={<ReportsPage />} />

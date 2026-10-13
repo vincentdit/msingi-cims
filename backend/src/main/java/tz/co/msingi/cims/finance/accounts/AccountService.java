@@ -45,6 +45,7 @@ public class AccountService {
     private final ApplicantProfileService profiles;
     private final ClearanceGateRepository gates;
     private final BillingService billing;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ------------------------------------------------------------------ statements
 
@@ -94,10 +95,17 @@ public class AccountService {
         BigDecimal billed = live.stream().map(Invoice::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal paid = live.stream().map(Invoice::getPaidAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal credit = pays.stream().map(Payment::getUnallocatedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sponsorPending = live.stream().filter(i -> i.getPayerType() == Invoice.PayerType.STUDENT)
+                .map(i -> invoices.sponsorPending(i.getId())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<AccountDtos.SponsorShare> sponsors = studentId == null ? List.of() : jdbc.query("""
+                select s.name, y.code, x.coverage_percent, x.cap_amount, x.reference from sponsorships x join sponsors s on s.id = x.sponsor_id
+                join academic_years y on y.id = x.academic_year_id where x.student_id = ? and x.status = 'ACTIVE' order by y.code desc""",
+                (rs, i) -> new AccountDtos.SponsorShare(rs.getString(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4), rs.getString(5)), studentId);
         return new Statement(name, regNo, billed, paid, billed.subtract(paid), credit,
                 list.stream().map(this::invoiceView).toList(),
                 pays.stream().map(p -> new PaymentView(p.getReceiptNo(), p.getPaidAt(), p.getAmount(), p.getUnallocatedAmount(),
-                        p.getChannel(), p.getPspName(), byId.get(p.getInvoice().getId()).getInvoiceNo(), p.getControlNo())).toList());
+                        p.getChannel(), p.getPspName(), byId.get(p.getInvoice().getId()).getInvoiceNo(), p.getControlNo())).toList(),
+                sponsorPending, sponsors);
     }
 
     private InvoiceView invoiceView(Invoice i) {
@@ -144,8 +152,10 @@ public class AccountService {
         BigDecimal required = inv.getTotalAmount().multiply(g.getMinPercentPaid()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         BigDecimal firstBalance = inv.getLines().stream().filter(l -> l.getInstalment() == 1).map(InvoiceLine::balance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal needed = required.subtract(inv.getPaidAmount()).max(BigDecimal.ZERO);
-        if (g.isFirstInstalmentRequired()) needed = needed.max(firstBalance);
+        // what sponsors have been invoiced for this student and not yet paid counts as paid for clearance (BP-17)
+        BigDecimal sponsor = invoices.sponsorPending(inv.getId());
+        BigDecimal needed = required.subtract(inv.getPaidAmount()).subtract(sponsor).max(BigDecimal.ZERO);
+        if (g.isFirstInstalmentRequired()) needed = needed.max(firstBalance.subtract(sponsor).max(BigDecimal.ZERO));
         boolean cleared = needed.signum() == 0;
         String reason = cleared ? null : "TZS " + tzs(needed) + " still to pay for " + gate.name().toLowerCase()
                 + " clearance (" + describe(g) + ")";

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tz.co.msingi.cims.hostel.HostelDtos.AllocateResult;
 import tz.co.msingi.cims.hostel.HostelDtos.AllocationView;
@@ -48,6 +49,39 @@ public class HostelController {
 
     private final InventoryService inventory;
     private final AllocationService allocation;
+    private final RepairService repairs;
+
+    // ------------------------------------------------------------------ repairs (FR-HST-06)
+
+    @GetMapping("/api/hostel/repairs")
+    @PreAuthorize(VIEWERS)
+    public List<RepairService.RepairView> repairs(@RequestParam(defaultValue = "false") boolean open) {
+        return repairs.list(open);
+    }
+
+    @PostMapping("/api/hostel/repairs")
+    @PreAuthorize(WARDENS)
+    public RepairService.RepairView logRepair(@Valid @RequestBody RepairService.RepairRequest req) {
+        return repairs.log(req);
+    }
+
+    @PostMapping("/api/hostel/repairs/{id}/status")
+    @PreAuthorize(WARDENS)
+    public RepairService.RepairView repairStatus(@PathVariable Long id, @Valid @RequestBody RepairService.StatusRequest req) {
+        return repairs.update(id, req);
+    }
+
+    @GetMapping("/api/student/hostel/repairs")
+    @PreAuthorize("hasRole('STUDENT')")
+    public List<RepairService.RepairView> myRepairs() {
+        return repairs.mine();
+    }
+
+    @PostMapping("/api/student/hostel/repairs")
+    @PreAuthorize("hasRole('STUDENT')")
+    public RepairService.RepairView reportRepair(@Valid @RequestBody RepairService.RepairRequest req) {
+        return repairs.report(req);
+    }
 
     // ------------------------------------------------------------------ inventory
 
@@ -93,6 +127,15 @@ public class HostelController {
     @PreAuthorize(VIEWERS)
     public HostelDetail hostel(@PathVariable Long id) {
         return inventory.hostel(id);
+    }
+
+    @PutMapping("/api/hostel/hostels/{id}/wardens")
+    @PreAuthorize("hasRole('INSTITUTION_ADMIN')")
+    public HostelDetail wardens(@PathVariable Long id, @Valid @RequestBody WardensRequest req) {
+        return inventory.assignWardens(id, req.userIds());
+    }
+
+    public record WardensRequest(@jakarta.validation.constraints.NotNull List<Long> userIds) {
     }
 
     @PostMapping("/api/hostel/rooms")

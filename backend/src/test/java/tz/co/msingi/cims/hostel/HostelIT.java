@@ -181,6 +181,74 @@ class HostelIT {
         assertThat(s.body(s.call(get("/api/reports/HST-02?academicYearId=" + yearId), warden, null)).get("rowCount").asInt()).isEqualTo(4);
     }
 
+    @Test
+    void wardensWorkOnlyWithTheirHostelsAndStudentsReportRepairs() throws Exception {
+        data.staff(inst.tenant(), "admin", Role.INSTITUTION_ADMIN);
+        data.staff(inst.tenant(), "warden2", Role.HOSTEL_WARDEN);
+        String admin = s.staffToken("admin"), warden2 = s.staffToken("warden2");
+        Students st = students();
+        long std = s.body(s.call(post("/api/hostel/fee-categories"), warden, "{\"code\":\"STD\",\"name\":\"Standard\",\"amount\":300000}")).get("id").asLong();
+        long kili = hostel("KILI", "Kilimanjaro", "FEMALE"), sere = hostel("SERE", "Serengeti", "MALE");
+        s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "1", "DOUBLE", null, std, false, "AVAILABLE", 2)).andExpect(status().isCreated());
+        long sereRoom = s.body(s.call(post("/api/hostel/rooms"), warden, room(sere, "", "1", "DOUBLE", null, std, false, "AVAILABLE", 2))).get("id").asLong();
+        long win = s.body(s.call(post("/api/hostel/windows"), warden, "{\"academicYearId\":" + yearId + ",\"name\":\"Hostels 2027/2028\",\"opensOn\":\""
+                + TODAY.minusDays(1) + "\",\"closesOn\":\"" + TODAY.plusDays(10) + "\",\"paymentDays\":7}")).get("id").asLong();
+        // b has not applied yet: the portal says so
+        JsonNode next = s.body(s.call(get("/api/student/dashboard"), st.bToken, null)).get("next");
+        assertThat(next.findValuesAsText("kind")).contains("HOSTEL_APPLY");
+        s.call(post("/api/student/hostel/applications"), st.aToken, apply(win, kili, false)).andExpect(status().isOk());
+        s.call(post("/api/student/hostel/applications"), st.dToken, apply(win, sere, false)).andExpect(status().isOk());
+        s.call(post("/api/hostel/windows/" + win + "/allocate"), warden, null).andExpect(jsonPath("$.allocated").value(2));
+        assertThat(s.body(s.call(get("/api/student/dashboard"), st.aToken, null)).get("next").findValuesAsText("kind")).contains("HOSTEL_PAY");
+
+        // the administrator assigns the second warden to Serengeti
+        long w2 = userId("warden2"), lect = userId("lecturer");
+        s.call(put("/api/hostel/hostels/" + sere + "/wardens"), warden, "{\"userIds\":[" + w2 + "]}").andExpect(status().isForbidden());
+        s.call(put("/api/hostel/hostels/" + sere + "/wardens"), admin, "{\"userIds\":[" + lect + "]}").andExpect(jsonPath("$.code").value("NOT_A_WARDEN"));
+        JsonNode d = s.body(s.call(put("/api/hostel/hostels/" + sere + "/wardens"), admin, "{\"userIds\":[" + w2 + "]}").andExpect(status().isOk()));
+        assertThat(d.get("wardens").findValuesAsText("fullName")).containsExactly("Staff warden2");
+
+        // the assigned warden sees and runs only Serengeti; window-wide work is for wardens of every hostel
+        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden2, null)).findValuesAsText("code")).containsExactly("SERE");
+        s.call(get("/api/hostel/hostels/" + kili), warden2, null).andExpect(status().isForbidden());
+        s.call(post("/api/hostel/rooms"), warden2, room(kili, "B", "1", "SINGLE", null, std, false, "AVAILABLE", 1)).andExpect(status().isForbidden());
+        s.call(post("/api/hostel/windows/" + win + "/allocate"), warden2, null).andExpect(status().isForbidden());
+        s.call(post("/api/hostel/windows"), warden2, "{\"academicYearId\":" + yearId + ",\"name\":\"Again\",\"opensOn\":\"" + TODAY + "\",\"closesOn\":\""
+                + TODAY.plusDays(5) + "\",\"paymentDays\":7}").andExpect(status().isForbidden());
+        JsonNode allocs = s.body(s.call(get("/api/hostel/windows/" + win + "/allocations"), warden2, null));
+        assertThat(allocs.findValuesAsText("registrationNo")).containsExactly(st.d);
+        long aAlloc = s.body(s.call(get("/api/hostel/windows/" + win + "/allocations"), warden, null)).findParents("registrationNo").stream()
+                .filter(x -> x.get("registrationNo").asText().equals(st.a)).findFirst().orElseThrow().get("id").asLong();
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/cancel"), warden2, "{\"reason\":\"Not my hostel at all\"}").andExpect(status().isForbidden());
+        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden, null)).findValuesAsText("code")).containsExactlyInAnyOrder("KILI", "SERE");
+
+        // repairs: a reports one from the portal; b has no room; the Kilimanjaro side handles it, the Serengeti warden does not see it
+        s.call(post("/api/student/hostel/repairs"), st.bToken, "{\"category\":\"ELECTRICAL\",\"description\":\"The light does not work\"}")
+                .andExpect(jsonPath("$.code").value("NO_ROOM"));
+        long rep = s.body(s.call(post("/api/student/hostel/repairs"), st.aToken, "{\"category\":\"ELECTRICAL\",\"priority\":\"URGENT\","
+                + "\"description\":\"The socket by the window sparks\"}").andExpect(status().isOk())).get("id").asLong();
+        assertThat(s.body(s.call(get("/api/hostel/repairs?open=true"), warden2, null))).isEmpty();
+        s.call(post("/api/hostel/repairs/" + rep + "/status"), warden2, "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        JsonNode list = s.body(s.call(get("/api/hostel/repairs?open=true"), warden, null));
+        assertThat(list).hasSize(1);
+        assertThat(list.at("/0/room").asText()).isEqualTo("A · Room 1");
+        assertThat(list.at("/0/canUpdate").asBoolean()).isTrue();
+        s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"IN_PROGRESS\",\"note\":\"Electrician booked\"}").andExpect(status().isOk());
+        s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"DONE\"}").andExpect(jsonPath("$.code").value("NOTE_REQUIRED"));
+        s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"DONE\",\"note\":\"Socket replaced\"}").andExpect(jsonPath("$.status").value("DONE"));
+        assertThat(s.body(s.call(get("/api/student/hostel/repairs"), st.aToken, null)).at("/0/status").asText()).isEqualTo("DONE");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode")
+                .stream().filter("HOSTEL_REPAIR_UPDATED"::equals).count()).isEqualTo(2);
+        // a warden logs one for a room without a student
+        s.call(post("/api/hostel/repairs"), warden2, "{\"hostelId\":" + sere + ",\"roomId\":" + sereRoom + ",\"category\":\"PLUMBING\",\"description\":\"Shower leaks\"}")
+                .andExpect(status().isOk());
+        s.call(post("/api/hostel/repairs"), warden2, "{\"hostelId\":" + kili + ",\"category\":\"PLUMBING\",\"description\":\"Tap leaks\"}").andExpect(status().isForbidden());
+    }
+
+    private long userId(String username) {
+        return TenantContext.callAs(inst.info(), () -> tx.execute(t -> jdbc.queryForObject("select id from user_accounts where username = ?", Long.class, username)));
+    }
+
     // ------------------------------------------------------------------ scenario
 
     record Students(String a, String b, String c, String d, String aToken, String bToken, String cToken, String dToken) {

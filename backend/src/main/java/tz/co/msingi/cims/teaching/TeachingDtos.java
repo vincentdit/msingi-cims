@@ -163,7 +163,8 @@ public final class TeachingDtos {
 
     public record MyTeaching(List<TeachingSemester> semesters, TeachingSemester semester, LocalDate marksEntryOpens, LocalDate marksEntryCloses,
                              String marksWindow, Integer daysToClose, BigDecimal threshold, int students, int sessions, BigDecimal hoursTaught,
-                             List<MyModule> modules, List<AtRisk> atRisk, List<AssignedRemark> remarks, List<Step> next) {
+                             List<MyModule> modules, List<tz.co.msingi.cims.exams.competence.CompetenceDtos.UnitSummary> competence,
+                             List<AtRisk> atRisk, List<AssignedRemark> remarks, List<Step> next) {
     }
 
     // ------------------------------------------------------------------ student portal

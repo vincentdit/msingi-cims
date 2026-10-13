@@ -15,7 +15,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ApprovalsController {
 
-    static final String APPROVERS = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER')";
+    static final String APPROVERS = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','BURSAR','MANAGEMENT_VIEWER')";
 
     private final ApprovalsService service;
 

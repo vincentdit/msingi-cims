@@ -16,7 +16,7 @@ public final class RoleCatalog {
     private RoleCatalog() {
     }
 
-    public enum Scope { INSTITUTION, DEPARTMENT, PROGRAMME }
+    public enum Scope { INSTITUTION, DEPARTMENT, PROGRAMME, SPONSOR }
 
     public record RoleInfo(Role role, String label, String description, List<Scope> scopes) {
     }
@@ -49,9 +49,11 @@ public final class RoleCatalog {
             info(Role.HOSTEL_WARDEN, "Dean of Students / Hostel Warden",
                     "Runs hostels: allocation, check-in and check-out."),
             info(Role.IPT_COORDINATOR, "IPT Coordinator",
-                    "Arranges industrial practical training placements, supervisors and assessment."),
+                    "Arranges industrial practical training placements, supervisors and assessment.", Scope.INSTITUTION, Scope.DEPARTMENT),
             info(Role.CLEARANCE_OFFICER, "Clearance Officer",
                     "Clears or holds students for one clearance office, e.g. the library."),
+            info(Role.SPONSOR_OFFICER, "Sponsor Officer",
+                    "Someone from a sponsor (e.g. HESLB) who sees only that sponsor's students, invoices and statements.", Scope.SPONSOR),
             info(Role.AUDITOR, "Auditor",
                     "Reads records and the audit trail; changes nothing."));
 

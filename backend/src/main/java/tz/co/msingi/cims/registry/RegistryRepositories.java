@@ -18,6 +18,9 @@ public final class RegistryRepositories {
     public interface StudentRepository extends JpaRepository<Student, Long> {
         boolean existsByRegistrationNo(String registrationNo);
 
+        @EntityGraph(attributePaths = {"programme"})
+        Optional<Student> findByRegistrationNoIgnoreCase(String registrationNo);
+
         Optional<Student> findByApplicationId(Long applicationId);
 
         List<Student> findByApplicationIdIn(Collection<Long> applicationIds);

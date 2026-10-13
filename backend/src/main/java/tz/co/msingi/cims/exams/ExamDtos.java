@@ -55,7 +55,7 @@ public final class ExamDtos {
     /** Fields left out (null) keep their current value. */
     public record SettingsView(Boolean useDepartmentBoard, BigDecimal minAttendancePercent, Boolean eligibilityRequiresCa,
                                Boolean eligibilityRequiresClearance, Integer attendanceAlertAfterSessions, Integer appealWindowDays,
-                               BigDecimal appealFee) {
+                               BigDecimal appealFee, Integer nvaMaxAttempts) {
     }
 
     // ------------------------------------------------------------------ offerings, plans and marks (FR-EXM-01/02/03/05)

@@ -56,6 +56,7 @@ public class StaffUserService {
     private final UserAccountRepository users;
     private final DepartmentRepository departments;
     private final ProgrammeRepository programmes;
+    private final tz.co.msingi.cims.finance.sponsors.SponsorRepositories.SponsorRepository sponsors;
     private final PasswordEncoder encoder;
     private final AuditService audit;
     private final SessionGuard guard;
@@ -245,6 +246,9 @@ public class StaffUserService {
             } else if (scope == Scope.PROGRAMME) {
                 scopeId = programmes.findById(req(g)).orElseThrow(() -> new BusinessRuleException("SCOPE_NOT_FOUND",
                         "Choose the programme for " + RoleCatalog.of(g.role()).label() + ".")).getId();
+            } else if (scope == Scope.SPONSOR) {
+                scopeId = sponsors.findById(req(g)).orElseThrow(() -> new BusinessRuleException("SCOPE_NOT_FOUND",
+                        "Choose the sponsor for " + RoleCatalog.of(g.role()).label() + ".")).getId();
             }
             out.add(new RoleAssignment(g.role(), scope.name(), scopeId));
         }
@@ -253,7 +257,8 @@ public class StaffUserService {
 
     private static Long req(RoleGrant g) {
         if (g.scopeId() == null) {
-            throw new BusinessRuleException("SCOPE_NOT_FOUND", "Choose the " + (g.scope() == Scope.DEPARTMENT ? "department" : "programme")
+            throw new BusinessRuleException("SCOPE_NOT_FOUND", "Choose the " + (g.scope() == Scope.DEPARTMENT ? "department"
+                    : g.scope() == Scope.SPONSOR ? "sponsor" : "programme")
                     + " for " + RoleCatalog.of(g.role()).label() + ".");
         }
         return g.scopeId();
@@ -322,14 +327,16 @@ public class StaffUserService {
         return p == null ? null : tz.co.msingi.cims.admission.service.PhoneNumbers.normalise(p);
     }
 
-    private record Names(Map<Long, String> departments, Map<Long, String> programmes) {
+    private record Names(Map<Long, String> departments, Map<Long, String> programmes, Map<Long, String> sponsors) {
     }
 
     private Names names() {
         Map<Long, String> d = new java.util.HashMap<>(), p = new java.util.HashMap<>();
         departments.findAll().forEach(x -> d.put(x.getId(), x.getName()));
         programmes.findAll().forEach(x -> p.put(x.getId(), x.getCode() + " · " + x.getName()));
-        return new Names(d, p);
+        Map<Long, String> sp = new java.util.HashMap<>();
+        sponsors.findAll().forEach(x -> sp.put(x.getId(), x.getName()));
+        return new Names(d, p, sp);
     }
 
     private StaffUserView view(UserAccount u, Names n) {
@@ -338,7 +345,8 @@ public class StaffUserService {
                 .map(r -> {
                     Scope scope = Scope.valueOf(r.getScopeType());
                     String scopeName = scope == Scope.DEPARTMENT ? n.departments().get(r.getScopeId())
-                            : scope == Scope.PROGRAMME ? n.programmes().get(r.getScopeId()) : null;
+                            : scope == Scope.PROGRAMME ? n.programmes().get(r.getScopeId())
+                            : scope == Scope.SPONSOR ? n.sponsors().get(r.getScopeId()) : null;
                     RoleCatalog.RoleInfo info = RoleCatalog.of(r.getRole());
                     return new RoleGrantView(r.getRole(), info == null ? r.getRole().name() : info.label(), scope, r.getScopeId(), scopeName);
                 }).toList();

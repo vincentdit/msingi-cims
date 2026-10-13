@@ -48,7 +48,10 @@ public final class HostelDtos {
                            Long feeCategoryId, String feeCategory, BigDecimal fee, boolean accessible, String status, List<BedView> beds) {
     }
 
-    public record HostelDetail(HostelSummary hostel, List<RoomView> rooms, boolean canEdit) {
+    public record Warden(Long id, String fullName) {
+    }
+
+    public record HostelDetail(HostelSummary hostel, List<RoomView> rooms, boolean canEdit, List<Warden> wardens, boolean canAssignWardens) {
     }
 
     public record BedStatusRequest(@NotNull HostelBed.Status status) {

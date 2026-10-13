@@ -445,6 +445,8 @@ export function RegulationsPage() {
         saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
       {settings.data && <AppealSettingsCard settings={settings.data} editable={can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
         saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
+      {settings.data && <NvaSettingsCard settings={settings.data} editable={can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
+        saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
       {list.isLoading && <Loading />}
       <Grid container spacing={2}>
         {list.data?.map((r) => (
@@ -588,6 +590,27 @@ function AppealSettingsCard({ settings, editable, saving, onSave }: {
           <TextField size="small" type="number" label="Fee per module (TZS)" value={fee} onChange={(e) => setFee(e.target.value)} disabled={!editable}
             sx={{ width: { md: 210 } }} slotProps={{ htmlInput: { min: 0, step: 1000 } }} />
           {editable && <Button variant="outlined" disabled={!valid || !changed || saving} onClick={() => onSave({ appealWindowDays: d, appealFee: f })}>Save</Button>}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NvaSettingsCard({ settings, editable, saving, onSave }: {
+  settings: ExamSettings; editable: boolean; saving: boolean; onSave: (v: Partial<ExamSettings>) => void;
+}) {
+  const [n, setN] = useState(String(settings.nvaMaxAttempts ?? 3));
+  const v = Number(n);
+  const valid = Number.isInteger(v) && v >= 1 && v <= 6;
+  return (
+    <Card sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>NVA competence assessment</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>How many times a trainee may be assessed on a task: the first attempt and the re-assessments of tasks not yet competent.</Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+          <TextField size="small" type="number" label="Attempts per task" value={n} onChange={(e) => setN(e.target.value)} disabled={!editable}
+            sx={{ width: { md: 190 } }} slotProps={{ htmlInput: { min: 1, max: 6 } }} />
+          {editable && <Button variant="outlined" disabled={!valid || v === settings.nvaMaxAttempts || saving} onClick={() => onSave({ nvaMaxAttempts: v })}>Save</Button>}
         </Stack>
       </CardContent>
     </Card>

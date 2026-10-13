@@ -47,17 +47,19 @@ public class MyTeachingService {
     private final OfferingService offerings;
     private final AttendanceService attendance;
     private final RegulationService regulations;
+    private final tz.co.msingi.cims.exams.competence.CompetenceService competenceUnits;
 
     @Transactional(readOnly = true)
     public MyTeaching board(Long semesterId) {
         Long me = CurrentUser.requireId();
         BigDecimal threshold = regulations.settings().getMinAttendancePercent();
         List<TeachingSemester> semesters = jdbc.query("""
-                select distinct s.id, s.name, y.code, s.start_date, s.end_date from offering_staff st
-                join module_offerings o on o.id = st.offering_id join semesters s on s.id = o.semester_id
-                join academic_years y on y.id = s.academic_year_id where st.user_id = ? order by s.start_date desc""",
+                select distinct s.id, s.name, y.code, s.start_date, s.end_date from semesters s join academic_years y on y.id = s.academic_year_id
+                where s.id in (select o.semester_id from offering_staff st join module_offerings o on o.id = st.offering_id where st.user_id = ?)
+                   or s.id in (select u.semester_id from competence_unit_assessors a join competence_units u on u.id = a.unit_id where a.user_id = ?)
+                order by s.start_date desc""",
                 (r, i) -> new TeachingSemester(r.getLong("id"), r.getString("name"), r.getString("code"), r.getObject("start_date", LocalDate.class),
-                        r.getObject("end_date", LocalDate.class)), me);
+                        r.getObject("end_date", LocalDate.class)), me, me);
         List<AssignedRemark> remarks = jdbc.query("""
                 select a.id, m.code, m.title, a.kind, a.assigned_at from result_appeals a join module_offerings o on o.id = a.offering_id
                 join modules m on m.id = o.module_id where a.examiner_user_id = ? and a.status = 'ASSIGNED' order by a.assigned_at""",
@@ -66,7 +68,7 @@ public class MyTeachingService {
         if (semesters.isEmpty()) {
             List<Step> next = new ArrayList<>(remarkSteps(remarks));
             next.add(new Step("info", "No modules are allocated to you yet. Your Head of Department allocates modules each semester.", null));
-            return new MyTeaching(List.of(), null, null, null, "NOT_SET", null, threshold, 0, 0, BigDecimal.ZERO, List.of(), List.of(), remarks, next);
+            return new MyTeaching(List.of(), null, null, null, "NOT_SET", null, threshold, 0, 0, BigDecimal.ZERO, List.of(), List.of(), List.of(), remarks, next);
         }
         LocalDate today = LocalDate.now(AttendanceService.ZONE);
         TeachingSemester sem = semesterId != null
@@ -116,10 +118,25 @@ public class MyTeachingService {
         atRisk.sort(Comparator.comparing(AtRisk::percent, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(AtRisk::registrationNo));
 
         int minutes = modules.stream().mapToInt(MyModule::minutesTaught).sum();
+        var competence = competenceUnits.mine(sem.id());
+        List<Step> next = next(sem, today, window, closes, daysToClose, modules, remarks);
+        List<Step> unitSteps = new ArrayList<>();
+        for (var u : competence) {
+            String link = "/staff/competence/" + u.id();
+            if ("DRAFT".equals(u.status()) && u.returnedNote() != null) unitSteps.add(new Step("error", u.code() + " was returned by the Head of Department: " + u.returnedNote(), link));
+            if ("DRAFT".equals(u.status()) && u.incomplete() > 0) {
+                unitSteps.add(new Step("warning", "Record competence outcomes for " + u.incomplete() + " trainee(s) in " + u.code() + ".", link));
+            } else if ("DRAFT".equals(u.status()) && u.students() > 0) {
+                unitSteps.add(new Step("info", "Every trainee in " + u.code() + " is assessed: submit it to the Head of Department.", link));
+            }
+        }
+        if (!unitSteps.isEmpty()) {
+            next.removeIf(x -> "success".equals(x.severity()));
+            next.addAll(0, unitSteps);
+        }
         return new MyTeaching(semesters, sem, opens, closes, window, daysToClose, threshold, modules.stream().mapToInt(MyModule::students).sum(),
                 modules.stream().mapToInt(MyModule::sessions).sum(), BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 1, RoundingMode.HALF_UP),
-                modules, atRisk.size() > 20 ? atRisk.subList(0, 20) : atRisk, remarks,
-                next(sem, today, window, closes, daysToClose, modules, remarks));
+                modules, competence, atRisk.size() > 20 ? atRisk.subList(0, 20) : atRisk, remarks, next);
     }
 
     private static List<Step> next(TeachingSemester sem, LocalDate today, String window, LocalDate closes, Integer daysToClose,

@@ -121,18 +121,24 @@ public class RegulationService {
             if (req.appealFee().signum() < 0) throw new BusinessRuleException("INVALID_SETTING", "The appeal fee cannot be negative");
             s.setAppealFee(req.appealFee().setScale(2, java.math.RoundingMode.HALF_UP));
         }
+        if (req.nvaMaxAttempts() != null) {
+            if (req.nvaMaxAttempts() < 1 || req.nvaMaxAttempts() > 6) {
+                throw new BusinessRuleException("INVALID_SETTING", "NVA tasks may be assessed between 1 and 6 times");
+            }
+            s.setNvaMaxAttempts(req.nvaMaxAttempts().shortValue());
+        }
         settings.save(s);
         SettingsView out = settingsView(s);
         audit.record("EXAM_SETTINGS_UPDATED", "ExamSettings", s.getId(), Map.of("useDepartmentBoard", out.useDepartmentBoard(),
                 "minAttendancePercent", out.minAttendancePercent(), "eligibilityRequiresCa", out.eligibilityRequiresCa(),
                 "eligibilityRequiresClearance", out.eligibilityRequiresClearance(), "attendanceAlertAfterSessions", out.attendanceAlertAfterSessions(),
-                "appealWindowDays", out.appealWindowDays(), "appealFee", out.appealFee()));
+                "appealWindowDays", out.appealWindowDays(), "appealFee", out.appealFee(), "nvaMaxAttempts", out.nvaMaxAttempts()));
         return out;
     }
 
     public static SettingsView settingsView(ExamSettings s) {
         return new SettingsView(s.isUseDepartmentBoard(), s.getMinAttendancePercent(), s.isEligibilityRequiresCa(), s.isEligibilityRequiresClearance(),
-                (int) s.getAttendanceAlertAfterSessions(), (int) s.getAppealWindowDays(), s.getAppealFee());
+                (int) s.getAttendanceAlertAfterSessions(), (int) s.getAppealWindowDays(), s.getAppealFee(), (int) s.getNvaMaxAttempts());
     }
 
     boolean inUse(RegulationSet rs) {

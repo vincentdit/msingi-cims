@@ -83,6 +83,7 @@ public class AllocationService {
     private final AccountService accounts;
     private final InventoryService inventory;
     private final ExamAccess access;
+    private final HostelScope scope;
     private final Messaging messaging;
     private final AuditService audit;
 
@@ -97,6 +98,7 @@ public class AllocationService {
     @Transactional
     public WindowView saveWindow(Long id, WindowRequest req) {
         access.require("manage hostel windows", InventoryService.WARDENS);
+        scope.requireAll("open hostel application windows");
         if (req.closesOn().isBefore(req.opensOn())) throw new BusinessRuleException("INVALID_DATES", "The window must close after it opens");
         AcademicYear y = years.findById(req.academicYearId()).orElseThrow(() -> new NotFoundException("Academic year", req.academicYearId()));
         HostelWindow w = id == null ? new HostelWindow() : windows.findById(id).orElseThrow(() -> new NotFoundException("Hostel window", id));
@@ -206,6 +208,7 @@ public class AllocationService {
     @Transactional
     public AllocateResult allocate(Long windowId) {
         access.require("allocate hostel beds", InventoryService.WARDENS);
+        scope.requireAll("run automatic allocation");
         HostelWindow w = windows.findById(windowId).orElseThrow(() -> new NotFoundException("Hostel window", windowId));
         return runAllocation(w, "AUTO");
     }
@@ -252,6 +255,7 @@ public class AllocationService {
         Student s = students.findById(a.getStudentId()).orElseThrow();
         Set<Long> busy = inventory.activeByBed().keySet();
         return beds.findAllWithRooms().stream().filter(InventoryService::usable).filter(b -> !busy.contains(b.getId()))
+                .filter(b -> scope.covers(b.getRoom().getHostel().getId()))
                 .filter(b -> b.getRoom().getGender().name().equals(gender(s)))
                 .sorted(Comparator.comparing((HostelBed b) -> preferenceRank(a, b.getRoom().getHostel().getId())).thenComparing(b -> b.getRoom().getHostel().getName())
                         .thenComparing(b -> b.getRoom().getRoomNo()).thenComparing(HostelBed::getLabel))
@@ -269,6 +273,7 @@ public class AllocationService {
         }
         Student s = students.findById(a.getStudentId()).orElseThrow();
         HostelBed b = beds.findById(bedId).orElseThrow(() -> new NotFoundException("Bed", bedId));
+        scope.require(b.getRoom().getHostel().getId());
         if (!b.getRoom().getGender().name().equals(gender(s))) {
             throw new BusinessRuleException("GENDER_MISMATCH", b.getRoom().label() + " is designated for " + b.getRoom().getGender().name().toLowerCase() + " students");
         }
@@ -316,7 +321,10 @@ public class AllocationService {
     /** Releases allocations still unpaid after their payment date, then offers the freed beds to the waiting lists of open windows. */
     @Transactional
     public ReleaseResult releaseUnpaid() {
-        if (CurrentUser.id().isPresent()) access.require("release unpaid hostel allocations", InventoryService.WARDENS);
+        if (CurrentUser.id().isPresent()) {
+            access.require("release unpaid hostel allocations", InventoryService.WARDENS);
+            scope.requireAll("release unpaid allocations");
+        }
         LocalDate today = LocalDate.now(ZONE);
         int released = 0;
         Set<Long> windowIds = new LinkedHashSet<>();
@@ -341,6 +349,7 @@ public class AllocationService {
     public AllocationView cancel(Long allocationId, String reason) {
         access.require("cancel hostel allocations", InventoryService.WARDENS);
         HostelAllocation al = require(allocationId);
+        scope.require(al.getBed().getRoom().getHostel().getId());
         if (al.getStatus() != HostelAllocation.Status.ALLOCATED) {
             throw new BusinessRuleException("NOT_CANCELLABLE", "Only allocations not yet checked in can be cancelled; check the student out instead");
         }
@@ -374,6 +383,7 @@ public class AllocationService {
     public AllocationView checkIn(Long allocationId, String condition) {
         access.require("check students in", InventoryService.WARDENS);
         HostelAllocation al = require(allocationId);
+        scope.require(al.getBed().getRoom().getHostel().getId());
         if (al.getStatus() != HostelAllocation.Status.ALLOCATED) throw new BusinessRuleException("NOT_ALLOCATED", "This allocation is not waiting for check-in");
         Invoice inv = al.getInvoiceId() == null ? null : invoices.findById(al.getInvoiceId()).orElse(null);
         if (inv != null && inv.getStatus() != Invoice.Status.PAID) {
@@ -392,6 +402,7 @@ public class AllocationService {
     public AllocationView checkOut(Long allocationId, CheckOutRequest req) {
         access.require("check students out", InventoryService.WARDENS);
         HostelAllocation al = require(allocationId);
+        scope.require(al.getBed().getRoom().getHostel().getId());
         if (al.getStatus() != HostelAllocation.Status.CHECKED_IN) throw new BusinessRuleException("NOT_CHECKED_IN", "The student has not checked in");
         BigDecimal charge = req.damageCharge() == null ? BigDecimal.ZERO : req.damageCharge();
         String damages = req.damages() == null || req.damages().isBlank() ? null : req.damages().trim();
@@ -419,7 +430,7 @@ public class AllocationService {
     @Transactional(readOnly = true)
     public List<AllocationView> allocationsOf(Long windowId) {
         access.require("see hostel allocations", InventoryService.VIEWERS);
-        List<HostelAllocation> list = allocations.findByWindow(windowId);
+        List<HostelAllocation> list = allocations.findByWindow(windowId).stream().filter(a -> scope.covers(a.getBed().getRoom().getHostel().getId())).toList();
         Map<Long, Student> ss = students.findAllById(list.stream().map(HostelAllocation::getStudentId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Student::getId, Function.identity()));
         return list.stream().sorted(Comparator.comparing(HostelAllocation::getAllocatedAt).reversed()).map(a -> allocationView(a, ss.get(a.getStudentId()))).toList();

@@ -52,9 +52,10 @@ export function MyTeachingPage() {
       {q.isLoading && <Loading />}
       {b && (
         <>
-          {b.modules.length > 0 && (
+          {(b.modules.length > 0 || b.competence.length > 0) && (
             <Grid container spacing={2} sx={{ mb: 2.5 }}>
-              <Kpi label="Modules" value={String(b.modules.length)} hint={`${b.students} student places`} />
+              <Kpi label="Modules" value={String(b.modules.length + b.competence.length)}
+                hint={`${b.students + b.competence.reduce((n, u) => n + u.students, 0)} student places`} />
               <Kpi label="Sessions recorded" value={String(b.sessions)} hint={`${Number(b.hoursTaught).toLocaleString('en-GB')} hours taught`} />
               <Kpi label="Below the threshold" value={String(b.atRisk.length)} hint={`Attendance under ${pct(b.threshold)}`} tone={b.atRisk.length ? 'warning.main' : undefined} />
               <Kpi label="Marks entry" value={WINDOW_LABEL[b.marksWindow]} tone={b.marksWindow === 'CLOSED' ? 'error.main' : closing ? 'warning.main' : undefined}
@@ -124,7 +125,36 @@ export function MyTeachingPage() {
             <Grid size={{ xs: 12, lg: 8 }}>
               <Grid container spacing={2}>
                 {b.modules.map((m) => <Grid key={m.offeringId} size={{ xs: 12, md: 6 }}><ModuleCard m={m} onCheckIn={() => setCheckIn(m)} /></Grid>)}
-                {!b.modules.length && (
+                {b.competence.map((u) => (
+                  <Grid key={`c${u.id}`} size={{ xs: 12, md: 6 }}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{u.code}</Typography>
+                            <Typography variant="body2" color="text.secondary" noWrap title={u.title}>{u.title}</Typography>
+                          </Box>
+                          <Chip size="small" label={{ DRAFT: 'With you', SUBMITTED: 'With Head of Department', VERIFIED: 'Verified' }[u.status]}
+                            color={u.status === 'VERIFIED' ? 'success' : u.status === 'SUBMITTED' ? 'info' : 'default'} variant={u.status === 'DRAFT' ? 'outlined' : 'filled'} />
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>Competence unit (NVA) · {u.students} trainees · {u.tasks} tasks</Typography>
+                        {u.returnedNote && u.status === 'DRAFT' && <Alert severity="error" sx={{ mt: 1.5, py: 0 }}>Returned: {u.returnedNote}</Alert>}
+                        <Box sx={{ mt: 1.5 }}>
+                          <Progress label="Trainees fully assessed" value={u.students ? ((u.students - u.incomplete) / u.students) * 100 : null}
+                            hint={`${u.students - u.incomplete} of ${u.students}`} />
+                        </Box>
+                        <Stack direction="row" spacing={0.75} sx={{ mt: 1.25 }}>
+                          <Chip size="small" color="success" label={`Competent ${u.competent}`} />
+                          {u.notYetCompetent > 0 && <Chip size="small" color="error" variant="outlined" label={`Not yet ${u.notYetCompetent}`} />}
+                        </Stack>
+                      </CardContent>
+                      <CardActions sx={{ px: 2, pb: 1.5 }}>
+                        <Button size="small" variant="contained" component={RouterLink} to={`/staff/competence/${u.id}`}>Assess</Button>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                ))}
+                {!b.modules.length && !b.competence.length && (
                   <Grid size={12}><Card><CardContent><Typography color="text.secondary">No modules are allocated to you for this semester.</Typography></CardContent></Card></Grid>
                 )}
               </Grid>

@@ -60,11 +60,19 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - Accepts or declines an offer.
 - **Next:** none planned.
 
-### 2. Student (student portal): Working
+### 2. Student (student portal): Done
 
-- **Sees:** their profile, fees, semester registration, results, notices, clearance, hostel and IPT.
-- **Does:** registers for the semester, requests detail changes, applies for a hostel and IPT, and downloads statements.
-- **Next:** review against the student journey after the staff roles.
+- **Sees:** their profile, fees, semester registration, results, notices, clearance, hostel, IPT, attendance and self check-in, and NVA competence outcomes.
+- **Does:** registers for the semester, requests detail changes, pays with GePG control numbers, applies for a hostel and IPT, reports hostel repairs, registers for supplementary examinations, asks for remarks and appeals, and downloads statements.
+- **What to do next (FR-STU-01 to 04):** the home page lists the student's next steps across the whole journey, in English and Swahili, each linking to its page:
+  - first registration not yet approved; semester registration open (with the last day) or waiting for approval;
+  - the most urgent unpaid invoice with its control number (or a prompt to get one), marked overdue after its due date; the amount still needed for examination clearance; the share still due from a sponsor;
+  - attendance below the examination threshold, by module; supplementary examinations open to register; NVA tasks not yet competent after verification;
+  - a hostel window open to apply, or a bed to pay for before it is released; an IPT period taking requests;
+  - clearance offices holding the student, with their reason;
+  - "all done" when nothing is outstanding.
+- **Sponsors:** the fees page says which sponsor pays what share (and any cap) and how much is still due from the sponsor. That amount counts towards the student's clearance until the sponsor pays.
+- **Next:** none planned.
 
 ### 3. Institution Administrator: Done in this slice
 
@@ -184,11 +192,16 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - **Closing:** by the lecturer, or on time by a job that runs every minute. Everyone in the class who did not check in is marked absent, low-attendance SMS warnings go out, and the lecturer can correct the register (a corrected line no longer counts as a self check-in).
 - **Next:** limiting check-in to the classroom (campus Wi-Fi or location) if institutions ask for it.
 
-### 11. Assessor (NVA): Working
+### 11. Assessor (NVA): Done
 
-- **Sees:** teaching, marks and IPT.
-- **Does:** records competence assessments for allocated NVA units.
-- **Next:** check the NVA competence workflow end to end.
+- **Sees:** **My teaching** (where they land) with a card per competence unit allocated to them, **Competence (NVA)**, teaching and attendance, marks and IPT.
+- **Competence units (BP-09, FR-EXM-09):**
+  - **Setup:** the Examinations Officer sets up units for a semester: every module marked COMPETENCE, or every module of a programme that is mostly NVA. Each unit starts with a practical and a theory task; the office edits the tasks (evidence required, optional tasks) and allocates assessors.
+  - **Recording:** the assessor records each trainee's outcome per task (competent or not yet competent), with optional practical and theory percentages, an evidence reference and a comment. Before verification an outcome is corrected in place; afterwards, or when ticked as a re-assessment, a not-yet-competent task gets a new attempt, up to the maximum set on Exam regulations (default 3). A competent task cannot be re-assessed.
+  - **Submitting:** refused while a required task has no outcome. The Head of Department verifies (or returns with a comment) from Approvals; verification locks the attempts and sends SMS to trainees not yet competent. The Examinations Office can reopen a unit.
+  - **Award lists:** per class, trainees competent in every unit are eligible; the office confirms the list and downloads it as Excel for NACTVET.
+- **Student:** the results page shows each unit's outcome per task and attempt.
+- **Next:** NACTVET's official NVA award template (when published).
 
 ### 12. Examinations Officer: Done
 
@@ -215,34 +228,50 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - **Record:** every step is in the audit trail.
 - **Next:** NACTVET's official results template and API (when NACTVET publishes them), examination analytics across years (FR-EXM-14), and registering carried-over modules.
 
-### 13. Bursar / Finance Manager: Working
+### 13. Bursar / Finance Manager: Done
 
-- **Sees:** dashboard, reports, fees, hostels (read), notices and messages.
-- **Does:** sets fee structures, approves waivers and refunds, signs off reconciliation and buys SMS bundles.
-- **Next:** a finance dashboard (collections against targets, debtors by programme).
-
-### 14. Accountant / Finance Officer: Working
-
-- **Sees:** dashboard, reports, fees, hostels (read) and notices.
-- **Does:** issues invoices, records payments and sponsors and works payment exceptions.
+- **Sees:** **Finance overview** (where they land), approvals, reports, fees, sponsors, waivers and refunds, hostels (read), notices and messages.
+- **Finance overview (per academic year):**
+  - **Totals:** annual fees billed, paid %, still owed (with the share due from sponsors), waived, and money received this month and today.
+  - **Collections against targets:** the Bursar sets targets (for example 50% by October, 80% by December, 100% by March; they cannot go down), and the overview says whether collections are on track and what the next target needs.
+  - **Annual fees by class**, **debtors by age**, the **largest debtors**, **money received over 12 months** and **by purpose**. Money received counts GePG payments and bank remittances only; sponsors' shares moved onto students and waivers are not money received.
+  - **Work in the bursary** and **Next:** reconciliation exceptions, waivers and refunds waiting, refunds to pay out, unpaid sponsor invoices, sponsors' shares not yet invoiced, failed control numbers, and when reconciliation was last signed off.
+  - **Postings:** a CSV of every posting in a date range for the accounting system.
+- **Waivers and refunds (FR-FIN-10, BP-17):**
+  - Requested by the bursary with a reason and evidence. A waiver cannot exceed the invoice balance; a refund cannot exceed the student's credit.
+  - **Approval:** the Bursar approves; above the threshold (default TZS 500,000, set by the Bursar) the Principal approves as well. Nobody approves their own request or both levels. Both appear in Approvals.
+  - **On approval:** a waiver is posted as a credit note (CN number) that reduces the invoice; a refund uses the student's credit and gets a refund voucher (RFV number), marked paid when paid out. The student is told by SMS; rejection needs a note.
 - **Next:** none planned.
 
-### 15. Dean of Students / Hostel Warden: Working
+### 14. Accountant / Finance Officer: Done
 
-- **Sees:** reports, clearance, hostels and notices.
-- **Does:** runs hostel allocation, check-in and check-out, clears students for the hostel and posts notices.
-- **Next:** limit to assigned hostels (SRS scope).
+- **Sees:** **Finance overview** (where they land), reports, fees, sponsors, waivers and refunds, hostels (read) and notices.
+- **Does:** issues invoices, records payments, works reconciliation exceptions, requests waivers and refunds, and runs sponsors.
+- **Sponsors (FR-FIN-08/09):**
+  - Sponsors (loans board, government, NGO, company...) with a contact; sponsorships per student and academic year: a percentage of all fees or chosen fee items, optionally capped, with the sponsor's reference. A CSV list from the sponsor can be imported by registration number.
+  - **Invoicing the sponsor:** one invoice with a line per student, never more than the student still owes; students with nothing left to pay are skipped with the reason.
+  - **Payment:** by GePG control number or a bank remittance (duplicate references refused). As the sponsor pays, each student's share moves onto that student's invoice. Until then the share invoiced to the sponsor counts towards the student's clearance.
+  - **Statement:** an Excel statement per sponsor and year.
+- **Next:** none planned.
 
-### 16. IPT Coordinator: Working
+### 15. Dean of Students / Hostel Warden: Done
 
-- **Sees:** reports and industrial training.
+- **Sees:** hostels (where they land), clearance, reports and notices.
+- **Assigned hostels (SRS scope):** the administrator assigns wardens to hostels from the hostel's page. A warden then sees and works only their hostels: allocations, free beds, manual allocation, cancelling, check-in and check-out. Windows, auto-allocation and releasing unpaid beds need a warden with no assignment (all hostels), such as the Dean of Students.
+- **Repairs:** wardens log repairs (category, urgency, room or common area) and students report them from the portal; the warden moves them through open, in progress, done or not fixed with a note, and the student who reported it is told by SMS.
+- **Next:** none planned.
+
+### 16. IPT Coordinator: Done
+
+- **Sees:** industrial training (where they land) and reports.
+- **Department scope:** a coordinator can be limited to a department (set on Users & roles). They then place, update, decide and cancel only that department's students. Periods and transfers between periods need a coordinator for the whole institution.
 - **Does:** manages placements, supervisors, letters, logbooks and assessment.
 - **Next:** none planned.
 
-### 17. Clearance Officer: Working
+### 17. Clearance Officer: Done
 
-- **Sees:** clearance for their office.
-- **Does:** clears or holds students.
+- **Sees:** clearance for their office only (where they land).
+- **Does:** clears or holds finalists with a reason; the student sees which office holds them and why on their home page.
 - **Next:** none planned.
 
 ### 18. Auditor: Done
@@ -332,11 +361,12 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - Created at start-up when none exists, from `CIMS_PLATFORM_BOOTSTRAP_USERNAME` (default `msingi`) and `CIMS_PLATFORM_BOOTSTRAP_PASSWORD`. That person must choose their own password at first sign-in.
   - **Development:** `msingi` / `Msingi@2026`.
 
-### 20. Sponsor Officer (optional in the SRS): Not started
+### 20. Sponsor Officer (optional in the SRS): Done
 
-- **Should see:** statements for the students they sponsor.
+- **Account:** created on Users & roles with the Sponsor Officer role and the sponsor it belongs to.
+- **Sees:** only their sponsor (they land on its page): the sponsored students with each share, what was invoiced, paid and outstanding, the sponsor's invoices and control numbers, and the Excel statement. They can get a GePG control number for an invoice, but cannot change sponsorships or record payments.
+- **Next:** none planned.
 
 ## Suggested order for the next slices
 
-1. The roles still marked Working, in this order: Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
-2. Sponsor Officer (optional in the SRS).
+Every role is now Done. Next: a review across roles (permissions matrix, mobile layouts, Swahili wording), then the integrations waiting on NACTVET (results template and API, NVA award template).

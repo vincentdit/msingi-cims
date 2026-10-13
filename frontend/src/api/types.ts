@@ -671,6 +671,8 @@ export interface Statement {
   paid: number;
   balance: number;
   credit: number;
+  sponsorPending?: number;
+  sponsors?: { sponsor: string; academicYear: string; coveragePercent: number; capAmount?: number; reference?: string }[];
   invoices: AccountInvoice[];
   payments: AccountPayment[];
 }
@@ -756,6 +758,7 @@ export interface StudentDashboard {
   billed: number; paid: number; balance: number; credit: number;
   nextPayment?: { invoiceId: number; invoiceNo: string; description: string; balance: number; dueDate?: string; controlNo?: string };
   clearance: Clearance[]; unreadNotices: number; latestNotices: StudentNotice[]; pendingRequest?: ChangeRequest;
+  next: { kind: string; severity: 'success' | 'info' | 'warning' | 'error'; values: Record<string, string>; link?: string }[];
 }
 
 export interface StudentProfile {
@@ -1457,6 +1460,7 @@ export interface ExamSettings {
   eligibilityRequiresClearance: boolean;
   attendanceAlertAfterSessions: number;
   appealWindowDays: number;
+  nvaMaxAttempts: number;
   appealFee: number;
 }
 
@@ -1527,6 +1531,8 @@ export interface MyTeaching {
   semester?: { id: number; name: string; academicYear: string; startDate?: string; endDate?: string };
   marksEntryOpens?: string; marksEntryCloses?: string; marksWindow: 'NOT_SET' | 'UPCOMING' | 'OPEN' | 'CLOSED'; daysToClose?: number;
   threshold: number; students: number; sessions: number; hoursTaught: number; modules: MyModule[];
+  competence: { id: number; code: string; title: string; status: 'DRAFT' | 'SUBMITTED' | 'VERIFIED'; students: number; tasks: number; competent: number;
+    notYetCompetent: number; incomplete: number; returnedNote?: string }[];
   atRisk: { offeringId: number; moduleCode: string; studentId: number; registrationNo: string; name: string; percent?: number; attended: number; counted: number; warned: boolean }[];
   remarks: { id: number; moduleCode: string; moduleTitle: string; kind: 'REMARK' | 'APPEAL'; assignedAt: string }[];
   next: { severity: 'success' | 'info' | 'warning' | 'error'; text: string; link?: string }[];
@@ -1943,7 +1949,13 @@ export interface HostelRoomView {
   feeCategoryId: number; feeCategory: string; fee: number; accessible: boolean; status: 'AVAILABLE' | 'MAINTENANCE' | 'CLOSED'; beds: HostelBedView[];
 }
 
-export interface HostelDetail { hostel: HostelSummary; rooms: HostelRoomView[]; canEdit: boolean }
+export interface HostelDetail { hostel: HostelSummary; rooms: HostelRoomView[]; canEdit: boolean; wardens: { id: number; fullName: string }[]; canAssignWardens: boolean }
+
+export interface HostelRepair {
+  id: number; repairNo: string; hostelId: number; hostel?: string; room?: string; category: string; priority: 'NORMAL' | 'URGENT'; description: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'; reportedByName: string; reportedAt: string; studentName?: string; registrationNo?: string; note?: string;
+  updatedByName?: string; resolvedAt?: string; canUpdate: boolean;
+}
 
 export interface HostelWindow {
   id: number; academicYearId: number; academicYear: string; name: string; opensOn: string; closesOn: string; occupancyStarts?: string;
@@ -2020,7 +2032,7 @@ export interface MyIpt {
   periods: IptPeriod[]; organisations: { id: number; name: string; region?: string }[]; placement?: IptPlacementView | null; history: IptPlacementSummary[];
 }
 
-export type RoleScope = 'INSTITUTION' | 'DEPARTMENT' | 'PROGRAMME';
+export type RoleScope = 'INSTITUTION' | 'DEPARTMENT' | 'PROGRAMME' | 'SPONSOR';
 export interface RoleInfo { role: string; label: string; description: string; scopes: RoleScope[] }
 export interface RoleGrant { role: string; label?: string; scope: RoleScope; scopeId?: number | null; scopeName?: string }
 export interface StaffUser {

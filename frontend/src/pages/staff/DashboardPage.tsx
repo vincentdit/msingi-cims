@@ -22,16 +22,18 @@ export default function DashboardPage() {
   // Lecturers and assessors have no dashboard: they start from their own modules.
   const teachingOnly = roles.length > 0 && roles.every((r) => r === 'LECTURER' || r === 'ASSESSOR');
   const officerOnly = roles.length > 0 && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN' || r === 'IPT_COORDINATOR');
-  const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly && !officerOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
+  const financeOnly = roles.length > 0 && roles.every((r) => r === 'BURSAR' || r === 'ACCOUNTANT');
+  const q = useQuery({ queryKey: ['staff', 'dashboard'], enabled: !teachingOnly && !officerOnly && !financeOnly, queryFn: () => api<DashboardData>('/api/dashboard', staff), refetchInterval: 60_000 });
   const d = q.data;
   // the Principal, administrator and Deputy Principal (Academic) also have the institution overview; management starts there
   const overview = roles.some((r) => r === 'MANAGEMENT_VIEWER' || r === 'INSTITUTION_ADMIN' || r === 'DEPUTY_PRINCIPAL_ACADEMIC');
   const [tab, setTab] = useState<'overview' | 'today'>(roles.includes('MANAGEMENT_VIEWER') ? 'overview' : 'today');
-  const approver = roles.some((r) => ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER'].includes(r));
+  const approver = roles.some((r) => ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'EXAMINATIONS_OFFICER', 'BURSAR', 'MANAGEMENT_VIEWER'].includes(r));
   const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: approver, refetchInterval: 60_000,
     queryFn: () => api<{ actionable: number }>('/api/approvals/count', staff) }).data?.actionable ?? 0;
   const first = user('staff')?.fullName?.split(' ').find((w) => !/^(mr|mrs|ms|miss|dr|prof|eng|rev)\.?$/i.test(w));
   if (teachingOnly) return <Navigate to="/staff/my-teaching" replace />;
+  if (roles.length > 0 && roles.every((r) => r === 'BURSAR' || r === 'ACCOUNTANT')) return <Navigate to="/staff/finance-overview" replace />;
   if (officerOnly) return <Navigate to={roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance'} replace />;
   return (
     <Container maxWidth="lg" disableGutters>

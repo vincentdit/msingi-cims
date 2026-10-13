@@ -49,10 +49,13 @@ public class ApprovalsService {
         MODULE_MODERATION("Module results", "Head of Department"),
         MODULE_BOARD("Module results", "Department Board"),
         RESIT_MODERATION("Resit marks", "Head of Department"),
+        COMPETENCE_VERIFY("Competence outcomes (NVA)", "Head of Department"),
         STATUS_RECOMMEND("Student status change", "Head of Department"),
         STATUS_DECISION("Student status change", "Deputy Principal (Academic)"),
         APPEAL_ASSIGN("Remark or appeal", "Examinations Office"),
-        APPEAL_FORWARD("Remark or appeal", "Examinations Office");
+        APPEAL_FORWARD("Remark or appeal", "Examinations Office"),
+        FIN_ADJUSTMENT("Waiver or refund", "Bursar"),
+        FIN_ADJUSTMENT_SECOND("Waiver or refund", "Principal");
 
         public final String label;
         public final String body;
@@ -158,6 +161,17 @@ public class ApprovalsService {
                             null, null, link, true, null));
                 }
             });
+            jdbc.query("""
+                    select u.id, u.submitted_by_name, u.submitted_at, m.code, m.title, m.department_id, se.name as semester
+                    from competence_units u join modules m on m.id = u.module_id join semesters se on se.id = u.semester_id
+                    where u.status = 'SUBMITTED'""", p, rs -> {
+                Long dept = rs.getObject("department_id") == null ? null : rs.getLong("department_id");
+                if (hod.covers(dept) || admin) {
+                    out.add(item(Kind.COMPETENCE_VERIFY, rs.getLong("id"), rs.getString("code") + " · " + rs.getString("title"),
+                            "Competence outcomes submitted by the assessor; verify or return · " + rs.getString("semester"), rs.getString("submitted_by_name"),
+                            rs.getObject("submitted_at", OffsetDateTime.class), "/staff/competence/" + rs.getLong("id"), true, null));
+                }
+            });
         }
         if (hod.any() || committee) {
             jdbc.query("""
@@ -197,6 +211,26 @@ public class ApprovalsService {
                     out.add(item(Kind.APPEAL_ASSIGN, rs.getLong("id"), what, "Fee paid; assign an examiner who did not teach the module",
                             rs.getString("registration_no"), rs.getObject("requested_at", OffsetDateTime.class), "/staff/appeals", true, null));
                 }
+            });
+        }
+        boolean bursar = admin || roles.contains(Role.BURSAR);
+        boolean principal = admin || roles.contains(Role.MANAGEMENT_VIEWER);
+        if (bursar || principal) {
+            jdbc.query("""
+                    select a.id, a.kind, a.status, a.amount, a.adjustment_no, a.requested_by_id, a.requested_by_name, a.requested_at, a.first_by_id,
+                           a.first_by_name, a.first_at, s.registration_no
+                    from finance_adjustments a join students s on s.id = a.student_id where a.status in ('PENDING', 'ENDORSED')""", p, rs -> {
+                boolean pending = "PENDING".equals(rs.getString("status"));
+                if ((pending && !bursar) || (!pending && !principal)) return;
+                boolean own = Objects.equals(rs.getLong("requested_by_id"), me)
+                        || (!pending && Objects.equals(rs.getObject("first_by_id") == null ? null : rs.getLong("first_by_id"), me));
+                String what = ("WAIVER".equals(rs.getString("kind")) ? "Waiver" : "Refund") + " · " + rs.getString("registration_no") + " · TZS "
+                        + String.format(java.util.Locale.ENGLISH, "%,.0f", rs.getBigDecimal("amount"));
+                out.add(item(pending ? Kind.FIN_ADJUSTMENT : Kind.FIN_ADJUSTMENT_SECOND, rs.getLong("id"), what,
+                        pending ? rs.getString("adjustment_no") + " · requested" : rs.getString("adjustment_no") + " · approved by the Bursar; above the threshold",
+                        pending ? rs.getString("requested_by_name") : rs.getString("first_by_name"),
+                        rs.getObject(pending ? "requested_at" : "first_at", OffsetDateTime.class), "/staff/waivers", !own,
+                        own ? "You requested or approved this already; someone else decides it." : null));
             });
         }
         out.sort(Comparator.comparing(Item::canAct).reversed()

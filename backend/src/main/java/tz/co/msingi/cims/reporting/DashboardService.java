@@ -157,7 +157,7 @@ public class DashboardService {
         Map<LocalDate, BigDecimal[]> perDay = new HashMap<>();
         jdbc.query("""
                 select cast(paid_at at time zone 'Africa/Dar_es_Salaam' as date) as d, sum(amount) as a, count(*) as c from payments
-                where paid_at >= :since group by 1""",
+                where paid_at >= :since and source <> 'INTERNAL' group by 1""",
                 new MapSqlParameterSource("since", today.minusDays(29).atStartOfDay(Sql.ZONE).toOffsetDateTime()),
                 rs -> { perDay.put(rs.getObject("d", LocalDate.class), new BigDecimal[]{rs.getBigDecimal("a"), BigDecimal.valueOf(rs.getLong("c"))}); });
         List<Money> daily = new ArrayList<>();
@@ -165,14 +165,14 @@ public class DashboardService {
             BigDecimal[] v = perDay.get(d);
             daily.add(new Money(d.toString(), d.getDayOfMonth() + "/" + d.getMonthValue(), v == null ? BigDecimal.ZERO : v[0], v == null ? 0 : v[1].longValue()));
         }
-        BigDecimal month = n2(jdbc.queryForObject("select coalesce(sum(amount), 0) from payments where paid_at >= :since",
+        BigDecimal month = n2(jdbc.queryForObject("select coalesce(sum(amount), 0) from payments where paid_at >= :since and source <> 'INTERNAL'",
                 new MapSqlParameterSource("since", today.withDayOfMonth(1).atStartOfDay(Sql.ZONE).toOffsetDateTime()), BigDecimal.class));
         BigDecimal todays = daily.get(daily.size() - 1).amount();
         List<Money> ageing = financeReports.debtors(yearId).byBucket().stream()
                 .map(a -> new Money(a.key(), a.label(), a.amount(), a.count())).toList();
         long notReconciled = n(jdbc.queryForObject("""
                 select count(distinct cast(p.paid_at at time zone 'Africa/Dar_es_Salaam' as date)) from payments p
-                where p.paid_at >= :since and p.paid_at < :today
+                where p.paid_at >= :since and p.paid_at < :today and p.source = 'GEPG'
                   and not exists (select 1 from gepg_reconciliations r where r.recon_date = cast(p.paid_at at time zone 'Africa/Dar_es_Salaam' as date)
                                   and r.status = 'CLOSED')""",
                 new MapSqlParameterSource("since", today.minusDays(30).atStartOfDay(Sql.ZONE).toOffsetDateTime())

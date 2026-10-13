@@ -117,6 +117,7 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
   const qc = useQueryClient();
   const depts = useQuery({ queryKey: ['staff', 'departments'], queryFn: () => api<Department[]>('/api/academic/departments', staff) });
   const progs = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  const sponsors = useQuery({ queryKey: ['staff', 'sponsors'], queryFn: () => api<{ id: number; name: string }[]>('/api/finance/sponsors', staff) });
   const [f, setF] = useState({
     username: user?.username ?? '', fullName: user?.fullName ?? '', jobTitle: user?.jobTitle ?? '', email: user?.email ?? '',
     phone: user?.phone ? '0' + user.phone.replace(/^255/, '') : '',
@@ -145,7 +146,7 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
   );
   const setRole = (r: RoleInfo, on: boolean) => {
     const next = { ...grants };
-    if (on) next[r.role] = { role: r.role, scope: 'INSTITUTION' }; else delete next[r.role];
+    if (on) next[r.role] = { role: r.role, scope: r.scopes.includes('INSTITUTION') ? 'INSTITUTION' : r.scopes[0] }; else delete next[r.role];
     setGrants(next);
   };
 
@@ -171,6 +172,14 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
                   <FormControlLabel sx={{ alignItems: 'flex-start', m: 0 }} disabled={readOnly}
                     control={<Checkbox size="small" checked={!!g} onChange={(e) => setRole(r, e.target.checked)} sx={{ p: 0.25, mr: 1 }} />}
                     label={<Box><Typography variant="body2" sx={{ fontWeight: 600 }}>{r.label}</Typography><Typography variant="caption" color="text.secondary">{r.description}</Typography></Box>} />
+                  {g && r.scopes.length === 1 && r.scopes[0] === 'SPONSOR' && (
+                    <TextField select size="small" fullWidth sx={{ mt: 1 }} disabled={readOnly} label="Sponsor" required
+                      value={g.scopeId ? String(g.scopeId) : ''}
+                      onChange={(e) => setGrants({ ...grants, [r.role]: { ...g, scope: 'SPONSOR', scopeId: Number(e.target.value) } })}
+                      helperText={!sponsors.data?.length ? 'Add the sponsor under Finance › Sponsors first.' : undefined}>
+                      {sponsors.data?.map((x) => <MenuItem key={x.id} value={String(x.id)}>{x.name}</MenuItem>)}
+                    </TextField>
+                  )}
                   {g && r.scopes.length > 1 && (
                     <TextField select size="small" fullWidth sx={{ mt: 1 }} disabled={readOnly} label="Limited to"
                       value={g.scope === 'INSTITUTION' ? 'INSTITUTION' : String(g.scopeId ?? '')}

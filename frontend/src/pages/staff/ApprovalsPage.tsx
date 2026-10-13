@@ -19,7 +19,9 @@ const age = (iso?: string) => {
 export default function ApprovalsPage() {
   const q = useQuery({ queryKey: ['staff', 'approvals'], refetchInterval: 60_000, queryFn: () => api<ApprovalInbox>('/api/approvals', { realm: 'staff' }) });
   const d = q.data;
-  const groups = ORDER.map((body) => ({ body, items: d?.items.filter((i) => i.body === body) ?? [] })).filter((g) => g.items.length);
+  // known bodies first, in their usual order; any other body (Bursar, Principal, examinations office...) after them
+  const bodies = [...ORDER, ...Array.from(new Set((d?.items ?? []).map((i) => i.body))).filter((b) => !ORDER.includes(b))];
+  const groups = bodies.map((body) => ({ body, items: d?.items.filter((i) => i.body === body) ?? [] })).filter((g) => g.items.length);
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Approvals"
@@ -31,7 +33,7 @@ export default function ApprovalsPage() {
         <Card sx={{ p: 3 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <CheckIcon sx={{ color: 'success.main' }} aria-hidden />
-            <Typography>You are up to date. New selection rounds, curricula, results, exemptions and amendments will appear here.</Typography>
+            <Typography>You are up to date. New selection rounds, curricula, results, exemptions, amendments, competence verifications, waivers and refunds will appear here.</Typography>
           </Stack>
         </Card>
       )}

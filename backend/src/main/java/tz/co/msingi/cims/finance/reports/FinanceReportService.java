@@ -66,7 +66,8 @@ public class FinanceReportService {
         if (to.isBefore(from)) throw new BusinessRuleException("INVALID_RANGE", "The end date is before the start date");
         if (ChronoUnit.DAYS.between(from, to) > 366) throw new BusinessRuleException("RANGE_TOO_LONG", "Choose a period of at most one year");
         List<Payment> list = payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAtAsc(
-                from.atStartOfDay(ZONE).toOffsetDateTime(), to.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime());
+                from.atStartOfDay(ZONE).toOffsetDateTime(), to.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime()).stream()
+                .filter(Payment::isCash).toList();   // a sponsor's share moved to a student, or a waiver, is not money received
         Map<String, BigDecimal> byItem = new TreeMap<>();
         Map<String, String> itemLabel = new LinkedHashMap<>();
         Map<String, Long> itemCount = new TreeMap<>();

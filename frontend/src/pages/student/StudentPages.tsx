@@ -101,6 +101,8 @@ export function StudentHome() {
         </CardContent>
       </Card>
 
+      <NextStepsCard steps={d.next ?? []} />
+
       {d.status === 'ADMITTED' && d.firstRegistrationStatus !== 'APPROVED' && (
         <Alert severity="info"><strong>{t('student.statusADMITTED')}.</strong> {t('student.reportHint')}</Alert>
       )}
@@ -214,6 +216,13 @@ export function StudentFees() {
         <Figure label={t('student.balance')} value={formatTzs(st.balance)} tone={st.balance > 0 ? 'warning.main' : 'success.main'} />
       </Grid>
       {st.credit > 0 && <Alert severity="info">{t('fees.credit', { amount: formatTzs(st.credit) })}</Alert>}
+      {(st.sponsors ?? []).map((sp) => (
+        <Alert key={sp.sponsor + sp.academicYear} severity="success">
+          {t('fees.sponsored', { sponsor: sp.sponsor, year: sp.academicYear, percent: Number(sp.coveragePercent).toLocaleString('en-GB'), interpolation: { escapeValue: false } })}
+          {sp.capAmount ? ` ${t('fees.sponsorCap', { amount: formatTzs(sp.capAmount) })}` : ''}
+          {!!st.sponsorPending && st.sponsorPending > 0 && <> {t('fees.sponsorPending', { amount: formatTzs(st.sponsorPending) })}</>}
+        </Alert>
+      ))}
 
       <Typography variant="h6">{t('student.invoices')}</Typography>
       {st.invoices.map((inv) => (
@@ -288,6 +297,30 @@ export function StudentFees() {
         </CardContent>
       </Card>
     </Stack>
+  );
+}
+
+/** What the student should do next, across registration, fees, attendance, resits, hostel, IPT and clearance. */
+function NextStepsCard({ steps }: { steps: StudentDashboard['next'] }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  if (!steps.length) return null;
+  const colour = { success: 'success.main', info: 'info.main', warning: 'warning.main', error: 'error.main' } as const;
+  return (
+    <Card sx={{ borderRadius: 3 }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1 }}>{t('next.title')}</Typography>
+        <Stack divider={<Divider flexItem />}>
+          {steps.map((s, i) => (
+            <Stack key={i} direction="row" spacing={1.25} alignItems="center" sx={{ py: 1 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colour[s.severity], flexShrink: 0 }} />
+              <Typography variant="body2" sx={{ flex: 1 }}>{t(`next.${s.kind}`, { ...s.values, interpolation: { escapeValue: false } })}</Typography>
+              {s.link && <Button size="small" onClick={() => navigate(s.link!)}>{t('next.open')}</Button>}
+            </Stack>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
