@@ -4,15 +4,17 @@ import { Box } from '@mui/material';
  * A drawing of a college campus, shown on the portal until the institution uploads a photo of its own.
  * Drawn in the institution's colours so it sits with the rest of the page.
  */
-export function CampusIllustration({ primary, accent, name }: { primary: string; accent: string; name: string }) {
+export function CampusIllustration({ primary, accent, name, wide }: { primary: string; accent: string; name: string; wide?: boolean }) {
+  // wide: a broader scene for a full-width banner, with the campus on the right and open ground on the left
+  const view = wide ? '-640 30 1200 350' : '0 0 560 380';
   const windows = (x0: number, y0: number, cols: number, rows: number) =>
     Array.from({ length: cols * rows }, (_, i) => (
       <rect key={`${x0}-${i}`} x={x0 + (i % cols) * 26} y={y0 + Math.floor(i / cols) * 30} width="16" height="18" rx="2"
         fill={(i * 7) % 5 === 0 ? '#FFE7A8' : '#CFE0F2'} />
     ));
   return (
-    <Box component="svg" viewBox="0 0 560 380" role="img" aria-label={`Illustration of ${name}`} sx={{ display: 'block', width: '100%', height: '100%' }}
-      preserveAspectRatio="xMidYMid slice">
+    <Box component="svg" viewBox={view} role="img" aria-label={`Illustration of ${name}`} sx={{ display: 'block', width: '100%', height: '100%' }}
+      preserveAspectRatio={wide ? "xMaxYMax slice" : "xMidYMid slice"}>
       <defs>
         <linearGradient id="ci-sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#BFE0F5" />
@@ -23,11 +25,11 @@ export function CampusIllustration({ primary, accent, name }: { primary: string;
           <stop offset="1" stopColor="#E6ECF2" />
         </linearGradient>
       </defs>
-      <rect width="560" height="380" fill="url(#ci-sky)" />
+      <rect x="-640" width="1200" height="380" fill="url(#ci-sky)" />
       <circle cx="470" cy="70" r="30" fill="#FFD66B" opacity="0.9" />
       {/* hills */}
-      <path d="M0 250 Q90 190 190 232 T380 214 T560 228 V380 H0Z" fill="#9FC48A" />
-      <path d="M0 272 Q140 236 280 262 T560 254 V380 H0Z" fill="#7FB06A" />
+      <path d="M-640 236 Q-480 196 -330 226 T-40 220 T190 232 T380 214 T560 228 V380 H-640Z" fill="#9FC48A" />
+      <path d="M-640 268 Q-400 240 -160 266 T280 262 T560 254 V380 H-640Z" fill="#7FB06A" />
       {/* side wings */}
       <rect x="60" y="178" width="140" height="112" fill="url(#ci-wall)" />
       <rect x="360" y="178" width="140" height="112" fill="url(#ci-wall)" />
@@ -55,7 +57,7 @@ export function CampusIllustration({ primary, accent, name }: { primary: string;
       </g>
       {/* path and acacias */}
       <path d="M266 292 L294 292 L340 380 L220 380 Z" fill="#E9DFC9" />
-      {[[30, 262, 1], [520, 266, 1.1], [218, 300, 0.7], [352, 302, 0.75]].map(([x, y, k]) => (
+      {[[30, 262, 1], [520, 266, 1.1], [218, 300, 0.7], [352, 302, 0.75], ...(wide ? [[-90, 258, 1.2], [-300, 250, 0.9], [-520, 262, 1.1], [-200, 300, 0.8]] : [])].map(([x, y, k]) => (
         <g key={x} transform={`translate(${x} ${y}) scale(${k})`}>
           <rect x="-3" y="-6" width="6" height="34" fill="#6D5A44" />
           <ellipse cx="0" cy="-12" rx="34" ry="11" fill="#4E8C46" />

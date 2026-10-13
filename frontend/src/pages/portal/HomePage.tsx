@@ -33,7 +33,7 @@ export default function HomePage() {
   const theme = useTheme();
   const photo = usePublicImage(inst.campusPhoto?.url);
   const caption = inst.campusPhoto?.caption ?? inst.name;
-  const chip = { bgcolor: 'rgba(255,255,255,0.14)', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } };
+  const chip = { bgcolor: 'rgba(255,255,255,0.16)', backdropFilter: 'blur(4px)', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } };
 
   // the applicant's own progress, when signed in
   const realm = { realm: 'applicant' as const };
@@ -53,51 +53,51 @@ export default function HomePage() {
 
   return (
     <>
-      <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', position: 'relative', overflow: 'hidden' }}>
-        {photo && (
-          <Box component="img" src={photo} alt="" aria-hidden sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
-            filter: 'grayscale(1) blur(3px)', opacity: 0.22, transform: 'scale(1.05)' }} />
-        )}
-        <Box sx={{ position: 'absolute', inset: 0, background: (th) => `linear-gradient(100deg, ${th.palette.primary.dark} 0%, ${th.palette.primary.main} 55%, ${alpha(th.palette.primary.main, 0.75)} 100%)`, opacity: photo ? 0.9 : 1 }} />
-        <Box sx={{ position: 'absolute', inset: 0, backgroundImage: MKEKA }} />
-        <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 5, md: 8 } }}>
-          <Grid container spacing={{ xs: 4, md: 6 }} alignItems="center">
-            <Grid size={{ xs: 12, md: 7 }}>
-              <Typography sx={{ opacity: 0.85, fontWeight: 600, fontSize: 15 }}>{inst.branding.tagline ?? inst.name}</Typography>
-              <Typography variant="h3" component="h1" sx={{ mt: 1, maxWidth: 720, fontSize: { xs: 30, md: 44 } }}>
-                {t('home.heroTitle', { year: window?.academicYear ?? '' })}
-              </Typography>
-              <Typography sx={{ mt: 2, maxWidth: 560, opacity: 0.9, fontSize: 18 }}>{t('home.heroText')}</Typography>
-              {window ? (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 4 }} alignItems={{ sm: 'center' }}>
-                  <Button size="large" variant="contained" color="warning" component={RouterLink} to={cta} sx={{ color: '#0F1B2D', py: 1.4, flexShrink: 0 }}>
-                    {submitted ? t('home.viewApplication') : mine ? t('home.continueApplication') : t('home.startApplication')}
-                  </Button>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Chip icon={<EventIcon />} label={t('home.closes', { date: formatDate(window.closesAt) })} sx={chip} />
-                    <Chip icon={<PaymentsIcon />} label={`${t('home.fee')}: ${formatTzs(window.applicationFee)}`} sx={chip} />
-                  </Stack>
+      <Box component="section" aria-label={caption} sx={{ bgcolor: 'primary.dark', color: 'primary.contrastText', position: 'relative', overflow: 'hidden',
+        minHeight: { xs: 520, md: 500 }, display: 'flex', alignItems: 'center' }}>
+        {/* the institution's picture fills the banner */}
+        <Box aria-hidden sx={{ position: 'absolute', inset: 0 }}>
+          {photo
+            ? <Box component="img" src={photo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+            : <>
+                <Box sx={{ display: { xs: 'none', md: 'block' }, height: '100%' }}><CampusIllustration wide primary={theme.palette.primary.main} accent={theme.palette.warning.main} name={inst.name} /></Box>
+                <Box sx={{ display: { xs: 'block', md: 'none' }, height: '100%' }}><CampusIllustration primary={theme.palette.primary.main} accent={theme.palette.warning.main} name={inst.name} /></Box>
+              </>}
+        </Box>
+        {/* shade it in the institution's colour so the words stay readable */}
+        <Box aria-hidden sx={{ position: 'absolute', inset: 0, background: {
+          xs: `linear-gradient(180deg, ${alpha(theme.palette.primary.dark, 0.86)} 0%, ${alpha(theme.palette.primary.dark, 0.72)} 55%, ${alpha(theme.palette.primary.dark, 0.4)} 100%)`,
+          md: `linear-gradient(90deg, ${alpha(theme.palette.primary.dark, 0.94)} 0%, ${alpha(theme.palette.primary.dark, 0.82)} 38%, ${alpha(theme.palette.primary.dark, 0.35)} 68%, ${alpha(theme.palette.primary.dark, 0.05)} 100%)`,
+        } }} />
+        <Box aria-hidden sx={{ position: 'absolute', inset: 0, backgroundImage: MKEKA, maskImage: { md: 'linear-gradient(90deg, #000 0%, #000 35%, transparent 65%)' } }} />
+        <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 6, md: 9 } }}>
+          <Box sx={{ maxWidth: 720, textShadow: '0 1px 12px rgba(0,0,0,0.25)' }}>
+            <Typography sx={{ opacity: 0.9, fontWeight: 600, fontSize: 15 }}>{inst.branding.tagline ?? inst.name}</Typography>
+            <Typography variant="h3" component="h1" sx={{ mt: 1, fontSize: { xs: 30, md: 46 } }}>
+              {t('home.heroTitle', { year: window?.academicYear ?? '' })}
+            </Typography>
+            <Typography sx={{ mt: 2, maxWidth: 560, opacity: 0.92, fontSize: 18 }}>{t('home.heroText')}</Typography>
+            {window ? (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 4, textShadow: 'none' }} alignItems={{ sm: 'center' }}>
+                <Button size="large" variant="contained" color="warning" component={RouterLink} to={cta} sx={{ color: '#0F1B2D', py: 1.4, flexShrink: 0 }}>
+                  {submitted ? t('home.viewApplication') : mine ? t('home.continueApplication') : t('home.startApplication')}
+                </Button>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip icon={<EventIcon />} label={t('home.closes', { date: formatDate(window.closesAt) })} sx={chip} />
+                  <Chip icon={<PaymentsIcon />} label={`${t('home.fee')}: ${formatTzs(window.applicationFee)}`} sx={chip} />
                 </Stack>
-              ) : (
-                q.isSuccess && <Alert severity="info" sx={{ mt: 4, maxWidth: 560 }}>
-                  {upcoming ? t('home.opensOn', { window: upcoming.name, date: formatDateTime(upcoming.opensAt) }) : t('home.noWindow')}
-                </Alert>
-              )}
-            </Grid>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Box component="figure" sx={{ m: 0, position: 'relative', borderRadius: 3, overflow: 'hidden', aspectRatio: { xs: '16 / 9', md: '4 / 3' },
-                border: '6px solid rgba(255,255,255,0.92)', boxShadow: '0 24px 48px -16px rgba(0,0,0,0.45)', transform: { md: 'rotate(1.2deg)' }, bgcolor: 'primary.dark' }}>
-                {photo
-                  ? <Box component="img" src={photo} alt={caption} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  : <CampusIllustration primary={theme.palette.primary.main} accent={theme.palette.warning.main} name={inst.name} />}
-                <Box component="figcaption" sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 0.75,
-                  color: '#fff', fontSize: 14, fontWeight: 600, background: 'linear-gradient(to top, rgba(10,20,35,0.78), rgba(10,20,35,0))' }}>
-                  <PlaceIcon sx={{ fontSize: 18 }} />{caption}
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
+              </Stack>
+            ) : (
+              q.isSuccess && <Alert severity="info" sx={{ mt: 4, maxWidth: 560, textShadow: 'none' }}>
+                {upcoming ? t('home.opensOn', { window: upcoming.name, date: formatDateTime(upcoming.opensAt) }) : t('home.noWindow')}
+              </Alert>
+            )}
+          </Box>
         </Container>
+        <Box sx={{ position: 'absolute', right: { xs: 12, md: 24 }, bottom: { xs: 12, md: 20 }, display: 'flex', alignItems: 'center', gap: 0.75,
+          px: 1.5, py: 0.75, borderRadius: 5, bgcolor: 'rgba(10,20,35,0.55)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 13, fontWeight: 600 }}>
+          <PlaceIcon sx={{ fontSize: 17 }} />{caption}
+        </Box>
       </Box>
 
       <Container maxWidth="lg" sx={{ py: 6 }}>
