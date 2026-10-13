@@ -50,7 +50,9 @@ public class ApprovalsService {
         MODULE_BOARD("Module results", "Department Board"),
         RESIT_MODERATION("Resit marks", "Head of Department"),
         STATUS_RECOMMEND("Student status change", "Head of Department"),
-        STATUS_DECISION("Student status change", "Deputy Principal (Academic)");
+        STATUS_DECISION("Student status change", "Deputy Principal (Academic)"),
+        APPEAL_ASSIGN("Remark or appeal", "Examinations Office"),
+        APPEAL_FORWARD("Remark or appeal", "Examinations Office");
 
         public final String label;
         public final String body;
@@ -178,6 +180,22 @@ public class ApprovalsService {
                 } else if (requested && hod.covers(dept)) {
                     out.add(item(Kind.STATUS_RECOMMEND, rs.getLong("id"), title, detail + " · requested by Registry",
                             rs.getString("requested_by_name"), rs.getObject("requested_at", OffsetDateTime.class), "/staff/status-changes", true, null));
+                }
+            });
+        }
+        if (examsOffice) {
+            jdbc.query("""
+                    select a.id, a.status, a.kind, a.requested_at, a.marked_at, a.examiner_name, s.registration_no, m.code,
+                           (a.fee = 0 or a.invoice_id is null or exists (select 1 from invoices i where i.id = a.invoice_id and i.status = 'PAID')) as paid
+                    from result_appeals a join students s on s.id = a.student_id join module_offerings o on o.id = a.offering_id
+                    join modules m on m.id = o.module_id where a.status in ('REQUESTED', 'MARKED')""", p, rs -> {
+                String what = ("REMARK".equals(rs.getString("kind")) ? "Remark" : "Appeal") + " · " + rs.getString("code") + " · " + rs.getString("registration_no");
+                if ("MARKED".equals(rs.getString("status"))) {
+                    out.add(item(Kind.APPEAL_FORWARD, rs.getLong("id"), what, "Marked by " + rs.getString("examiner_name") + "; to forward",
+                            rs.getString("examiner_name"), rs.getObject("marked_at", OffsetDateTime.class), "/staff/appeals", true, null));
+                } else if (rs.getBoolean("paid")) {
+                    out.add(item(Kind.APPEAL_ASSIGN, rs.getLong("id"), what, "Fee paid; assign an examiner who did not teach the module",
+                            rs.getString("registration_no"), rs.getObject("requested_at", OffsetDateTime.class), "/staff/appeals", true, null));
                 }
             });
         }

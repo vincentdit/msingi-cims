@@ -180,11 +180,30 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Does:** records competence assessments for allocated NVA units.
 - **Next:** check the NVA competence workflow end to end.
 
-### 12. Examinations Officer: Working
+### 12. Examinations Officer: Done
 
-- **Sees:** programmes, students, calendar, curricula, teaching, marks, eligibility, results, amendments, regulations and notices.
+- **Sees:** the **Examinations office** board (where they land after signing in), programmes, students, calendar, curricula, teaching, marks, eligibility, results, **remarks and appeals**, amendments, regulations and notices.
 - **Does:** runs marks windows, results processing and publication, resits, amendments, transcripts and NACTVET results files.
-- **Next:** none planned.
+- **Examinations office board** (per semester, refreshed every minute):
+  - **Marks entry:** whether the window is set, upcoming, open or closed.
+  - **Modules:** how many are in marks entry, with the Head of Department, with the Department Board, or approved. Those still behind are listed with their lecturers, and modules without a lecturer are flagged.
+  - **Examination eligibility:** lists generated per module, students not eligible, and exemptions waiting.
+  - **Result sheets:** each class's sheet from computed to published, the classes with no sheet yet, and each sheet's NACTVET submission (not submitted, accepted or queried).
+  - **Supplementary and special examinations:** registrations, unpaid fees, resit marks submitted and approved.
+  - **Also counted:** remarks and appeals at each stage, and amendments waiting for the administrator.
+  - **Next:** a short list of what to do, each step linking to its page. For example: set the marks window, modules still in marks entry after the window closed, sheets to compute, confirmed sheets not published, sheets not sent to NACTVET, a NACTVET query, opening the resit session, or remarks needing an examiner.
+- **Remarks and appeals (FR-EXM-12, BP-11):**
+  - **Settings:** the appeal period (default 14 days after results are published; 0 stops new requests) and the fee per module. The Deputy Principal or the administrator sets them on Exam regulations.
+  - **Student:** in the portal (Results, English and Swahili), asks for an examination script to be re-marked or appeals a result. Only published results within the period can be chosen, with one open request per module. The fee is invoiced with a GePG control number. The student can withdraw before an examiner is assigned; an unpaid invoice is then cancelled.
+  - **Examinations Officer:** once the fee is paid, assigns an examiner from the teaching staff. The module's own lecturers are not offered, and choosing one is refused as a conflict of interest. Requests outside the grounds can be declined with a reason, sent to the student by SMS.
+  - **Examiner:** sees only the requests assigned to them and records the new marks with a comment. A remark re-marks only the examination; the coursework stays. The original marks stay on record.
+  - **Forwarding:** the Examinations Officer forwards the outcome.
+    - **Unchanged:** the request closes and the student is told by SMS.
+    - **Changed:** it becomes a result amendment for the administrator. On approval the result is re-graded, the student's GPA, CGPA and decisions are recomputed, and the student is told by SMS. A rejected amendment closes the request as unchanged.
+  - **Privacy:** the student sees the new marks only once the request is decided, and never who examined it.
+  - **Approvals:** paid requests needing an examiner, and outcomes to forward, appear in the Examinations Officer's Approvals.
+  - **Record:** every step is in the audit trail.
+- **Next:** NACTVET's official results template and API (when NACTVET publishes them), examination analytics across years (FR-EXM-14), and registering carried-over modules.
 
 ### 13. Bursar / Finance Manager: Working
 
@@ -309,5 +328,5 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 
 ## Suggested order for the next slices
 
-1. The roles still marked Working, in this order: Examinations Officer, Lecturer, Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
+1. The roles still marked Working, in this order: Lecturer, Assessor, Bursar, Accountant, Student, Hostel Warden, IPT Coordinator, Clearance Officer.
 2. Sponsor Officer (optional in the SRS).

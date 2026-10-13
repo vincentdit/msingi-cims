@@ -1456,6 +1456,8 @@ export interface ExamSettings {
   eligibilityRequiresCa: boolean;
   eligibilityRequiresClearance: boolean;
   attendanceAlertAfterSessions: number;
+  appealWindowDays: number;
+  appealFee: number;
 }
 
 export interface RegisterLine {

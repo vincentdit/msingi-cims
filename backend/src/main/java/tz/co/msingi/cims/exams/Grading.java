@@ -179,7 +179,7 @@ public final class Grading {
         return Decision.REPEAT;
     }
 
-    static String plain(BigDecimal n) {
+    public static String plain(BigDecimal n) {
         return n.stripTrailingZeros().toPlainString();
     }
 }

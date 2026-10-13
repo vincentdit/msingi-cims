@@ -14,6 +14,14 @@ import tz.co.msingi.cims.common.BaseEntity;
 @Table(name = "exam_settings")
 public class ExamSettings extends BaseEntity {
 
+    /** Days after results are published during which students may ask for a remark or appeal (BP-11); 0 closes appeals. */
+    @Column(nullable = false)
+    private short appealWindowDays = 14;
+
+    /** Fee per module for a remark or appeal, invoiced with a GePG control number (0 = free). */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal appealFee = java.math.BigDecimal.ZERO;
+
     /** Whether module results go to a Department Board after the Head of Department. */
     @Column(nullable = false)
     private boolean useDepartmentBoard = true;

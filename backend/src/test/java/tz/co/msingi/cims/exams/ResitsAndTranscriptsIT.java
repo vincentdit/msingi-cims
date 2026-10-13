@@ -236,6 +236,125 @@ class ResitsAndTranscriptsIT {
         assertThat(s.body(s.call(get("/api/exams/sheets/" + mainSheet), exams, null)).at("/nactvetSubmissions/0/status").asText()).isEqualTo("ACCEPTED");
     }
 
+    @Test
+    void remarksAndAppealsOfPublishedResults() throws Exception {
+        data.staff(inst.tenant(), "examiner", Role.LECTURER);
+        String examiner = s.staffToken("examiner");
+        s.call(put("/api/exams/settings"), exams, "{\"appealFee\":0}").andExpect(status().isForbidden());
+        s.call(put("/api/exams/settings"), dpa, "{\"appealWindowDays\":14,\"appealFee\":0}").andExpect(jsonPath("$.appealWindowDays").value(14));
+
+        // student A asks for ITU 04103 (B: CA 28 + SE 42) to be re-marked
+        JsonNode mine = s.body(s.call(get("/api/student/appeals"), tok[0], null).andExpect(status().isOk()));
+        assertThat(mine.get("windowDays").asInt()).isEqualTo(14);
+        assertThat(mine.get("eligible").findValuesAsText("moduleCode")).contains("ITU 04101", "ITU 04102", "ITU 04103");
+        long m3 = 0;
+        for (JsonNode e : mine.get("eligible")) if (e.get("moduleCode").asText().equals("ITU 04103")) m3 = e.get("moduleResultId").asLong();
+        assertThat(LocalDate.parse(mine.at("/eligible/0/lastDay").asText())).isEqualTo(TODAY.plusDays(14));
+        s.call(post("/api/student/appeals"), tok[1], "{\"moduleResultId\":" + m3 + ",\"kind\":\"REMARK\",\"reason\":\"x\"}")
+                .andExpect(jsonPath("$.code").value("NOT_ELIGIBLE"));   // not student B's result
+        mine = s.body(s.call(post("/api/student/appeals"), tok[0], "{\"moduleResultId\":" + m3 + ",\"kind\":\"REMARK\","
+                + "\"reason\":\"I answered all five questions; I expected a higher mark\"}").andExpect(status().isOk()));
+        long id = mine.at("/appeals/0/id").asLong();
+        assertThat(mine.at("/appeals/0/status").asText()).isEqualTo("REQUESTED");
+        assertThat(mine.get("eligible").findValuesAsText("moduleCode")).doesNotContain("ITU 04103");
+        s.call(post("/api/student/appeals"), tok[0], "{\"moduleResultId\":" + m3 + ",\"kind\":\"APPEAL\",\"reason\":\"again\"}")
+                .andExpect(jsonPath("$.code").value("ALREADY_REQUESTED"));
+        assertThat(s.body(s.call(get("/api/approvals"), exams, null)).findValuesAsText("kind")).contains("APPEAL_ASSIGN");
+
+        // the module's own lecturer cannot examine it; another lecturer can
+        JsonNode options = s.body(s.call(get("/api/exams/appeals/" + id + "/examiners"), exams, null));
+        assertThat(options.findValuesAsText("name")).contains("Staff examiner", "Staff hod").doesNotContain("Staff lecturer");
+        long lecturerId = s.body(s.call(get("/api/exams/staff"), exams, null)).findParents("fullName").stream()
+                .filter(x -> x.get("fullName").asText().equals("Staff lecturer")).findFirst().orElseThrow().get("id").asLong();
+        long examinerId = options.findParents("name").stream().filter(x -> x.get("name").asText().equals("Staff examiner")).findFirst().orElseThrow().get("id").asLong();
+        s.call(post("/api/exams/appeals/" + id + "/assign"), exams, "{\"examinerUserId\":" + lecturerId + "}").andExpect(jsonPath("$.code").value("CONFLICT_OF_INTEREST"));
+        s.call(post("/api/exams/appeals/" + id + "/assign"), lecturer, "{\"examinerUserId\":" + examinerId + "}").andExpect(status().isForbidden());
+        s.call(post("/api/exams/appeals/" + id + "/assign"), exams, "{\"examinerUserId\":" + examinerId + "}").andExpect(jsonPath("$.status").value("ASSIGNED"));
+        assertThat(s.body(s.call(get("/api/exams/appeals"), examiner, null)).findValuesAsText("id")).containsExactly(String.valueOf(id));
+        assertThat(s.body(s.call(get("/api/exams/appeals"), lecturer, null)).size()).isZero();
+
+        // the examiner re-marks the examination only (SE 54 of 60): A
+        s.call(post("/api/exams/appeals/" + id + "/marks"), lecturer, "{\"seTotal\":54,\"comment\":\"x\"}").andExpect(status().isForbidden());
+        s.call(post("/api/exams/appeals/" + id + "/marks"), examiner, "{\"seTotal\":61,\"comment\":\"x\"}").andExpect(jsonPath("$.code").value("INVALID_SCORE"));
+        JsonNode marked = s.body(s.call(post("/api/exams/appeals/" + id + "/marks"), examiner,
+                "{\"caTotal\":40,\"seTotal\":54,\"comment\":\"Question 4 was not added to the total\"}").andExpect(status().isOk()));
+        assertThat(marked.get("newCaTotal").decimalValue()).isEqualByComparingTo("28");    // a remark keeps the coursework
+        assertThat(marked.get("newTotal").decimalValue()).isEqualByComparingTo("82");
+        assertThat(marked.get("newGrade").asText()).isEqualTo("A");
+        assertThat(marked.get("originalGrade").asText()).isEqualTo("B");
+        // the student does not see the new marks until the request is decided, nor who examined it
+        JsonNode studentView = s.body(s.call(get("/api/student/appeals"), tok[0], null)).at("/appeals/0");
+        assertThat(studentView.has("newGrade")).isFalse();
+        assertThat(studentView.has("examinerName")).isFalse();
+
+        // forwarded: an amendment for the administrator; on approval the result is A and the request closes as changed
+        JsonNode fwd = s.body(s.call(post("/api/exams/appeals/" + id + "/forward"), exams, "{}").andExpect(status().isOk()));
+        assertThat(fwd.get("status").asText()).isEqualTo("AMENDMENT_PENDING");
+        long amendment = fwd.get("amendmentId").asLong();
+        s.call(post("/api/exams/amendments/" + amendment + "/approve"), admin, "{\"note\":\"Remark accepted\"}").andExpect(jsonPath("$.status").value("APPROVED"));
+        JsonNode closed = s.body(s.call(get("/api/exams/appeals/" + id), exams, null));
+        assertThat(closed.get("status").asText()).isEqualTo("CLOSED");
+        assertThat(closed.get("outcome").asText()).isEqualTo("CHANGED");
+        assertThat(rows(s.body(s.call(get("/api/exams/sheets/" + mainSheet), exams, null))).get(reg[0]).at("/cells/ITU 04103/grade").asText()).isEqualTo("A");
+        assertThat(s.body(s.call(get("/api/student/appeals"), tok[0], null)).at("/appeals/0/newGrade").asText()).isEqualTo("A");
+
+        // student C appeals ITU 04102; the marks stand, so it closes unchanged with an SMS
+        JsonNode c = s.body(s.call(get("/api/student/appeals"), tok[2], null));
+        long m2 = 0;
+        for (JsonNode e : c.get("eligible")) if (e.get("moduleCode").asText().equals("ITU 04102")) m2 = e.get("moduleResultId").asLong();
+        long id2 = s.body(s.call(post("/api/student/appeals"), tok[2], "{\"moduleResultId\":" + m2 + ",\"kind\":\"APPEAL\",\"reason\":\"Coursework test 2 missing\"}"))
+                .at("/appeals/0/id").asLong();
+        JsonNode v2 = s.body(s.call(get("/api/exams/appeals/" + id2), exams, null));
+        s.call(post("/api/exams/appeals/" + id2 + "/assign"), exams, "{\"examinerUserId\":" + examinerId + "}").andExpect(status().isOk());
+        s.call(post("/api/exams/appeals/" + id2 + "/marks"), examiner, "{\"caTotal\":" + v2.get("originalCaTotal").asText() + ",\"seTotal\":"
+                + v2.get("originalSeTotal").asText() + ",\"comment\":\"Test 2 was recorded correctly\"}").andExpect(status().isOk());
+        s.call(post("/api/exams/appeals/" + id2 + "/forward"), exams, "{}").andExpect(jsonPath("$.status").value("CLOSED"))
+                .andExpect(jsonPath("$.outcome").value("UNCHANGED"));
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=50"), admin, null)).get("content").findValuesAsText("templateCode")).contains("APPEAL_OUTCOME");
+
+        // with a fee: an invoice with a control number; no examiner before payment; withdrawing cancels the unpaid invoice
+        s.call(put("/api/exams/settings"), dpa, "{\"appealFee\":15000}").andExpect(status().isOk());
+        JsonNode b = s.body(s.call(get("/api/student/appeals"), tok[1], null));
+        assertThat(b.get("fee").decimalValue()).isEqualByComparingTo("15000");
+        long mb = b.at("/eligible/0/moduleResultId").asLong();
+        JsonNode bReq = s.body(s.call(post("/api/student/appeals"), tok[1], "{\"moduleResultId\":" + mb + ",\"kind\":\"REMARK\",\"reason\":\"Please re-mark\"}"))
+                .at("/appeals/0");
+        assertThat(bReq.get("paid").asBoolean()).isFalse();
+        assertThat(bReq.get("controlNo").asText()).isNotBlank();
+        long id3 = bReq.get("id").asLong();
+        s.call(post("/api/exams/appeals/" + id3 + "/assign"), exams, "{\"examinerUserId\":" + examinerId + "}").andExpect(jsonPath("$.code").value("FEE_NOT_PAID"));
+        s.call(post("/api/exams/appeals/" + id3 + "/reject"), exams, "{}").andExpect(jsonPath("$.code").value("REASON_REQUIRED"));
+        s.call(post("/api/student/appeals/" + id3 + "/withdraw"), tok[0], null).andExpect(status().isNotFound());
+        JsonNode withdrawn = s.body(s.call(post("/api/student/appeals/" + id3 + "/withdraw"), tok[1], null));
+        assertThat(withdrawn.at("/appeals/0/status").asText()).isEqualTo("WITHDRAWN");
+        assertThat(s.body(s.call(get("/api/student/appeals"), tok[1], null)).at("/appeals/0/invoiceNo").asText()).isNotBlank();
+
+        // after the appeal period nothing can be asked
+        s.call(put("/api/exams/settings"), dpa, "{\"appealWindowDays\":0}").andExpect(status().isOk());
+        assertThat(s.body(s.call(get("/api/student/appeals"), tok[1], null)).get("eligible").size()).isZero();
+        s.call(post("/api/student/appeals"), tok[1], "{\"moduleResultId\":" + mb + ",\"kind\":\"REMARK\",\"reason\":\"x\"}")
+                .andExpect(jsonPath("$.code").value("NOT_ELIGIBLE"));
+    }
+
+    @Test
+    void theExaminationsOfficeBoardShowsWhereTheSemesterStands() throws Exception {
+        JsonNode board = s.body(s.call(get("/api/exams/office?semesterId=" + semId), exams, null).andExpect(status().isOk()));
+        assertThat(board.at("/semester/id").asLong()).isEqualTo(semId);
+        assertThat(board.at("/marksWindow/state").asText()).isEqualTo("OPEN");
+        assertThat(board.at("/modules/total").asLong()).isEqualTo(3);
+        assertThat(board.at("/modules/boardApproved").asLong()).isEqualTo(3);
+        assertThat(board.at("/modules/withoutLecturer").asLong()).isZero();
+        assertThat(board.at("/modules/behind").size()).isZero();
+        assertThat(board.at("/sheets/published").asLong()).isEqualTo(1);
+        assertThat(board.at("/sheets/classes").asLong()).isEqualTo(1);
+        assertThat(board.at("/sheets/sheets/0/nactvetSubmitted").asBoolean()).isFalse();
+        assertThat(board.at("/resits/open").asBoolean()).isFalse();
+        String steps = board.get("next").toString();
+        assertThat(steps).contains("not yet submitted to NACTVET", "open the supplementary and special examinations session");
+        s.call(get("/api/exams/office"), dpa, null).andExpect(status().isOk());
+        s.call(get("/api/exams/office"), lecturer, null).andExpect(status().isForbidden());
+    }
+
     // ------------------------------------------------------------------ a published class: A passes, B supplementary, C special exam
 
     private void publishedMainResults() throws Exception {

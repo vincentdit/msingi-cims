@@ -111,17 +111,28 @@ public class RegulationService {
             }
             s.setAttendanceAlertAfterSessions(req.attendanceAlertAfterSessions().shortValue());
         }
+        if (req.appealWindowDays() != null) {
+            if (req.appealWindowDays() < 0 || req.appealWindowDays() > 120) {
+                throw new BusinessRuleException("INVALID_SETTING", "The appeal period must be between 0 and 120 days");
+            }
+            s.setAppealWindowDays(req.appealWindowDays().shortValue());
+        }
+        if (req.appealFee() != null) {
+            if (req.appealFee().signum() < 0) throw new BusinessRuleException("INVALID_SETTING", "The appeal fee cannot be negative");
+            s.setAppealFee(req.appealFee().setScale(2, java.math.RoundingMode.HALF_UP));
+        }
         settings.save(s);
         SettingsView out = settingsView(s);
         audit.record("EXAM_SETTINGS_UPDATED", "ExamSettings", s.getId(), Map.of("useDepartmentBoard", out.useDepartmentBoard(),
                 "minAttendancePercent", out.minAttendancePercent(), "eligibilityRequiresCa", out.eligibilityRequiresCa(),
-                "eligibilityRequiresClearance", out.eligibilityRequiresClearance(), "attendanceAlertAfterSessions", out.attendanceAlertAfterSessions()));
+                "eligibilityRequiresClearance", out.eligibilityRequiresClearance(), "attendanceAlertAfterSessions", out.attendanceAlertAfterSessions(),
+                "appealWindowDays", out.appealWindowDays(), "appealFee", out.appealFee()));
         return out;
     }
 
     public static SettingsView settingsView(ExamSettings s) {
         return new SettingsView(s.isUseDepartmentBoard(), s.getMinAttendancePercent(), s.isEligibilityRequiresCa(), s.isEligibilityRequiresClearance(),
-                (int) s.getAttendanceAlertAfterSessions());
+                (int) s.getAttendanceAlertAfterSessions(), (int) s.getAppealWindowDays(), s.getAppealFee());
     }
 
     boolean inUse(RegulationSet rs) {

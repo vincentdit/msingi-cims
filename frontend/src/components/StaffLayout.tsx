@@ -27,6 +27,8 @@ import InstitutionIcon from '@mui/icons-material/AccountBalance';
 import UsersIcon from '@mui/icons-material/ManageAccounts';
 import AuditIcon from '@mui/icons-material/Policy';
 import ApprovalsIcon from '@mui/icons-material/Inbox';
+import OfficeIcon from '@mui/icons-material/FactCheck';
+import AppealIcon from '@mui/icons-material/Gavel';
 import { Badge } from '@mui/material';
 import KeyIcon from '@mui/icons-material/Key';
 import { Alert, Button } from '@mui/material';
@@ -68,8 +70,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'marks', to: '/staff/marks', label: 'Marks', icon: <MarksIcon /> },
   ] },
   { title: 'Examinations', items: [
+    { page: 'examsOffice', to: '/staff/exams-office', label: 'Examinations office', icon: <OfficeIcon /> },
     { page: 'eligibility', to: '/staff/eligibility', label: 'Exam eligibility', icon: <EligibleIcon /> },
     { page: 'results', to: '/staff/results', label: 'Results', icon: <ResultsIcon /> },
+    { page: 'appeals', to: '/staff/appeals', label: 'Remarks & appeals', icon: <AppealIcon /> },
     { page: 'amendments', to: '/staff/amendments', label: 'Result amendments', icon: <AmendIcon /> },
     { page: 'regulations', to: '/staff/regulations', label: 'Exam regulations', icon: <RulesIcon /> },
   ] },
@@ -94,6 +98,8 @@ const GROUPS: { title?: string; items: Item[] }[] = [
 
 /** Where each person lands: their first page (the dashboard when they have one). */
 export function homeFor(roles: readonly string[] | undefined) {
+  // the Examinations Officer starts from the Examinations Office board
+  if (roles?.includes('EXAMINATIONS_OFFICER') && !roles.includes('INSTITUTION_ADMIN')) return '/staff/exams-office';
   for (const g of GROUPS) for (const i of g.items) if (can(roles, i.page)) return i.to;
   return '/staff/password';
 }

@@ -443,6 +443,8 @@ export function RegulationsPage() {
       )}
       {settings.data && <EligibilitySettingsCard settings={settings.data} editable={can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
         saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
+      {settings.data && <AppealSettingsCard settings={settings.data} editable={can(['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'])}
+        saving={saveSettings.isPending} onSave={(v) => saveSettings.mutate(v)} />}
       {list.isLoading && <Loading />}
       <Grid container spacing={2}>
         {list.data?.map((r) => (
@@ -566,6 +568,32 @@ function RegulationDialog({ form: initial, onClose, onSaved }: { form: RegForm; 
 }
 
 /** The examination eligibility rules (BRU-08) and when students are warned about low attendance. */
+/** The appeal period and fee for remarks and appeals of published results (BP-11). */
+function AppealSettingsCard({ settings, editable, saving, onSave }: {
+  settings: ExamSettings; editable: boolean; saving: boolean; onSave: (v: Partial<ExamSettings>) => void;
+}) {
+  const [days, setDays] = useState(String(settings.appealWindowDays));
+  const [fee, setFee] = useState(String(settings.appealFee));
+  const d = Number(days), f = Number(fee);
+  const valid = days !== '' && Number.isInteger(d) && d >= 0 && d <= 120 && fee !== '' && f >= 0;
+  const changed = d !== settings.appealWindowDays || f !== Number(settings.appealFee);
+  return (
+    <Card sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Remarks and appeals</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>How long after results are published students may ask for a remark or appeal, and the fee per module (0 for none, 0 days to stop accepting).</Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+          <TextField size="small" type="number" label="Appeal period (days)" value={days} onChange={(e) => setDays(e.target.value)} disabled={!editable}
+            sx={{ width: { md: 190 } }} slotProps={{ htmlInput: { min: 0, max: 120 } }} />
+          <TextField size="small" type="number" label="Fee per module (TZS)" value={fee} onChange={(e) => setFee(e.target.value)} disabled={!editable}
+            sx={{ width: { md: 210 } }} slotProps={{ htmlInput: { min: 0, step: 1000 } }} />
+          {editable && <Button variant="outlined" disabled={!valid || !changed || saving} onClick={() => onSave({ appealWindowDays: d, appealFee: f })}>Save</Button>}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EligibilitySettingsCard({ settings, editable, saving, onSave }: {
   settings: ExamSettings; editable: boolean; saving: boolean; onSave: (v: Partial<ExamSettings>) => void;
 }) {

@@ -28,7 +28,7 @@ const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'semesterRegistrations' | 'graduations'
   | 'calendar' | 'curricula' | 'teaching' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
+  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
@@ -45,6 +45,8 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   curricula: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   teaching: TEACHING,
   marks: TEACHING,
+  examsOffice: [R.ADMIN, R.EXAMS, R.ACADEMIC, R.MANAGEMENT],
+  appeals: [R.ADMIN, R.EXAMS, R.ACADEMIC, R.MANAGEMENT, R.HOD, R.LECTURER, R.ASSESSOR, R.COORDINATOR],
   eligibility: EXAMS_READERS,
   results: EXAMS_READERS,
   amendments: [R.ADMIN, R.EXAMS, R.ACADEMIC],
@@ -66,7 +68,7 @@ export const can = (roles: readonly string[] | undefined, page: PageKey) => !!ro
 const PATH_PAGE: Record<string, PageKey> = {
   '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
-  teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
+  'exams-office': 'examsOffice', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution',
 };

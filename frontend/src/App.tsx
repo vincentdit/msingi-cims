@@ -32,6 +32,7 @@ import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
 import { HandoverPage, StudentDetailPage, StudentsPage } from './pages/staff/RegistryPages';
 import { StatusChangesPage } from './pages/staff/StatusAndCards';
+import { AppealsPage, ExamsOfficePage } from './pages/staff/ExamsOfficePages';
 import PlatformLayout from './pages/platform/PlatformLayout';
 import { PlatformLoginPage, PlatformPasswordPage } from './pages/platform/PlatformAuth';
 import { InstitutionDetailPage, InstitutionsPage, OnboardPage } from './pages/platform/InstitutionPages';
@@ -107,6 +108,8 @@ export default function App() {
         <Route path="graduations/:id" element={<GraduationPage />} />
         <Route path="results" element={<ResultSheetsPage />} />
         <Route path="results/:id" element={<ResultSheetPage />} />
+        <Route path="exams-office" element={<ExamsOfficePage />} />
+        <Route path="appeals" element={<AppealsPage />} />
         <Route path="regulations" element={<RegulationsPage />} />
         <Route path="amendments" element={<AmendmentsPage />} />
         <Route path="curricula" element={<CurriculaPage />} />

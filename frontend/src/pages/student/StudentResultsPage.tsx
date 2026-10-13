@@ -1,6 +1,6 @@
 import DownloadIcon from '@mui/icons-material/Download';
 import LockIcon from '@mui/icons-material/LockOutlined';
-import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, Divider, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, Divider, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +27,7 @@ export default function StudentResultsPage() {
       </Stack>
       {!list.length && <Alert severity="info">{t('results.none')}</Alert>}
       <ResitsCard />
+      <AppealsCard />
       {list.map((r) => (
         <Card key={r.id} sx={{ borderRadius: 3 }}>
           <CardContent>
@@ -137,6 +138,84 @@ function ResitsCard() {
             {register.error && <Alert severity="error" sx={{ mt: 1 }}>{(register.error as Error).message}</Alert>}
             <Button fullWidth variant="contained" sx={{ mt: 1.5 }} disabled={!picked.length || register.isPending}
               onClick={() => register.mutate()}>{picked.length ? t('results.registerFor', { n: picked.length, fee: fee > 0 ? formatTzs(fee) : t('results.free') }) : t('results.chooseResits')}</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface StudentAppeal {
+  id: number; moduleCode: string; moduleTitle: string; semester: string; kind: 'REMARK' | 'APPEAL'; reason: string; fee: number; paid: boolean;
+  controlNo?: string; status: string; outcome?: 'CHANGED' | 'UNCHANGED'; originalGrade?: string; newGrade?: string; decisionNote?: string;
+  requestedAt: string; canWithdraw: boolean;
+}
+interface StudentAppeals {
+  windowDays: number; fee: number; appeals: StudentAppeal[];
+  eligible: { moduleResultId: number; moduleCode: string; moduleTitle: string; semester: string; grade?: string; total?: number; lastDay: string }[];
+}
+
+/** Remarks and appeals of published results (FR-EXM-12): ask within the appeal period, pay the fee, follow the outcome. */
+function AppealsCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['student', 'appeals'], queryFn: () => api<StudentAppeals>('/api/student/appeals', { realm: 'student' }) });
+  const [moduleResultId, setModule] = useState<number | ''>('');
+  const [kind, setKind] = useState<'REMARK' | 'APPEAL'>('REMARK');
+  const [reason, setReason] = useState('');
+  const done = (r: StudentAppeals) => { qc.setQueryData(['student', 'appeals'], r); setModule(''); setReason(''); qc.invalidateQueries({ queryKey: ['student', 'dashboard'] }); };
+  const send = useMutation({
+    mutationFn: () => api<StudentAppeals>('/api/student/appeals', { realm: 'student', method: 'POST', body: { moduleResultId, kind, reason } }), onSuccess: done,
+  });
+  const withdraw = useMutation({ mutationFn: (id: number) => api<StudentAppeals>(`/api/student/appeals/${id}/withdraw`, { realm: 'student', method: 'POST' }), onSuccess: done });
+  const a = q.data;
+  if (!a || (a.windowDays === 0 && !a.appeals.length) || (!a.eligible.length && !a.appeals.length)) return null;
+  return (
+    <Card sx={{ borderRadius: 3 }}>
+      <CardContent>
+        <Typography variant="h6">{t('results.appealsTitle')}</Typography>
+        <Typography variant="body2" color="text.secondary">{t('results.appealsIntro', { days: a.windowDays })}</Typography>
+        {Number(a.fee) > 0 && <Typography variant="body2" color="text.secondary">{t('results.appealFee', { fee: formatTzs(a.fee) })}</Typography>}
+        {a.eligible.length > 0 ? (
+          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+            <TextField select size="small" label={t('results.appealModule')} value={moduleResultId} onChange={(e) => setModule(Number(e.target.value))}>
+              {a.eligible.map((e) => (
+                <MenuItem key={e.moduleResultId} value={e.moduleResultId}>
+                  {e.moduleCode} · {e.moduleTitle} · {e.grade ?? '—'} ({t('results.appealLastDay', { date: formatDate(e.lastDay) })})
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField select size="small" label={t('results.appealKind')} value={kind} onChange={(e) => setKind(e.target.value as 'REMARK' | 'APPEAL')}>
+              <MenuItem value="REMARK">{t('results.appealRemark')}</MenuItem>
+              <MenuItem value="APPEAL">{t('results.appealAppeal')}</MenuItem>
+            </TextField>
+            <TextField size="small" multiline minRows={2} label={t('results.appealReason')} value={reason} onChange={(e) => setReason(e.target.value)} inputProps={{ maxLength: 1000 }} />
+            {send.error && <Alert severity="error">{(send.error as Error).message}</Alert>}
+            <Button variant="contained" disabled={!moduleResultId || !reason.trim() || send.isPending} onClick={() => send.mutate()}>{t('results.appealSend')}</Button>
+          </Stack>
+        ) : <Typography variant="body2" sx={{ mt: 1 }}>{t('results.appealNone')}</Typography>}
+        {a.appeals.length > 0 && (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2 }}>{t('results.appealMine')}</Typography>
+            <Stack divider={<Divider flexItem />}>
+              {a.appeals.map((x) => (
+                <Box key={x.id} sx={{ py: 1 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.moduleCode} · {t(x.kind === 'REMARK' ? 'results.appealRemark' : 'results.appealAppeal')}</Typography>
+                    <Chip size="small" color={x.status === 'CLOSED' ? 'success' : x.status === 'REJECTED' ? 'error' : x.status === 'WITHDRAWN' ? 'default' : 'info'}
+                      label={t(`results.appealS_${x.status}`)} />
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">{x.semester} · {formatDate(x.requestedAt)}</Typography>
+                  {x.outcome === 'CHANGED' && <Typography variant="body2" color="success.main">{t('results.appealChanged', { from: x.originalGrade, to: x.newGrade })}</Typography>}
+                  {x.outcome === 'UNCHANGED' && <Typography variant="body2">{t('results.appealUnchanged', { grade: x.originalGrade })}</Typography>}
+                  {x.status === 'REJECTED' && x.decisionNote && <Typography variant="body2" color="error.main">{x.decisionNote}</Typography>}
+                  {!x.paid && x.controlNo && x.status === 'REQUESTED' && (
+                    <Alert severity="info" sx={{ mt: 0.5 }}>{t('results.appealPay', { amount: formatTzs(x.fee) })} <strong style={{ fontFamily: 'monospace' }}>{x.controlNo}</strong></Alert>
+                  )}
+                  {x.canWithdraw && <Button size="small" color="inherit" disabled={withdraw.isPending} onClick={() => withdraw.mutate(x.id)}>{t('results.appealWithdraw')}</Button>}
+                </Box>
+              ))}
+            </Stack>
           </>
         )}
       </CardContent>

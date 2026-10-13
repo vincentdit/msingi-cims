@@ -37,7 +37,8 @@ public final class MessageTemplates {
                 Map.entry("office", "Library"), Map.entry("award", "Ordinary Diploma (NTA Level 6)"), Map.entry("graduation", "27th Graduation 2029"),
                 Map.entry("date", "23 November 2029"), Map.entry("place", "Kilimanjaro Hostel, A · Room 12, bed B"),
                 Map.entry("window", "Hostel applications 2027/2028"), Map.entry("organisation", "Tanzania Ports Authority"),
-                Map.entry("start", "6 July 2028"), Map.entry("week", "3"), Map.entry("change", "postponed until 1 March 2028"));
+                Map.entry("start", "6 July 2028"), Map.entry("week", "3"), Map.entry("change", "postponed until 1 March 2028"),
+                Map.entry("outcome", "your grade is now B"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -137,6 +138,10 @@ public final class MessageTemplates {
                 List.of("module", "semester", "grade", "institution"), Set.of(),
                 "Your result in {module} for {semester} has been corrected: grade {grade}. See the student portal.",
                 "Matokeo yako ya {module} ya {semester} yamesahihishwa: daraja {grade}. Angalia tovuti ya mwanafunzi.", s);
+        add("APPEAL_OUTCOME", "Remark or appeal decided", "A student's remark or appeal of a module result is decided", "Examinations",
+                List.of("module", "outcome", "institution"), Set.of("module", "outcome"),
+                "{institution}: your remark/appeal in {module} has been decided: {outcome}. See the student portal.",
+                "{institution}: ombi lako la kusahihishwa upya/rufaa katika {module} limeamuliwa: {outcome}. Angalia tovuti ya mwanafunzi.", s);
         add("ATTENDANCE_LOW", "Low attendance warning", "A student's attendance in a module falls below the examination threshold", "Teaching",
                 List.of("module", "percent", "threshold", "institution"), Set.of(),
                 "Your attendance in {module} is {percent}. You need at least {threshold} to sit the examination. Please attend all classes.",

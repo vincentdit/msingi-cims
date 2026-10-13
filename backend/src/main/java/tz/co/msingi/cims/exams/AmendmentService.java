@@ -21,6 +21,7 @@ import tz.co.msingi.cims.platform.security.Role;
 import tz.co.msingi.cims.registry.RegistryRepositories.StudentRepository;
 import tz.co.msingi.cims.registry.Student;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,6 +52,7 @@ public class AmendmentService {
     private final ExamAccess access;
     private final AuditService audit;
     private final EntityManager em;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /** A student's module results, to choose the one to amend. */
     @Transactional(readOnly = true)
@@ -116,6 +118,12 @@ public class AmendmentService {
         return view(a);
     }
 
+    /** An amendment requested on behalf of a remark or appeal (the examiner's new marks); returns its id. */
+    @Transactional
+    public Long requestForAppeal(Long moduleResultId, BigDecimal caTotal, BigDecimal seTotal, String reason, String evidenceRef) {
+        return request(new AmendmentRequest(moduleResultId, caTotal, seTotal, reason, evidenceRef)).id();
+    }
+
     @Transactional
     public AmendmentView approve(Long id, String note) {
         access.require("approve an amendment", Role.INSTITUTION_ADMIN);
@@ -152,6 +160,7 @@ public class AmendmentService {
         audit.record("RESULT_AMENDED", "ModuleResult", m.getId(), Map.of("module", o.getModule().getCode(), "from", String.valueOf(a.getOldGrade()),
                 "to", out.grade(), "fromTotal", String.valueOf(a.getOldTotal()), "toTotal", String.valueOf(out.total()), "reason", a.getReason(),
                 "requestedBy", a.getRequestedByName(), "sheets", affected.size()));
+        events.publishEvent(new AmendmentDecided(a.getId(), true, a.getDecisionNote()));
         Student st = students.findById(m.getStudentId()).orElseThrow();
         boolean published = affected.stream().anyMatch(s -> s.getStatus() == ResultSheet.Status.PUBLISHED);
         if (published) {
@@ -170,6 +179,7 @@ public class AmendmentService {
         a.setDecidedAt(OffsetDateTime.now());
         a.setDecisionNote(note.trim());
         audit.record("RESULT_AMENDMENT_REJECTED", "ModuleResult", a.getModuleResult().getId(), Map.of("note", note.trim()));
+        events.publishEvent(new AmendmentDecided(a.getId(), false, note.trim()));
         return view(a);
     }
 
@@ -179,7 +189,8 @@ public class AmendmentService {
         return a;
     }
 
-    private RegulationSet regulationFor(ModuleResult m) {
+    /** The regulations a module result is graded under (the programme's, for NTA). */
+    public RegulationSet regulationFor(ModuleResult m) {
         Programme p = students.findById(m.getStudentId()).orElseThrow().getProgramme();
         ModuleOffering o = offerings.findById(m.getOfferingId()).orElseThrow();
         return p.getAwardFamily() == Programme.AwardFamily.NTA
