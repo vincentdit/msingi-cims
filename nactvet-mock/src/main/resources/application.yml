@@ -1,0 +1,13 @@
+server:
+  port: ${MOCK_PORT:8099}
+
+spring:
+  application:
+    name: nactvet-mock
+
+mock:
+  # Credentials CIMS must send (NACTE_AUTHORIZATION and NACTE_API_CODE on the CIMS side). Not real NACTVET credentials.
+  authorization: ${MOCK_NACTE_AUTHORIZATION:mock-authorization}
+  api-code: ${MOCK_NACTE_API_CODE:MOCK}
+  # Seconds before a submitted candidate has an outcome; index numbers ending in 5 take three times as long.
+  processing-seconds: ${MOCK_PROCESSING_SECONDS:5}

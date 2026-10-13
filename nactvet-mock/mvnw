@@ -1,0 +1,18 @@
+#!/bin/sh
+# Maven Wrapper for Linux/macOS: runs the Maven version pinned in .mvn/wrapper/maven-wrapper.properties.
+set -e
+BASEDIR=$(cd "$(dirname "$0")" && pwd)
+URL=$(sed -n 's/^[[:space:]]*distributionUrl[[:space:]]*=[[:space:]]*//p' "$BASEDIR/.mvn/wrapper/maven-wrapper.properties" | tr -d '\r')
+NAME=$(basename "$URL" .zip | sed 's/-bin$//')
+HASH=$(printf %s "$URL" | sha256sum | cut -d' ' -f1)
+MAVEN_HOME="${MAVEN_USER_HOME:-$HOME/.m2}/wrapper/dists/$NAME/$HASH"
+if [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  echo "Downloading $URL" >&2
+  TMP=$(mktemp -d)
+  if command -v curl >/dev/null 2>&1; then curl -fsSL "$URL" -o "$TMP/maven.zip"; else wget -q "$URL" -O "$TMP/maven.zip"; fi
+  unzip -q "$TMP/maven.zip" -d "$TMP"
+  mkdir -p "$MAVEN_HOME"
+  cp -R "$TMP"/apache-maven-*/. "$MAVEN_HOME/"
+  rm -rf "$TMP"
+fi
+exec "$MAVEN_HOME/bin/mvn" "$@"

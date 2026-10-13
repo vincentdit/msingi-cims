@@ -1,5 +1,6 @@
 # Java / Maven
 backend/target/
+nactvet-mock/target/
 *.class
 *.log
 # Node

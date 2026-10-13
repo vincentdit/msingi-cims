@@ -88,7 +88,18 @@ cims:
     read-timeout-seconds: 30
     lookup-rate-limit: 20       # public index-number look-ups per minute per client address
   nactvet:
+    # Admission verification: simulated (in CIMS) or live (HTTP; run the nactvet-mock project to try it without NACTVET)
     mode: ${CIMS_NACTVET_MODE:simulated}
+    verification:
+      # NOAS-style endpoints. Placeholders until NACTVET publishes its admission verification API; nactvet-mock answers them.
+      base-url: ${CIMS_NACTVET_VERIFICATION_URL:${cims.nactvet.awards.base-url}}
+      submit-path: ${CIMS_NACTVET_SUBMIT_PATH:/nacteapi/index.php/api-out-service/admissionverification}
+      results-path: ${CIMS_NACTVET_RESULTS_PATH:/nacteapi/index.php/api-out-service/admissionverificationresults}
+      confirm-path: ${CIMS_NACTVET_CONFIRM_PATH:/nacteapi/index.php/api-out-service/admissionconfirmation}
+      authorization: ${CIMS_NACTVET_VERIFICATION_AUTHORIZATION:${cims.nactvet.awards.authorization}}
+      api-code: ${CIMS_NACTVET_VERIFICATION_API_CODE:${cims.nactvet.awards.api-code}}
+      # Development against nactvet-mock only: show the confirmation code the mock "sent by SMS" on screen
+      mock-codes: ${CIMS_NACTVET_MOCK_CODES:false}
     awards:
       # NTA awards of applicants (NACTVET particulars, as in NOAS): simulated or live. Live needs NACTE_AUTHORIZATION and NACTE_API_CODE.
       mode: ${CIMS_NACTVET_AWARDS_MODE:simulated}

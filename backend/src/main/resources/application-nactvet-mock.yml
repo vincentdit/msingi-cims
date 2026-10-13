@@ -1,0 +1,10 @@
+# Live NACTVET admission verification against the nactvet-mock project (development).
+# Start the mock first (cd nactvet-mock; .\mvnw.cmd spring-boot:run), then run CIMS with profiles dev,nactvet-mock.
+cims:
+  nactvet:
+    mode: live
+    verification:
+      base-url: ${CIMS_NACTVET_VERIFICATION_URL:http://localhost:8099}
+      authorization: mock-authorization
+      api-code: MOCK
+      mock-codes: true

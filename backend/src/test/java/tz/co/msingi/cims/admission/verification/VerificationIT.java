@@ -80,7 +80,7 @@ class VerificationIT {
         long batchId = batch.get("id").asLong();
         assertThat(batch.get("batchNo").asInt()).isEqualTo(1);
         assertThat(batch.get("pending").asInt()).isEqualTo(4);
-        assertThat(batch.get("externalRef").asText()).startsWith("SIM-");
+        assertThat(batch.get("externalRef").asText()).isNotBlank();   // SIM-... when simulated, NACTVET's batch reference when live
         submit("API").andExpect(jsonPath("$.code").value("NOTHING_TO_SUBMIT"));
         assertThat(statusOf(single)).isEqualTo("PENDING_VERIFICATION");
 
