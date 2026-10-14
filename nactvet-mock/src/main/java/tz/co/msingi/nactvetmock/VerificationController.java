@@ -107,9 +107,20 @@ public class VerificationController {
             m.put("batch_ref", b.batchRef());
             m.put("institution_code", b.institutionCode());
             m.put("received_at", b.receivedAt().toString());
-            m.put("outcomes", store.outcomes(b));
+            List<Map<String, Object>> outcomes = store.outcomes(b);
+            outcomes.forEach(o -> {   // for the developer: the code NACTVET "sent" to a multiple admission
+                if (Integer.valueOf(1).equals(o.get("multiple_admission"))) {
+                    store.confirmationCode((String) o.get("index_number")).ifPresent(c -> o.put("confirmation_code", c));
+                }
+            });
+            m.put("outcomes", outcomes);
             return m;
         }).toList();
+    }
+
+    @GetMapping("/mock/status")
+    public Map<String, Object> status() {
+        return Map.of("outage", store.outage(), "batches", store.batches().size(), "processing_seconds", store.processingSeconds());
     }
 
     @GetMapping("/mock/confirmation-codes/{indexNumber}")

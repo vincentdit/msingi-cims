@@ -1,8 +1,15 @@
 package tz.co.msingi.nactvetmock;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,6 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </pre>
  * A candidate without names, date of birth or programme code is QUERIED, as is the same index number twice in one batch.
  * An application already decided in an earlier batch gets the same outcome again (NACTVET does not decide twice).
+ * <p>
+ * Everything is saved to {@code mock.state-file} after each change and read back at start-up, so restarting the mock does
+ * not forget the batches CIMS is still waiting on (as the real NACTVET would not). An empty setting keeps it in memory only.
  */
 @Component
 public class VerificationStore {
@@ -61,9 +71,17 @@ public class VerificationStore {
         }
     }
 
+    /** What is saved to the state file. */
+    record State(List<Batch> batches, Map<String, Decision> decided, Map<String, ConfirmationState> confirmations, int batchSeq, int verificationSeq) {
+    }
+
+    record ConfirmationState(String code, Set<String> admittedBy, String confirmedBy) {
+    }
+
     public enum ConfirmResult { CONFIRMED, WRONG_CODE, NOT_ADMITTED, ALREADY_CONFIRMED_ELSEWHERE }
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Logger log = LoggerFactory.getLogger(VerificationStore.class);
 
     private final Map<String, Batch> batches = new ConcurrentHashMap<>();
     private final Map<String, Decision> decided = new ConcurrentHashMap<>();          // institution + application -> final decision
@@ -74,8 +92,50 @@ public class VerificationStore {
     private volatile Clock clock = Clock.systemUTC();
     private volatile boolean outage;
 
-    public VerificationStore(@Value("${mock.processing-seconds:5}") long processingSeconds) {
+    private final ObjectMapper json;
+    private final Path stateFile;
+
+    public VerificationStore(@Value("${mock.processing-seconds:5}") long processingSeconds,
+                             @Value("${mock.state-file:}") String stateFile, ObjectMapper json) {
         this.processingSeconds = processingSeconds;
+        this.json = json;
+        this.stateFile = stateFile == null || stateFile.isBlank() ? null : Path.of(stateFile).toAbsolutePath();
+        load();
+    }
+
+    private synchronized void load() {
+        if (stateFile == null || !Files.exists(stateFile)) return;
+        try {
+            State st = json.readValue(stateFile.toFile(), State.class);
+            st.batches().forEach(b -> batches.put(b.batchRef(), b));
+            decided.putAll(st.decided());
+            st.confirmations().forEach((k, v) -> {
+                Confirmation c = new Confirmation(v.code());
+                c.admittedBy.addAll(v.admittedBy());
+                c.confirmedBy = v.confirmedBy();
+                confirmations.put(k, c);
+            });
+            batchSeq.set(st.batchSeq());
+            verificationSeq.set(st.verificationSeq());
+            log.info("[NACTVET mock] {} batch(es) read back from {}", batches.size(), stateFile);
+        } catch (IOException e) {
+            log.warn("[NACTVET mock] could not read {} ({}); starting empty", stateFile, e.getMessage());
+        }
+    }
+
+    private synchronized void save() {
+        if (stateFile == null) return;
+        Map<String, ConfirmationState> conf = new LinkedHashMap<>();
+        confirmations.forEach((k, c) -> conf.put(k, new ConfirmationState(c.code, Set.copyOf(c.admittedBy), c.confirmedBy)));
+        try {
+            Files.createDirectories(stateFile.getParent());
+            Path tmp = stateFile.resolveSibling(stateFile.getFileName() + ".tmp");
+            json.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(),
+                    new State(List.copyOf(batches.values()), Map.copyOf(decided), conf, batchSeq.get(), verificationSeq.get()));
+            Files.move(tmp, stateFile, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            log.warn("[NACTVET mock] could not save {}: {}", stateFile, e.getMessage());
+        }
     }
 
     public synchronized Batch submit(String institutionCode, List<Candidate> candidates) {
@@ -92,6 +152,7 @@ public class VerificationStore {
         }
         Batch b = new Batch(ref, institutionCode, now, List.copyOf(items));
         batches.put(ref, b);
+        save();
         return b;
     }
 
@@ -163,6 +224,7 @@ public class VerificationStore {
         if (c.confirmedBy != null && !c.confirmedBy.equals(institution)) return ConfirmResult.ALREADY_CONFIRMED_ELSEWHERE;
         if (code == null || !c.code.equals(code.trim())) return ConfirmResult.WRONG_CODE;
         c.confirmedBy = institution;
+        save();
         return ConfirmResult.CONFIRMED;
     }
 
@@ -177,6 +239,7 @@ public class VerificationStore {
         Confirmation c = confirmations.get(indexNumber == null ? "" : indexNumber.trim().toUpperCase());
         if (c == null) return false;
         c.confirmedBy = "OTHER-INSTITUTION";
+        save();
         return true;
     }
 
@@ -188,7 +251,14 @@ public class VerificationStore {
         batches.clear();
         decided.clear();
         confirmations.clear();
+        batchSeq.set(0);
+        verificationSeq.set(0);
         outage = false;
+        save();
+    }
+
+    public long processingSeconds() {
+        return processingSeconds;
     }
 
     public boolean outage() {

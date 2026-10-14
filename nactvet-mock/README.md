@@ -8,7 +8,9 @@ and see what happens when NACTVET is down or refuses the credentials.
 It speaks the NOAS style of NACTVET's api-out-service: every call is a JSON POST carrying `authorization` and `api_code`,
 answered with HTTP 200 and `{code, message, params}`. **The paths and field names are placeholders** until NACTVET publishes
 its admission verification API. CIMS reads them from configuration (`cims.nactvet.verification.*`), so only configuration
-changes when the real ones are known. State is kept in memory and lost on restart.
+changes when the real ones are known. Batches and confirmation codes are saved to `data/nactvet-mock-state.json`
+(gitignored) and read back when the mock restarts, so CIMS can still fetch outcomes of earlier batches. **Reset everything**
+on the dashboard clears it.
 
 ## Run it
 
@@ -17,7 +19,11 @@ cd C:\dev\msingi-cims\nactvet-mock
 .\mvnw.cmd spring-boot:run
 ```
 
-It listens on port 8099. Then run CIMS with the `nactvet-mock` profile as well as `dev`:
+It listens on port 8099. Open **http://localhost:8099** for its dashboard: every batch CIMS has submitted with each
+candidate's outcome (refreshed every 3 seconds), the confirmation code for multiple admissions with a **Confirm elsewhere**
+button, an outage switch and a reset.
+
+Then run CIMS with the `nactvet-mock` profile as well as `dev`:
 
 ```powershell
 cd C:\dev\msingi-cims\backend
@@ -29,6 +35,7 @@ cd C:\dev\msingi-cims\backend
 | `MOCK_PORT` | `8099` | Port |
 | `MOCK_NACTE_AUTHORIZATION`, `MOCK_NACTE_API_CODE` | `mock-authorization`, `MOCK` | Credentials CIMS must send (the `nactvet-mock` profile sends these) |
 | `MOCK_PROCESSING_SECONDS` | `5` | Seconds before a candidate has an outcome; index numbers ending in 5 take three times as long |
+| `MOCK_STATE_FILE` | `data/nactvet-mock-state.json` | Where batches are saved between restarts; empty keeps them in memory only |
 
 ## Outcomes
 
@@ -64,7 +71,8 @@ Index numbers in these paths use `-` for `/` (`S0101-0003`).
 
 | Call | Does |
 |---|---|
-| `GET /mock/batches` | Every batch received, with its outcomes so far |
+| `GET /mock/status` | Outage on or off, number of batches, processing time |
+| `GET /mock/batches` | Every batch received, with its outcomes so far (and confirmation codes) |
 | `GET /mock/confirmation-codes/{index}` | The confirmation code for a multiple admission |
 | `POST /mock/confirm-elsewhere/{index}` | The other institution confirms first, so this institution's confirmation is refused |
 | `POST /mock/outage?on=true` | Every NACTVET call answers HTTP 503 until `on=false` (CIMS shows "NACTVET could not be reached") |
@@ -79,3 +87,4 @@ Invoke-RestMethod -Method Post "http://localhost:8099/mock/outage?on=true"
 
 `NactvetMockTest`: outcomes by index number and processing time, resubmission and repeated decisions, incomplete and
 duplicate candidates, confirmation codes and confirmation elsewhere, credentials, unknown batches and outages.
+`StatePersistenceTest`: batches, verification numbers and confirmation codes survive a restart; reset clears the file.

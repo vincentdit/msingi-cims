@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NACTVET mock</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1b2330; --muted:#5d6878; --line:#e3e6eb; --brand:#1d4e89;
+          --ok:#1e7d3a; --warn:#b26a00; --bad:#c62828; --info:#0b6bcb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--brand); color: #fff; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  header small { opacity: .85; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+  .pill { padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+  .up { background: #e3f3e7; color: var(--ok); } .down { background: #fdeaea; color: var(--bad); }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+  button:hover { border-color: var(--brand); }
+  button.danger { color: var(--bad); }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .card h2 { margin: 0; padding: 12px 16px; font-size: 15px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 16px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  td.wrap { white-space: normal; min-width: 220px; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: 0; }
+  .s { font-weight: 600; } .VERIFIED { color: var(--ok); } .QUERIED { color: var(--warn); } .NOT_VERIFIED { color: var(--bad); } .PROCESSING { color: var(--info); }
+  code { background: #eef1f5; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  .empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+  details { margin-top: 8px; } summary { cursor: pointer; color: var(--brand); }
+  ul.rules { margin: 8px 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NACTVET mock <small>· admission verification, for development only</small></h1>
+  <small id="meta"></small>
+</header>
+<main>
+  <div class="bar">
+    <span id="state" class="pill up">Answering</span>
+    <button id="outage">Simulate an outage</button>
+    <button id="reset" class="danger">Reset everything</button>
+    <span class="muted" id="updated"></span>
+  </div>
+
+  <div id="batches"><div class="card"><div class="empty">Loading…</div></div></div>
+
+  <div class="card"><h2>How the mock answers</h2>
+    <div style="padding: 4px 16px 14px">
+      By the last digit of the CSEE index number:
+      <ul class="rules">
+        <li><b>7</b>: queried (name does not match NECTA); verified once resubmitted with remarks</li>
+        <li><b>9</b>: not verified (minimum entry requirements)</li>
+        <li><b>3</b>: verified, also admitted elsewhere; the applicant needs the confirmation code shown in the batch</li>
+        <li><b>5</b>: verified, but takes three times as long</li>
+        <li>any other digit: verified</li>
+      </ul>
+      <details><summary>Endpoints</summary>
+        <p>NACTVET (JSON POST with <code>authorization</code> and <code>api_code</code>):
+        <code>/nacteapi/index.php/api-out-service/admissionverification</code>,
+        <code>…/admissionverificationresults</code>, <code>…/admissionconfirmation</code>.</p>
+        <p>Developer: <code>GET /mock/batches</code>, <code>GET /mock/confirmation-codes/{index}</code>,
+        <code>POST /mock/confirm-elsewhere/{index}</code>, <code>POST /mock/outage?on=true|false</code>, <code>POST /mock/reset</code>
+        (use <code>-</code> for <code>/</code> in index numbers).</p>
+      </details>
+    </div>
+  </div>
+</main>
+<script>
+  const esc = (v) => v == null ? '' : String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const label = { VERIFIED: 'Verified', QUERIED: 'Queried', NOT_VERIFIED: 'Not verified', PROCESSING: 'Processing…' };
+  let outage = false;
+
+  async function refresh() {
+    try {
+      const [status, batches] = await Promise.all([fetch('/mock/status').then(r => r.json()), fetch('/mock/batches').then(r => r.json())]);
+      outage = status.outage;
+      const st = document.getElementById('state');
+      st.textContent = outage ? 'Outage: every NACTVET call answers 503' : 'Answering';
+      st.className = 'pill ' + (outage ? 'down' : 'up');
+      document.getElementById('outage').textContent = outage ? 'End the outage' : 'Simulate an outage';
+      document.getElementById('meta').textContent = `Outcomes after ${status.processing_seconds}s · ${status.batches} batch(es)`;
+      document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      document.getElementById('batches').innerHTML = batches.length ? batches.map(card).join('')
+        : '<div class="card"><div class="empty">No batches yet. Submit selected applicants from CIMS (NACTVET verification &amp; offers → Submit to NACTVET → Send through the NACTVET API).</div></div>';
+    } catch (e) {
+      document.getElementById('updated').textContent = 'Could not reach the mock';
+    }
+  }
+
+  function card(b) {
+    const rows = b.outcomes.map(o => `<tr>
+      <td>${esc(o.application_ref)}</td><td>${esc(o.index_number)}</td><td>${esc(o.programme_code)}</td>
+      <td class="s ${esc(o.status)}">${label[o.status] || esc(o.status)}</td>
+      <td>${esc(o.verification_number)}</td>
+      <td>${o.confirmation_code ? `<code>${esc(o.confirmation_code)}</code> <button data-elsewhere="${esc(o.index_number)}" title="Another institution confirms first">Confirm elsewhere</button>` : ''}</td>
+      <td class="wrap">${esc(o.reason)}</td></tr>`).join('');
+    return `<div class="card"><h2><span>${esc(b.batch_ref)}</span><span class="muted">${esc(b.institution_code)} · received ${new Date(b.received_at).toLocaleString()}</span></h2>
+      <div class="scroll"><table><thead><tr><th>Application</th><th>Index</th><th>Programme</th><th>Status</th><th>Verification no.</th><th>Confirmation code</th><th>Reason</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  document.getElementById('outage').onclick = async () => { await fetch('/mock/outage?on=' + !outage, { method: 'POST' }); refresh(); };
+  document.getElementById('reset').onclick = async () => {
+    if (!window.confirm('Forget every batch and confirmation code?')) return;
+    await fetch('/mock/reset', { method: 'POST' }); refresh();
+  };
+  document.getElementById('batches').onclick = async (e) => {
+    const index = e.target.dataset && e.target.dataset.elsewhere;
+    if (!index) return;
+    await fetch('/mock/confirm-elsewhere/' + encodeURIComponent(index.replace(/\//g, '-')), { method: 'POST' });
+    e.target.textContent = 'Confirmed elsewhere'; e.target.disabled = true;
+  };
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+</body>
+</html>

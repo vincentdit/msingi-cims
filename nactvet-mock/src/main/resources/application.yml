@@ -11,3 +11,5 @@ mock:
   api-code: ${MOCK_NACTE_API_CODE:MOCK}
   # Seconds before a submitted candidate has an outcome; index numbers ending in 5 take three times as long.
   processing-seconds: ${MOCK_PROCESSING_SECONDS:5}
+  # Batches and confirmations are saved here and read back at start-up; empty keeps them in memory only
+  state-file: ${MOCK_STATE_FILE:data/nactvet-mock-state.json}

@@ -19,6 +19,8 @@ import type {
   AdmissionWindow, NactvetSubmission, OutcomeResult, VerificationApplicantRow, VerificationOverview,
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { ROLES } from '../../auth/access';
+import { useSession } from '../../auth/session';
 
 const staff = { realm: 'staff' as const };
 const OFFER_STATUSES = ['OFFERED', 'ACCEPTED', 'DECLINED', 'OFFER_LAPSED'];
@@ -30,6 +32,10 @@ type TabKey = 'ready' | 'submissions' | 'queries' | 'offers' | 'rejected';
 export default function VerificationPage() {
   const { id } = useParams();
   const qc = useQueryClient();
+  // the API decides; these keep read-only roles (Deputy Principal, Registrar, Principal) away from actions they cannot take
+  const roles = useSession().user('staff')?.roles ?? [];
+  const office = roles.some((r) => r === ROLES.ADMIN || r === ROLES.ADMISSIONS);          // submit, outcomes, queries, letters
+  const revoker = roles.some((r) => r === ROLES.ADMIN || r === ROLES.ACADEMIC);           // revoke a letter
   const win = useQuery({ queryKey: ['staff', 'window', id], queryFn: () => api<AdmissionWindow>(`/api/admission/windows/${id}`, staff) });
   const ov = useQuery({ queryKey: ['staff', 'verification', id], queryFn: () => api<VerificationOverview>(`/api/admission/windows/${id}/verification`, staff) });
   const [tab, setTab] = useState<TabKey>('ready');
@@ -121,7 +127,7 @@ export default function VerificationPage() {
       <PageTitle
         title="NACTVET verification & offers"
         subtitle={<>Submit approved selections to NACTVET, record outcomes, and follow offers to acceptance. Offers stay open for <strong>{d.offerAcceptanceDays} days</strong> after verification.</>}
-        action={
+        action={office ? (
           <Tooltip title={readyCount ? '' : 'No selected applicant is ready to submit'}>
             <span>
               <Button variant="contained" startIcon={<SendIcon />} disabled={!readyCount || busy} onClick={() => setSubmitOpen(true)} sx={{ whiteSpace: 'nowrap' }}>
@@ -129,7 +135,7 @@ export default function VerificationPage() {
               </Button>
             </span>
           </Tooltip>
-        }
+        ) : <Chip label="View only: the admissions office submits to NACTVET" variant="outlined" />}
       />
       {busy && <LinearProgress sx={{ mb: 2 }} />}
       <ErrorAlert error={submit.error ?? fetchOutcomes.error ?? resolve.error ?? issueLetters.error ?? dlError ?? ov.error} />
@@ -204,8 +210,8 @@ export default function VerificationPage() {
                     <TableCell><Chip size="small" color={s.status === 'COMPLETED' ? 'success' : 'info'} label={s.status === 'COMPLETED' ? 'Completed' : 'Awaiting NACTVET'} /></TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end" useFlexGap flexWrap="wrap">
-                        {s.channel === 'API' && s.pending > 0 && <Button size="small" startIcon={<CloudSyncIcon />} disabled={busy} onClick={() => fetchOutcomes.mutate(s.id)}>Fetch outcomes</Button>}
-                        {s.pending > 0 && <Button size="small" startIcon={<UploadFileIcon />} disabled={busy} onClick={() => { setImporting(s); setCsv(null); setFileError(null); }}>Import outcomes</Button>}
+                        {office && s.channel === 'API' && s.pending > 0 && <Button size="small" startIcon={<CloudSyncIcon />} disabled={busy} onClick={() => fetchOutcomes.mutate(s.id)}>Fetch outcomes</Button>}
+                        {office && s.pending > 0 && <Button size="small" startIcon={<UploadFileIcon />} disabled={busy} onClick={() => { setImporting(s); setCsv(null); setFileError(null); }}>Import outcomes</Button>}
                         <Button size="small" startIcon={<DownloadIcon />} onClick={() => dl(`/api/admission/nactvet-submissions/${s.id}/file`, `nactvet-batch-${s.batchNo}.csv`)}>File</Button>
                       </Stack>
                     </TableCell>
@@ -226,13 +232,13 @@ export default function VerificationPage() {
         <Section empty={!queries.length} emptyText="No open NACTVET queries."
           intro="Correct the record (for example the applicant's name or index number), then mark the query resolved with a note. The applicant goes into the next submission with your note.">
           <ApplicantTable rows={queries} columns={['ref', 'name', 'programme', 'index', 'reason']}
-            action={(r) => <Button size="small" onClick={() => { setResolving(r); setRemarks(''); }}>Resolve</Button>} />
+            action={office ? (r) => <Button size="small" onClick={() => { setResolving(r); setRemarks(''); }}>Resolve</Button> : undefined} />
         </Section>
       )}
 
       {tab === 'offers' && (
         <Stack spacing={2}>
-          {d.lettersPending > 0 && (d.joiningInstructionsSet
+          {office && d.lettersPending > 0 && (d.joiningInstructionsSet
             ? <Alert severity="info" action={<Button color="inherit" size="small" disabled={busy} onClick={() => issueLetters.mutate()}>Issue {d.lettersPending} letter(s)</Button>}>
                 {d.lettersPending} accepted applicant(s) do not have an admission letter yet.
               </Alert>
@@ -245,12 +251,12 @@ export default function VerificationPage() {
                 <Stack direction="row" spacing={0} sx={{ ml: -0.75 }}>
                   <Tooltip title="Download letter (PDF)"><IconButton size="small" aria-label="Download letter"
                     onClick={() => dl(`/api/admission/applications/${r.applicationId}/admission-letter`, `admission-letter-${r.referenceNo.replace(/\W+/g, '-')}.pdf`)}><DownloadIcon fontSize="small" /></IconButton></Tooltip>
-                  <Tooltip title="Reissue (corrected edition)"><IconButton size="small" aria-label="Reissue letter"
-                    onClick={() => { setLetterAction({ kind: 'reissue', row: r }); setLetterReason(''); }}><AutorenewIcon fontSize="small" /></IconButton></Tooltip>
-                  <Tooltip title="Revoke"><IconButton size="small" color="error" aria-label="Revoke letter"
-                    onClick={() => { setLetterAction({ kind: 'revoke', row: r }); setLetterReason(''); }}><BlockIcon fontSize="small" /></IconButton></Tooltip>
+                  {office && <Tooltip title="Reissue (corrected edition)"><IconButton size="small" aria-label="Reissue letter"
+                    onClick={() => { setLetterAction({ kind: 'reissue', row: r }); setLetterReason(''); }}><AutorenewIcon fontSize="small" /></IconButton></Tooltip>}
+                  {revoker && <Tooltip title="Revoke"><IconButton size="small" color="error" aria-label="Revoke letter"
+                    onClick={() => { setLetterAction({ kind: 'revoke', row: r }); setLetterReason(''); }}><BlockIcon fontSize="small" /></IconButton></Tooltip>}
                 </Stack>
-              ) : r.status === 'ACCEPTED' && d.joiningInstructionsSet ? (
+              ) : office && r.status === 'ACCEPTED' && d.joiningInstructionsSet ? (
                 <Button size="small" onClick={() => setLetterAction({ kind: 'reissue', row: r })}>Issue letter</Button>
               ) : null} />
           </Section>

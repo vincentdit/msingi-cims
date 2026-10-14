@@ -1,6 +1,7 @@
 # Java / Maven
 backend/target/
 nactvet-mock/target/
+nactvet-mock/data/
 *.class
 *.log
 # Node
@@ -18,3 +19,5 @@ Thumbs.db
 # Local configuration with keys
 backend/config/*.yml
 !backend/config/*.example
+# Word lock files
+~$*

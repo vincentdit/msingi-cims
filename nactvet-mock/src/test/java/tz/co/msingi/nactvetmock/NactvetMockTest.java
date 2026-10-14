@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "mock.processing-seconds=10")
+@SpringBootTest(properties = {"mock.processing-seconds=10", "mock.state-file="})
 @AutoConfigureMockMvc
 class NactvetMockTest {
 
