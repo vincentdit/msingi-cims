@@ -58,7 +58,7 @@ export default function ApprovalsPage() {
 
 function Line({ i }: { i: ApprovalItem }) {
   return (
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} sx={{ px: 2, py: 1.5, opacity: i.canAct ? 1 : 0.75 }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} sx={{ px: 2, py: 1.5, bgcolor: i.canAct ? undefined : 'action.hover' }}>
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <Chip size="small" label={i.label} variant="outlined" />

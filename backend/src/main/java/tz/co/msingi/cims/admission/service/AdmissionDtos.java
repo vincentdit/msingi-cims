@@ -33,9 +33,9 @@ public final class AdmissionDtos {
     private AdmissionDtos() {
     }
 
-    /** As in NOAS: at least 8 characters with an upper-case letter, a lower-case letter, a digit and a special character. */
-    public static final String PASSWORD_RULE = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,72}$";
-    public static final String PASSWORD_MESSAGE = "Use at least 8 characters with an upper-case letter, a lower-case letter, a digit and a special character";
+    /** At least 10 characters (NFR-SEC-01) with an upper-case letter, a lower-case letter, a digit and a special character. */
+    public static final String PASSWORD_RULE = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{10,72}$";
+    public static final String PASSWORD_MESSAGE = "Use at least 10 characters with an upper-case letter, a lower-case letter, a digit and a special character";
 
     // ------------------------------------------------------------------ applicant auth
     /**

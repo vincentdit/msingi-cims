@@ -57,10 +57,10 @@ export default function ReportsPage() {
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Card sx={{ position: { md: 'sticky' }, top: { md: 80 }, maxHeight: { md: 'calc(100vh - 100px)' }, overflowY: { md: 'auto' } }}>
-            <List dense disablePadding sx={{ py: 0.5 }}>
+            <List component="nav" aria-label="Reports" dense disablePadding sx={{ py: 0.5 }}>
               {[...areas.entries()].map(([area, list]) => (
                 <Box key={area}>
-                  <ListSubheader sx={{ lineHeight: '36px', fontWeight: 700 }}>{area}</ListSubheader>
+                  <ListSubheader component="div" sx={{ lineHeight: '36px', fontWeight: 700 }}>{area}</ListSubheader>
                   {list.map((r) => (
                     <ListItemButton key={r.code} selected={r.code === code} onClick={() => setParams({ code: r.code })} sx={{ py: 0.5 }}>
                       <ListItemText primary={r.title} secondary={r.code} primaryTypographyProps={{ variant: 'body2' }} secondaryTypographyProps={{ variant: 'caption' }} />

@@ -1,0 +1,26 @@
+/** The student part of CIMS, loaded only when someone opens it (keeps the admission portal small on phones). */
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { RequireAuth } from '../auth/session';
+import StudentLayout from '../components/StudentLayout';
+import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from '../pages/student/StudentPages';
+import SemesterRegistrationPage from '../pages/student/SemesterRegistrationPage';
+import StudentResultsPage from '../pages/student/StudentResultsPage';
+import CheckInPage from '../pages/student/CheckInPage';
+
+export default function StudentApp() {
+  return (
+    <Routes>
+      <Route path="login" element={<StudentLoginPage />} />
+      <Route element={<RequireAuth realm="student"><StudentLayout /></RequireAuth>}>
+        <Route index element={<StudentHome />} />
+        <Route path="register" element={<SemesterRegistrationPage />} />
+        <Route path="results" element={<StudentResultsPage />} />
+        <Route path="check-in" element={<CheckInPage />} />
+        <Route path="fees" element={<StudentFees />} />
+        <Route path="notices" element={<StudentNotices />} />
+        <Route path="profile" element={<StudentProfilePage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/student" replace />} />
+    </Routes>
+  );
+}

@@ -185,6 +185,15 @@ cd frontend
 npm test
 ```
 
+End-to-end and accessibility tests (Playwright with axe, WCAG 2.1 A/AA) run against a running demo institution — start the
+backend with the dev profile and `npm run dev` first. CI runs them in Chromium, Firefox and WebKit and at phone size:
+
+```bash
+cd frontend
+npx playwright install chromium        # once
+npm run e2e -- --project=chromium      # or: npm run e2e  (all browsers, after installing them)
+```
+
 To add or correct Kiswahili for a staff screen, add the English text as it appears in the code (or as the server sends it) and its Kiswahili to `frontend/src/locale/staff-sw.json`; for text built from values use `{0}`, `{1}` … in both (`"{0} students": "Wanafunzi {0}"`). A status on a chip can be worded differently from a button with a `[label] ` key (`"[label] Open": "Wazi"`, `"Open": "Fungua"`).
 
 Integration tests run against real PostgreSQL so that row-level security, triggers and constraints are exercised. They include:
@@ -305,6 +314,13 @@ Each outside system has a simulated adapter (development, tests) and a live one,
 - **CI**: `.github/workflows/ci.yml` runs the backend tests against PostgreSQL 16 with a non-superuser role, the mocks'
   tests, the web app's type check and build, shell and compose checks, and builds the Docker images (pushed to GHCR on
   version tags).
+- **End-to-end and security**: `.github/workflows/e2e-security.yml` starts the demo institution and runs the Playwright
+  smoke and accessibility suites in three browsers, an OWASP ZAP baseline scan (report kept as an artifact; rules in
+  `.zap/rules.tsv`) and a Trivy scan of dependencies, secrets and Dockerfiles (accepted findings in `.trivyignore`); on
+  pushes to main, pull requests and every Monday. The main CI also runs `npm audit --audit-level=high`.
+- **Several backend instances**: scheduled jobs take a row in `job_locks` before running (like ShedLock: held at most a
+  set time if an instance dies, and at least a short time so a slightly later clock does not run a job twice), so the
+  backend can run as several replicas behind the proxy.
 - **Load tests**: `loadtest/k6/cims.js` and `loadtest/locust/locustfile.py` with the NFR-PER-01 thresholds; results in
   `loadtest/README.md`.
 

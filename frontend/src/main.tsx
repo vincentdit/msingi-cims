@@ -9,13 +9,17 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { SessionProvider } from './auth/session';
 import { InstitutionProvider } from './components/InstitutionContext';
-import './i18n';
+import i18n from './i18n';
+import { loadUiDictionary } from './locale/dictionary';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+// a saved choice of Kiswahili: fetch the back-office dictionary before the first screen
+const ready = i18n.language === 'sw' ? loadUiDictionary() : Promise.resolve();
+
+ready.then(() => ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
@@ -27,7 +31,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </SessionProvider>
     </QueryClientProvider>
   </React.StrictMode>,
-);
+));
 
 // Installable app (FR-STU-01): the service worker is registered in production builds only, so development always runs fresh code.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

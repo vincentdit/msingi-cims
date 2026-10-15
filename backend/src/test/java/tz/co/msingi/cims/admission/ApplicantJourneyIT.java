@@ -197,7 +197,7 @@ class ApplicantJourneyIT {
 
     @Test
     void passwordsNeedUpperLowerDigitAndSpecialCharacter() throws Exception {
-        for (String weak : new String[]{"Secret123", "kifaru#mto47", "KIFARU#MTO47", "Secret@abc", "Se@1"}) {
+        for (String weak : new String[]{"Secret123", "Kifaru#7a", "kifaru#mto47", "KIFARU#MTO47", "Secret@abc", "Se@1"}) {
             call(post("/api/applicant-auth/register"), null, """
                     {"indexNumber":"S0101/0006","examYear":2025,"phone":"0688 222 444","password":"%s","acceptPrivacyNotice":true}""".formatted(weak))
                     .andExpect(status().isBadRequest())

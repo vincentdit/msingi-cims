@@ -1,5 +1,7 @@
 package tz.co.msingi.cims.reporting;
 
+import tz.co.msingi.cims.platform.jobs.JobLock;
+import java.time.Duration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -51,6 +53,8 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class ReportScheduleService {
+
+    private final JobLock jobLock;
 
     static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.ENGLISH);
@@ -153,6 +157,11 @@ public class ReportScheduleService {
 
     @Scheduled(cron = "${cims.reports.schedule-cron:0 */10 * * * *}", zone = "Africa/Dar_es_Salaam")
     public void runDue() {
+        jobLock.runOnce("report-schedules", Duration.ofMinutes(9), Duration.ofSeconds(30), this::runDueNow);
+    }
+
+    /** One run of the job; the schedule above runs it through the job lock, so only one instance runs it at a time. */
+    public void runDueNow() {
         for (Tenant t : tenants.findAll()) {
             if (!"ACTIVE".equals(t.getStatus())) continue;
             try {

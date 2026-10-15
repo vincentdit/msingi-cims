@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 /** The same rules as the server (and NOAS): 8+ characters, upper and lower case, a digit and a special character. */
 export const PASSWORD_RULES = [
-  { key: 'length', test: (v: string) => v.length >= 8 },
+  { key: 'length', test: (v: string) => v.length >= 10 },
   { key: 'upper', test: (v: string) => /[A-Z]/.test(v) },
   { key: 'lower', test: (v: string) => /[a-z]/.test(v) },
   { key: 'digit', test: (v: string) => /\d/.test(v) },

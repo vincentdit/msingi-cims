@@ -130,7 +130,7 @@ export function StudentHome() {
             </Stack>
             {d.billed > 0 && (
               <>
-                <LinearProgress variant="determinate" value={paidPct} sx={{ mt: 1, height: 8, borderRadius: 4 }} color={paidPct >= 100 ? 'success' : 'primary'} />
+                <LinearProgress variant="determinate" value={paidPct} aria-label={t('student.paidSoFar')} sx={{ mt: 1, height: 8, borderRadius: 4 }} color={paidPct >= 100 ? 'success' : 'primary'} />
                 <Typography variant="caption" color="text.secondary">{t('student.paidSoFar')}: {formatTzs(d.paid)} / {formatTzs(d.billed)} ({paidPct}%)</Typography>
               </>
             )}

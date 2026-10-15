@@ -1,0 +1,120 @@
+# End-to-end, accessibility and security checks (NFR-CMP-01, NFR-USA-03, NFR-SEC-04):
+#  - the demo institution is started (backend with the dev profile on PostgreSQL, the built web app behind `vite preview`);
+#  - Playwright runs the smoke and accessibility suites in Chromium, Firefox and WebKit (Safari's engine) and on a phone;
+#  - OWASP ZAP runs a baseline (passive) scan of the running app; the report is kept as an artifact;
+#  - Trivy scans the code and dependencies for known vulnerabilities, committed secrets and Dockerfile misconfigurations.
+# Runs on pushes to main, pull requests, every Monday, and by hand.
+name: E2E and security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Browsers, accessibility and ZAP baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      CIMS_DB_URL: jdbc:postgresql://localhost:5432/cims
+      CIMS_DB_USER: cims
+      CIMS_DB_PASSWORD: cims
+      E2E_BASE_URL: http://127.0.0.1:5173
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Application role and database, as in production
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE cims LOGIN PASSWORD 'cims' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS" \
+            -c "CREATE DATABASE cims OWNER cims"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build and start the backend (demo institution)
+        working-directory: backend
+        run: |
+          mvn -B -ntp -DskipTests package
+          nohup java -jar target/cims-backend-*.jar --spring.profiles.active=dev > ../backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8085/api/public/institution > /dev/null && exit 0; sleep 3; done
+          echo "backend did not start"; tail -100 ../backend.log; exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build and serve the web app
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          nohup npx vite preview --host 127.0.0.1 --port 5173 --strictPort > ../preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5173/ > /dev/null && exit 0; sleep 2; done
+          echo "web app did not start"; cat ../preview.log; exit 1
+
+      - name: Install the browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Smoke and accessibility tests (Chromium, Firefox, WebKit, phone)
+        working-directory: frontend
+        run: npx playwright test
+
+      - name: OWASP ZAP baseline scan (passive)
+        if: always()
+        run: |
+          mkdir -p zap && chmod 777 zap
+          cp .zap/rules.tsv zap/rules.tsv
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.16.1 \
+            zap-baseline.py -t http://127.0.0.1:5173 -c rules.tsv -r zap-report.html -J zap-report.json -I
+
+      - name: Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-and-zap-reports
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            zap/zap-report.html
+            zap/zap-report.json
+            backend.log
+          retention-days: 14
+
+  trivy:
+    name: Trivy (dependencies, secrets, Dockerfiles)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan the repository
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src aquasec/trivy:0.58.1 fs \
+            --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed \
+            --skip-dirs dev-keys --skip-dirs frontend/node_modules --ignorefile .trivyignore \
+            --exit-code 1 .

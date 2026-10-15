@@ -1,42 +1,14 @@
 import i18n from '../i18n';
-import sw from './staff-sw.json';
+import { dictionaryVersion, exact, patterns } from './dictionary';
 
 /**
  * Kiswahili for the back-office (BR-40). The staff screens are written in English; when Kiswahili is chosen every string
- * React renders from our own components (text, and labels such as `label`, `title`, `placeholder`) is looked up here,
- * English being the key. A string with no entry stays in English, so a new screen is never blank, only untranslated.
- * Entries with {0}, {1} … are patterns for text built from values, e.g. "{0} students" → "wanafunzi {0}".
+ * React renders from our own components (text, and labels such as `label`, `title`, `placeholder`) is looked up in the
+ * dictionary (dictionary.ts), English being the key. A string with no entry stays in English, so a new screen is never
+ * blank, only untranslated.
  */
-const exact = new Map<string, string>();
-interface Pattern { re: RegExp; to: string; hint: string; numeric: boolean }
-const patterns: Pattern[] = [];
-
-for (const [en, s] of Object.entries(sw as Record<string, string>)) {
-  if (!s) continue;
-  if (/\{\d\}/.test(en)) {
-    const parts = en.split(/\{(\d)\}/);
-    let re = '^';
-    let longest = '';
-    parts.forEach((p, i) => {
-      if (i % 2 === 1) re += '([\\s\\S]+?)';
-      else {
-        re += p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        if (p.trim().length > longest.length) longest = p.trim();
-      }
-    });
-    // the placeholder numbers in the translation refer to the order in the English text
-    const order = parts.filter((_, i) => i % 2 === 1).map(Number);
-    // "{0} of {1}" and the like carry too little text of their own to tell "3 of 10" from "Head of Department": numbers only
-    const numeric = /^\{\d\}/.test(en) && /\{\d\}$/.test(en) && longest.length <= 3;
-    patterns.push({ re: new RegExp(re + '$'), to: s.replace(/\{(\d)\}/g, (_, d) => `{@${order.indexOf(Number(d))}}`), hint: longest, numeric });
-  } else {
-    exact.set(en, s);
-  }
-}
-// most specific first, so "{0} of {1} accepted" is tried before "{0} accepted"
-patterns.sort((a, b) => b.hint.length - a.hint.length);
-
 const cache = new Map<string, string>();
+let cachedFor = -1;
 
 export function uiLanguage(): string {
   return i18n.language === 'sw' ? 'sw' : 'en';
@@ -48,6 +20,10 @@ export function uiLanguage(): string {
  */
 export function translateUi(text: string, context?: string): string {
   if (uiLanguage() !== 'sw' || text.length < 2 || text.length > 400) return text;
+  if (cachedFor !== dictionaryVersion()) {
+    cache.clear();
+    cachedFor = dictionaryVersion();
+  }
   if (context) {
     const special = exact.get(`[${context}] ${text.trim()}`);
     if (special !== undefined) return special;
@@ -83,5 +59,3 @@ export function translateUi(text: string, context?: string): string {
 
 /** For text built outside JSX (window.confirm, document titles): the same lookup. */
 export const tr = (text: string, context?: string): string => translateUi(text, typeof context === 'string' ? context : undefined);
-
-export const UI_DICTIONARY_SIZE = exact.size + patterns.length;

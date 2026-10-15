@@ -177,11 +177,11 @@ export default function StaffLayout() {
         <Typography variant="caption" sx={{ opacity: 0.7 }}>CIMS · Back-office</Typography>
       </Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-      <List sx={{ px: 1, flexGrow: 1 }} dense>
+      <List component="nav" aria-label="Main menu" sx={{ px: 1, flexGrow: 1 }} dense>
         {groups.map((g, gi) => (
-          <Box key={g.title ?? gi} component="li" sx={{ listStyle: 'none', mt: gi ? 1.5 : 0.5 }}>
+          <Box key={g.title ?? gi} role="group" aria-label={g.title ?? undefined} sx={{ mt: gi ? 1.5 : 0.5 }}>
             {g.title && <Typography component="div" sx={{ px: 1.5, pb: 0.5, fontSize: 12, fontWeight: 600, color: 'rgba(230,235,242,0.55)' }}>{g.title}</Typography>}
-            <Box component="ul" sx={{ p: 0, m: 0 }}>
+            <Box sx={{ p: 0, m: 0 }}>
               {g.items.map((n) => (
                 <ListItemButton
                   key={n.to}

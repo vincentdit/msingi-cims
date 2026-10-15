@@ -92,6 +92,9 @@ jobs:
       - name: Type check
         working-directory: frontend
         run: npx tsc --noEmit -p .
+      - name: Dependency audit (high and critical)
+        working-directory: frontend
+        run: npm audit --audit-level=high
       - name: Unit tests (back-office Kiswahili)
         working-directory: frontend
         run: npm test

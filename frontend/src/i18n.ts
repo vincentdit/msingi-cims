@@ -1,4 +1,5 @@
 import i18n from 'i18next';
+import { loadUiDictionary } from './locale/dictionary';
 import { initReactI18next } from 'react-i18next';
 
 // English and Kiswahili (BR-40). Keys are grouped by screen.
@@ -35,10 +36,10 @@ const en = {
     registerTitle: 'Create your applicant account',
     firstName: 'First name', middleName: 'Middle name (optional)', surname: 'Surname',
     phone: 'Mobile number', email: 'Email (optional)', password: 'Password',
-    passwordHelp: 'At least 8 characters with upper and lower case letters, a digit and a special character',
+    passwordHelp: 'At least 10 characters with upper and lower case letters, a digit and a special character',
     confirmPassword: 'Confirm password', pwMismatch: 'Passwords do not match.', pwMatch: 'Passwords match.',
     pwNotMet: 'Password does not meet all requirements.', pwMustContain: 'Password must contain:', pwStrength: 'Password strength {{met}} of {{total}}',
-    pwRule_length: 'At least 8 characters', pwRule_upper: 'One uppercase letter (A-Z)', pwRule_lower: 'One lowercase letter (a-z)',
+    pwRule_length: 'At least 10 characters', pwRule_upper: 'One uppercase letter (A-Z)', pwRule_lower: 'One lowercase letter (a-z)',
     pwRule_digit: 'One digit (0-9)', pwRule_special: 'One special character (!@#$…)', showPassword: 'Show password', hidePassword: 'Hide password',
     privacy: 'I have read the privacy notice and agree that my data is used to process my application.',
     create: 'Create account', haveAccount: 'Already have an account? Sign in',
@@ -402,10 +403,10 @@ const sw: typeof en = {
     registerTitle: 'Fungua akaunti ya mwombaji',
     firstName: 'Jina la kwanza', middleName: 'Jina la kati (si lazima)', surname: 'Jina la ukoo',
     phone: 'Namba ya simu', email: 'Barua pepe (si lazima)', password: 'Nenosiri',
-    passwordHelp: 'Angalau herufi 8 zenye herufi kubwa na ndogo, tarakimu na alama maalum',
+    passwordHelp: 'Angalau herufi 10 zenye herufi kubwa na ndogo, tarakimu na alama maalum',
     confirmPassword: 'Thibitisha nenosiri', pwMismatch: 'Manenosiri hayalingani.', pwMatch: 'Manenosiri yanalingana.',
     pwNotMet: 'Nenosiri halijatimiza masharti yote.', pwMustContain: 'Nenosiri liwe na:', pwStrength: 'Uimara wa nenosiri {{met}} kati ya {{total}}',
-    pwRule_length: 'Angalau herufi 8', pwRule_upper: 'Herufi kubwa moja (A-Z)', pwRule_lower: 'Herufi ndogo moja (a-z)',
+    pwRule_length: 'Angalau herufi 10', pwRule_upper: 'Herufi kubwa moja (A-Z)', pwRule_lower: 'Herufi ndogo moja (a-z)',
     pwRule_digit: 'Tarakimu moja (0-9)', pwRule_special: 'Alama maalum moja (!@#$…)', showPassword: 'Onyesha nenosiri', hidePassword: 'Ficha nenosiri',
     privacy: 'Nimesoma taarifa ya faragha na nakubali taarifa zangu zitumike kushughulikia maombi yangu.',
     create: 'Fungua akaunti', haveAccount: 'Una akaunti tayari? Ingia',
@@ -758,8 +759,10 @@ const setHtmlLang = (lng: string) => {
 i18n.on('languageChanged', setHtmlLang);
 setHtmlLang(i18n.language);
 
-export function setLanguage(lng: 'en' | 'sw') {
-  i18n.changeLanguage(lng);
+/** Switches the language; for Kiswahili the back-office dictionary is fetched first, so the screen changes in one go. */
+export async function setLanguage(lng: 'en' | 'sw'): Promise<void> {
+  if (lng === 'sw') await loadUiDictionary();
+  await i18n.changeLanguage(lng);
   try {
     localStorage.setItem('cims.lang', lng);
   } catch {

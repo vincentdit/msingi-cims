@@ -19,5 +19,7 @@ Thumbs.db
 # Local configuration with keys
 backend/config/*.yml
 !backend/config/*.example
-# Word lock files
-~$*
+# Playwright reports and traces
+frontend/playwright-report/
+frontend/test-results/
+zap/

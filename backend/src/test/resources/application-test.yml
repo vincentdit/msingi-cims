@@ -6,6 +6,8 @@ spring:
   flyway:
     clean-disabled: false
 cims:
+  jobs:
+    hold-minimum: false       # tests call jobs back to back; production keeps each job's minimum hold
   otp:
     expose-in-response: true
   demo:

@@ -14,7 +14,9 @@ export function buildTheme(primary = '#1F4E8C', accent = '#12715B') {
     palette: {
       primary: { main: primary },
       secondary: { main: accent },
-      warning: { main: '#E3A72F' },
+      // darker than MUI's defaults so text and chips in these colours meet WCAG AA contrast (4.5:1)
+      warning: { main: '#8A5A00' },
+      info: { main: '#0277BD' },
       background: { default: '#F6F7F9', paper: '#FFFFFF' },
       text: { primary: '#0F1B2D', secondary: '#4A5568' },
     },
@@ -34,6 +36,10 @@ export function buildTheme(primary = '#1F4E8C', accent = '#12715B') {
       MuiCard: { defaultProps: { variant: 'outlined' }, styleOverrides: { root: { borderColor: '#E2E6EC' } } },
       MuiTextField: { defaultProps: { fullWidth: true, size: 'medium' } },
       MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
+      // a table wider than the screen scrolls; keyboard users must be able to reach it (WCAG 2.1.1)
+      MuiTableContainer: { defaultProps: { tabIndex: 0 } },
+      // every progress bar needs a name for screen readers; pages give a precise one, this is the fallback
+      MuiLinearProgress: { defaultProps: { 'aria-label': 'Progress' } },
       MuiTablePagination: { defaultProps: { labelRowsPerPage: createElement(RowsPerPage), labelDisplayedRows: rows } },
       MuiAutocomplete: { defaultProps: { noOptionsText: createElement(Ui, { text: 'No options' }), loadingText: createElement(Ui, { text: 'Loading…' }) } },
     },

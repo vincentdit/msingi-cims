@@ -1,5 +1,7 @@
 package tz.co.msingi.cims.notification;
 
+import tz.co.msingi.cims.platform.jobs.JobLock;
+import java.time.Duration;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,8 @@ import java.util.concurrent.Executors;
 @Component
 public class MessageDispatcher {
 
+    private final JobLock jobLock;
+
     static final int MAX_ATTEMPTS = 3;
     private static final Object KEY = new Object();
 
@@ -46,7 +50,8 @@ public class MessageDispatcher {
     });
 
     public MessageDispatcher(MessageRepository messages, MessagingSettingsRepository settings, TenantRepository tenants, SmsGateway gateway,
-                             PlatformTransactionManager txManager, @Value("${cims.sms.async:true}") boolean async) {
+                             PlatformTransactionManager txManager, @Value("${cims.sms.async:true}") boolean async, JobLock jobLock) {
+        this.jobLock = jobLock;
         this.messages = messages;
         this.settings = settings;
         this.tenants = tenants;
@@ -177,6 +182,11 @@ public class MessageDispatcher {
     /** Retries messages still queued (gateway refused or the application stopped before sending). */
     @Scheduled(cron = "${cims.sms.retry-cron:30 * * * * *}")
     public void retryQueued() {
+        jobLock.runOnce("sms-retry", Duration.ofSeconds(50), Duration.ofSeconds(20), this::retryQueuedNow);
+    }
+
+    /** One run of the job; the schedule above runs it through the job lock, so only one instance runs it at a time. */
+    public void retryQueuedNow() {
         for (Tenant t : tenants.findAll()) {
             if (!"ACTIVE".equals(t.getStatus())) continue;
             try {

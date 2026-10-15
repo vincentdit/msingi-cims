@@ -51,7 +51,7 @@ export default function PlatformLayout() {
     <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', bgcolor: BG, color: '#E3EFEE' }}>
       <Box sx={{ p: 2.5 }}>{brand}</Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-      <List sx={{ px: 1, pt: 1, flexGrow: 1 }} dense>
+      <List component="nav" aria-label="Main menu" sx={{ px: 1, pt: 1, flexGrow: 1 }} dense>
         {NAV.map((n) => (
           <ListItemButton key={n.to} component={NavLink} to={n.to} end={n.end} onClick={() => setOpen(false)}
             sx={{

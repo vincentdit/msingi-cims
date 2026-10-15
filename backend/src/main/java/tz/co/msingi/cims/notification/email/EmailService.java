@@ -1,5 +1,6 @@
 package tz.co.msingi.cims.notification.email;
 
+import tz.co.msingi.cims.platform.jobs.JobLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +31,8 @@ import java.util.concurrent.Executors;
 @Service
 public class EmailService {
 
+    private final JobLock jobLock;
+
     public static final int MAX_ATTEMPTS = 5;
     private static final int MAX_ATTACHMENT = 10 * 1024 * 1024;
 
@@ -46,7 +49,8 @@ public class EmailService {
     });
 
     public EmailService(EmailRepository emails, EmailGateway gateway, EmailProperties props, TenantRepository tenants, JdbcTemplate jdbc,
-                        PlatformTransactionManager txManager) {
+                        PlatformTransactionManager txManager, JobLock jobLock) {
+        this.jobLock = jobLock;
         this.emails = emails;
         this.gateway = gateway;
         this.props = props;
@@ -167,6 +171,11 @@ public class EmailService {
     /** Retries emails still queued (mail server down at the time). */
     @Scheduled(cron = "${cims.email.retry-cron:0 */5 * * * *}")
     public void retryQueued() {
+        jobLock.runOnce("email-retry", Duration.ofMinutes(4), Duration.ofSeconds(30), this::retryQueuedNow);
+    }
+
+    /** One run of the job; the schedule above runs it through the job lock, so only one instance runs it at a time. */
+    public void retryQueuedNow() {
         for (Tenant t : tenants.findAll()) {
             try {
                 TenantContext.runAs(t.toInfo(), () -> {

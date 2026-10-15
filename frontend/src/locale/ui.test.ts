@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import i18n from '../i18n';
 import { localise } from './jsx-runtime';
-import { translateUi, UI_DICTIONARY_SIZE } from './ui';
+import { loadUiDictionary, uiDictionarySize } from './dictionary';
+import { translateUi } from './ui';
 
 describe('back-office Kiswahili (BR-40)', () => {
-  beforeAll(async () => { await i18n.changeLanguage('sw'); });
+  beforeAll(async () => { await loadUiDictionary(); await i18n.changeLanguage('sw'); });
   afterAll(async () => { await i18n.changeLanguage('en'); });
 
   it('has a dictionary', () => {
-    expect(UI_DICTIONARY_SIZE).toBeGreaterThan(3000);
+    expect(uiDictionarySize()).toBeGreaterThan(3000);
   });
 
   it('translates exact strings and keeps the surrounding spaces', () => {
