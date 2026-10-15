@@ -29,9 +29,13 @@ public class PublicController {
     private final TenantRepository tenants;
     private final AdmissionWindowService windows;
     private final InstitutionPhotoService photos;
+    private final tz.co.msingi.cims.finance.collection.PaymentChannelService payments;
+    private final tz.co.msingi.cims.platform.privacy.SecuritySettingsService security;
 
     public record InstitutionView(String code, String name, String shortName, String nactvetRegNo, String contactEmail,
-                                  String contactPhone, Map<String, Object> branding, PhotoView campusPhoto) {
+                                  String contactPhone, Map<String, Object> branding, PhotoView campusPhoto,
+                                  tz.co.msingi.cims.finance.collection.PaymentChannelService.PublicPayment payment,
+                                  tz.co.msingi.cims.platform.privacy.SecuritySettingsService.IdleMinutes idleMinutes) {
     }
 
     @Operation(summary = "Institution name and branding for the portal")
@@ -39,7 +43,7 @@ public class PublicController {
     public InstitutionView institution() {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
         return new InstitutionView(t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactEmail(),
-                t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null));
+                t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), payments.forPayers(), security.idle());
     }
 
     @Operation(summary = "Admission windows open now, with programmes and entry requirements")

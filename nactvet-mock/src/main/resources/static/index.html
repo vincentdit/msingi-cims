@@ -37,7 +37,7 @@
 </head>
 <body>
 <header>
-  <h1>NACTVET mock <small>· admission verification, for development only</small></h1>
+  <h1>NACTVET mock <small>· admission verification, student registration and results, for development only</small></h1>
   <small id="meta"></small>
 </header>
 <main>
@@ -49,6 +49,8 @@
   </div>
 
   <div id="batches"><div class="card"><div class="empty">Loading…</div></div></div>
+
+  <div class="card"><h2>Student registration and results received</h2><div id="subs" class="scroll"><div class="empty">None yet.</div></div></div>
 
   <div class="card"><h2>How the mock answers</h2>
     <div style="padding: 4px 16px 14px">
@@ -63,7 +65,9 @@
       <details><summary>Endpoints</summary>
         <p>NACTVET (JSON POST with <code>authorization</code> and <code>api_code</code>):
         <code>/nacteapi/index.php/api-out-service/admissionverification</code>,
-        <code>…/admissionverificationresults</code>, <code>…/admissionconfirmation</code>.</p>
+        <code>…/admissionverificationresults</code>, <code>…/admissionconfirmation</code>; student registration
+        <code>…/studentregistration</code> and <code>…/studentregistrationstatus</code> (a student without a verification number is queried);
+        results <code>…/resultsubmission</code> and <code>…/resultsubmissionstatus</code> (a row without a verification number or a grade is queried).</p>
         <p>Developer: <code>GET /mock/batches</code>, <code>GET /mock/confirmation-codes/{index}</code>,
         <code>POST /mock/confirm-elsewhere/{index}</code>, <code>POST /mock/outage?on=true|false</code>, <code>POST /mock/reset</code>
         (use <code>-</code> for <code>/</code> in index numbers).</p>
@@ -78,7 +82,11 @@
 
   async function refresh() {
     try {
-      const [status, batches] = await Promise.all([fetch('/mock/status').then(r => r.json()), fetch('/mock/batches').then(r => r.json())]);
+      const [status, batches, subs] = await Promise.all([fetch('/mock/status').then(r => r.json()), fetch('/mock/batches').then(r => r.json()),
+        fetch('/mock/submissions').then(r => r.json())]);
+      document.getElementById('subs').innerHTML = subs.length ? `<table><thead><tr><th>Batch</th><th>Kind</th><th>Institution</th><th>Detail</th><th>Students</th><th>Queried</th><th>Status</th><th>Received</th></tr></thead><tbody>${
+        subs.map(x => `<tr><td>${esc(x.batch_ref)}</td><td>${esc(x.kind)}</td><td>${esc(x.institution_code)}</td><td>${esc(x.detail)}</td><td>${x.students}</td><td>${x.queried}</td><td class="s">${esc(x.status)}</td><td>${new Date(x.received_at).toLocaleString()}</td></tr>`).join('')}</tbody></table>`
+        : '<div class="empty">None yet. Send students (Registry → NACTVET registration) or confirmed results (Results → Send to NACTVET) from CIMS.</div>';
       outage = status.outage;
       const st = document.getElementById('state');
       st.textContent = outage ? 'Outage: every NACTVET call answers 503' : 'Answering';

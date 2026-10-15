@@ -69,6 +69,10 @@ public class ResultSheet extends BaseEntity {
     private String publishedByName;
     private OffsetDateTime publishedAt;
     private String returnedNote;
+
+    /** Review stages passed before the Academic Committee (FR-EXM-05). */
+    @Column(nullable = false)
+    private short stageNo;
     private String returnedByName;
     private OffsetDateTime returnedAt;
 

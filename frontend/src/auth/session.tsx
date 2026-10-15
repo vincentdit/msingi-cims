@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Navigate, useLocation } from 'react-router-dom';
 import { clearSession, getSessionUser, getToken, setSession, type Realm } from '../api/client';
 import type { TokenResponse } from '../api/types';
+import { setLanguage } from '../i18n';
 
 type User = TokenResponse['user'];
 
@@ -22,6 +23,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const user = useCallback((realm: Realm) => (getToken(realm) ? getSessionUser<User>(realm) : null), []);
   const signIn = useCallback((realm: Realm, t: TokenResponse) => {
     setSession(realm, t.accessToken, t.expiresIn, t.user);
+    // the language kept with the account follows the person to this device (BR-40)
+    if (t.user?.language === 'en' || t.user?.language === 'sw') setLanguage(t.user.language);
     bump();
   }, []);
   const signOut = useCallback((realm: Realm) => {

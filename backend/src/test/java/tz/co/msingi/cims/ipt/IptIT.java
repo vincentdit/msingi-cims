@@ -40,6 +40,8 @@ class IptIT {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired TestData data;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
 
     AdmissionScenario s;
     TestData.Institution inst;
@@ -174,6 +176,42 @@ class IptIT {
     }
 
     @Test
+    void theWorkplaceSupervisorAssessesThroughThePersonalLink() throws Exception {
+        Setup c = setup();
+        long tcra = s.body(s.call(post("/api/ipt/organisations"), coordinator, "{\"name\":\"TCRA\",\"region\":\"Dar es Salaam\"}")).get("id").asLong();
+        long pid = s.body(s.call(post("/api/ipt/periods"), coordinator, period(c, "40", "30", "30")).andExpect(status().isCreated())).get("id").asLong();
+        long lecturerId = staffId("Staff lecturer");
+        long pl = s.body(s.call(post("/api/ipt/placements"), coordinator, "{\"periodId\":" + pid + ",\"studentId\":" + c.cId + ",\"organisationId\":" + tcra
+                + ",\"institutionSupervisorId\":" + lecturerId + "}").andExpect(status().isOk())).at("/summary/id").asLong();
+        s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer2, "{\"phone\":\"0754999888\"}").andExpect(status().isForbidden());
+        s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer, "{}").andExpect(jsonPath("$.code").value("NO_CONTACT"));
+        String first = s.body(s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer, "{\"phone\":\"0754999888\"}").andExpect(status().isOk())).get("url").asText();
+        JsonNode sent = s.body(s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer,
+                "{\"phone\":\"0754999888\",\"email\":\"supervisor@tcra.go.tz\"}").andExpect(status().isOk()));
+        String token = sent.get("url").asText().replaceAll(".*/ipt-assessment/", "");
+        // a new link replaces the old one; the message log never shows the link
+        s.call(get("/api/public/ipt-assessment/" + first.replaceAll(".*/ipt-assessment/", "")), null, null).andExpect(status().isNotFound());
+        List<String> bodies = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForList(
+                "select body from messages where template_code = 'IPT_WORKPLACE_ASSESSMENT'", String.class)));
+        assertThat(bodies).isNotEmpty().allMatch(b -> b.contains("[personal link]") && !b.contains(token));
+
+        JsonNode form = s.body(s.call(get("/api/public/ipt-assessment/" + token), null, null).andExpect(status().isOk()));
+        assertThat(form.get("organisation").asText()).isEqualTo("TCRA");
+        assertThat(form.get("criteria").size()).isEqualTo(5);
+        s.call(post("/api/public/ipt-assessment/" + token), null, "{\"ratings\":{\"ATTENDANCE\":5},\"supervisorName\":\"Eng. Baraka Said\"}")
+                .andExpect(jsonPath("$.code").value("RATINGS_INCOMPLETE"));
+        s.call(post("/api/public/ipt-assessment/" + token), null, "{\"ratings\":{\"ATTENDANCE\":5,\"SKILLS\":4,\"INITIATIVE\":4,\"CONDUCT\":5,\"SAFETY\":2},"
+                + "\"comments\":\"Reliable and keen\",\"supervisorName\":\"Eng. Baraka Said\"}").andExpect(jsonPath("$.submitted").value(true));
+        s.call(post("/api/public/ipt-assessment/" + token), null, "{\"ratings\":{\"ATTENDANCE\":1,\"SKILLS\":1,\"INITIATIVE\":1,\"CONDUCT\":1,\"SAFETY\":1},"
+                + "\"supervisorName\":\"Someone\"}").andExpect(jsonPath("$.code").value("ALREADY_SUBMITTED"));
+        JsonNode view = s.body(s.call(get("/api/ipt/placements/" + pl), lecturer, null));
+        assertThat(view.toString()).contains("Eng. Baraka Said (workplace supervisor)", "Reliable and keen");
+        java.math.BigDecimal score = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForObject(
+                "select score from ipt_assessments where kind = 'WORKPLACE' and source = 'LINK'", java.math.BigDecimal.class)));
+        assertThat(score).isEqualByComparingTo("80");
+    }
+
+    @Test
     void aDepartmentsCoordinatorPlacesOnlyThatDepartmentsStudents() throws Exception {
         Setup c = setup();
         JsonNode prog = s.body(s.call(get("/api/academic/programmes/" + inst.programmeId()), coordinator, null));
@@ -225,7 +263,7 @@ class IptIT {
         for (int i = 0; i < 3; i++) {
             String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Secret@123\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }

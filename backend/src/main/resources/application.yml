@@ -1,6 +1,16 @@
 spring:
   application:
     name: cims-backend
+  mail:                                   # used when cims.email.mode=smtp; Mailpit (docker compose up -d mailpit) listens on 1027
+    host: ${CIMS_SMTP_HOST:localhost}
+    port: ${CIMS_SMTP_PORT:1027}
+    username: ${CIMS_SMTP_USERNAME:}
+    password: ${CIMS_SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${CIMS_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${CIMS_SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
   datasource:
     url: ${CIMS_DB_URL:jdbc:postgresql://localhost:5434/cims}
     username: ${CIMS_DB_USER:cims}
@@ -41,11 +51,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,metrics,prometheus   # served inside the network only: the proxy exposes just the health probes
   endpoint:
     health:
       probes:
         enabled: true
+  health:
+    mail:
+      enabled: false        # the outbox retries when the mail server is down; it must not mark CIMS unhealthy
 
 springdoc:
   swagger-ui:
@@ -69,6 +82,8 @@ cims:
     keycloak-issuer-uri: ${CIMS_KEYCLOAK_ISSUER_URI:}
     max-failed-logins: 5
     cors-allowed-origins: ${CIMS_CORS_ORIGINS:http://localhost:5173}
+    # encrypts authenticator-app secrets (base64 of 32 random bytes: openssl rand -base64 32); keep it with the database backups
+    data-key: ${CIMS_DATA_KEY:}
   otp:
     length: 6
     ttl: 10m
@@ -78,6 +93,19 @@ cims:
     mode: ${CIMS_GEPG_MODE:simulated}
     callback-secret: ${CIMS_GEPG_CALLBACK_SECRET:change-me}
     control-number-validity: 7d
+    # Live GePG (CIMS_GEPG_MODE=live): signed XML per the GePG specification. The SP code, sub SP code, system id and default
+    # GFS code are each institution's (Integrations page). Run the gov-mocks project to try it without GePG (profile gov-mocks).
+    live:
+      base-url: ${CIMS_GEPG_URL:https://uat1.gepg.go.tz}
+      bill-path: ${CIMS_GEPG_BILL_PATH:/api/bill/sigqrequest}
+      reconciliation-path: ${CIMS_GEPG_RECON_PATH:/api/reconciliations/sig_sp_qrequest}
+      keystore: ${CIMS_GEPG_KEYSTORE:}               # PKCS#12 with the institution's (or integrator's) signing key
+      keystore-password: ${CIMS_GEPG_KEYSTORE_PASSWORD:}
+      key-alias: ${CIMS_GEPG_KEY_ALIAS:}
+      gepg-certificate: ${CIMS_GEPG_CERTIFICATE:}    # GePG's public certificate (PEM or DER)
+  collection:                       # private and faith-based institutions: fees paid into their own mobile money and bank accounts
+    mode: ${CIMS_COLLECTION_MODE:simulated}   # simulated | statement (confirm from the day's statement until a collector adapter is added)
+    callback-secret: ${CIMS_COLLECTION_CALLBACK_SECRET:change-me}
   necta:
     # simulated (development) or live: the NECTA results API used by NOAS. Live needs NECTA_API_KEY.
     mode: ${CIMS_NECTA_MODE:simulated}
@@ -114,9 +142,46 @@ cims:
       mode: ${CIMS_NACTVET_CATALOGUE_MODE:${cims.nactvet.awards.mode}}
       catalogue-path: /nacteapi/index.php/api-out-service/institutionprogrammeall
       page-size: ${CIMS_NACTVET_CATALOGUE_PAGE_SIZE:200}
+    submission:
+      # Student registration (FR-REG-07) and results (FR-EXM-11) by API: simulated (in CIMS) or live (nactvet-mock answers them).
+      # The paths are placeholders until NACTVET publishes these services; the file exports remain available either way.
+      mode: ${CIMS_NACTVET_SUBMISSION_MODE:simulated}
+      base-url: ${CIMS_NACTVET_SUBMISSION_URL:${cims.nactvet.awards.base-url}}
+      registration-path: /nacteapi/index.php/api-out-service/studentregistration
+      registration-status-path: /nacteapi/index.php/api-out-service/studentregistrationstatus
+      results-path: /nacteapi/index.php/api-out-service/resultsubmission
+      results-status-path: /nacteapi/index.php/api-out-service/resultsubmissionstatus
+      authorization: ${cims.nactvet.verification.authorization}
+      api-code: ${cims.nactvet.verification.api-code}
+  # HESLB (FR-INT-05), NIDA (FR-INT-06), MUSE (FR-INT-07) and TAMISEMI (FR-INT-08): simulated (in CIMS) or live (JSON over HTTPS
+  # with an API key). The paths are placeholders until each body issues its interface document; gov-mocks answers them.
+  heslb:
+    mode: ${CIMS_HESLB_MODE:simulated}
+    base-url: ${CIMS_HESLB_URL:https://olas.heslb.go.tz}
+    api-key: ${CIMS_HESLB_API_KEY:}
+    registrations-path: /heslb/api/v1/registrations
+    beneficiaries-path: /heslb/api/v1/beneficiaries
+    disbursements-path: /heslb/api/v1/disbursements
+  nida:
+    mode: ${CIMS_NIDA_MODE:simulated}
+    base-url: ${CIMS_NIDA_URL:https://services.nida.go.tz}
+    api-key: ${CIMS_NIDA_API_KEY:}
+    verify-path: /nida/api/v1/verify
+  muse:
+    mode: ${CIMS_MUSE_MODE:simulated}
+    base-url: ${CIMS_MUSE_URL:https://muse.mof.go.tz}
+    api-key: ${CIMS_MUSE_API_KEY:}
+    journals-path: /muse/api/v1/journals
+  tamisemi:
+    mode: ${CIMS_TAMISEMI_MODE:simulated}
+    base-url: ${CIMS_TAMISEMI_URL:https://selform.tamisemi.go.tz}
+    api-key: ${CIMS_TAMISEMI_API_KEY:}
+    selections-path: /tamisemi/api/v1/selections
   documents:
     # Link printed in the QR code of admission letters; {host} is the institution's primary domain
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}
+    # The portal address in links sent by SMS and email (workplace assessment, tracer surveys); {host} as above
+    portal-url: ${CIMS_PORTAL_URL:https://{host}}
   offers:
     expiry-cron: ${CIMS_OFFER_EXPIRY_CRON:0 5 * * * *}   # close expired offers hourly; "-" disables
   sms:
@@ -124,8 +189,14 @@ cims:
     callback-secret: ${CIMS_SMS_CALLBACK_SECRET:change-me}   # HMAC key for delivery reports
     async: true                                  # hand messages to the gateway on a background thread after commit
     retry-cron: ${CIMS_SMS_RETRY_CRON:30 * * * * *}  # retry messages still queued; "-" disables
+  email:
+    mode: ${CIMS_EMAIL_MODE:simulated}            # simulated = written to the log and the outbox; smtp = spring.mail.* (Mailpit in development)
+    from: ${CIMS_EMAIL_FROM:no-reply@cims.msingi.co.tz}
+    async: true
+    retry-cron: ${CIMS_EMAIL_RETRY_CRON:0 */5 * * * *}
   privacy:
     notice-version: "2026-10"
+    retention-cron: ${CIMS_RETENTION_CRON:0 0 2 1 * *}   # monthly; runs only where the institution switched it on
   demo:
     seed: false
 

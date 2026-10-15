@@ -77,7 +77,14 @@ public final class ExamDtos {
 
     public record ComponentDto(Long id, @NotBlank @Size(max = 80) String name, @NotNull AssessmentComponent.Category category,
                                @NotNull @DecimalMin(value = "0.5") @DecimalMax("100") BigDecimal weight,
-                               @NotNull @DecimalMin(value = "1") @DecimalMax("1000") BigDecimal maxScore) {
+                               @NotNull @DecimalMin(value = "1") @DecimalMax("1000") BigDecimal maxScore,
+                               LocalDate entryOpens, LocalDate entryCloses, String entryNote) {
+        public ComponentDto(Long id, String name, AssessmentComponent.Category category, BigDecimal weight, BigDecimal maxScore) {
+            this(id, name, category, weight, maxScore, null, null, null);
+        }
+    }
+
+    public record ComponentWindowRequest(Long offeringId, Long componentId, String name, LocalDate opens, LocalDate closes) {
     }
 
     public record PlanRequest(@NotEmpty List<@Valid ComponentDto> components) {
@@ -132,7 +139,8 @@ public final class ExamDtos {
                                boolean useDepartmentBoard, List<ComponentDto> components, List<StudentRow> rows, Stats stats,
                                String submittedByName, OffsetDateTime submittedAt, String hodByName, OffsetDateTime hodAt,
                                String boardByName, OffsetDateTime boardAt, String returnedNote, String returnedByName,
-                               OffsetDateTime returnedAt, Permissions can) {
+                               OffsetDateTime returnedAt, Permissions can, List<ApprovalStageService.Stage> stages, String waitingAtStage,
+                               List<ApprovalStageService.StageApproval> stageApprovals) {
     }
 
     // ------------------------------------------------------------------ class result sheets (FR-EXM-06/07, BP-08 steps 6-9)
@@ -162,7 +170,8 @@ public final class ExamDtos {
                            String proposedDecision, String decision, String decisionReason, String classification) {
     }
 
-    public record SheetPermissions(boolean compute, boolean decide, boolean recommend, boolean confirm, boolean publish, boolean returnSheet) {
+    public record SheetPermissions(boolean compute, boolean decide, boolean recommend, boolean confirm, boolean publish, boolean returnSheet,
+                                   boolean approveStage) {
     }
 
     public record SheetView(Long id, Long semesterId, String semesterName, String academicYear, Long programmeId, String programmeCode,
@@ -170,11 +179,13 @@ public final class ExamDtos {
                             List<SheetRow> rows, Map<String, Long> decisions, String computedByName, OffsetDateTime computedAt,
                             String recommendedByName, OffsetDateTime recommendedAt, String committeeNote, String confirmedByName,
                             OffsetDateTime confirmedAt, String publishedByName, OffsetDateTime publishedAt, String returnedNote,
-                            String returnedByName, OffsetDateTime returnedAt, List<SubmissionView> nactvetSubmissions, SheetPermissions can) {
+                            String returnedByName, OffsetDateTime returnedAt, List<SubmissionView> nactvetSubmissions, SheetPermissions can,
+                            List<ApprovalStageService.Stage> stages, String waitingAtStage, List<ApprovalStageService.StageApproval> stageApprovals) {
     }
 
     public record SubmissionView(Long id, String status, String reference, String note, int students, String submittedByName,
-                                 OffsetDateTime submittedAt, String responseByName, OffsetDateTime responseAt) {
+                                 OffsetDateTime submittedAt, String responseByName, OffsetDateTime responseAt, String channel, String externalRef,
+                                 java.util.List<java.util.Map<String, String>> queries) {
     }
 
     public record SubmissionRequest(@Size(max = 100) String reference, @Size(max = 1000) String note) {

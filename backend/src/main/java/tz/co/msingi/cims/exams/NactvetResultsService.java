@@ -48,6 +48,9 @@ public class NactvetResultsService {
     private final TenantRepository tenants;
     private final ExamAccess access;
     private final AuditService audit;
+    private final tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient api;
+    private final tz.co.msingi.cims.integration.settings.IntegrationSettingsService settings;
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public record File(String filename, byte[] content) {
     }
@@ -163,9 +166,92 @@ public class NactvetResultsService {
         return view(x);
     }
 
+    /**
+     * Sends a confirmed result sheet to NACTVET's results service (FR-EXM-11, by API): every student with their verification
+     * number, module grades, GPA and remark. NACTVET's outcome is fetched with {@link #refreshOnline}; simulated NACTVET decides at once.
+     */
+    @Transactional
+    public SubmissionView submitOnline(Long sheetId) {
+        access.require("send results to NACTVET", ExamAccess.EXAMS_OFFICE);
+        ResultSheet s = sheets.require(sheetId);
+        if (!ResultSheetService.FINAL.contains(s.getStatus())) {
+            throw new BusinessRuleException("NOT_CONFIRMED", "Only results confirmed by the Governing Board can be sent to NACTVET");
+        }
+        if (submissions.findBySheetIdOrderBySubmittedAtDesc(sheetId).stream()
+                .anyMatch(x -> "API".equals(x.getChannel()) && x.getStatus() != NactvetResultSubmission.Status.QUERIED)) {
+            throw new BusinessRuleException("ALREADY_SENT", "These results are already with NACTVET. Check NACTVET's answer instead.");
+        }
+        if (s.getProgramme().getNactvetCode() == null) {
+            throw new BusinessRuleException("NO_NACTVET_CODE", "Programme " + s.getProgramme().getCode() + " has no NACTVET programme code (Academic structure).");
+        }
+        SheetView v = sheets.view(s);
+        Map<Long, Student> people = students.findAllById(v.rows().stream().map(SheetRow::studentId).toList()).stream()
+                .collect(Collectors.toMap(Student::getId, Function.identity()));
+        java.util.List<tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.ResultRow> rows = v.rows().stream().map(sr -> {
+            Student st = people.get(sr.studentId());
+            return new tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.ResultRow(st.getRegistrationNo(), st.getNactvetVerificationNo(),
+                    v.modules().stream().map(m -> {
+                        var c = sr.cells().get(m.code());
+                        String g = c == null ? null : c.grade() != null ? c.grade() : "ABSENT".equals(c.remark()) ? "ABS" : "I";
+                        return new tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.ModuleGrade(m.code(), g);
+                    }).toList(), sr.gpa(), ResultSheetService.decisionText(SemesterResult.Decision.valueOf(sr.decision())));
+        }).toList();
+        String ref = api.submitResults(settings.institutionCode(), new tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.Results(
+                s.getProgramme().getNactvetCode(), s.getSemester().getAcademicYear().getCode(), s.getSemester().getName(), s.getYearOfStudy(),
+                s.getRound().name(), rows));
+        NactvetResultSubmission x = new NactvetResultSubmission();
+        x.setSheet(s);
+        x.setChannel("API");
+        x.setExternalRef(ref);
+        x.setReference(ref);
+        x.setStudents(rows.size());
+        x.setSubmittedByName(CurrentUser.name());
+        submissions.save(x);
+        audit.record("NACTVET_RESULTS_SENT", "ResultSheet", s.getId(), Map.of("batch", ref, "students", rows.size()));
+        return refresh(x);
+    }
+
+    /** Fetches NACTVET's answer on results sent by API: accepted, or queried with the students concerned. */
+    @Transactional
+    public SubmissionView refreshOnline(Long submissionId) {
+        access.require("check NACTVET's answer", ExamAccess.EXAMS_OFFICE);
+        NactvetResultSubmission x = submissions.findById(submissionId).orElseThrow(() -> new NotFoundException("Submission", submissionId));
+        if (!"API".equals(x.getChannel())) throw new BusinessRuleException("NOT_API", "This submission was a file; record NACTVET's answer by hand.");
+        return refresh(x);
+    }
+
+    private SubmissionView refresh(NactvetResultSubmission x) {
+        var st = api.resultStatus(x.getExternalRef());
+        if ("ACCEPTED".equals(st.state()) || "QUERIED".equals(st.state())) {
+            x.setStatus(NactvetResultSubmission.Status.valueOf(st.state()));
+            x.setResponseByName("NACTVET");
+            x.setResponseAt(OffsetDateTime.now());
+            java.util.List<Map<String, String>> q = st.items().stream().filter(i -> "QUERIED".equals(i.status()))
+                    .map(i -> Map.of("registrationNo", String.valueOf(i.registrationNo()), "reason", String.valueOf(i.reason()))).toList();
+            try {
+                x.setQueries(q.isEmpty() ? null : JSON.writeValueAsString(q));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalStateException(e);
+            }
+            x.setNote(q.isEmpty() ? "Accepted by NACTVET" : q.size() + " student(s) queried by NACTVET");
+            audit.record("NACTVET_RESULTS_RESPONSE", "ResultSheet", x.getSheet().getId(), Map.of("status", st.state(), "queried", q.size()));
+        }
+        submissions.save(x);
+        return view(x);
+    }
+
     static SubmissionView view(NactvetResultSubmission x) {
+        java.util.List<Map<String, String>> q = java.util.List.of();
+        if (x.getQueries() != null) {
+            try {
+                q = JSON.readValue(x.getQueries(), new com.fasterxml.jackson.core.type.TypeReference<>() {
+                });
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                q = java.util.List.of();
+            }
+        }
         return new SubmissionView(x.getId(), x.getStatus().name(), x.getReference(), x.getNote(), x.getStudents(), x.getSubmittedByName(),
-                x.getSubmittedAt(), x.getResponseByName(), x.getResponseAt());
+                x.getSubmittedAt(), x.getResponseByName(), x.getResponseAt(), x.getChannel(), x.getExternalRef(), q);
     }
 
     private static void cell(Row r, int i, String v, CellStyle style) {

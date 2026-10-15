@@ -74,7 +74,8 @@ public class AnnualBillingService {
         Programme programme = app.getSelectedWindowProgramme().getProgramme();
         var joining = app.getWindow().getJoiningInstructions();
         java.time.LocalDate due = joining != null ? joining.reportingDate() : year.getStartDate();
-        return approved(year, programme, (short) 1).map(f -> issue(f, Invoice.PayerType.APPLICANT, ap.getId(), ap.fullName(),
+        return approved(year, programme, (short) 1, app.getWindow().getIntake() == null ? null : app.getWindow().getIntake().getId(), null)
+                .map(f -> issue(f, Invoice.PayerType.APPLICANT, ap.getId(), ap.fullName(),
                 ap.getPhone(), ap.getEmail(), isForeign(ap.getNationality()), app.getId(), due));
     }
 
@@ -92,7 +93,8 @@ public class AnnualBillingService {
         }
         java.time.LocalDate due = s.getApplicationId() == null ? year.getStartDate() : applications.findById(s.getApplicationId())
                 .map(a -> a.getWindow().getJoiningInstructions()).map(j -> j.reportingDate()).orElse(year.getStartDate());
-        return approved(year, s.getProgramme(), s.getYearOfStudy()).map(f -> issue(f, Invoice.PayerType.STUDENT, s.getId(),
+        return approved(year, s.getProgramme(), s.getYearOfStudy(), s.getIntake() == null ? null : s.getIntake().getId(), s.getStudentCategoryId())
+                .map(f -> issue(f, Invoice.PayerType.STUDENT, s.getId(),
                 s.fullName(), s.getPhone(), s.getEmail(), isForeign(s.getNationality()), s.getApplicationId(), due));
     }
 
@@ -166,9 +168,10 @@ public class AnnualBillingService {
                 .filter(i -> academicYearId.equals(i.getAcademicYearId())).findFirst();
     }
 
-    private Optional<FeeStructure> approved(AcademicYear year, Programme programme, short yearOfStudy) {
-        return structures.findByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(year.getId(), programme.getId(), yearOfStudy,
-                FeeStructure.Status.APPROVED);
+    /** The approved structure for the payer's intake and category, falling back to the general one (BR-22). */
+    private Optional<FeeStructure> approved(AcademicYear year, Programme programme, short yearOfStudy, Long intakeId, Long categoryId) {
+        return tz.co.msingi.cims.finance.fees.FeeService.best(structures.findAllByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(
+                year.getId(), programme.getId(), yearOfStudy, FeeStructure.Status.APPROVED), intakeId, categoryId);
     }
 
     /** Foreign rates apply to non-Tanzanians (an applicant without a stated nationality is charged the local rate). */

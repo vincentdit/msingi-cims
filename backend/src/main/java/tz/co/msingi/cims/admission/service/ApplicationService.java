@@ -80,6 +80,7 @@ public class ApplicationService {
     private final StudentRepository students;
     private final ApplicationEditGuard editGuard;
     private final tz.co.msingi.cims.platform.audit.AuditLogRepository auditLogs;
+    private final tz.co.msingi.cims.admission.document.ApplicationDocumentService documents;
 
     // ------------------------------------------------------------------ applicant side
 
@@ -156,11 +157,11 @@ public class ApplicationService {
             if (app.getStatus() == Application.Status.PAYMENT_PENDING) {
                 app.setStatus(Application.Status.DRAFT);
             }
-            audit.recordAs(null, "GePG", "FEE_PAID", "Application", app.getId(), Map.of("invoiceId", e.invoiceId()));
+            audit.recordAs(null, "Payment", "FEE_PAID", "Application", app.getId(), Map.of("invoiceId", e.invoiceId()));
         });
     }
 
-    /** Development only: simulates a GePG payment of the current control number. */
+    /** Development only: simulates paying the current control number or payment reference. */
     @Transactional
     public FeeView simulatePayment(Long applicationId) {
         if (!gepgProps.isSimulated()) {
@@ -329,6 +330,8 @@ public class ApplicationService {
         }
         if (!app.isFeePaid()) b.add("Pay the application fee");
         if (app.getChoices().isEmpty()) b.add("Choose at least one programme");
+        List<String> docs = documents.missingRequired(app);
+        if (!docs.isEmpty()) b.add("Upload " + String.join(", ", docs));
         // qualifications added since choosing may have changed the entry level (as in NOAS)
         List<EligibilityEngine.Qualification> quals = engineQualifications(a);
         for (ApplicationChoice c : app.getChoices()) {

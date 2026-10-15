@@ -172,7 +172,7 @@ public class DashboardService {
                 .map(a -> new Money(a.key(), a.label(), a.amount(), a.count())).toList();
         long notReconciled = n(jdbc.queryForObject("""
                 select count(distinct cast(p.paid_at at time zone 'Africa/Dar_es_Salaam' as date)) from payments p
-                where p.paid_at >= :since and p.paid_at < :today and p.source = 'GEPG'
+                where p.paid_at >= :since and p.paid_at < :today and p.source in ('GEPG', 'COLLECTION')
                   and not exists (select 1 from gepg_reconciliations r where r.recon_date = cast(p.paid_at at time zone 'Africa/Dar_es_Salaam' as date)
                                   and r.status = 'CLOSED')""",
                 new MapSqlParameterSource("since", today.minusDays(30).atStartOfDay(Sql.ZONE).toOffsetDateTime())

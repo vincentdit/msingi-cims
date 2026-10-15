@@ -57,7 +57,11 @@ public final class RegistryDtos {
                                 String nationality, String email, String region, String district, String postalAddress,
                                 String disability, String nextOfKinName, String nextOfKinPhone, String nextOfKinRelation,
                                 String awardName, String applicationRef, String nactvetVerificationNo, String admissionLetterNo,
-                                OffsetDateTime admittedAt, String admittedByName, FirstRegistrationView firstRegistration) {
+                                OffsetDateTime admittedAt, String admittedByName, FirstRegistrationView firstRegistration,
+                                Long campusId, String campus, Long studentCategoryId, String studentCategory) {
+    }
+
+    public record CategoryRequest(Long studentCategoryId) {
     }
 
     public record ChecklistRequest(@NotNull @Size(max = 30) List<@Valid DocumentCheckRequest> documents, @Size(max = 500) String remarks) {

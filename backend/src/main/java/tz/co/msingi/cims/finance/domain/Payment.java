@@ -16,7 +16,7 @@ import tz.co.msingi.cims.common.TenantScopedEntity;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/** A payment confirmed by GePG. gepgReceiptNo is unique, so a repeated notification is ignored. */
+/** A payment received. gepgReceiptNo holds GePG's or the collector's receipt number and is unique, so a repeated notification is ignored. */
 @Getter
 @Setter
 @Entity
@@ -25,8 +25,17 @@ public class Payment extends TenantScopedEntity {
 
     public enum Status { RECEIVED, ALLOCATED, UNMATCHED, REVERSED }
 
-    /** GEPG: paid through GePG (reconciled); BANK: a bank remittance recorded by the Accountant; INTERNAL: not cash (a sponsor's share moved to a student, a waiver). */
-    public enum Source { GEPG, BANK, INTERNAL }
+    /**
+     * GEPG: paid through GePG (reconciled); COLLECTION: paid with a CIMS reference into the institution's own mobile money or bank account
+     * (reported by the collector or posted from its statement, reconciled); BANK: a bank remittance recorded by the Accountant;
+     * INTERNAL: not cash (a sponsor's share moved to a student, a waiver).
+     */
+    public enum Source { GEPG, COLLECTION, BANK, INTERNAL }
+
+    /** Paid electronically against a control number or payment reference, so it appears in the daily file that is reconciled. */
+    public boolean isReconciled() {
+        return source == Source.GEPG || source == Source.COLLECTION;
+    }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "invoice_id")

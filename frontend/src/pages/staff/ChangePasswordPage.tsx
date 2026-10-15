@@ -8,13 +8,17 @@ import { useSession } from '../../auth/session';
 import { ErrorAlert, PageTitle } from '../../components/common';
 import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
 import { homeFor } from '../../components/StaffLayout';
+import EmailCard from '../../components/EmailCard';
+import MfaCard from '../../components/MfaCard';
+import PrivacyCard from '../../components/PrivacyCard';
 
-/** A staff member chooses their own password: required after a temporary one, available any time from the menu. */
+/** The staff member's own account: password, two-step sign-in, email and personal data. A temporary password or a required MFA set-up comes first. */
 export default function ChangePasswordPage() {
   const { user, signIn } = useSession();
   const navigate = useNavigate();
   const me = user('staff');
   const forced = !!me?.mustChangePassword;
+  const mfaFirst = !forced && !!me?.mfaSetupRequired;
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -29,11 +33,14 @@ export default function ChangePasswordPage() {
   });
   return (
     <Container maxWidth="sm" disableGutters>
-      <PageTitle title={forced ? 'Choose your password' : 'Change password'}
-        subtitle={forced ? 'You signed in with a temporary password from the administrator. Choose your own to continue.' : 'Your other sessions are signed out when you change it.'} />
-      <Card>
+      <PageTitle title={forced ? 'Choose your password' : mfaFirst ? 'Set up two-step sign-in' : 'My account'}
+        subtitle={forced ? 'You signed in with a temporary password from the administrator. Choose your own to continue.'
+          : mfaFirst ? 'Your role must sign in with an authenticator app. It takes a minute.' : 'Your password, two-step sign-in, email and personal data.'} />
+      {!forced && <Box sx={{ mb: 2.5 }}><MfaCard /></Box>}
+      {!mfaFirst && <Card>
         <CardContent>
           <Stack spacing={2}>
+            {!forced && <Typography variant="h6">Password</Typography>}
             {done && <Alert severity="success">Your password has been changed.</Alert>}
             <TextField label={forced ? 'Temporary password' : 'Current password'} type="password" value={current} onChange={(e) => setCurrent(e.target.value)}
               autoComplete="current-password" required fullWidth />
@@ -47,7 +54,9 @@ export default function ChangePasswordPage() {
             <Typography variant="caption" color="text.secondary">Signed in as {me?.fullName}.</Typography>
           </Stack>
         </CardContent>
-      </Card>
+      </Card>}
+      {!forced && !mfaFirst && <Box sx={{ mt: 2.5 }}><EmailCard realm="staff" /></Box>}
+      {!forced && !mfaFirst && <Box sx={{ mt: 2.5 }}><PrivacyCard realm="staff" /></Box>}
     </Container>
   );
 }

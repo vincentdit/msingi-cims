@@ -12,6 +12,7 @@ cims:
     staff-login-url: http://{host}:5173/staff/login
   documents:
     verification-url: ${CIMS_VERIFICATION_URL:http://localhost:5173/verify/{code}}   # the Vite dev portal
+    portal-url: ${CIMS_PORTAL_URL:http://localhost:5173}
 
 logging:
   level:

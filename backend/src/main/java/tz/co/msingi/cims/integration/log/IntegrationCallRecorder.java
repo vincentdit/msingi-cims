@@ -16,7 +16,7 @@ import tz.co.msingi.cims.platform.tenancy.TenantContext;
 @Component
 public class IntegrationCallRecorder {
 
-    public enum ExternalSystem { NECTA, NACTVET, NACTVET_AWARDS, NACTVET_CATALOGUE, GEPG, SMS }
+    public enum ExternalSystem { NECTA, NACTVET, NACTVET_AWARDS, NACTVET_CATALOGUE, NACTVET_SUBMISSION, GEPG, COLLECTION, SMS, HESLB, NIDA, MUSE, TAMISEMI }
 
     public enum Outcome { SUCCESS, FAILURE }
 

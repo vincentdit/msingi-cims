@@ -98,6 +98,13 @@ public class RegistryController {
         return service.detail(id);
     }
 
+    @Operation(summary = "Set the student's fee category (regular, evening, …)")
+    @org.springframework.web.bind.annotation.PutMapping("/students/{id}/category")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','BURSAR')")
+    public StudentDetail setCategory(@PathVariable Long id, @RequestBody RegistryDtos.CategoryRequest req) {
+        return service.setCategory(id, req.studentCategoryId());
+    }
+
     @Operation(summary = "Record the originals seen at reporting (first registration checklist)")
     @PutMapping("/students/{id}/first-registration")
     @PreAuthorize(REGISTRY)

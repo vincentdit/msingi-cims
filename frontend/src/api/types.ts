@@ -12,7 +12,9 @@ export interface TokenResponse {
   accessToken: string;
   tokenType: string;
   expiresIn: number;
-  user: { id: number; fullName: string; userType: string; roles: string[]; tenant: string; mustChangePassword?: boolean };
+  user: { id: number; fullName: string; userType: string; roles: string[]; tenant: string; mustChangePassword?: boolean; mfaSetupRequired?: boolean; language?: 'en' | 'sw' | null };
+  /** Present instead of a token when the staff member signs in with an authenticator app: send the code with this challenge. */
+  mfa?: { challenge: string; smsAvailable: boolean };
 }
 
 export interface Institution {
@@ -25,6 +27,16 @@ export interface Institution {
   branding: { primaryColor?: string; accentColor?: string; tagline?: string; logoUrl?: string };
   /** The institution's own campus photo, when the administrator has uploaded one. */
   campusPhoto?: InstitutionPhoto;
+  /** How fees are paid: GEPG (public institutions) or COLLECTION (private and faith-based: the college's own accounts). */
+  payment?: { mode: 'GEPG' | 'COLLECTION'; channels: PaymentChannel[] };
+  /** Minutes without activity before each kind of user is signed out. */
+  idleMinutes?: { staff: number; student: number; applicant: number };
+}
+
+/** One account a private or faith-based institution is paid into. */
+export interface PaymentChannel {
+  id: number; provider: string; label: string; operator?: string; kind: 'MOBILE_MONEY' | 'BANK'; ussd?: string;
+  accountName: string; accountNumber: string; branch?: string; instructions?: string; active: boolean; sortOrder: number;
 }
 
 export interface InstitutionPhoto {
@@ -361,6 +373,7 @@ export interface Department {
   id: number;
   code: string;
   name: string;
+  facultyId?: number;
   active: boolean;
 }
 
@@ -555,6 +568,7 @@ export interface FirstRegistration {
 }
 
 export interface StudentDetail {
+  campusId?: number; campus?: string; studentCategoryId?: number; studentCategory?: string;
   summary: StudentSummary;
   firstName: string;
   middleName?: string;
@@ -608,6 +622,7 @@ export interface FeeStructureLine {
 }
 
 export interface FeeStructure {
+  intakeId?: number; intakeName?: string; studentCategoryId?: number; studentCategoryName?: string;
   id: number;
   academicYearId: number;
   academicYear: string;
@@ -1122,7 +1137,14 @@ export interface AssessmentComponent {
   category: 'CA' | 'SE';
   weight: number;
   maxScore: number;
+  /** This item's own marks entry window, when the Examinations Officer set one. */
+  entryOpens?: string;
+  entryCloses?: string;
+  entryNote?: string;
 }
+
+export interface ApprovalStage { order: number; name: string; role: string }
+export interface StageApproval { order: number; name: string; byName: string; at: string; note?: string }
 
 export interface ScoreCell {
   score?: number;
@@ -1197,6 +1219,9 @@ export interface Offering {
     editPlan: boolean; enterCa: boolean; enterSe: boolean; submit: boolean; hodApprove: boolean; boardApprove: boolean;
     returnToLecturer: boolean; assign: boolean;
   };
+  stages: ApprovalStage[];
+  waitingAtStage?: string;
+  stageApprovals: StageApproval[];
 }
 
 export interface UploadResult {
@@ -1270,7 +1295,10 @@ export interface ResultSheet {
   returnedByName?: string;
   returnedAt?: string;
   nactvetSubmissions: NactvetResultSubmission[];
-  can: { compute: boolean; decide: boolean; recommend: boolean; confirm: boolean; publish: boolean; returnSheet: boolean };
+  can: { compute: boolean; decide: boolean; recommend: boolean; confirm: boolean; publish: boolean; returnSheet: boolean; approveStage: boolean };
+  stages: ApprovalStage[];
+  waitingAtStage?: string;
+  stageApprovals: StageApproval[];
 }
 
 export interface StudentSemesterResult {
@@ -1302,6 +1330,10 @@ export interface NactvetResultSubmission {
   submittedAt: string;
   responseByName?: string;
   responseAt?: string;
+  /** FILE: uploaded on the NACTVET portal; API: sent to NACTVET's results service. */
+  channel: 'FILE' | 'API';
+  externalRef?: string;
+  queries: { registrationNo: string; reason: string }[];
 }
 
 export interface ResitSession {
@@ -2038,7 +2070,7 @@ export interface RoleGrant { role: string; label?: string; scope: RoleScope; sco
 export interface StaffUser {
   id: number; username: string; fullName: string; jobTitle?: string; email?: string; phone?: string;
   status: 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'PENDING_VERIFICATION'; mustChangePassword: boolean; lastLoginAt?: string; createdAt: string;
-  createdByName?: string; roles: RoleGrant[]; self: boolean;
+  createdByName?: string; roles: RoleGrant[]; self: boolean; mfaEnabled?: boolean;
 }
 export interface IssuedPassword { user: StaffUser; temporaryPassword: string }
 export interface StaffUserSummary { total: number; active: number; disabled: number; locked: number; mustChangePassword: number }
@@ -2078,3 +2110,21 @@ export interface ApprovalItem {
   link: string; canAct: boolean; note?: string;
 }
 export interface ApprovalInbox { items: ApprovalItem[]; total: number; actionable: number }
+
+// ---------------------------------------------------------------- campuses, faculties, categories, transfers (BR-13, BR-22)
+
+export interface Campus { id: number; code: string; name: string; region?: string; district?: string; address?: string; main: boolean; active: boolean; programmes: number }
+export interface NamedItem { id: number; code: string; name: string; active: boolean }
+export interface TransferOptions {
+  programmeId: number; programme: string; campusId?: number; campus?: string; yearOfStudy: number; status: string; openTransfer: boolean;
+  programmes: { id: number; code: string; name: string; years: number; campusIds: number[] }[];
+  campuses: { id: number; name: string; main: boolean }[];
+}
+export interface Transfer {
+  id: number; studentId: number; registrationNo: string; studentName: string; kind: 'PROGRAMME' | 'CAMPUS' | 'BOTH';
+  fromProgramme: string; toProgramme: string; fromCampus?: string; toCampus?: string; fromYear: number; toYear: number;
+  reason: string; effectiveDate: string; state: 'REQUESTED' | 'RECOMMENDED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  requestedByStudent: boolean; requestedByName: string; requestedAt: string; recommendedByName?: string; recommendedAt?: string;
+  recommendationNote?: string; decidedByName?: string; decidedAt?: string; decisionNote?: string;
+  canRecommend: boolean; canDecide: boolean; canCancel: boolean;
+}

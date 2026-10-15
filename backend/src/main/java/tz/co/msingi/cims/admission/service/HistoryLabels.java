@@ -28,7 +28,12 @@ public final class HistoryLabels {
             Map.entry("OFFER_ACCEPTED", "Offer accepted"),
             Map.entry("OFFER_DECLINED", "Offer declined"),
             Map.entry("WITHDRAW", "Application withdrawn"),
-            Map.entry("APPLICATION_FILE_PRINTED", "Application file printed"));
+            Map.entry("APPLICATION_FILE_PRINTED", "Application file printed"),
+            Map.entry("DOCUMENT_UPLOADED", "Document uploaded"),
+            Map.entry("DOCUMENT_REMOVED", "Document removed"),
+            Map.entry("DOCUMENT_VIEWED", "Document opened by the office"),
+            Map.entry("DOCUMENT_ACCEPTED", "Document accepted"),
+            Map.entry("DOCUMENT_REJECTED", "Document not accepted"));
 
     public static String of(String action) {
         String known = LABELS.get(action);

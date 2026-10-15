@@ -84,6 +84,7 @@ public class TestData {
             x.setCode(code);
             x.setName(code + " Technical College");
             x.setNactvetRegNo("REG/" + code + "/001");
+            x.setOwnership("PUBLIC");   // GePG control numbers; collection tests switch to PRIVATE or FBO
             return tenants.save(x);
         });
         return TenantContext.callAs(t.toInfo(), () -> tx.execute(s -> {

@@ -98,6 +98,7 @@ public class IptService {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
 
     private final tz.co.msingi.cims.platform.security.DataScope scope;
+    private final tz.co.msingi.cims.platform.letters.LetterTemplateService letterTemplates;
     private final OrganisationRepository organisations;
     private final PeriodRepository periods;
     private final PlacementRepository placements;
@@ -366,7 +367,9 @@ public class IptService {
         Student s = students.findById(pl.getStudentId()).orElseThrow();
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow();
         String supervisor = pl.getInstitutionSupervisorId() == null ? null : users.findById(pl.getInstitutionSupervisorId()).map(UserAccount::getFullName).orElse(null);
-        return PlacementLetter.render(t, pl, s, supervisor);
+        return PlacementLetter.render(t, pl, s, supervisor,
+                letterTemplates.body(tz.co.msingi.cims.platform.letters.LetterTemplateService.IPT_INTRO),
+                letterTemplates.body(tz.co.msingi.cims.platform.letters.LetterTemplateService.IPT_REQUESTS));
     }
 
     // ------------------------------------------------------------------ logbook (FR-IPT-03)
@@ -454,15 +457,20 @@ public class IptService {
                         + approved + " so far)");
             }
         }
-        IptAssessment a = assessments.findByPlacementIdAndKind(pl.getId(), req.kind()).orElse(null);
+        return view(recordMark(pl, req.kind(), req.score(), req.comments(), CurrentUser.name()));
+    }
+
+    /** Saves one of the three marks (by staff, or by the workplace supervisor through the link) and completes the placement with all three. */
+    IptPlacement recordMark(IptPlacement pl, IptAssessment.Kind kind, BigDecimal score, String comments, String byName) {
+        IptAssessment a = assessments.findByPlacementIdAndKind(pl.getId(), kind).orElse(null);
         if (a == null) {
             a = new IptAssessment();
             a.setPlacement(pl);
-            a.setKind(req.kind());
+            a.setKind(kind);
         }
-        a.setScore(req.score().setScale(2, RoundingMode.HALF_UP));
-        a.setComments(blank(req.comments()));
-        a.setAssessedByName(CurrentUser.name());
+        a.setScore(score.setScale(2, RoundingMode.HALF_UP));
+        a.setComments(blank(comments));
+        a.setAssessedByName(byName);
         a.setAssessedAt(OffsetDateTime.now());
         assessments.saveAndFlush(a);
         Map<IptAssessment.Kind, BigDecimal> by = assessments.findByPlacementId(pl.getId()).stream()
@@ -477,8 +485,8 @@ public class IptService {
             pl.setStatus(IptPlacement.Status.COMPLETED);
         }
         if (!Objects.equals(before, pl.getTotalMark())) pl.setTransferredAt(null);   // the examination record needs the new mark
-        audit.record("IPT_ASSESSED", "IptPlacement", pl.getId(), Map.of("kind", req.kind().name(), "score", a.getScore()));
-        return view(pl);
+        audit.record("IPT_ASSESSED", "IptPlacement", pl.getId(), Map.of("kind", kind.name(), "score", a.getScore(), "by", byName));
+        return pl;
     }
 
     /** Sends the IPT marks of completed placements to the IPT module's marks (BP-13 step 4); results then follow BP-08. */
@@ -629,7 +637,7 @@ public class IptService {
         return me != null && me.equals(pl.getInstitutionSupervisorId());
     }
 
-    private void requireSupervisor(IptPlacement pl) {
+    void requireSupervisor(IptPlacement pl) {
         if (!supervises(pl) && !access.has(COORDINATORS)) throw new AccessDeniedException("Only the student's institution supervisor or the IPT Coordinator does this");
     }
 
@@ -642,7 +650,7 @@ public class IptService {
         return periods.findById(id).orElseThrow(() -> new NotFoundException("IPT period", id));
     }
 
-    private IptPlacement placement(Long id) {
+    IptPlacement placement(Long id) {
         return placements.findById(id).orElseThrow(() -> new NotFoundException("Placement", id));
     }
 
@@ -702,7 +710,7 @@ public class IptService {
                 pl.getLetterNo());
     }
 
-    private PlacementView view(IptPlacement pl) {
+    PlacementView view(IptPlacement pl) {
         Student s = students.findById(pl.getStudentId()).orElseThrow();
         List<LogbookEntry> logs = logbook.findByPlacementIdOrderByWeekNoAsc(pl.getId());
         List<IptAssessment> as = assessments.findByPlacementId(pl.getId());

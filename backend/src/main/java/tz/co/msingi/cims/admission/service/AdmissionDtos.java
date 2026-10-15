@@ -47,7 +47,7 @@ public final class AdmissionDtos {
             Integer examYear,
             @NotBlank String phone,
             @Email @Size(max = 120) String email,
-            @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) String password,
+            @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) @tz.co.msingi.cims.platform.security.NotBreached String password,
             @AssertTrue(message = "You must accept the privacy notice to apply") boolean acceptPrivacyNotice) {
     }
 
@@ -73,7 +73,7 @@ public final class AdmissionDtos {
     }
 
     public record ResetPasswordRequest(@NotBlank String phone, @NotBlank String code,
-                                       @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) String newPassword) {
+                                       @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) @tz.co.msingi.cims.platform.security.NotBreached String newPassword) {
     }
 
     public record OtpSentResponse(String maskedPhone, String message, String devOtp) {

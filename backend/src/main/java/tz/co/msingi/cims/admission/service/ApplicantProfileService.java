@@ -154,7 +154,7 @@ public class ApplicantProfileService {
     }
 
     /** A verified CSEE/ACSEE qualification from NECTA's answer. */
-    static ApplicantQualification fromNecta(Applicant a, ApplicantQualification.Type type, NectaClient.NectaResult r) {
+    public static ApplicantQualification fromNecta(Applicant a, ApplicantQualification.Type type, NectaClient.NectaResult r) {
         ApplicantQualification q = new ApplicantQualification();
         q.setApplicant(a);
         q.setType(type);

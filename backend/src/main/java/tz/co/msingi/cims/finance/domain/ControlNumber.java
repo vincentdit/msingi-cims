@@ -14,7 +14,10 @@ import tz.co.msingi.cims.common.BaseEntity;
 
 import java.time.OffsetDateTime;
 
-/** A GePG control number issued for an invoice. An invoice may receive a new one after expiry. */
+/**
+ * The number an invoice is paid with: a GePG control number (public institutions) or a CIMS payment reference into the institution's
+ * own mobile money and bank accounts (private and faith-based institutions). An invoice may receive a new one after expiry.
+ */
 @Getter
 @Setter
 @Entity
@@ -22,6 +25,9 @@ import java.time.OffsetDateTime;
 public class ControlNumber extends BaseEntity {
 
     public enum Status { REQUESTED, ACTIVE, PAID, EXPIRED, FAILED }
+
+    /** GEPG: control number from GePG; COLLECTION: payment reference issued by CIMS for the institution's own accounts. */
+    public enum Issuer { GEPG, COLLECTION }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "invoice_id")
@@ -37,6 +43,10 @@ public class ControlNumber extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status = Status.REQUESTED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Issuer issuer = Issuer.GEPG;
 
     private OffsetDateTime issuedAt;
     private OffsetDateTime expiresAt;

@@ -10,7 +10,7 @@ import QrIcon from '@mui/icons-material/QrCode2';
 import WarningIcon from '@mui/icons-material/Warning';
 import {
   Alert, Box, Button, Card, CardActions, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, LinearProgress, Menu,
-  MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableRow, TextField, Tooltip, Typography,
+  MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TextField, Tooltip, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type { CheckInScreen, ClassSessionView, MyModule, MyTeaching, SessionKind } from '../../api/types';
-import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { ErrorAlert, Loading, PageTitle, LinkRow } from '../../components/common';
 import { OFFERING_STAGE } from './MarksPages';
 
 const staff = { realm: 'staff' as const };
@@ -91,7 +91,7 @@ export function MyTeachingPage() {
                     <Table size="small">
                       <TableBody>
                         {b.atRisk.map((s) => (
-                          <TableRow key={`${s.offeringId}-${s.studentId}`} hover component={RouterLink} to={`/staff/teaching/${s.offeringId}`} sx={{ textDecoration: 'none' }}>
+                          <LinkRow key={`${s.offeringId}-${s.studentId}`} to={`/staff/teaching/${s.offeringId}`}>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.name}</Typography>
                               <Typography variant="caption" color="text.secondary">{s.registrationNo} · {s.moduleCode}</Typography>
@@ -100,7 +100,7 @@ export function MyTeachingPage() {
                               <Typography variant="body2" color="warning.main" sx={{ fontWeight: 700 }}>{pct(s.percent)}</Typography>
                               <Typography variant="caption" color="text.secondary">{s.attended} of {s.counted}{s.warned ? ' · warned' : ''}</Typography>
                             </TableCell>
-                          </TableRow>
+                          </LinkRow>
                         ))}
                       </TableBody>
                     </Table>

@@ -20,6 +20,25 @@ cims:
   gepg:
     mode: simulated
     callback-secret: test-secret
+    live:
+      # TEST-ONLY keys: the signed XML callbacks are exercised while bills still go to the simulator
+      keystore: ../dev-keys/cims-sp-test.p12
+      keystore-password: test-only-not-secret
+      key-alias: cims-sp
+      gepg-certificate: ../dev-keys/gepg-mock-test.crt
+  email:
+    mode: simulated
+    async: false
+    retry-cron: "-"
+  reports:
+    schedule-cron: "-"
+  finance:
+    reminder-cron: "-"
+  privacy:
+    retention-cron: "-"
+  collection:
+    mode: simulated
+    callback-secret: test-collection-secret
   necta:
     mode: simulated
     lookup-rate-limit: 100000   # test helpers look up many simulated candidates

@@ -40,6 +40,18 @@ public class UserAccount extends BaseEntity {
     private String email;
     private String phone;
 
+    /** When the email was confirmed with a code (FR-ADM-02); emails go only to confirmed addresses. */
+    private java.time.OffsetDateTime emailVerifiedAt;
+
+    /** Authenticator-app MFA (BR-36): the encrypted TOTP secret, one waiting to be confirmed, and one-time recovery codes (hashed). */
+    private String mfaSecret;
+    private String mfaPendingSecret;
+    private java.time.OffsetDateTime mfaEnabledAt;
+    private String mfaRecoveryCodes;
+
+    /** Set when the personal data of the account was anonymised under the retention policy (BR-38). */
+    private java.time.OffsetDateTime anonymisedAt;
+
     @Column(nullable = false)
     private String fullName;
 
@@ -62,6 +74,9 @@ public class UserAccount extends BaseEntity {
     /** Set when the administrator issues a temporary password; the user chooses their own at the next sign-in. */
     @Column(nullable = false)
     private boolean mustChangePassword;
+
+    /** en or sw, as the person chose (BR-40); null until they choose. */
+    private String language;
 
     /** Sessions (tokens) issued before this moment are no longer accepted: disabled, roles changed or password reset. */
     private OffsetDateTime sessionsValidAfter;

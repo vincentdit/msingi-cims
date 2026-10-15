@@ -1,6 +1,7 @@
 # NACTVET mock
 
-A development stand-in for **NACTVET admission verification** (BP-04, FR-ADM-12, FR-INT-02). CIMS's live adapter
+A development stand-in for **NACTVET admission verification** (BP-04, FR-ADM-12, FR-INT-02), **student registration**
+(FR-REG-07) and **results submission** (FR-EXM-11). CIMS's live adapter
 (`LiveNactvetGateway`) talks to it over HTTP exactly as it would talk to NACTVET, so the whole path can be tried without
 NACTVET: submit selected applicants, fetch outcomes (some still processing), resolve queries, confirm multiple admissions,
 and see what happens when NACTVET is down or refuses the credentials.
@@ -65,6 +66,22 @@ All under `/nacteapi/index.php/api-out-service`. Body `code`: 200 OK, 401 wrong 
 | `/admissionverificationresults` | `batch_ref` | one entry per candidate: `application_ref`, `index_number`, `programme_code`, `status` (`PROCESSING`, `VERIFIED`, `QUERIED`, `NOT_VERIFIED`), `reason`, `verification_number`, `multiple_admission` (0/1) |
 | `/admissionconfirmation` | `institution_code`, `index_number`, `confirmation_code` | `confirmed` (0/1), `reason` (`WRONG_CODE`, `ALREADY_CONFIRMED_ELSEWHERE`) |
 
+## Student registration and results (placeholders)
+
+CIMS's `LiveNactvetSubmissionClient` (profile `gov-mocks` sets `CIMS_NACTVET_SUBMISSION_MODE=live` against this mock).
+Same envelope and credentials as above; outcomes appear after the processing time (`PROCESSING` until then).
+
+| Path | Request | `params` in the answer |
+|---|---|---|
+| `/studentregistration` | `institution_code`, `academic_year`, `students`: `registration_no`, `verification_number`, `index_number`, names, `sex`, `date_of_birth`, `nationality`, `phone`, `programme_code`, `year_of_study` | `batch_ref`, `received` |
+| `/studentregistrationstatus` | `batch_ref` | `status` (`PROCESSING`, `COMPLETED`), `items`: `registration_no`, `status` (`REGISTERED`, `QUERIED`), `reason`, `nactvet_number` |
+| `/resultsubmission` | `institution_code`, `programme_code`, `academic_year`, `semester`, `year_of_study`, `round`, `results`: `registration_no`, `verification_number`, `modules` (`code`, `grade`), `gpa`, `remark` | `batch_ref`, `received` |
+| `/resultsubmissionstatus` | `batch_ref` | `status` (`PROCESSING`, `ACCEPTED`, `QUERIED`), `items` as above |
+
+Rules: a student without a verification number, date of birth or programme code is queried; a results row without a
+verification number, or with a module without a grade, is queried, and the sheet is accepted only when no row is.
+`GET /mock/submissions` lists them; the dashboard shows them under the verification batches. Kept in memory only.
+
 ## Developer endpoints (not at NACTVET)
 
 Index numbers in these paths use `-` for `/` (`S0101-0003`).
@@ -85,6 +102,7 @@ Invoke-RestMethod -Method Post "http://localhost:8099/mock/outage?on=true"
 
 ## Tests
 
+`SubmissionTest`: student registration and results outcomes and credentials.
 `NactvetMockTest`: outcomes by index number and processing time, resubmission and repeated decisions, incomplete and
 duplicate candidates, confirmation codes and confirmation elsewhere, credentials, unknown batches and outages.
 `StatePersistenceTest`: batches, verification numbers and confirmation codes survive a restart; reset clears the file.

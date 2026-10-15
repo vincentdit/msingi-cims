@@ -235,6 +235,7 @@ function PlacementDialog({ id, onClose }: { id: number; onClose: () => void }) {
     mutationFn: (kind: string) => api<IptPlacementView>(`/api/ipt/placements/${id}/assessments`, { ...staff, method: 'PUT', body: { kind, score: Number(marks[kind]) } }),
     onSuccess: refresh,
   });
+  const [linkOpen, setLinkOpen] = useState(false);
   const s = v?.summary;
   const weight = { WORKPLACE: v?.workplaceWeight, INSTITUTION: v?.institutionWeight, LOGBOOK: v?.logbookWeight } as Record<string, number | undefined>;
   return (
@@ -331,7 +332,12 @@ function PlacementDialog({ id, onClose }: { id: number; onClose: () => void }) {
                 )}
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Marks (out of 100)</Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Marks (out of 100)</Typography>
+                  {v.can.supervise && !s.transferredAt && (s.status === 'CONFIRMED' || s.status === 'COMPLETED') && (
+                    <Button size="small" onClick={() => setLinkOpen(true)}>Send workplace assessment link</Button>
+                  )}
+                </Stack>
                 {(['WORKPLACE', 'INSTITUTION', 'LOGBOOK'] as const).map((k) => {
                   const a = v.assessments.find((x) => x.kind === k);
                   return (
@@ -356,6 +362,43 @@ function PlacementDialog({ id, onClose }: { id: number; onClose: () => void }) {
         )}
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+      {linkOpen && v && <WorkplaceLinkDialog placementId={id} phone={v.workplaceSupervisorPhone} email={v.workplaceSupervisorEmail}
+        name={v.summary.workplaceSupervisorName} onClose={() => setLinkOpen(false)} />}
+    </Dialog>
+  );
+}
+
+/** Sends the workplace supervisor a personal link to assess the student online (FR-IPT-03). */
+function WorkplaceLinkDialog({ placementId, phone, email, name, onClose }: { placementId: number; phone?: string; email?: string; name?: string; onClose: () => void }) {
+  const [p, setP] = useState(phone ?? '');
+  const [e, setE] = useState(email ?? '');
+  const send = useMutation({ mutationFn: () => api<{ url: string; expiresAt: string; sentToPhone?: string; sentToEmail?: string }>(`/api/ipt/placements/${placementId}/workplace-link`,
+    { ...staff, method: 'POST', body: { phone: blank(p), email: blank(e) } }) });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Workplace assessment link{name ? ` for ${name}` : ''}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          The supervisor gets a personal link by SMS and email, rates the student on five points without an account, and the rating becomes the workplace mark. A new link replaces any earlier one.
+        </Typography>
+        {!send.data ? (
+          <Stack spacing={2}>
+            <TextField label="Supervisor's mobile number" value={p} onChange={(x) => setP(x.target.value)} />
+            <TextField label="Supervisor's email (optional)" value={e} onChange={(x) => setE(x.target.value)} />
+          </Stack>
+        ) : (
+          <Alert severity="success">
+            Sent{send.data.sentToPhone ? ` by SMS to ${send.data.sentToPhone}` : ''}{send.data.sentToEmail ? ` and by email to ${send.data.sentToEmail}` : ''}. The link works until {formatDate(send.data.expiresAt)}.
+            <Box sx={{ mt: 1, fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all' }}>{send.data.url}</Box>
+          </Alert>
+        )}
+        <ErrorAlert error={send.error} />
+      </DialogContent>
+      <DialogActions>
+        {send.data && <Button onClick={() => navigator.clipboard?.writeText(send.data!.url)}>Copy link</Button>}
+        <Button onClick={onClose}>Close</Button>
+        {!send.data && <Button variant="contained" disabled={(!p.trim() && !e.trim()) || send.isPending} onClick={() => send.mutate()}>Send</Button>}
+      </DialogActions>
     </Dialog>
   );
 }

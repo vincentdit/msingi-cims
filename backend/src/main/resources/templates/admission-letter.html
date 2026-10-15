@@ -70,10 +70,7 @@
 <div class="subject">Admission to {{programmeName}} — {{academicYear}} {{intake}}</div>
 
 <p>Dear {{applicantName}},</p>
-<p>We are pleased to inform you that you have been admitted to <strong>{{institutionName}}</strong> to study the programme below.
-Your admission has been verified by the National Council for Technical and Vocational Education and Training (NACTVET)
-under verification number <strong>{{nactvetVerificationNo}}</strong>, and you accepted the offer on {{acceptedDate}}.</p>
-
+{{{introBlock}}}
 <table class="details">
   <tr><th>Programme</th><td>{{programmeName}}</td></tr>
   <tr><th>Award</th><td>{{awardName}}</td></tr>
@@ -84,15 +81,7 @@ under verification number <strong>{{nactvetVerificationNo}}</strong>, and you ac
   <tr><th>Reporting</th><td>{{reportingLine}}</td></tr>
 </table>
 
-<p>This admission is subject to the following conditions:</p>
-<ol>
-  <li>You present your original academic certificates and birth certificate for verification at registration.</li>
-  <li>The admission will be cancelled at any time if any information you gave is found to be false or your certificates are not genuine.</li>
-  <li>You register within the period given in the joining instructions; a place not taken up by then may be given to another applicant.</li>
-  <li>You abide by the rules and regulations of the institution and of NACTVET.</li>
-</ol>
-<p>The joining instructions attached to this letter give the reporting arrangements, what to bring and the fees. We look forward to welcoming you.</p>
-
+{{{termsBlock}}}
 <table class="closing">
   <tr>
     <td class="sign">
@@ -134,8 +123,7 @@ under verification number <strong>{{nactvetVerificationNo}}</strong>, and you ac
 
 <h3>Contacts</h3>
 <p style="text-align: left;">For any question about your admission contact the Admissions Office: {{contactLine}}.</p>
-<div class="notice small">Fees are paid only through a GePG control number issued by the institution. Do not pay money to any individual
-or into any account not shown on a control number.</div>
+{{{paymentNotice}}}
 
 </body>
 </html>

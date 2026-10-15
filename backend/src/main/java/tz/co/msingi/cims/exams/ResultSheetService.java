@@ -76,6 +76,7 @@ public class ResultSheetService {
     static final Set<ResultSheet.Status> FINAL = EnumSet.of(ResultSheet.Status.CONFIRMED, ResultSheet.Status.PUBLISHED);
 
     private final tz.co.msingi.cims.platform.security.DataScope scope;
+    private final ApprovalStageService stages;
     private final ResultSheetRepository sheets;
     private final SemesterResultRepository semesterResults;
     private final ModuleResultRepository moduleResults;
@@ -199,6 +200,7 @@ public class ResultSheetService {
         sheet.setRegulationSet(rs);
         sheet.setComputedByName(CurrentUser.name());
         sheet.setComputedAt(OffsetDateTime.now());
+        sheet.setStageNo((short) 0);
         sheet.setReturnedNote(null);
 
         Map<Long, ModuleResult> results = firstAttempts(regs);
@@ -346,6 +348,10 @@ public class ResultSheetService {
         access.require("recommend results", ExamAccess.COMMITTEE);
         ResultSheet s = require(id);
         if (s.getStatus() != ResultSheet.Status.COMPUTED) throw new BusinessRuleException("WRONG_STAGE", "Only a computed sheet can be recommended");
+        List<ApprovalStageService.Stage> list = stages.stages(ApprovalStageService.Flow.RESULT_SHEET);
+        if (s.getStageNo() < list.size()) {
+            throw new BusinessRuleException("STAGES_PENDING", "The sheet waits for \"" + list.get(s.getStageNo()).name() + "\" before the Academic Committee");
+        }
         s.setStatus(ResultSheet.Status.RECOMMENDED);
         s.setRecommendedBy(access.me());
         s.setRecommendedByName(CurrentUser.name());
@@ -353,6 +359,21 @@ public class ResultSheetService {
         s.setCommitteeNote(note == null || note.isBlank() ? null : note.trim());
         audit.record("RESULTS_RECOMMENDED", "ResultSheet", s.getId(), Map.of("programme", s.getProgramme().getCode(), "year", s.getYearOfStudy(),
                 "round", s.getRound().name()));
+        return view(s);
+    }
+
+    /** A review stage the institution added before the Academic Committee (FR-EXM-05). */
+    @Transactional
+    public SheetView approveStage(Long id, String note) {
+        ResultSheet s = require(id);
+        if (s.getStatus() != ResultSheet.Status.COMPUTED) throw new BusinessRuleException("WRONG_STAGE", "Only a computed sheet goes through the review stages");
+        List<ApprovalStageService.Stage> list = stages.stages(ApprovalStageService.Flow.RESULT_SHEET);
+        if (s.getStageNo() >= list.size()) throw new BusinessRuleException("WRONG_STAGE", "The sheet has passed every review stage");
+        ApprovalStageService.Stage stage = list.get(s.getStageNo());
+        if (!stages.canAct(stage, null, s.getProgramme())) throw new AccessDeniedException("Not in charge of the stage \"" + stage.name() + "\"");
+        stages.record(ApprovalStageService.Flow.RESULT_SHEET, s.getId(), stage, note);
+        s.setStageNo((short) (s.getStageNo() + 1));
+        audit.record("RESULTS_STAGE_APPROVED", "ResultSheet", s.getId(), Map.of("programme", s.getProgramme().getCode(), "stage", stage.name()));
         return view(s);
     }
 
@@ -386,12 +407,25 @@ public class ResultSheetService {
     @Transactional
     public SheetView returnSheet(Long id, String note) {
         ResultSheet s = require(id);
+        if (s.getStatus() == ResultSheet.Status.COMPUTED && s.getStageNo() > 0) {
+            // a review stage sends the sheet back to the Examinations Officer with comments
+            List<ApprovalStageService.Stage> list = stages.stages(ApprovalStageService.Flow.RESULT_SHEET);
+            boolean may = (s.getStageNo() < list.size() && stages.canAct(list.get(s.getStageNo()), null, s.getProgramme())) || access.has(ExamAccess.COMMITTEE);
+            if (!may) throw new AccessDeniedException("Not allowed to return results");
+            s.setStageNo((short) 0);
+            s.setReturnedNote(note.trim());
+            s.setReturnedByName(CurrentUser.name());
+            s.setReturnedAt(OffsetDateTime.now());
+            audit.record("RESULTS_RETURNED_FROM_STAGE", "ResultSheet", s.getId(), Map.of("note", note.trim()));
+            return view(s);
+        }
         if (s.getStatus() != ResultSheet.Status.RECOMMENDED) {
             throw new BusinessRuleException("WRONG_STAGE", s.getStatus() == ResultSheet.Status.COMPUTED ? "The sheet is already with the Examinations Officer"
                     : "Confirmed results are locked and change only by amendment");
         }
         if (!access.has(ExamAccess.BOARD) && !access.has(ExamAccess.COMMITTEE)) throw new AccessDeniedException("Not allowed to return results");
         s.setStatus(ResultSheet.Status.COMPUTED);
+        s.setStageNo((short) 0);
         s.setReturnedNote(note.trim());
         s.setReturnedByName(CurrentUser.name());
         s.setReturnedAt(OffsetDateTime.now());
@@ -500,20 +534,25 @@ public class ResultSheetService {
         }
         rows.sort(Comparator.comparing(SheetRow::registrationNo));
         boolean computed = s.getStatus() == ResultSheet.Status.COMPUTED;
+        List<ApprovalStageService.Stage> stageList = stages.stages(ApprovalStageService.Flow.RESULT_SHEET);
+        boolean stagesDone = s.getStageNo() >= stageList.size();
+        boolean canStage = computed && !stagesDone && stages.canAct(stageList.get(s.getStageNo()), null, s.getProgramme());
         SheetPermissions can = new SheetPermissions(computed && access.has(ExamAccess.EXAMS_OFFICE), computed && access.has(ExamAccess.COMMITTEE),
-                computed && access.has(ExamAccess.COMMITTEE),
+                computed && stagesDone && access.has(ExamAccess.COMMITTEE),
                 s.getStatus() == ResultSheet.Status.RECOMMENDED && access.has(ExamAccess.BOARD) && !Objects.equals(s.getRecommendedBy(), access.me()),
                 s.getStatus() == ResultSheet.Status.CONFIRMED && access.has(ExamAccess.EXAMS_OFFICE),
-                s.getStatus() == ResultSheet.Status.RECOMMENDED && (access.has(ExamAccess.BOARD) || access.has(ExamAccess.COMMITTEE)));
+                (s.getStatus() == ResultSheet.Status.RECOMMENDED && (access.has(ExamAccess.BOARD) || access.has(ExamAccess.COMMITTEE)))
+                        || (computed && s.getStageNo() > 0 && (canStage || access.has(ExamAccess.COMMITTEE))), canStage);
         Semester sem = s.getSemester();
         List<SubmissionView> subs = s.getId() == null ? List.of() : submissions.findBySheetIdOrderBySubmittedAtDesc(s.getId()).stream()
-                .map(x -> new SubmissionView(x.getId(), x.getStatus().name(), x.getReference(), x.getNote(), x.getStudents(), x.getSubmittedByName(),
-                        x.getSubmittedAt(), x.getResponseByName(), x.getResponseAt())).toList();
+                .map(NactvetResultsService::view).toList();
         return new SheetView(s.getId(), sem.getId(), sem.getName(), sem.getAcademicYear().getCode(), s.getProgramme().getId(), s.getProgramme().getCode(),
                 s.getProgramme().getName(), s.getYearOfStudy(), s.getRound().name(), s.getStatus().name(), s.getRegulationSet().getName(),
                 new ArrayList<>(modules.values()), rows, decisions(s), s.getComputedByName(), s.getComputedAt(), s.getRecommendedByName(),
                 s.getRecommendedAt(), s.getCommitteeNote(), s.getConfirmedByName(), s.getConfirmedAt(), s.getPublishedByName(), s.getPublishedAt(),
-                s.getReturnedNote(), s.getReturnedByName(), s.getReturnedAt(), subs, can);
+                s.getReturnedNote(), s.getReturnedByName(), s.getReturnedAt(), subs, can, stageList,
+                computed && !stagesDone ? stageList.get(s.getStageNo()).name() : null,
+                s.getId() == null ? List.of() : stages.approvals(ApprovalStageService.Flow.RESULT_SHEET, s.getId(), computed ? s.getStageNo() : stageList.size()));
     }
 
     /** Module codes of the class whose results have not passed every department stage. */

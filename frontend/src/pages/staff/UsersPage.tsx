@@ -140,7 +140,8 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
     mutationFn: (enable: boolean) => api<StaffUser>(`/api/admin/users/${user!.id}/${enable ? 'enable' : 'disable'}`, { ...staff, method: 'POST', body: enable ? undefined : { reason: reason || null } }),
     onSuccess: () => { refresh(); onClose(); },
   });
-  const error = save.error ?? reset.error ?? toggle.error;
+  const mfaReset = useMutation({ mutationFn: () => api(`/api/admin/users/${user!.id}/mfa/reset`, { ...staff, method: 'POST' }), onSuccess: () => { refresh(); onClose(); } });
+  const error = save.error ?? reset.error ?? toggle.error ?? mfaReset.error;
   const tf = (k: keyof typeof f, label: string, extra: object = {}) => (
     <TextField fullWidth size="small" label={label} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} disabled={readOnly} {...extra} />
   );
@@ -219,6 +220,7 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
           {user && !readOnly && !user.self && (
             <>
               <Button disabled={reset.isPending} onClick={() => reset.mutate()}>Reset password</Button>
+              {user.mfaEnabled && <Button disabled={mfaReset.isPending} onClick={() => mfaReset.mutate()} title="Lost phone: they set up two-step sign-in again at their next sign-in">Reset two-step sign-in</Button>}
               {user.status === 'ACTIVE'
                 ? <Button color="error" disabled={toggle.isPending} onClick={() => (confirmDisable ? toggle.mutate(false) : setConfirmDisable(true))}>{confirmDisable ? 'Disable now' : 'Disable'}</Button>
                 : <Button color="success" disabled={toggle.isPending} onClick={() => toggle.mutate(true)}>{user.status === 'LOCKED' ? 'Unlock' : 'Enable'}</Button>}

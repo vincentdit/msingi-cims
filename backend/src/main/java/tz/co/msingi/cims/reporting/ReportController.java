@@ -26,6 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReportController {
 
+    private final ReportScheduleService schedules;
+
     private static final String STAFF = "hasAnyRole('INSTITUTION_ADMIN','MANAGEMENT_VIEWER','DEPUTY_PRINCIPAL_ACADEMIC','ADMISSIONS_OFFICER','REGISTRAR',"
             + "'HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','BURSAR','ACCOUNTANT','HOSTEL_WARDEN','IPT_COORDINATOR','AUDITOR')";
 
@@ -77,6 +79,44 @@ public class ReportController {
     }
 
     @Operation(summary = "Dashboard sections for this user's roles")
+    // ---- scheduled reports by email (FR-RPT-03)
+
+    @GetMapping("/api/reports/schedules")
+    @PreAuthorize(STAFF)
+    public List<ReportScheduleService.ScheduleView> schedules() {
+        return schedules.list();
+    }
+
+    @GetMapping("/api/reports/schedules/recipients")
+    @PreAuthorize(STAFF)
+    public List<ReportScheduleService.Recipient> scheduleRecipients() {
+        return schedules.recipients();
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/reports/schedules")
+    @PreAuthorize(STAFF)
+    public ReportScheduleService.ScheduleView createSchedule(@jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody ReportScheduleService.ScheduleRequest req) {
+        return schedules.save(null, req);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/api/reports/schedules/{id}")
+    @PreAuthorize(STAFF)
+    public ReportScheduleService.ScheduleView updateSchedule(@PathVariable Long id, @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody ReportScheduleService.ScheduleRequest req) {
+        return schedules.save(id, req);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/api/reports/schedules/{id}")
+    @PreAuthorize(STAFF)
+    public void deleteSchedule(@PathVariable Long id) {
+        schedules.delete(id);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/reports/schedules/{id}/send")
+    @PreAuthorize(STAFF)
+    public ReportScheduleService.ScheduleView sendSchedule(@PathVariable Long id) {
+        return schedules.sendNow(id);
+    }
+
     @GetMapping("/api/dashboard")
     @PreAuthorize(STAFF)
     public DashboardService.Dashboard dashboard() {

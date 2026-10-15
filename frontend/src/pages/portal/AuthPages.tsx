@@ -196,6 +196,7 @@ export function LoginPage() {
 
   return (
     <AuthCard title={t('auth.loginTitle')}>
+      {new URLSearchParams(window.location.search).get('idle') === '1' && <Alert severity="info" sx={{ mb: 2 }}>{t('idle.signedOut')}</Alert>}
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Stack spacing={2}>
           <TextField label={t('auth.login')} value={login} onChange={(e) => setLogin(e.target.value)} required autoComplete="username" />

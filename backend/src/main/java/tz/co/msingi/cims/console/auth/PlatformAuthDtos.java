@@ -23,7 +23,7 @@ public final class PlatformAuthDtos {
     }
 
     public record ChangePasswordRequest(@NotBlank String currentPassword,
-                                        @NotBlank @Pattern(regexp = AdmissionDtos.PASSWORD_RULE, message = AdmissionDtos.PASSWORD_MESSAGE) String newPassword) {
+                                        @NotBlank @Pattern(regexp = AdmissionDtos.PASSWORD_RULE, message = AdmissionDtos.PASSWORD_MESSAGE) @tz.co.msingi.cims.platform.security.NotBreached String newPassword) {
     }
 
     public record PlatformUserRequest(@NotBlank @Size(min = 3, max = 60) @Pattern(regexp = "^[A-Za-z0-9._-]+$",

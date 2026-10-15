@@ -3,7 +3,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
   IconButton, InputAdornment, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow,
-  TextField, Typography, Checkbox, FormControlLabel, TableSortLabel,
+  TextField, Typography, Checkbox, FormControlLabel, TableSortLabel, Tab, Tabs,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import CloseIcon from '@mui/icons-material/Close';
@@ -12,6 +12,10 @@ import PrintIcon from '@mui/icons-material/Print';
 import { homeFor } from '../../components/StaffLayout';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import { setLanguage } from '../../i18n';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
@@ -22,7 +26,9 @@ import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../co
 import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
 import JoiningInstructionsCard from './JoiningInstructionsCard';
+import { ApplicationDocumentsSection, WindowDocumentsCard } from './ApplicationDocuments';
 import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './QualificationChecks';
+import { CampusPicker, CampusesTab, DepartmentsTab, NamedListTab, useCampuses, useProgrammeCampuses } from './StructurePages';
 import { WindowFormDialog, WindowHistoryCard, WindowLifecycle, WindowStateChip, useWindowRoles } from './WindowAdmin';
 
 const staff = { realm: 'staff' as const };
@@ -32,27 +38,68 @@ export function StaffLoginPage() {
   const inst = useInstitution();
   const { signIn } = useSession();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();   // re-renders the page in the chosen language
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mfa, setMfa] = useState<TokenResponse['mfa'] | null>(null);
+  const [code, setCode] = useState('');
+  const [smsSent, setSmsSent] = useState(false);
+  const idleOut = new URLSearchParams(window.location.search).get('idle') === '1';
+  const done = (t: TokenResponse) => {
+    if (t.mfa) { setMfa(t.mfa); setCode(''); setSmsSent(false); return; }
+    signIn('staff', t);
+    navigate(t.user.mustChangePassword || t.user.mfaSetupRequired ? '/staff/password' : homeFor(t.user.roles));
+  };
   const m = useMutation({
     mutationFn: () => api<TokenResponse>('/api/auth/login', { method: 'POST', body: { username, password } }),
-    onSuccess: (t) => { signIn('staff', t); navigate(t.user.mustChangePassword ? '/staff/password' : homeFor(t.user.roles)); },
+    onSuccess: done,
+  });
+  const verify = useMutation({
+    mutationFn: () => api<TokenResponse>('/api/auth/mfa/verify', { method: 'POST', body: { challenge: mfa!.challenge, code: code.trim() } }),
+    onSuccess: done,
+  });
+  const sms = useMutation({
+    mutationFn: () => api('/api/auth/mfa/sms', { method: 'POST', body: { challenge: mfa!.challenge } }),
+    onSuccess: () => setSmsSent(true),
   });
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: '#0F1B2D', p: 2 }}>
       <Card sx={{ width: '100%', maxWidth: 420, borderRadius: 3 }}>
         <CardContent sx={{ p: 4 }}>
-          <Typography variant="overline" color="text.secondary">CIMS back-office</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="overline" color="text.secondary">CIMS back-office</Typography>
+            <ToggleButtonGroup size="small" exclusive value={i18n.language === 'sw' ? 'sw' : 'en'} onChange={(_, v) => v && setLanguage(v)} aria-label="Language">
+              <ToggleButton value="en" sx={{ px: 1, py: 0.25 }}>EN</ToggleButton>
+              <ToggleButton value="sw" sx={{ px: 1, py: 0.25 }}>SW</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
           <Typography variant="h5">{inst.shortName ?? inst.name}</Typography>
-          <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
-            <Stack spacing={2} sx={{ mt: 3 }}>
-              <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
-              <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-              <ErrorAlert error={m.error} />
-              <Button type="submit" variant="contained" size="large" disabled={m.isPending}>Sign in</Button>
-              <Button component={RouterLink} to="/">Back to admission portal</Button>
-            </Stack>
-          </form>
+          {idleOut && !mfa && <Alert severity="info" sx={{ mt: 2 }}>You were signed out after a time with no activity.</Alert>}
+          {!mfa ? (
+            <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+              <Stack spacing={2} sx={{ mt: 3 }}>
+                <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
+                <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+                <ErrorAlert error={m.error} />
+                <Button type="submit" variant="contained" size="large" disabled={m.isPending}>Sign in</Button>
+                <Button component={RouterLink} to="/">Back to admission portal</Button>
+              </Stack>
+            </form>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); verify.mutate(); }}>
+              <Stack spacing={2} sx={{ mt: 3 }}>
+                <Typography variant="body2">
+                  {smsSent ? 'We sent a code by SMS to the phone on your account. Type it here.' : 'Open your authenticator app and type the 6-digit code for CIMS.'}
+                </Typography>
+                <TextField label="Code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" autoFocus required
+                  inputProps={{ maxLength: 9 }} helperText="Lost your phone? Type one of your recovery codes." />
+                <ErrorAlert error={verify.error ?? sms.error} />
+                <Button type="submit" variant="contained" size="large" disabled={verify.isPending || code.trim().length < 6}>Continue</Button>
+                {mfa.smsAvailable && <Button onClick={() => sms.mutate()} disabled={sms.isPending}>{smsSent ? 'Send the SMS again' : 'Send me a code by SMS instead'}</Button>}
+                <Button onClick={() => { setMfa(null); setPassword(''); }}>Back</Button>
+              </Stack>
+            </form>
+          )}
         </CardContent>
       </Card>
     </Box>
@@ -305,6 +352,7 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
               </Box>
             ))}
           </Box>
+          <ApplicationDocumentsSection applicationId={a.application.id} onChange={() => d.refetch()} />
           <Divider />
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Fee</Typography>
@@ -341,37 +389,71 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
 
 // ---------------------------------------------------------------- Programmes
 export function ProgrammesPage() {
-  const qc = useQueryClient();
   const { user } = useSession();
   const canEdit = !!user('staff')?.roles.some((r) => r === 'INSTITUTION_ADMIN' || r === 'DEPUTY_PRINCIPAL_ACADEMIC');
+  const [tab, setTab] = useState<'programmes' | 'departments' | 'faculties' | 'campuses'>('programmes');
+  return (
+    <Container maxWidth="lg" disableGutters>
+      <PageTitle title="Programmes and structure" subtitle="NVA and NTA programmes accredited by NACTVET, the departments and faculties that run them, and the campuses they are taught at." />
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }}>
+        <Tab value="programmes" label="Programmes" />
+        <Tab value="departments" label="Departments" />
+        <Tab value="faculties" label="Faculties / schools" />
+        <Tab value="campuses" label="Campuses" />
+      </Tabs>
+      {tab === 'programmes' && <ProgrammesTab canEdit={canEdit} />}
+      {tab === 'departments' && <DepartmentsTab canEdit={canEdit} />}
+      {tab === 'faculties' && <NamedListTab kind="faculties" canEdit={canEdit} />}
+      {tab === 'campuses' && <CampusesTab canEdit={canEdit} />}
+    </Container>
+  );
+}
+
+function ProgrammesTab({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const campuses = useCampuses();
+  const pc = useProgrammeCampuses();
+  const [campusIds, setCampusIds] = useState<number[]>([]);
   const list = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const depts = useQuery({ queryKey: ['staff', 'departments'], queryFn: () => api<Department[]>('/api/academic/departments', staff) });
   const empty = { id: 0, departmentId: '', code: '', nactvetCode: '', name: '', awardFamily: 'NTA', awardLevel: '4', durationSemesters: '2', accreditedCapacity: '', entryLevel: '' };
   const [form, setForm] = useState<typeof empty | null>(null);
-  const edit = (p: Programme) => setForm({ id: p.id, departmentId: String(p.departmentId), code: p.code, nactvetCode: p.nactvetCode ?? '', name: p.name,
+  const edit = (p: Programme) => { setCampusIds(pc.data?.[String(p.id)] ?? []); setForm({ id: p.id, departmentId: String(p.departmentId), code: p.code, nactvetCode: p.nactvetCode ?? '', name: p.name,
     awardFamily: p.awardFamily, awardLevel: String(p.awardLevel), durationSemesters: String(p.durationSemesters),
-    accreditedCapacity: p.accreditedCapacity ? String(p.accreditedCapacity) : '', entryLevel: p.entryLevelSet ? String(p.entryLevel) : '' });
+    accreditedCapacity: p.accreditedCapacity ? String(p.accreditedCapacity) : '', entryLevel: p.entryLevelSet ? String(p.entryLevel) : '' }); };
   const save = useMutation({
-    mutationFn: (f: typeof empty) => api(f.id ? `/api/academic/programmes/${f.id}` : '/api/academic/programmes', { method: f.id ? 'PUT' : 'POST', realm: 'staff', body: {
-      ...f, id: undefined, departmentId: Number(f.departmentId), awardLevel: Number(f.awardLevel), durationSemesters: Number(f.durationSemesters),
-      accreditedCapacity: f.accreditedCapacity ? Number(f.accreditedCapacity) : null, entryLevel: f.entryLevel ? Number(f.entryLevel) : null, active: true } }),
-    onSuccess: () => { setForm(null); qc.invalidateQueries({ queryKey: ['staff', 'programmes'] }); },
+    mutationFn: async (f: typeof empty) => {
+      const saved = await api<Programme>(f.id ? `/api/academic/programmes/${f.id}` : '/api/academic/programmes', { method: f.id ? 'PUT' : 'POST', realm: 'staff', body: {
+        ...f, id: undefined, departmentId: Number(f.departmentId), awardLevel: Number(f.awardLevel), durationSemesters: Number(f.durationSemesters),
+        accreditedCapacity: f.accreditedCapacity ? Number(f.accreditedCapacity) : null, entryLevel: f.entryLevel ? Number(f.entryLevel) : null, active: true } });
+      if ((campuses.data?.length ?? 0) > 1) await api(`/api/academic/programmes/${saved.id}/campuses`, { method: 'PUT', realm: 'staff', body: { campusIds } });
+      return saved;
+    },
+    onSuccess: () => { setForm(null); qc.invalidateQueries({ queryKey: ['staff', 'programmes'] }); qc.invalidateQueries({ queryKey: ['staff', 'programme-campuses'] }); qc.invalidateQueries({ queryKey: ['staff', 'campuses'] }); },
   });
+  const campusNames = (id: number) => {
+    const ids = pc.data?.[String(id)] ?? [];
+    if (!ids.length) return campuses.data?.find((c) => c.main)?.name ?? '—';
+    return ids.map((i) => campuses.data?.find((c) => c.id === i)?.name).filter(Boolean).join(', ');
+  };
+  const multiCampus = (campuses.data?.length ?? 0) > 1;
   const levels = (f: typeof empty) => (f.awardFamily === 'NVA' ? [1, 2, 3] : [4, 5, 6, 7, 8]).filter((l) => l <= Number(f.awardLevel));
   return (
-    <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Programmes" subtitle="NVA and NTA programmes accredited by NACTVET. Applicants see only programmes that admit at the level their highest qualification leads to."
-        action={canEdit && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>New programme</Button>} />
+    <>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+        <Typography variant="body2" color="text.secondary">Applicants see only programmes that admit at the level their highest qualification leads to.</Typography>
+        {canEdit && <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCampusIds([]); setForm(empty); }} sx={{ flexShrink: 0, ml: 2 }}>New programme</Button>}
+      </Stack>
       <ErrorAlert error={list.error} />
       <Card><TableContainer>
         <Table size="small">
-          <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell>Admits at</TableCell><TableCell>Department</TableCell><TableCell align="right">Capacity</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell>Admits at</TableCell><TableCell>Department</TableCell>{multiCampus && <TableCell>Campus</TableCell>}<TableCell align="right">Capacity</TableCell></TableRow></TableHead>
           <TableBody>
             {list.data?.map((p) => (
               <TableRow key={p.id} hover={canEdit} sx={{ cursor: canEdit ? 'pointer' : 'default' }} onClick={() => canEdit && edit(p)}>
                 <TableCell>{p.code}</TableCell><TableCell>{p.name}</TableCell><TableCell>{p.awardName}</TableCell>
                 <TableCell>{p.awardFamily} Level {p.entryLevel}</TableCell>
-                <TableCell>{p.departmentName}</TableCell><TableCell align="right">{p.accreditedCapacity ?? '—'}</TableCell>
+                <TableCell>{p.departmentName}</TableCell>{multiCampus && <TableCell>{campusNames(p.id)}</TableCell>}<TableCell align="right">{p.accreditedCapacity ?? '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -406,13 +488,14 @@ export function ProgrammesPage() {
                 <MenuItem value="">Automatic</MenuItem>
                 {levels(form).map((l) => <MenuItem key={l} value={String(l)}>{form.awardFamily} Level {l}</MenuItem>)}
               </TextField>
+              <CampusPicker value={campusIds} onChange={setCampusIds} />
               <ErrorAlert error={save.error} />
             </Stack>
           </DialogContent>
         )}
         <DialogActions><Button onClick={() => setForm(null)}>Cancel</Button><Button variant="contained" onClick={() => form && save.mutate(form)} disabled={save.isPending}>Save</Button></DialogActions>
       </Dialog>
-    </Container>
+    </>
   );
 }
 
@@ -500,6 +583,7 @@ export function WindowDetailPage() {
           </TableBody>
         </Table>
       </TableContainer></Card>
+      <WindowDocumentsCard windowId={win.id} canEdit={canConfigure} />
       <JoiningInstructionsCard win={win} canEdit={canConfigure} />
       <WindowHistoryCard windowId={win.id} />
       {editing && <WindowFormDialog win={win} onClose={() => setEditing(false)} onSaved={(x) => { setEditing(false); qc.setQueryData(['staff', 'window', id], x); refresh(); }} />}

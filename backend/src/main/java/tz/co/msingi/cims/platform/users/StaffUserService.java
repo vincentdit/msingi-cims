@@ -351,6 +351,6 @@ public class StaffUserService {
                     return new RoleGrantView(r.getRole(), info == null ? r.getRole().name() : info.label(), scope, r.getScopeId(), scopeName);
                 }).toList();
         return new StaffUserView(u.getId(), u.getUsername(), u.getFullName(), u.getJobTitle(), u.getEmail(), u.getPhone(), u.getStatus().name(),
-                u.isMustChangePassword(), u.getLastLoginAt(), u.getCreatedAt(), u.getCreatedByName(), roles, isSelf(u));
+                u.isMustChangePassword(), u.getLastLoginAt(), u.getCreatedAt(), u.getCreatedByName(), roles, isSelf(u), tz.co.msingi.cims.platform.security.mfa.MfaPolicy.enabled(u));
     }
 }

@@ -40,6 +40,16 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class.isAssignableFrom(type))
             return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class, ExternalSystem.NACTVET_CATALOGUE);
         if (GepgGateway.class.isAssignableFrom(type)) return wrap(bean, GepgGateway.class, ExternalSystem.GEPG);
+        if (tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.class, ExternalSystem.NACTVET_SUBMISSION);
+        if (tz.co.msingi.cims.integration.heslb.HeslbClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.heslb.HeslbClient.class, ExternalSystem.HESLB);
+        if (tz.co.msingi.cims.integration.nida.NidaClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.nida.NidaClient.class, ExternalSystem.NIDA);
+        if (tz.co.msingi.cims.integration.muse.MuseClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.muse.MuseClient.class, ExternalSystem.MUSE);
+        if (tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class, ExternalSystem.TAMISEMI);
         if (SmsGateway.class.isAssignableFrom(type)) return wrap(bean, SmsGateway.class, ExternalSystem.SMS);
         return bean;
     }
@@ -74,6 +84,7 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
     private static String failure(Object result) {
         if (result instanceof SmsGateway.Result r && !r.accepted()) return r.error() == null ? "Not accepted by the SMS gateway" : r.error();
         if (result instanceof GepgGateway.ControlNumberResponse r && !r.issued() && r.errorMessage() != null) return r.errorMessage();
+        if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r && !"POSTED".equals(r.status())) return r.status() + ": " + r.message();
         return null;
     }
 
@@ -82,6 +93,11 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (result instanceof GepgGateway.ControlNumberResponse r && !r.issued()) return "Control number pending";
         if (result instanceof Collection<?> c) return c.size() + (c.size() == 1 ? " result" : " results");
         if (result instanceof Boolean b) return b ? "Confirmed" : "Not confirmed";
+        if (result instanceof tz.co.msingi.cims.integration.nida.NidaClient.Result r) return "NIN " + r.status();
+        if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r) return "Posted as " + r.museRef();
+        if (result instanceof tz.co.msingi.cims.integration.heslb.HeslbClient.SubmissionResult r) return r.accepted() + " of " + r.received() + " accepted";
+        if (result instanceof tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.Status r) return r.state() + " · " + r.items().size() + " decided";
+        if (result instanceof String s && s.length() <= 60) return "Reference " + s;
         return null;
     }
 
@@ -98,6 +114,13 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
                     default -> null;
                 };
                 case GEPG -> args.length >= 1 && args[0] instanceof GepgGateway.BillRequest b ? "bill " + b.billId() : null;
+                case COLLECTION -> null;
+                case NACTVET_SUBMISSION -> args.length >= 1 ? String.valueOf(args[0] instanceof String s ? s : op) : null;
+                case HESLB -> args.length >= 2 ? args[0] + " " + args[1] + (args.length >= 3 && args[2] instanceof String k ? " " + k : "") : null;
+                case NIDA -> args.length >= 1 && args[0] instanceof String nin ? "NIN …" + (nin.replaceAll("\\D", "").length() >= 4
+                        ? nin.replaceAll("\\D", "").substring(nin.replaceAll("\\D", "").length() - 4) : "") : null;
+                case MUSE -> args.length >= 1 && args[0] instanceof tz.co.msingi.cims.integration.muse.MuseClient.Journal j ? "journal " + j.batchRef() : null;
+                case TAMISEMI -> args.length >= 2 ? args[0] + " " + args[1] : null;
                 case SMS -> args.length >= 1 ? mask(String.valueOf(args[0])) + (args.length >= 4 && args[3] != null ? " · " + args[3] : "") : null;
             };
         } catch (RuntimeException e) {

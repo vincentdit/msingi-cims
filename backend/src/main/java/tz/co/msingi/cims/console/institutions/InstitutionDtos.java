@@ -37,7 +37,7 @@ public final class InstitutionDtos {
                                  @NotBlank @Size(max = 200) String name,
                                  @Size(max = 60) String shortName,
                                  @Size(max = 40) String nactvetRegNo,
-                                 @NotBlank @Pattern(regexp = "PUBLIC|PRIVATE") String ownership,
+                                 @NotBlank @Pattern(regexp = tz.co.msingi.cims.platform.tenancy.Ownership.RULE) String ownership,
                                  @Email @Size(max = 120) String contactEmail,
                                  @Size(max = 30) String contactPhone,
                                  @Pattern(regexp = COLOUR_RULE, message = "A colour like #1F4E8C") String primaryColor,
@@ -45,13 +45,24 @@ public final class InstitutionDtos {
                                  @NotNull @Valid AdminRequest admin,
                                  @Size(max = 1000) String notes,
                                  Long nactvetInstitutionId,
-                                 @Size(max = 500) List<Long> importProgrammeIds) {
+                                 @Size(max = 500) List<Long> importProgrammeIds,
+                                 @Size(max = 20) List<@Valid CampusSeed> campuses) {
+        public OnboardRequest(String code, String name, String shortName, String nactvetRegNo, String ownership, String contactEmail,
+                              String contactPhone, String primaryColor, List<String> domains, AdminRequest admin, String notes,
+                              Long nactvetInstitutionId, List<Long> importProgrammeIds) {
+            this(code, name, shortName, nactvetRegNo, ownership, contactEmail, contactPhone, primaryColor, domains, admin, notes,
+                    nactvetInstitutionId, importProgrammeIds, null);
+        }
+    }
+
+    /** A campus created at onboarding; the first one is the main campus (FR-ADM-S01). */
+    public record CampusSeed(@NotBlank @Size(max = 150) String name, @Size(max = 60) String region, @Size(max = 80) String district) {
     }
 
     public record UpdateRequest(@NotBlank @Size(max = 200) String name,
                                 @Size(max = 60) String shortName,
                                 @Size(max = 40) String nactvetRegNo,
-                                @NotBlank @Pattern(regexp = "PUBLIC|PRIVATE") String ownership,
+                                @NotBlank @Pattern(regexp = tz.co.msingi.cims.platform.tenancy.Ownership.RULE) String ownership,
                                 @Email @Size(max = 120) String contactEmail,
                                 @Size(max = 30) String contactPhone,
                                 @Pattern(regexp = COLOUR_RULE, message = "A colour like #1F4E8C") String primaryColor,

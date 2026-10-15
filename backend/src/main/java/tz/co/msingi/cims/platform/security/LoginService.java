@@ -24,6 +24,7 @@ public class LoginService {
     private final TokenService tokens;
     private final CimsSecurityProperties props;
     private final AuditService audit;
+    private final tz.co.msingi.cims.platform.security.mfa.MfaService mfa;
 
     @Transactional(noRollbackFor = {BadCredentialsException.class, LockedException.class, BusinessRuleException.class})
     public TokenService.TokenResponse login(String login, String password, UserAccount.UserType expectedType) {
@@ -52,8 +53,11 @@ public class LoginService {
         if (user.getStatus() == UserAccount.Status.PENDING_VERIFICATION) {
             throw new BusinessRuleException("ACCOUNT_NOT_VERIFIED", "Verify your phone number with the code sent by SMS before signing in.");
         }
-        user.setFailedLogins(0);
-        user.setLastLoginAt(OffsetDateTime.now());
+        if (user.getUserType() == UserAccount.UserType.STAFF && tz.co.msingi.cims.platform.security.mfa.MfaPolicy.enabled(user)) {
+            // the password is right; the authenticator code comes next (BR-36)
+            return TokenService.mfaChallenge(mfa.challenge(user), user.getPhone() != null && !user.getPhone().isBlank());
+        }
+        users.recordSignIn(user.getId());
         audit.recordAs(user.getId(), user.getFullName(), "LOGIN", "UserAccount", user.getId(), null);
         return tokens.issue(user);
     }

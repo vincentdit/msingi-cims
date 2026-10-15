@@ -12,21 +12,24 @@ import { useState, type ReactNode } from 'react';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { Reconciliation, ReconciliationItem, ReconciliationMonth } from '../../api/types';
 import { ErrorAlert, Loading } from '../../components/common';
+import { useInstitution } from '../../components/InstitutionContext';
 
 const staff = { realm: 'staff' as const };
 
 const KIND: Record<string, { label: string; help: string; colour: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
-  MATCHED: { label: 'Matched', help: 'In GePG’s file and in CIMS with the same amount', colour: 'success' },
-  MISSING_IN_CIMS: { label: 'Not received by CIMS', help: 'GePG collected it but the payment notice never reached CIMS. Post it to credit the payer.', colour: 'error' },
-  MISSING_IN_GEPG: { label: 'Not in GePG’s file', help: 'CIMS recorded it but GePG does not report it for this day. It settles itself if a later file has it.', colour: 'warning' },
-  AMOUNT_MISMATCH: { label: 'Amount differs', help: 'GePG and CIMS have different amounts for the same receipt', colour: 'error' },
-  DUPLICATE: { label: 'Repeated in file', help: 'The same GePG receipt appears more than once in the file', colour: 'warning' },
-  UNKNOWN_BILL: { label: 'Unknown bill', help: 'GePG reports a bill CIMS did not issue (another institution’s or a test bill)', colour: 'info' },
+  MATCHED: { label: 'Matched', help: 'In the day’s file and in CIMS with the same amount', colour: 'success' },
+  MISSING_IN_CIMS: { label: 'Not received by CIMS', help: 'It was collected (GePG, mobile money or bank) but the payment notice never reached CIMS. Post it to credit the payer.', colour: 'error' },
+  MISSING_IN_GEPG: { label: 'Not in the file', help: 'CIMS recorded it but the day’s file does not report it. It settles itself if a later file has it.', colour: 'warning' },
+  AMOUNT_MISMATCH: { label: 'Amount differs', help: 'The file and CIMS have different amounts for the same receipt', colour: 'error' },
+  DUPLICATE: { label: 'Repeated in file', help: 'The same receipt appears more than once in the file', colour: 'warning' },
+  UNKNOWN_BILL: { label: 'Unknown bill', help: 'The file reports a bill or reference CIMS did not issue (another institution’s, a test, or a mistyped reference)', colour: 'info' },
 };
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** Daily GePG reconciliation and the Bursar's monthly sign-off (FR-FIN-05). */
+/** Daily reconciliation of GePG's file (public institutions) or the collector's or bank's statement (private and faith-based), and the Bursar's monthly sign-off (FR-FIN-05). */
+const useGepg = () => (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
+
 export default function ReconciliationTab({ canWork, isBursar }: { canWork: boolean; isBursar: boolean }) {
   const [month, setMonth] = useState(iso(new Date()).substring(0, 7));
   const [openId, setOpenId] = useState<number | null>(null);
@@ -44,6 +47,7 @@ export default function ReconciliationTab({ canWork, isBursar }: { canWork: bool
 function MonthView({ month, setMonth, canWork, isBursar, onOpen, onImport }: {
   month: string; setMonth: (m: string) => void; canWork: boolean; isBursar: boolean; onOpen: (id: number) => void; onImport: (date: string) => void;
 }) {
+  const gepg = useGepg();
   const qc = useQueryClient();
   const [signing, setSigning] = useState(false);
   const [note, setNote] = useState('');
@@ -59,7 +63,7 @@ function MonthView({ month, setMonth, canWork, isBursar, onOpen, onImport }: {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }} alignItems={{ sm: 'center' }}>
         <TextField size="small" type="month" label="Month" sx={{ width: 190, flexShrink: 0 }} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
-          Import GePG’s reconciliation file each day. Matched payments need nothing; exceptions are resolved before the day is closed.
+          {gepg ? 'Import GePG’s reconciliation file each day.' : 'Import the day’s mobile money or collector statement, and the bank statement, each day.'} Matched payments need nothing; exceptions are resolved before the day is closed.
         </Typography>
       </Stack>
       <ErrorAlert error={q.error} />
@@ -86,7 +90,7 @@ function MonthView({ month, setMonth, canWork, isBursar, onOpen, onImport }: {
           <Card><TableContainer><Table size="small">
             <TableHead><TableRow>
               <TableCell>Day</TableCell><TableCell align="right">CIMS payments</TableCell><TableCell align="right">Amount</TableCell>
-              <TableCell align="right">In GePG file</TableCell><TableCell>Reconciliation</TableCell><TableCell align="right" />
+              <TableCell align="right">In file</TableCell><TableCell>Reconciliation</TableCell><TableCell align="right" />
             </TableRow></TableHead>
             <TableBody>
               {days.map((d) => (
@@ -112,7 +116,7 @@ function MonthView({ month, setMonth, canWork, isBursar, onOpen, onImport }: {
         <DialogTitle>Sign off {m && new Date(`${m.month}T00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 2 }}>
-            You confirm that collections of <strong>{m && formatTzs(m.collected)}</strong> agree with GePG for every day of the month.
+            You confirm that collections of <strong>{m && formatTzs(m.collected)}</strong> agree with {gepg ? 'GePG' : 'the statements'} for every day of the month.
             The sign-off is recorded with your name and cannot be undone.
           </Typography>
           <TextField fullWidth multiline minRows={2} label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Agrees with the bank statement" />
@@ -138,6 +142,7 @@ function DayStatus({ d }: { d: ReconciliationMonth['days'][number] }) {
 }
 
 function ImportDialog({ date, onClose, onDone }: { date: string; onClose: () => void; onDone: (r: Reconciliation) => void }) {
+  const gepg = useGepg();
   const qc = useQueryClient();
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
   const [dlError, setDlError] = useState<unknown>(null);
@@ -145,13 +150,21 @@ function ImportDialog({ date, onClose, onDone }: { date: string; onClose: () => 
     mutationFn: () => api<Reconciliation>('/api/finance/reconciliations', { ...staff, method: 'POST', body: { date, fileName: file?.name, csv: file?.text } }),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['staff', 'reconciliation-month'] }); qc.setQueryData(['staff', 'reconciliation', r.id], r); onDone(r); },
   });
+  // live GePG: ask GePG for the day's transactions; they arrive by callback and are matched like a file
+  const ask = useMutation({
+    mutationFn: () => api<{ requestId: string }>(`/api/finance/reconciliations/request-gepg?date=${date}`, { ...staff, method: 'POST' }),
+    onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['staff', 'reconciliation-month'] }), 4000),
+  });
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Import GePG file for {formatDate(date)}</DialogTitle>
+      <DialogTitle>Import {gepg ? 'GePG file' : 'statement'} for {formatDate(date)}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Download the day’s reconciliation file from the GePG portal as CSV (columns PayRefId, SpBillId, BillCtrNum, PspTrxId, PspName, PaidAmt, Ccy,
-          TrxDtTm, UsdPayChnl, PyrCellNum). Payments are matched by GePG receipt number. A file with any invalid line is rejected as a whole.
+          {gepg ? <>Download the day’s reconciliation file from the GePG portal as CSV (columns PayRefId, SpBillId, BillCtrNum, PspTrxId, PspName, PaidAmt, Ccy,
+          TrxDtTm, UsdPayChnl, PyrCellNum). Payments are matched by GePG receipt number.</>
+            : <>Export the day’s statement from the collector, mobile money or bank portal as CSV with at least the columns <strong>TransactionId</strong>, <strong>Reference</strong> (the
+          12-digit CIMS payment reference) and <strong>Amount</strong>; TransactionDate, Provider or Bank and MSISDN are used when present. Payments are matched by transaction id.</>}
+          {' '}A file with any invalid line is rejected as a whole.
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
           <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
@@ -170,10 +183,12 @@ function ImportDialog({ date, onClose, onDone }: { date: string; onClose: () => 
           onClick={() => download(`/api/finance/reconciliations/cims-payments.csv?date=${date}`, 'staff', `cims-payments-${date}.csv`).catch(setDlError)}>
           CIMS payments of this day in the same layout
         </Button>
-        <ErrorAlert error={run.error ?? dlError} />
+        <ErrorAlert error={run.error ?? dlError ?? ask.error} />
+        {ask.isSuccess && <Alert severity="success" sx={{ mt: 1 }}>Asked GePG (request {ask.data.requestId}). GePG answers in a moment; the day then shows its matches and exceptions.</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
+        {gepg && <Button disabled={ask.isPending || ask.isSuccess} onClick={() => ask.mutate()}>Ask GePG instead</Button>}
         <Button variant="contained" disabled={!file || run.isPending} onClick={() => run.mutate()}>Import and match</Button>
       </DialogActions>
     </Dialog>
@@ -207,7 +222,7 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
         <Box sx={{ flex: 1 }}>
           <Typography variant="h6">Reconciliation for {formatDate(r.date)}</Typography>
           <Typography variant="body2" color="text.secondary">
-            {r.fileName ?? 'GePG file'} imported by {r.importedByName}, {formatDateTime(r.importedAt)}
+            {r.fileName ?? 'File'} imported by {r.importedByName}, {formatDateTime(r.importedAt)}
             {r.closedAt && <> · closed by {r.closedByName}, {formatDateTime(r.closedAt)}</>}
           </Typography>
         </Box>
@@ -222,7 +237,7 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
       <ErrorAlert error={close.error} />
 
       <Grid container spacing={1.5}>
-        <Tile small label={`GePG (${r.gepgCount})`} value={formatTzs(r.gepgTotal)} />
+        <Tile small label={`In file (${r.gepgCount})`} value={formatTzs(r.gepgTotal)} />
         <Tile small label={`CIMS (${r.cimsCount})`} value={formatTzs(r.cimsTotal)} />
         <Tile small label="Difference" value={formatTzs(r.gepgTotal - r.cimsTotal)} tone={r.gepgTotal !== r.cimsTotal ? 'warning' : 'success'} />
         <Tile small label="Matched" value={r.matchRate != null ? `${r.matchedCount} (${r.matchRate}%)` : r.matchedCount} tone="success" />
@@ -231,11 +246,11 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
 
       <Card><CardContent>
         <Typography variant="h6" sx={{ mb: 1 }}>Exceptions</Typography>
-        {!exceptions.length ? <Typography color="text.secondary">None. Every line in GePG’s file matches a CIMS payment.</Typography> : (
+        {!exceptions.length ? <Typography color="text.secondary">None. Every line in the file matches a CIMS payment.</Typography> : (
           <TableContainer><Table size="small">
             <TableHead><TableRow>
-              <TableCell>Exception</TableCell><TableCell>GePG receipt</TableCell><TableCell>Payer / bill</TableCell>
-              <TableCell align="right">GePG</TableCell><TableCell align="right">CIMS</TableCell><TableCell>Resolution</TableCell>
+              <TableCell>Exception</TableCell><TableCell>Receipt</TableCell><TableCell>Payer / bill</TableCell>
+              <TableCell align="right">File</TableCell><TableCell align="right">CIMS</TableCell><TableCell>Resolution</TableCell>
             </TableRow></TableHead>
             <TableBody>
               {exceptions.map((i) => (
@@ -279,7 +294,7 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
         </Stack>
         {showMatched && (
           <TableContainer><Table size="small">
-            <TableHead><TableRow><TableCell>GePG receipt</TableCell><TableCell>Payer</TableCell><TableCell>CIMS receipt</TableCell><TableCell align="right">Amount</TableCell></TableRow></TableHead>
+            <TableHead><TableRow><TableCell>Receipt</TableCell><TableCell>Payer</TableCell><TableCell>CIMS receipt</TableCell><TableCell align="right">Amount</TableCell></TableRow></TableHead>
             <TableBody>
               {matched.map((i) => (
                 <TableRow key={i.id}>
@@ -313,7 +328,7 @@ function NoteDialog({ item, onClose, onDone }: { item: ReconciliationItem; onClo
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{KIND[item.kind]?.help}. Record what was found; the explanation is kept with your name for the auditors.</Typography>
         <TextField autoFocus fullWidth multiline minRows={2} label="Explanation" value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. Confirmed with GePG helpdesk, ticket 4471" inputProps={{ maxLength: 500 }} />
+          placeholder="e.g. Confirmed with the helpdesk, ticket 4471" inputProps={{ maxLength: 500 }} />
         <ErrorAlert error={m.error} />
       </DialogContent>
       <DialogActions>
@@ -325,16 +340,17 @@ function NoteDialog({ item, onClose, onDone }: { item: ReconciliationItem; onClo
 }
 
 function PostDialog({ item, onClose, onDone }: { item: ReconciliationItem; onClose: () => void; onDone: (r: Reconciliation) => void }) {
+  const gepg = useGepg();
   const m = useMutation({
     mutationFn: () => api<Reconciliation>(`/api/finance/reconciliations/items/${item.id}/post`, { ...staff, method: 'POST', body: {} }),
     onSuccess: onDone,
   });
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Post payment from GePG</DialogTitle>
+      <DialogTitle>Post payment from the file</DialogTitle>
       <DialogContent>
         <Typography sx={{ mb: 1 }}>
-          GePG collected <strong>{formatTzs(item.gepgAmount ?? 0)}</strong> (receipt {item.gepgReceiptNo}) for bill {item.billId ?? item.controlNo}, but the payment notice never reached CIMS.
+          {gepg ? 'GePG' : item.pspName ?? 'The collector'} collected <strong>{formatTzs(item.gepgAmount ?? 0)}</strong> (receipt {item.gepgReceiptNo}) for bill {item.billId ?? item.controlNo}, but the payment notice never reached CIMS.
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Posting records the payment as if the notice had arrived: a receipt is issued, the amount is allocated to the bill and the payer’s balance and clearance are updated.

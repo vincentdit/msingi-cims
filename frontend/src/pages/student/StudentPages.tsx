@@ -24,6 +24,12 @@ import StudentClearanceCard from './StudentClearanceCard';
 import StudentHostelCard from './StudentHostelCard';
 import StudentIptCard from './StudentIptCard';
 import { useInstitution } from '../../components/InstitutionContext';
+import { HowToPay, usePayWords } from '../../components/HowToPay';
+import StudentTransferCard from './StudentTransferCard';
+import EmailCard from '../../components/EmailCard';
+import PrivacyCard from '../../components/PrivacyCard';
+import AlumniCard from '../../components/AlumniCard';
+import NinCard from '../../components/NinCard';
 
 const student = { realm: 'student' as const };
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
@@ -53,6 +59,7 @@ export function StudentLoginPage() {
         </Stack>
         <Card sx={{ borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
+            {new URLSearchParams(window.location.search).get('idle') === '1' && <Alert severity="info" sx={{ mb: 2 }}>{t('idle.signedOut')}</Alert>}
             <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
               <Stack spacing={2}>
                 <Typography variant="body2" color="text.secondary">{t('student.signInHint')}</Typography>
@@ -81,6 +88,7 @@ function useDashboard() {
 
 export function StudentHome() {
   const { t } = useTranslation();
+  const words = usePayWords();
   const navigate = useNavigate();
   const q = useDashboard();
   const d = q.data;
@@ -130,7 +138,7 @@ export function StudentHome() {
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
                 <Typography variant="body2"><strong>{t('student.nextPayment')}:</strong> {formatTzs(d.nextPayment.balance)}
                   {d.nextPayment.dueDate && <> · {t('student.dueBy', { date: formatDate(d.nextPayment.dueDate) })}</>}</Typography>
-                {d.nextPayment.controlNo && <Typography variant="body2" color="text.secondary">{t('fees.controlNo')}: <strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{d.nextPayment.controlNo}</strong></Typography>}
+                {d.nextPayment.controlNo && <Typography variant="body2" color="text.secondary">{words.number}: <strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{d.nextPayment.controlNo}</strong></Typography>}
               </Box>
             ) : d.billed > 0 && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>{t('student.allPaid')}</Typography>}
           </CardContent>
@@ -197,6 +205,7 @@ export function ClearanceRow({ c }: { c: Clearance }) {
 
 export function StudentFees() {
   const { t } = useTranslation();
+  const words = usePayWords();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['student', 'account'], queryFn: () => api<Statement>('/api/student/account', student) });
   const refresh = (st: Statement) => { qc.setQueryData(['student', 'account'], st); qc.invalidateQueries({ queryKey: ['student', 'dashboard'] }); };
@@ -243,11 +252,11 @@ export function StudentFees() {
             {inv.balance > 0 && !['CANCELLED', 'CREDITED'].includes(inv.status) && (
               inv.controlNo ? (
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
-                  <Typography variant="caption" color="text.secondary">{t('fees.controlNo')}</Typography>
+                  <Typography variant="caption" color="text.secondary">{words.number}</Typography>
                   <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
-                  <Typography variant="body2" color="text.secondary">{t('fees.payWith')}</Typography>
+                  <HowToPay reference={inv.controlNo} amount={inv.balance} />
                 </Box>
-              ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{t('fees.getControlNo')}</Button>
+              ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.getNumber}</Button>
             )}
             {SHOW_DEV_TOOLS && inv.balance > 0 && (
               <Button size="small" color="warning" variant="outlined" sx={{ mt: 1.5 }} disabled={simulate.isPending} onClick={() => simulate.mutate(inv.id)}>{t('student.simulatePay')}</Button>
@@ -466,6 +475,12 @@ export function StudentProfilePage() {
           <Typography variant="caption" color="text.secondary">{t('student.readOnlyNote')}</Typography>
         </CardContent>
       </Card>
+
+      <StudentTransferCard />
+      <EmailCard realm="student" />
+      <NinCard />
+      <AlumniCard />
+      <PrivacyCard realm="student" />
 
       {GROUPS.map((g) => (
         <Card key={g.key} sx={{ borderRadius: 3 }}>

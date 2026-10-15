@@ -45,6 +45,12 @@ public class FeeStructure extends BaseEntity {
     @Column(nullable = false)
     private short yearOfStudy = 1;
 
+    /** Only this intake (null = every intake), FR-FIN-01. */
+    private Long intakeId;
+
+    /** Only this student category (null = every category), FR-FIN-01. */
+    private Long studentCategoryId;
+
     @Column(name = "structure_version", nullable = false)
     private short structureVersion = 1;
 

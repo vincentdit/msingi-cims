@@ -44,4 +44,9 @@ public class AssessmentComponent extends TenantScopedEntity {
 
     @Column(nullable = false)
     private short sortOrder;
+
+    /** Marks entry for this item only, when set (FR-EXM-02); otherwise the semester's window applies. */
+    private java.time.LocalDate entryOpens;
+
+    private java.time.LocalDate entryCloses;
 }

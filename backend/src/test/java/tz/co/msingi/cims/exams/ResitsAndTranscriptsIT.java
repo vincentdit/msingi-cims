@@ -48,6 +48,8 @@ class ResitsAndTranscriptsIT {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired TestData data;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
 
     AdmissionScenario s;
     TestData.Institution inst;
@@ -234,6 +236,19 @@ class ResitsAndTranscriptsIT {
                 "{\"reference\":\"NACTVET/RES/2028/0042\",\"note\":\"Uploaded on the NACTVET portal\"}").andExpect(status().isOk()));
         s.call(put("/api/exams/nactvet-submissions/" + sub.get("id").asLong()), exams, "{\"status\":\"ACCEPTED\"}").andExpect(jsonPath("$.status").value("ACCEPTED"));
         assertThat(s.body(s.call(get("/api/exams/sheets/" + mainSheet), exams, null)).at("/nactvetSubmissions/0/status").asText()).isEqualTo("ACCEPTED");
+
+        // the same results through NACTVET's results service (simulated NACTVET decides at once)
+        JsonNode online = s.body(s.call(post("/api/exams/sheets/" + mainSheet + "/nactvet-api"), exams, null).andExpect(status().isOk()));
+        assertThat(online.get("channel").asText()).isEqualTo("API");
+        assertThat(online.get("externalRef").asText()).startsWith("SIM-RES-");
+        assertThat(online.get("status").asText()).isEqualTo("ACCEPTED");
+        assertThat(online.get("responseByName").asText()).isEqualTo("NACTVET");
+        s.call(post("/api/exams/sheets/" + mainSheet + "/nactvet-api"), exams, null).andExpect(jsonPath("$.code").value("ALREADY_SENT"));
+        s.call(post("/api/exams/nactvet-submissions/" + online.get("id").asLong() + "/refresh"), exams, null).andExpect(jsonPath("$.status").value("ACCEPTED"));
+        s.call(post("/api/exams/nactvet-submissions/" + sub.get("id").asLong() + "/refresh"), exams, null).andExpect(jsonPath("$.code").value("NOT_API"));
+        String log = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForObject(
+                "select string_agg(operation, ',') from integration_calls where system = 'NACTVET_SUBMISSION'", String.class)));
+        assertThat(log).contains("submitResults", "resultStatus");
     }
 
     @Test
@@ -387,7 +402,7 @@ class ResitsAndTranscriptsIT {
             String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
             reg[i] = byPhone.get(phone);
             studentId[i] = idByReg.get(reg[i]);
-            tok[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + reg[i] + "\",\"password\":\"Secret@123\"}")).get("accessToken").asText();
+            tok[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + reg[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
             s.call(post("/api/student/semester-registration"), tok[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }

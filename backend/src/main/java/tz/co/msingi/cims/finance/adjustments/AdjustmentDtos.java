@@ -14,9 +14,25 @@ public final class AdjustmentDtos {
     private AdjustmentDtos() {
     }
 
+    /** amount may be left out for a discount or scholarship with a scheme: it is worked out from the scheme. */
     public record AdjustmentRequest(@NotNull FinanceAdjustment.Kind kind, Long studentId, @Size(max = 40) String registrationNo, Long invoiceId,
-                                    @NotNull @DecimalMin("1") BigDecimal amount, @NotBlank @Size(min = 10, max = 1000) String reason,
-                                    @NotBlank @Size(max = 300) String evidenceRef) {
+                                    @DecimalMin("1") BigDecimal amount, @NotBlank @Size(min = 10, max = 1000) String reason,
+                                    @NotBlank @Size(max = 300) String evidenceRef, Long schemeId) {
+        public AdjustmentRequest(FinanceAdjustment.Kind kind, Long studentId, String registrationNo, Long invoiceId, BigDecimal amount,
+                                 String reason, String evidenceRef) {
+            this(kind, studentId, registrationNo, invoiceId, amount, reason, evidenceRef, null);
+        }
+    }
+
+    public record SchemeRequest(@NotBlank @jakarta.validation.constraints.Pattern(regexp = "[A-Z0-9_\\-]{2,20}") String code,
+                                @NotBlank @Size(max = 150) String name, @NotNull FinanceAdjustment.Kind kind,
+                                @NotBlank @jakarta.validation.constraints.Pattern(regexp = "PERCENT|FIXED") String basis,
+                                @NotNull @DecimalMin("0.01") BigDecimal value, @Size(max = 20) String feeCategory,
+                                @Size(max = 500) String description, boolean active) {
+    }
+
+    public record SchemeView(Long id, String code, String name, String kind, String basis, BigDecimal value, String feeCategory,
+                             String description, boolean active) {
     }
 
     public record DecisionRequest(@Size(max = 1000) String note) {
@@ -33,7 +49,7 @@ public final class AdjustmentDtos {
                                  boolean needsSecondLevel, String requestedByName, OffsetDateTime requestedAt, String firstByName,
                                  OffsetDateTime firstAt, String secondByName, OffsetDateTime secondAt, String decisionNote, String documentNo,
                                  String paidReference, OffsetDateTime paidAt, String waitingFor, boolean canApprove, boolean canReject,
-                                 boolean canMarkPaid) {
+                                 boolean canMarkPaid, Long schemeId, String schemeName) {
     }
 
     /** What can be waived or refunded for a student: open invoices and credit. */

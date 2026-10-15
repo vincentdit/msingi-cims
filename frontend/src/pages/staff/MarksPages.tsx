@@ -17,12 +17,13 @@ import { api, download, formatDate, formatDateTime, upload } from '../../api/cli
 import type { AssessmentComponent, MarksRow, Offering, OfferingStatus, OfferingSummary, ResitMarks, Semester, StaffOption, UploadResult } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { ApprovalStagesDialog, ItemWindowDialog } from './ExamRouteDialogs';
 
 const staff = { realm: 'staff' as const };
 const ALLOCATORS = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC'];
 const WIDE = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'];
 export const OFFERING_STAGE: Record<OfferingStatus, string> = {
-  DRAFT: 'With lecturer', SUBMITTED: 'With Head of Department', HOD_APPROVED: 'With Department Board', BOARD_APPROVED: 'Department approved',
+  DRAFT: 'With lecturer', SUBMITTED: 'With Head of Department', HOD_APPROVED: 'At an approval stage', BOARD_APPROVED: 'Department approved',
 };
 const STAGE_COLOUR = { DRAFT: 'default', SUBMITTED: 'info', HOD_APPROVED: 'warning', BOARD_APPROVED: 'success' } as const;
 const REMARK_COLOUR = { PASS: 'success', FAIL: 'error', ABSENT: 'warning', INCOMPLETE: 'default' } as const;
@@ -64,6 +65,8 @@ export function MarksPage() {
   const [assigning, setAssigning] = useState<OfferingSummary | null>(null);
   const [setupResult, setSetupResult] = useState<{ created: number; skipped: string[] } | null>(null);
   const [windowOpen, setWindowOpen] = useState(false);
+  const [itemWindow, setItemWindow] = useState(false);
+  const [stagesOpen, setStagesOpen] = useState(false);
   const list = useQuery({
     queryKey: ['staff', 'offerings', semesterId, mine], enabled: !!semesterId,
     queryFn: () => api<OfferingSummary[]>(`/api/exams/offerings?semesterId=${semesterId}${mine ? '&mine=true' : ''}`, staff),
@@ -96,7 +99,11 @@ export function MarksPage() {
         </Stack>
         <Stack direction="row" spacing={1}>
         {can(['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER']) && semesterId && (
-          <Button onClick={() => setWindowOpen(true)} sx={{ whiteSpace: 'nowrap' }}>Marks entry dates</Button>
+          <>
+            <Button onClick={() => setWindowOpen(true)} sx={{ whiteSpace: 'nowrap' }}>Marks entry dates</Button>
+            <Button onClick={() => setItemWindow(true)} sx={{ whiteSpace: 'nowrap' }}>Dates per item</Button>
+            <Button onClick={() => setStagesOpen(true)} sx={{ whiteSpace: 'nowrap' }}>Approval stages</Button>
+          </>
         )}
         {can(ALLOCATORS) && semesterId && (
           <Tooltip title="Creates a module offering, with the default CA/SE plan, for every module students are registered for">
@@ -155,6 +162,8 @@ export function MarksPage() {
         <MarksWindowDialog semester={semesters.data.find((x) => x.id === semesterId)!} onClose={() => setWindowOpen(false)}
           onDone={() => { setWindowOpen(false); semesters.refetch(); }} />
       )}
+      {itemWindow && semesterId && <ItemWindowDialog semesterId={semesterId} onClose={() => { setItemWindow(false); qc.invalidateQueries({ queryKey: ['staff', 'offering'] }); }} />}
+      {stagesOpen && <ApprovalStagesDialog onClose={() => setStagesOpen(false)} />}
       {assigning && <AssignDialog offering={assigning} onClose={() => setAssigning(null)}
         onDone={() => { setAssigning(null); qc.invalidateQueries({ queryKey: ['staff', 'offerings'] }); }} />}
     </Container>
@@ -251,7 +260,7 @@ export function OfferingPage() {
     onSuccess: (x) => { put(x); setEdits({}); },
   });
   const act = useMutation({
-    mutationFn: (what: 'submit' | 'hod-approve' | 'board-approve') => api<Offering>(`/api/exams/offerings/${id}/${what}`, { ...staff, method: 'POST' }),
+    mutationFn: (what: 'submit' | 'hod-approve' | 'approve-stage') => api<Offering>(`/api/exams/offerings/${id}/${what}`, { ...staff, method: 'POST' }),
     onSuccess: put,
   });
   const send = useMutation({
@@ -267,14 +276,19 @@ export function OfferingPage() {
 
   if (q.isLoading) return <Loading />;
   if (!o) return <ErrorAlert error={q.error} onRetry={() => q.refetch()} />;
-  const editable = (c: AssessmentComponent, r?: MarksRow) => (c.category === 'CA' ? o.can.enterCa : o.can.enterSe && r?.examEligible !== false);
+  const ownWindow = (c: AssessmentComponent) => !!(c.entryOpens || c.entryCloses);
+  const editable = (c: AssessmentComponent, r?: MarksRow) => (ownWindow(c)
+    ? o.can.submit && (c.entryNote ?? '').startsWith('Open') && (c.category === 'CA' || r?.examEligible !== false)
+    : c.category === 'CA' ? o.can.enterCa : o.can.enterSe && r?.examEligible !== false);
   const anyEditable = o.components.some((c) => editable(c));
   const invalid = Object.entries(edits).some(([k, v]) => {
     const c = o.components.find((x) => x.id === Number(k.split(':')[1]));
     return !c || !parseCell(v, c.maxScore).ok;
   });
-  const steps = ['Marks entry', 'Head of Department', ...(o.useDepartmentBoard ? ['Department Board'] : []), 'Department approved'];
-  const active = { DRAFT: 0, SUBMITTED: 1, HOD_APPROVED: 2, BOARD_APPROVED: steps.length }[o.status];
+  const stageNames = (o.stages ?? []).map((x) => x.name);
+  const steps = ['Marks entry', 'Head of Department', ...stageNames, 'Department approved'];
+  const passed = o.stageApprovals ?? [];
+  const active = { DRAFT: 0, SUBMITTED: 1, HOD_APPROVED: 2 + passed.length, BOARD_APPROVED: steps.length }[o.status];
   const missing = o.rows.filter((r) => r.remark === 'INCOMPLETE').length;
   const focusNext = (row: number, col: number) => {
     const el = document.querySelector<HTMLInputElement>(`input[data-cell="${row + 1}-${col}"]`);
@@ -298,7 +312,7 @@ export function OfferingPage() {
               <Step key={s}><StepLabel optional={
                 <Typography variant="caption" color="text.secondary">
                   {i === 0 && o.submittedAt ? `${o.submittedByName}, ${formatDate(o.submittedAt)}` : i === 1 && o.hodAt ? `${o.hodByName}, ${formatDate(o.hodAt)}`
-                    : i === 2 && o.useDepartmentBoard && o.boardAt ? `${o.boardByName}, ${formatDate(o.boardAt)}` : ''}
+                    : i >= 2 && passed[i - 2] ? `${passed[i - 2].byName}, ${formatDate(passed[i - 2].at)}` : ''}
                 </Typography>}>{s}</StepLabel></Step>
             ))}
           </Stepper>
@@ -341,7 +355,8 @@ export function OfferingPage() {
               <Table size="small" stickyHeader>
                 <TableHead><TableRow>
                   <TableCell>Student</TableCell>
-                  {o.components.map((c) => <TableCell key={c.id} align="center" sx={{ minWidth: 92 }}>{c.name}<br /><Typography variant="caption" color="text.secondary">{c.category} · /{num(c.maxScore)}</Typography></TableCell>)}
+                  {o.components.map((c) => <TableCell key={c.id} align="center" sx={{ minWidth: 92 }}>{c.name}<br /><Typography variant="caption" color="text.secondary">{c.category} · /{num(c.maxScore)}</Typography>
+                    {ownWindow(c) && <Typography variant="caption" component="div" color={(c.entryNote ?? '').startsWith('Open') ? 'success.main' : 'warning.main'}>{c.entryNote}</Typography>}</TableCell>)}
                   <TableCell align="right">CA /{num(o.caWeight)}</TableCell><TableCell align="right">SE /{num(o.seWeight)}</TableCell>
                   <TableCell align="right">Total</TableCell><TableCell>Grade</TableCell><TableCell>Result</TableCell>
                 </TableRow></TableHead>
@@ -438,14 +453,14 @@ export function OfferingPage() {
             {(o.can.hodApprove || o.can.boardApprove || o.can.returnToLecturer) && (
               <Card>
                 <CardContent>
-                  <Typography variant="h6" sx={{ mb: 1 }}>{o.can.boardApprove ? 'Department Board' : 'Moderation'}</Typography>
+                  <Typography variant="h6" sx={{ mb: 1 }}>{o.can.boardApprove ? o.waitingAtStage ?? 'Approval' : 'Moderation'}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     {o.can.hodApprove ? 'Check the marks and the flags, then approve or return them to the lecturer with a comment.'
-                      : o.can.boardApprove ? "Record the Department Board's approval of these results." : 'Return the results to the lecturer for correction.'}
+                      : o.can.boardApprove ? `Record the approval at this stage (${o.waitingAtStage}), or return the results to the lecturer with a comment.` : 'Return the results to the lecturer for correction.'}
                   </Typography>
                   <Stack spacing={1}>
                     {o.can.hodApprove && <Button variant="contained" color="success" onClick={() => act.mutate('hod-approve')} disabled={act.isPending}>Approve results</Button>}
-                    {o.can.boardApprove && <Button variant="contained" color="success" onClick={() => act.mutate('board-approve')} disabled={act.isPending}>Record Board approval</Button>}
+                    {o.can.boardApprove && <Button variant="contained" color="success" onClick={() => act.mutate('approve-stage')} disabled={act.isPending}>Approve: {o.waitingAtStage}</Button>}
                     {o.can.returnToLecturer && <Button color="warning" onClick={() => setReturning(true)}>Return to lecturer</Button>}
                   </Stack>
                 </CardContent>

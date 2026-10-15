@@ -39,7 +39,9 @@ public final class MessageTemplates {
                 Map.entry("window", "Hostel applications 2027/2028"), Map.entry("organisation", "Tanzania Ports Authority"),
                 Map.entry("start", "6 July 2028"), Map.entry("week", "3"), Map.entry("change", "postponed until 1 March 2028"),
                 Map.entry("outcome", "your grade is now B"), Map.entry("kind", "Waiver"), Map.entry("status", "Fixed"),
-                Map.entry("sponsor", "Higher Education Students' Loans Board"));
+                Map.entry("sponsor", "Higher Education Students' Loans Board"),
+                Map.entry("channels", "M-Pesa 555123, CRDB Bank 0150123456700"), Map.entry("instalment", "2"),
+                Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -61,6 +63,22 @@ public final class MessageTemplates {
                 List.of("award", "reason", "institution"), Set.of("award"),
                 "{institution}: your qualification {award} was not accepted: {reason}. Sign in to see the details.",
                 "{institution}: sifa yako {award} haikukubaliwa: {reason}. Ingia kuona maelezo.", s);
+        add("DOCUMENT_NOT_ACCEPTED", "Document not accepted", "The Admissions Office does not accept a document an applicant uploaded", "Admission",
+                List.of("document", "reason", "institution"), Set.of("document"),
+                "{institution}: your {document} was not accepted: {reason}. Sign in and upload it again.",
+                "{institution}: {document} yako haikukubaliwa: {reason}. Ingia na uipakie tena.", s);
+        add("EXTERNAL_SELECTION", "Selected by an external body", "Students selected by TAMISEMI or another body are imported into an admission window", "Admission",
+                List.of("institution", "organisation", "programme", "referenceNo"), Set.of("programme"),
+                "{institution}: you were selected by {organisation} to join {programme} (ref {referenceNo}). Sign up on the admission portal with your Form Four index number to follow your admission.",
+                "{institution}: umechaguliwa na {organisation} kujiunga na {programme} (kumb. {referenceNo}). Jisajili kwenye mfumo wa udahili kwa namba yako ya mtihani wa kidato cha nne kufuatilia udahili wako.", s);
+        add("IPT_WORKPLACE_ASSESSMENT", "IPT workplace assessment link", "The IPT office sends the workplace supervisor the link to assess a student", "Industrial training",
+                List.of("student", "institution", "link", "deadline"), Set.of("link"),
+                "{institution}: please assess {student}'s industrial training at your workplace by {deadline}: {link}",
+                "{institution}: tafadhali tathmini mafunzo kwa vitendo ya {student} mahali pako pa kazi kabla ya {deadline}: {link}", s);
+        add("TRACER_SURVEY", "Graduate tracer survey", "The institution invites graduates to its tracer survey", "Graduation",
+                List.of("institution", "title", "link"), Set.of("link"),
+                "{institution} would like to hear how you are doing since graduating. Please answer a short survey ({title}): {link}",
+                "{institution} ingependa kujua unaendeleaje tangu uhitimu. Tafadhali jibu dodoso fupi ({title}): {link}", s);
         add("OFFER_MADE", "Admission offer", "NACTVET verifies an applicant and the offer is made", "Admission",
                 List.of("programme", "institution", "deadline"), Set.of(),
                 "Congratulations! NACTVET has verified your admission to {programme} at {institution}. Log in to accept your offer by {deadline}.",
@@ -99,6 +117,18 @@ public final class MessageTemplates {
                 List.of("controlNo", "amount", "description", "institution"), Set.of("controlNo"),
                 "Control number {controlNo} for {amount} ({description}). Pay via bank or mobile money.",
                 "Namba ya malipo {controlNo} kwa {amount} ({description}). Lipa kupitia benki au simu.", s);
+        add("FEE_REMINDER", "Instalment reminder", "An instalment of the year's fees is due soon, due today or overdue", "Fees",
+                List.of("amount", "instalment", "when", "controlNo", "description", "institution"), Set.of("amount"),
+                "{institution}: instalment {instalment} of {description}, {amount}, {when}. Pay with number {controlNo}.",
+                "{institution}: awamu ya {instalment} ya {description}, {amount}, {when}. Lipa kwa namba {controlNo}.", s);
+        add("FEE_PENALTY", "Late payment penalty", "A late-payment penalty is added to an invoice after the grace period", "Fees",
+                List.of("amount", "instalment", "description", "institution"), Set.of("amount"),
+                "{institution}: a late payment penalty of {amount} was added for instalment {instalment} of {description}. Contact the Bursar's office if you have paid.",
+                "{institution}: adhabu ya kuchelewa kulipa ya {amount} imeongezwa kwa awamu ya {instalment} ya {description}. Wasiliana na ofisi ya Mhasibu Mkuu kama umeshalipa.", s);
+        add("PAYMENT_REFERENCE", "Payment reference issued", "CIMS issues a payment reference for an invoice (private and faith-based institutions)", "Fees",
+                List.of("controlNo", "amount", "description", "channels", "institution"), Set.of("controlNo"),
+                "Payment reference {controlNo} for {amount} ({description}). Pay {institution} via {channels} and quote this reference.",
+                "Namba ya kumbukumbu ya malipo {controlNo} kwa {amount} ({description}). Lipa {institution} kupitia {channels} ukitaja namba hii.", s);
         add("PAYMENT_RECEIVED", "Payment received", "A GePG payment is received", "Fees",
                 List.of("amount", "receiptNo", "institution"), Set.of(),
                 "Payment of {amount} received. Receipt {receiptNo}.",
@@ -123,6 +153,10 @@ public final class MessageTemplates {
                 List.of("change", "date", "institution", "registrationNo"), Set.of("change"),
                 "{institution}: your studies are {change} from {date} ({registrationNo}). Contact Registry if you have questions.",
                 "{institution}: hali ya masomo yako imebadilika ({change}) kuanzia {date} ({registrationNo}). Wasiliana na Ofisi ya Usajili kwa maswali.", s);
+        add("STUDENT_TRANSFERRED", "Transfer decided", "The Deputy Principal (Academic) approves or rejects a programme or campus transfer", "Registry",
+                List.of("outcome", "registrationNo", "institution"), Set.of("outcome"),
+                "{institution}: your transfer request {outcome}. Your registration number {registrationNo} stays the same.",
+                "{institution}: ombi lako la kuhamia {outcome}. Namba yako ya usajili {registrationNo} haibadiliki.", s);
         add("SEMESTER_REGISTRATION_APPROVED", "Semester registration approved", "Registry approves a student's semester registration", "Registry",
                 List.of("semester", "modules", "institution"), Set.of(),
                 "Your registration for {semester} is approved: {modules} modules. See them on the student portal.",

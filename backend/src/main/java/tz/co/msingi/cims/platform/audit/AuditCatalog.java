@@ -18,16 +18,17 @@ public final class AuditCatalog {
     static {
         AREAS.put(SECURITY, List.of("UserAccount", "StaffUser"));
         AREAS.put("Admissions", List.of("AdmissionWindow", "Applicant", "Application", "SelectionRound", "AdmissionLetter",
-                "NactvetVerification", "VerificationBatch", "LetterTemplate"));
-        AREAS.put("Registry", List.of("Student", "SemesterRegistration", "ChangeRequest", "StudentChangeRequest"));
+                "NactvetVerification", "VerificationBatch", "LetterTemplate", "ImportBatch"));
+        AREAS.put("Registry", List.of("Student", "SemesterRegistration", "ChangeRequest", "StudentChangeRequest", "NactvetRegistrationBatch"));
         AREAS.put("Teaching", List.of("Curriculum", "Semester", "AcademicYear", "ClassSession", "ModuleOffering", "Programme", "Department"));
         AREAS.put("Examinations", List.of("ResultSheet", "RegulationSet", "EligibilityExemption", "ResultAmendment", "ResitSession",
                 "ResitRegistration", "Transcript", "NactvetSubmission"));
-        AREAS.put("Finance", List.of("Invoice", "Payment", "FeeStructure", "FeeItem", "Waiver", "Refund", "Reconciliation", "SmsTopup"));
+        AREAS.put("Finance", List.of("Invoice", "Payment", "FeeStructure", "FeeItem", "Waiver", "Refund", "Reconciliation", "SmsTopup", "GepgReconciliation",
+                "Sponsorship", "Sponsor", "MusePosting", "ExternalExchange"));
         AREAS.put("Student services", List.of("Clearance", "Graduation", "Graduand", "HostelAllocation", "HostelApplication", "HostelWindow",
                 "Hostel", "IptPlacement", "LogbookEntry", "IptPeriod"));
         AREAS.put("Communication", List.of("Notice", "MessageCampaign", "MessageTemplate", "MessagingSettings"));
-        AREAS.put("Institution", List.of("InstitutionPhoto", "Report", "Tenant"));
+        AREAS.put("Institution", List.of("InstitutionPhoto", "Report", "Tenant", "IntegrationSettings"));
     }
 
     /** Sign-ins, failed sign-ins, locked accounts, password changes and staff account changes. */

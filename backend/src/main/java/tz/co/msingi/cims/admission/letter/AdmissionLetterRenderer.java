@@ -4,6 +4,8 @@ import tz.co.msingi.cims.common.document.HtmlTemplate;
 import tz.co.msingi.cims.common.document.PdfRenderer;
 import tz.co.msingi.cims.common.document.QrCodes;
 
+import tz.co.msingi.cims.common.document.LetterWording;
+import tz.co.msingi.cims.platform.letters.LetterTemplateService;
 import java.net.URI;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -19,6 +21,7 @@ import java.util.stream.Stream;
 
 /** Renders an admission letter with its joining instructions to PDF from the issued snapshot. */
 public final class AdmissionLetterRenderer {
+
 
     private static final HtmlTemplate TEMPLATE = HtmlTemplate.classpath("templates/admission-letter.html");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
@@ -86,6 +89,15 @@ public final class AdmissionLetterRenderer {
         m.put("itemsBlock", blocks.get(1));
         m.put("feesBlock", blocks.get(2));
         m.put("notesBlock", blocks.get(3));
+        // the wording frozen in the letter; letters issued before the wording could be edited use the built-in text
+        java.util.Map<String, String> w = c.wording() == null ? java.util.Map.of() : c.wording();
+        m.put("introBlock", LetterWording.html(w.getOrDefault(LetterTemplateService.ADMISSION_INTRO,
+                LetterTemplateService.defaultBody(LetterTemplateService.ADMISSION_INTRO, true)), v));
+        m.put("termsBlock", LetterWording.html(w.getOrDefault(LetterTemplateService.ADMISSION_TERMS,
+                LetterTemplateService.defaultBody(LetterTemplateService.ADMISSION_TERMS, true)), v));
+        String notice = LetterWording.html(w.getOrDefault(LetterTemplateService.ADMISSION_PAYMENT,
+                LetterTemplateService.defaultBody(LetterTemplateService.ADMISSION_PAYMENT, true)), v);
+        m.put("paymentNotice", notice.isEmpty() ? "" : "<div class=\"notice small\">" + notice + "</div>");
         return TEMPLATE.render(v, m);
     }
 

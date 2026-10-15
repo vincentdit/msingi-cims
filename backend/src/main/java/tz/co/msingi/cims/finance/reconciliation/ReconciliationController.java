@@ -61,6 +61,13 @@ public class ReconciliationController {
         return service.importFile(req.date(), req.fileName(), req.csv());
     }
 
+    @Operation(summary = "Ask GePG for a day's transactions (live GePG); the answer arrives by callback and is matched like a file")
+    @PostMapping("/request-gepg")
+    @PreAuthorize(WORK)
+    public java.util.Map<String, Object> requestFromGepg(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate date) {
+        return service.requestFromGepg(date);
+    }
+
     @Operation(summary = "Post a payment GePG reports but CIMS never received")
     @PostMapping("/items/{itemId}/post")
     @PreAuthorize(WORK)

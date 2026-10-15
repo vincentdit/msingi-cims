@@ -61,6 +61,24 @@ public class SessionGuard extends OncePerRequestFilter {
                         : "Sign in to the Msingi platform console to use this.");
                 return;
             }
+            boolean apiToken = "API".equals(jwt.getClaimAsString(TokenService.CLAIM_USER_TYPE));
+            boolean apiPath = path.startsWith("/api/integration/");
+            // a connected system's token works only on the integration API, and only while its client is active
+            if (apiToken != apiPath) {
+                deny(res, HttpServletResponse.SC_FORBIDDEN, "WRONG_REALM", apiToken
+                        ? "An API client token can only be used on the integration API."
+                        : "The integration API takes API client tokens only.");
+                return;
+            }
+            if (apiToken) {
+                if (!(jwt.getClaims().get("cid") instanceof Number cid) || TenantContext.current().isEmpty()
+                        || !clientActive(TenantContext.current().get().id(), cid.longValue())) {
+                    deny(res, HttpServletResponse.SC_UNAUTHORIZED, "SESSION_ENDED", "This API client has been switched off.");
+                    return;
+                }
+                chain.doFilter(req, res);
+                return;
+            }
             Object uid = jwt.getClaims().get(TokenService.CLAIM_USER_ID);
             long generation = jwt.getClaims().get(TokenService.CLAIM_SESSION) instanceof Number g ? g.longValue() : 0L;
             State st = null;
@@ -86,9 +104,35 @@ public class SessionGuard extends OncePerRequestFilter {
                             "Choose your own password before continuing.");
                     return;
                 }
+                if (Boolean.TRUE.equals(jwt.getClaims().get(TokenService.CLAIM_MFA_SETUP)) && !path.startsWith("/api/auth/")
+                        && !path.startsWith("/api/account/")) {
+                    deny(res, HttpServletResponse.SC_FORBIDDEN, "MFA_SETUP_REQUIRED",
+                            "Your role must sign in with an authenticator app. Set it up before continuing.");
+                    return;
+                }
             }
         }
         chain.doFilter(req, res);
+    }
+
+    private boolean clientActive(long tenantId, long clientId) {
+        String key = "api:" + tenantId + ":" + clientId;
+        State cached = cache.get(key);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.fetchedAt() < TTL_MS) {
+            return "ACTIVE".equals(cached.status());
+        }
+        Boolean active = tx.execute(s -> {
+            List<Boolean> r = jdbc.queryForList("select active from api_clients where id = ?", Boolean.class, clientId);
+            return !r.isEmpty() && Boolean.TRUE.equals(r.get(0));
+        });
+        cache.put(key, new State(Boolean.TRUE.equals(active) ? "ACTIVE" : "OFF", null, now));
+        return Boolean.TRUE.equals(active);
+    }
+
+    /** Forget what is known about an API client (after it is switched off). */
+    public void evictClient(Long tenantId, Long clientId) {
+        cache.remove("api:" + tenantId + ":" + clientId);
     }
 
     /** Forget what is known about a platform user (after a change to their account). */

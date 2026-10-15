@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Sends the institution's SMS (FR-COM-01). Event messages are rendered from the institution's template (or the built-in
+ * Sends the institution's SMS (FR-COM-01), and the same event message by email to a verified address (BR-33). Event messages are rendered from the institution's template (or the built-in
  * wording) in its message language and queued in the caller's transaction, so nothing is sent for work that rolls back.
  * Verification codes go out at once and are never stored.
  */
@@ -31,6 +31,7 @@ public class Messaging {
     private final TenantRepository tenants;
     private final MessageDispatcher dispatcher;
     private final SmsGateway gateway;
+    private final tz.co.msingi.cims.notification.email.EmailService email;
 
     /** Queues the event message {@code code} for {@code phone}; nothing happens without a phone or when the institution switched it off. */
     @Transactional(propagation = Propagation.REQUIRED)
@@ -41,8 +42,13 @@ public class Messaging {
         if (custom != null && !custom.isEnabled()) return;
         String lang = settings().getDefaultLanguage();
         String text = custom != null ? ("SW".equals(lang) ? custom.getBodySw() : custom.getBodyEn()) : ("SW".equals(lang) ? def.sw() : def.en());
-        String body = MessageRender.render(text, withInstitution(values), lang);
+        Map<String, Object> v = withInstitution(values);
+        String body = MessageRender.render(text, v, lang);
         queue(phone, null, Message.Kind.EVENT, code, null, lang, body);
+        // the same news by email to the account's verified address (BR-33)
+        email.verifiedEmailForPhone(phone).ifPresent(to -> email.queue(to, null, tz.co.msingi.cims.notification.email.EmailMessage.Kind.EVENT, code,
+                def.name() + " — " + v.get("institution"), SmsText.plain(body) + "\n\n— " + v.get("institution")
+                        + ("SW".equals(lang) ? " (ujumbe wa CIMS; usijibu barua pepe hii)" : " (sent by CIMS; please do not reply to this email)"), null));
     }
 
     /** A verification code: sent straight away (it is needed now) and logged with the code masked. */
@@ -57,6 +63,27 @@ public class Messaging {
         String body = MessageRender.render(text, v, lang);
         v.put("code", "******");
         Message m = newMessage(phone, null, Message.Kind.SECURITY, "OTP_CODE", null, lang, body);
+        m.setBody(MessageRender.render(text, v, lang));
+        messages.saveAndFlush(m);
+        dispatcher.sendNow(m, SmsText.plain(body));
+    }
+
+    /**
+     * An event message carrying a personal link (a workplace assessment, a survey): sent straight away and logged with the link masked,
+     * so the message log cannot be used to open someone else's form.
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void eventWithLink(String code, String phone, Map<String, ?> values, String linkKey) {
+        if (phone == null || phone.isBlank()) return;
+        MessageTemplates.Definition def = MessageTemplates.require(code);
+        MessageTemplate custom = templates.findByCode(code).orElse(null);
+        if (custom != null && !custom.isEnabled()) return;
+        String lang = settings().getDefaultLanguage();
+        String text = custom != null ? ("SW".equals(lang) ? custom.getBodySw() : custom.getBodyEn()) : ("SW".equals(lang) ? def.sw() : def.en());
+        Map<String, Object> v = new HashMap<>(withInstitution(values));
+        String body = MessageRender.render(text, v, lang);
+        v.put(linkKey, "[personal link]");
+        Message m = newMessage(phone, null, Message.Kind.EVENT, code, null, lang, body);
         m.setBody(MessageRender.render(text, v, lang));
         messages.saveAndFlush(m);
         dispatcher.sendNow(m, SmsText.plain(body));

@@ -15,6 +15,7 @@ import type { Application, EligibilityResult, Fee, Profile, ProgrammeEligibility
 import { AreaPicker } from '../../components/AreaPicker';
 import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
 import { ErrorAlert, Loading } from '../../components/common';
+import { HowToPay, usePayWords } from '../../components/HowToPay';
 
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
@@ -148,9 +149,14 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
 // ---------------------------------------------------------------- Fee
 export function FeeStep({ app, onNext }: { app: Application; onNext: () => void }) {
   const { t } = useTranslation();
+  const words = usePayWords();
   const invalidate = useInvalidate();
-  const fee = useQuery({ queryKey: ['applicant', 'fee', app.id], queryFn: () => api<Fee>(`/api/applicant/applications/${app.id}/fee`, { realm: 'applicant' }) });
   const request = useMutation({ mutationFn: () => api<Fee>(`/api/applicant/applications/${app.id}/fee`, { method: 'POST', realm: 'applicant' }), onSuccess: invalidate });
+  // live GePG sends the control number a moment after the bill: look again every few seconds until it is there
+  const fee = useQuery({
+    queryKey: ['applicant', 'fee', app.id], queryFn: () => api<Fee>(`/api/applicant/applications/${app.id}/fee`, { realm: 'applicant' }),
+    refetchInterval: (q) => (request.isSuccess && !q.state.data?.controlNo && !q.state.data?.feePaid ? 3000 : false),
+  });
   const simulate = useMutation({ mutationFn: () => api<Fee>(`/api/applicant/applications/${app.id}/fee/simulate-payment`, { method: 'POST', realm: 'applicant' }), onSuccess: invalidate });
   if (fee.isLoading) return <Loading />;
   const f = fee.data;
@@ -169,15 +175,16 @@ export function FeeStep({ app, onNext }: { app: Application; onNext: () => void 
       {f?.controlNo ? (
         <Card sx={{ bgcolor: '#FFFBEB', borderColor: '#F3D58A' }}>
           <CardContent>
-            <Typography variant="overline" color="text.secondary">{t('app.controlNo')}</Typography>
+            <Typography variant="overline" color="text.secondary">{words.number}</Typography>
             <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: { xs: 30, sm: 38 }, letterSpacing: 3 }}>
               {f.controlNo.replace(/(\d{4})(?=\d)/g, '$1 ')}
             </Typography>
             <Typography variant="body2" color="text.secondary">{formatTzs(f.amount - f.paid)} · {t('app.expires', { date: formatDateTime(f.controlNoExpiresAt) })}</Typography>
+            <HowToPay reference={f.controlNo} amount={f.amount - f.paid} />
           </CardContent>
         </Card>
-      ) : (
-        <Box><Button variant="contained" size="large" onClick={() => request.mutate()} disabled={request.isPending}>{t('app.getControlNo')}</Button></Box>
+      ) : request.isSuccess ? <Alert severity="info">{t('pay.pending')}</Alert> : (
+        <Box><Button variant="contained" size="large" onClick={() => request.mutate()} disabled={request.isPending}>{words.getNumber}</Button></Box>
       )}
       {f?.controlNo && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

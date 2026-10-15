@@ -288,7 +288,7 @@ class CurriculumAndRegistrationIT {
     }
 
     private String studentToken(String regNo) throws Exception {
-        return s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Secret@123\"}").andExpect(status().isOk()))
+        return s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Kifaru#Mto47\"}").andExpect(status().isOk()))
                 .get("accessToken").asText();
     }
 

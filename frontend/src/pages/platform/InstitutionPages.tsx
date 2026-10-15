@@ -20,6 +20,7 @@ import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import {
   HealthChip, IssuedPasswordDialog, MODE_LABEL, StatusChip, actionLabel, detailsText, n, platform,
   type CatalogueDetail, type CatalogueInstitution, type ImportResult, type InstitutionDetail, type InstitutionRow, type IssuedAdmin, type PageOf,
+  OWNERSHIPS, collectionText, ownershipLabel,
 } from './shared';
 
 // ============================================================ list
@@ -96,7 +97,7 @@ export function InstitutionsPage() {
 
 const EMPTY = {
   code: '', name: '', shortName: '', nactvetRegNo: '', ownership: 'PRIVATE', contactEmail: '', contactPhone: '', primaryColor: '#1F4E8C',
-  domains: '', notes: '', adminUsername: '', adminName: '', adminEmail: '', adminPhone: '',
+  domains: '', notes: '', adminUsername: '', adminName: '', adminEmail: '', adminPhone: '', campusName: '', campusRegion: '', campus2Name: '', campus2Region: '',
 };
 
 /** Onboards an institution: its details, its address(es) and its first administrator, all at once. */
@@ -115,7 +116,7 @@ export function OnboardPage() {
     if (!d) return;
     const sg = d.suggestion;
     setF((x) => ({ ...x, code: sg.code, name: sg.name, shortName: sg.shortName ?? '', nactvetRegNo: sg.nactvetRegNo ?? '', ownership: sg.ownership,
-      contactPhone: sg.contactPhone ?? '',
+      contactPhone: sg.contactPhone ?? '', campusName: x.campusName || 'Main Campus', campusRegion: x.campusRegion || d.institution.region || '',
       notes: x.notes || [d.institution.region && `Region: ${[d.institution.district, d.institution.region].filter(Boolean).join(', ')}`,
         d.institution.ownership && `NACTVET ownership: ${d.institution.ownership}`].filter(Boolean).join('. ') }));
     setSelected(new Set(d.programmes.filter((p) => p.active && !p.imported).map((p) => p.id)));
@@ -130,6 +131,7 @@ export function OnboardPage() {
         code: f.code.trim(), name: f.name, shortName: f.shortName || null, nactvetRegNo: f.nactvetRegNo || null, ownership: f.ownership,
         contactEmail: f.contactEmail || null, contactPhone: f.contactPhone || null, primaryColor: f.primaryColor || null, domains, notes: f.notes || null,
         nactvetInstitutionId: nactvetId ? Number(nactvetId) : null, importProgrammeIds: nactvetId ? [...selected] : null,
+        campuses: [[f.campusName, f.campusRegion], [f.campus2Name, f.campus2Region]].filter(([n]) => n.trim()).map(([name, region]) => ({ name, region: region || null })),
         admin: { username: f.adminUsername.trim(), fullName: f.adminName, email: f.adminEmail || null, phone: f.adminPhone || null },
       },
     }),
@@ -171,16 +173,30 @@ export function OnboardPage() {
                 <Grid size={{ xs: 12, sm: 4 }}><TextField label="Short name" fullWidth value={f.shortName} onChange={set('shortName')} inputProps={{ maxLength: 60 }} /></Grid>
                 <Grid size={{ xs: 12, sm: 4 }}><TextField label="NACTVET registration no." fullWidth value={f.nactvetRegNo} onChange={set('nactvetRegNo')} inputProps={{ maxLength: 40 }} /></Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField select label="Ownership" fullWidth value={f.ownership} onChange={set('ownership')}>
-                    <MenuItem value="PRIVATE">Private</MenuItem>
-                    <MenuItem value="PUBLIC">Public</MenuItem>
+                  <TextField select label="Ownership" fullWidth value={f.ownership} onChange={set('ownership')}
+                    helperText={source.data?.institution.ownership ? `NACTVET: ${source.data.institution.ownership}` : 'As NACTVET lists it'}>
+                    {OWNERSHIPS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
                   </TextField>
+                </Grid>
+                <Grid size={12}>
+                  <Alert severity={f.ownership === 'PUBLIC' ? 'info' : 'success'} icon={false} sx={{ py: 0.25 }}>
+                    <strong>Fee collection:</strong> {collectionText(f.ownership)}
+                    {f.ownership !== 'PUBLIC' && ' The Bursar lists the accounts under Finance › Payment methods.'}
+                  </Alert>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 5 }}><TextField label="Contact email" type="email" fullWidth value={f.contactEmail} onChange={set('contactEmail')} /></Grid>
                 <Grid size={{ xs: 12, sm: 4 }}><TextField label="Contact phone" fullWidth value={f.contactPhone} onChange={set('contactPhone')} /></Grid>
                 <Grid size={{ xs: 12, sm: 3 }}>
                   <TextField label="Colour" type="color" fullWidth value={f.primaryColor} onChange={set('primaryColor')} helperText={f.primaryColor} />
                 </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField label="Main campus" fullWidth value={f.campusName} onChange={set('campusName')} placeholder="Main Campus" helperText="Optional; more can be added later" />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><TextField label="Main campus region" fullWidth value={f.campusRegion} onChange={set('campusRegion')} /></Grid>
+                {f.campusName.trim() && <>
+                  <Grid size={{ xs: 12, sm: 6 }}><TextField label="Second campus (optional)" fullWidth value={f.campus2Name} onChange={set('campus2Name')} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><TextField label="Second campus region" fullWidth value={f.campus2Region} onChange={set('campus2Region')} /></Grid>
+                </>}
                 <Grid size={12}>
                   <TextField label="Web address(es)" required fullWidth value={f.domains} onChange={set('domains')}
                     placeholder="cims.college.ac.tz" helperText="Host names its portals answer on, separated by spaces or commas. Point DNS at CIMS first." />
@@ -266,7 +282,7 @@ export function InstitutionDetailPage() {
           <Box>
             <Typography variant="h5" component="h1">{d.name}</Typography>
             <Typography color="text.secondary"><Box component="span" sx={{ fontFamily: 'monospace' }}>{d.code}</Box>
-              {d.nactvetRegNo ? ` · NACTVET ${d.nactvetRegNo}` : ''} · {d.ownership === 'PUBLIC' ? 'Public' : 'Private'} · on CIMS since {formatDate(d.createdAt)}</Typography>
+              {d.nactvetRegNo ? ` · NACTVET ${d.nactvetRegNo}` : ''} · {ownershipLabel(d.ownership)} ({d.ownership === 'PUBLIC' ? 'GePG' : 'own accounts'}) · on CIMS since {formatDate(d.createdAt)}</Typography>
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -483,8 +499,9 @@ function EditDialog({ d, onClose, onDone }: { d: InstitutionDetail; onClose: () 
           <Grid size={{ xs: 12, sm: 6 }}><TextField label="Short name" fullWidth value={f.shortName} onChange={set('shortName')} /></Grid>
           <Grid size={{ xs: 12, sm: 6 }}><TextField label="NACTVET registration no." fullWidth value={f.nactvetRegNo} onChange={set('nactvetRegNo')} /></Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField select label="Ownership" fullWidth value={f.ownership} onChange={set('ownership')}>
-              <MenuItem value="PRIVATE">Private</MenuItem><MenuItem value="PUBLIC">Public</MenuItem>
+            <TextField select label="Ownership" fullWidth value={f.ownership} onChange={set('ownership')}
+              helperText={f.ownership !== d.ownership ? (f.ownership === 'PUBLIC' ? 'New payment numbers will be GePG control numbers' : 'New payment numbers will be CIMS references, not GePG') : undefined}>
+              {OWNERSHIPS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}><TextField label="Colour" type="color" fullWidth value={f.primaryColor} onChange={set('primaryColor')} /></Grid>

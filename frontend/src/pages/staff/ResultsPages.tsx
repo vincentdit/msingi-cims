@@ -50,7 +50,8 @@ export function ResultSheetsPage() {
   const officer = can(['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER']);
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Results" subtitle="Class result sheets: computed by the Examinations Officer, reviewed by the Academic Committee, confirmed by the Governing Board, then published." action={picker} />
+      <PageTitle title="Results" subtitle="Class result sheets: computed by the Examinations Officer, reviewed by the Academic Committee, confirmed by the Governing Board, then published."
+        action={<Stack direction="row" spacing={1} alignItems="center"><Button component={RouterLink} to="/staff/results-trends" sx={{ whiteSpace: 'nowrap' }}>Across years</Button>{picker}</Stack>} />
       <ErrorAlert error={semesters.error ?? list.error ?? compute.error} />
       {semesterId && <ResitSessionCard semesterId={semesterId} canEdit={officer} />}
       {list.isLoading && <Loading />}
@@ -101,7 +102,7 @@ export function ResultSheetPage() {
   const q = useQuery({ queryKey: ['staff', 'sheet', id], queryFn: () => api<ResultSheet>(`/api/exams/sheets/${id}`, staff) });
   const s = q.data;
   const [deciding, setDeciding] = useState<SheetRow | null>(null);
-  const [noteFor, setNoteFor] = useState<'recommend' | 'return' | null>(null);
+  const [noteFor, setNoteFor] = useState<'recommend' | 'return' | 'approve-stage' | null>(null);
   const done = (x: ResultSheet) => { qc.setQueryData(['staff', 'sheet', id], x); qc.invalidateQueries({ queryKey: ['staff', 'sheets'] }); };
   const act = useMutation({
     mutationFn: (what: 'confirm' | 'publish') => api<ResultSheet>(`/api/exams/sheets/${id}/${what}`, { ...staff, method: 'POST' }),
@@ -113,8 +114,17 @@ export function ResultSheetPage() {
   });
   if (q.isLoading) return <Loading />;
   if (!s) return <ErrorAlert error={q.error} onRetry={() => q.refetch()} />;
-  const steps = ['Computed', 'Academic Committee', 'Governing Board', 'Published'];
-  const active = { COMPUTED: 1, RECOMMENDED: 2, CONFIRMED: 3, PUBLISHED: 4 }[s.status];
+  const extra = (s.stages ?? []).map((x) => x.name);
+  const passedStages = s.stageApprovals ?? [];
+  const steps = ['Computed', ...extra, 'Academic Committee', 'Governing Board', 'Published'];
+  const active = { COMPUTED: 1 + (s.status === 'COMPUTED' ? passedStages.length : extra.length), RECOMMENDED: 2 + extra.length, CONFIRMED: 3 + extra.length, PUBLISHED: 4 + extra.length }[s.status];
+  const stamp = (i: number) => {
+    if (i === 0) return s.computedAt ? `${s.computedByName}, ${formatDate(s.computedAt)}` : '';
+    if (i <= extra.length) { const a = passedStages[i - 1]; return a ? `${a.byName}, ${formatDate(a.at)}` : ''; }
+    const j = i - extra.length;
+    return [null, s.recommendedAt && `${s.recommendedByName}, ${formatDate(s.recommendedAt)}`, s.confirmedAt && `${s.confirmedByName}, ${formatDate(s.confirmedAt)}`,
+      s.publishedAt && `${s.publishedByName}, ${formatDate(s.publishedAt)}`][j] || '';
+  };
   const exportUrl = `/api/reports/EXM-02/export?format=xlsx&semesterId=${s.semesterId}&programmeId=${s.programmeId}&yearOfStudy=${s.yearOfStudy}`;
   return (
     <Container maxWidth="xl" disableGutters>
@@ -132,14 +142,15 @@ export function ResultSheetPage() {
           <Stepper activeStep={active} alternativeLabel>
             {steps.map((x, i) => (
               <Step key={x}><StepLabel optional={<Typography variant="caption" color="text.secondary">
-                {[s.computedAt && `${s.computedByName}, ${formatDate(s.computedAt)}`, s.recommendedAt && `${s.recommendedByName}, ${formatDate(s.recommendedAt)}`,
-                  s.confirmedAt && `${s.confirmedByName}, ${formatDate(s.confirmedAt)}`, s.publishedAt && `${s.publishedByName}, ${formatDate(s.publishedAt)}`][i] || ''}
+                {stamp(i)}
               </Typography>}>{x}</StepLabel></Step>
             ))}
           </Stepper>
         </CardContent>
       </Card>
       {s.status === 'COMPUTED' && s.returnedNote && <Alert severity="warning" sx={{ mb: 2 }}><strong>Returned by {s.returnedByName}{s.returnedAt && `, ${formatDateTime(s.returnedAt)}`}:</strong> {s.returnedNote}</Alert>}
+      {s.status === 'COMPUTED' && s.waitingAtStage && <Alert severity="info" sx={{ mb: 2 }}>Waiting for: <strong>{s.waitingAtStage}</strong>, then the Academic Committee.</Alert>}
+      {passedStages.filter((a) => a.note).map((a) => <Alert key={a.order} severity="info" sx={{ mb: 1 }}><strong>{a.name}:</strong> {a.note}</Alert>)}
       {s.committeeNote && <Alert severity="info" sx={{ mb: 2 }}><strong>Academic Committee:</strong> {s.committeeNote}</Alert>}
       {(s.status === 'CONFIRMED' || s.status === 'PUBLISHED') && <Alert severity="success" sx={{ mb: 2 }}>Confirmed by the Governing Board: these results are locked.</Alert>}
       <ErrorAlert error={act.error ?? recompute.error} />
@@ -151,6 +162,7 @@ export function ResultSheetPage() {
         <Stack direction="row" spacing={1}>
           {s.can.compute && <Button onClick={() => recompute.mutate()} disabled={recompute.isPending}>Recompute</Button>}
           {s.can.returnSheet && <Button color="warning" onClick={() => setNoteFor('return')}>Return</Button>}
+          {s.can.approveStage && <Button variant="contained" color="success" onClick={() => setNoteFor('approve-stage')}>Approve: {s.waitingAtStage}</Button>}
           {s.can.recommend && <Button variant="contained" onClick={() => setNoteFor('recommend')}>Recommend to the Board</Button>}
           {s.can.confirm && <Button variant="contained" color="success" disabled={act.isPending}
             onClick={() => { if (window.confirm('Confirm these results for the Governing Board? They will be locked.')) act.mutate('confirm'); }}>Confirm for the Board</Button>}
@@ -302,6 +314,9 @@ function NactvetCard({ sheet, onChange }: { sheet: ResultSheet; onChange: (s: Re
     mutationFn: (x: { id: number; status: 'ACCEPTED' | 'QUERIED'; note?: string }) => api(`/api/exams/nactvet-submissions/${x.id}`, { ...staff, method: 'PUT', body: { status: x.status, note: x.note } }),
     onSuccess: refresh,
   });
+  const online = useMutation({ mutationFn: () => api(`/api/exams/sheets/${sheet.id}/nactvet-api`, { ...staff, method: 'POST' }), onSuccess: refresh });
+  const check = useMutation({ mutationFn: (id: number) => api(`/api/exams/nactvet-submissions/${id}/refresh`, { ...staff, method: 'POST' }), onSuccess: refresh });
+  const [queries, setQueries] = useState<NactvetResultSubmission | null>(null);
   const label = (x: NactvetResultSubmission) => ({ SUBMITTED: 'Sent, awaiting NACTVET', ACCEPTED: 'Accepted by NACTVET', QUERIED: 'Queried by NACTVET' }[x.status]);
   return (
     <Card sx={{ mt: 2 }}>
@@ -309,16 +324,17 @@ function NactvetCard({ sheet, onChange }: { sheet: ResultSheet; onChange: (s: Re
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} alignItems={{ sm: 'center' }}>
           <Box>
             <Typography variant="h6">NACTVET results submission</Typography>
-            <Typography variant="body2" color="text.secondary">Download the results file, upload it to NACTVET, then record the submission and NACTVET's response here.</Typography>
+            <Typography variant="body2" color="text.secondary">Send the results to NACTVET's results service, or download the file, upload it on the NACTVET portal and record the submission and NACTVET's response here.</Typography>
           </Box>
           {can && (
             <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
               <Button startIcon={<DownloadIcon />} onClick={() => download(`/api/exams/sheets/${sheet.id}/nactvet-file`, 'staff', `NACTVET results ${sheet.programmeCode} Y${sheet.yearOfStudy}.xlsx`)}>Results file</Button>
               <Button variant="outlined" onClick={() => setForm({ reference: '', note: '' })}>Record submission</Button>
+              <Button variant="contained" disabled={online.isPending} onClick={() => online.mutate()}>Send to NACTVET</Button>
             </Stack>
           )}
         </Stack>
-        <ErrorAlert error={submit.error ?? respond.error} />
+        <ErrorAlert error={submit.error ?? respond.error ?? online.error ?? check.error} />
         {sheet.nactvetSubmissions.length > 0 && (
           <Table size="small" sx={{ mt: 1.5 }}>
             <TableHead><TableRow><TableCell>Sent</TableCell><TableCell>Reference</TableCell><TableCell>Status</TableCell><TableCell>Note</TableCell>{can && <TableCell />}</TableRow></TableHead>
@@ -326,10 +342,12 @@ function NactvetCard({ sheet, onChange }: { sheet: ResultSheet; onChange: (s: Re
               {sheet.nactvetSubmissions.map((x) => (
                 <TableRow key={x.id}>
                   <TableCell>{formatDateTime(x.submittedAt)}<br /><Typography variant="caption" color="text.secondary">{x.submittedByName} · {x.students} student{x.students === 1 ? '' : 's'}</Typography></TableCell>
-                  <TableCell>{x.reference ?? '—'}</TableCell>
+                  <TableCell>{x.reference ?? '—'}<br /><Typography variant="caption" color="text.secondary">{x.channel === 'API' ? 'NACTVET results service' : 'File on the NACTVET portal'}</Typography></TableCell>
                   <TableCell><Chip size="small" color={x.status === 'ACCEPTED' ? 'success' : x.status === 'QUERIED' ? 'warning' : 'info'} label={label(x)} /></TableCell>
-                  <TableCell>{x.note ?? ''}</TableCell>
-                  {can && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{x.status === 'SUBMITTED' && (
+                  <TableCell>{x.note ?? ''}{x.queries.length > 0 && <Button size="small" onClick={() => setQueries(x)}>Show</Button>}</TableCell>
+                  {can && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{x.status === 'SUBMITTED' && x.channel === 'API' && (
+                    <Button size="small" onClick={() => check.mutate(x.id)}>Check NACTVET's answer</Button>
+                  )}{x.status === 'SUBMITTED' && x.channel !== 'API' && (
                     <>
                       <Button size="small" color="success" onClick={() => respond.mutate({ id: x.id, status: 'ACCEPTED' })}>Accepted</Button>
                       <Button size="small" color="warning" onClick={() => { const n = window.prompt("NACTVET's query"); if (n) respond.mutate({ id: x.id, status: 'QUERIED', note: n }); }}>Queried</Button>
@@ -353,6 +371,15 @@ function NactvetCard({ sheet, onChange }: { sheet: ResultSheet; onChange: (s: Re
           <DialogActions><Button onClick={() => setForm(null)}>Cancel</Button><Button variant="contained" onClick={() => submit.mutate()} disabled={submit.isPending}>Save</Button></DialogActions>
         </Dialog>
       )}
+      <Dialog open={!!queries} onClose={() => setQueries(null)} fullWidth maxWidth="sm">
+        <DialogTitle>NACTVET's queries</DialogTitle>
+        <DialogContent><Table size="small"><TableBody>{queries?.queries.map((q) => (
+          <TableRow key={q.registrationNo}><TableCell>{q.registrationNo}</TableCell><TableCell>{q.reason}</TableCell></TableRow>
+        ))}</TableBody></Table>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Correct these students (e.g. their NACTVET verification number) and send the results again.</Typography>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setQueries(null)}>Close</Button></DialogActions>
+      </Dialog>
     </Card>
   );
 }
@@ -381,20 +408,20 @@ function DecisionDialog({ sheetId, row, onClose, onDone }: { sheetId: number; ro
   );
 }
 
-function NoteDialog({ sheetId, what, onClose, onDone }: { sheetId: number; what: 'recommend' | 'return'; onClose: () => void; onDone: (x: ResultSheet) => void }) {
+function NoteDialog({ sheetId, what, onClose, onDone }: { sheetId: number; what: 'recommend' | 'return' | 'approve-stage'; onClose: () => void; onDone: (x: ResultSheet) => void }) {
   const [note, setNote] = useState('');
   const m = useMutation({ mutationFn: () => api<ResultSheet>(`/api/exams/sheets/${sheetId}/${what}`, { ...staff, method: 'POST', body: { note } }), onSuccess: onDone });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{what === 'recommend' ? 'Recommend to the Governing Board' : 'Return to the Examinations Officer'}</DialogTitle>
+      <DialogTitle>{what === 'recommend' ? 'Recommend to the Governing Board' : what === 'approve-stage' ? 'Approve at this stage' : 'Return to the Examinations Officer'}</DialogTitle>
       <DialogContent>
         <TextField autoFocus fullWidth multiline minRows={2} sx={{ mt: 1 }} value={note} onChange={(e) => setNote(e.target.value)}
-          label={what === 'recommend' ? 'Academic Committee minute or note (optional)' : 'What needs to change?'} />
+          label={what === 'recommend' ? 'Academic Committee minute or note (optional)' : what === 'approve-stage' ? 'Meeting or note (optional)' : 'What needs to change?'} />
         <ErrorAlert error={m.error} />
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" color={what === 'return' ? 'warning' : 'primary'} disabled={(what === 'return' && !note.trim()) || m.isPending} onClick={() => m.mutate()}>
-          {what === 'recommend' ? 'Recommend' : 'Return'}</Button></DialogActions>
+          {what === 'recommend' ? 'Recommend' : what === 'approve-stage' ? 'Approve' : 'Return'}</Button></DialogActions>
     </Dialog>
   );
 }

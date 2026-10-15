@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Government systems mock</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1b2330; --muted:#5d6878; --line:#e3e6eb; --brand:#1d4e89;
+          --ok:#1e7d3a; --warn:#b26a00; --bad:#c62828; --info:#0b6bcb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--brand); color: #fff; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  header small { opacity: .85; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; background: #fff; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 12px 14px; background: none; }
+  nav button.on { border-bottom-color: var(--brand); color: var(--brand); font-weight: 600; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+  .pill { padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+  .up { background: #e3f3e7; color: var(--ok); } .down { background: #fdeaea; color: var(--bad); }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+  button:hover { border-color: var(--brand); }
+  input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; max-width: 100%; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .card h2 { margin: 0; padding: 12px 16px; font-size: 15px; border-bottom: 1px solid var(--line); }
+  .card .body { padding: 12px 16px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  tr:last-child td { border-bottom: 0; }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; }
+  .empty { padding: 24px 16px; text-align: center; color: var(--muted); }
+  .muted { color: var(--muted); }
+  code { background: #eef1f5; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  #toast { position: fixed; bottom: 16px; left: 16px; right: 16px; max-width: 520px; margin: auto; background: #1b2330; color: #fff; padding: 10px 14px; border-radius: 8px; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Government systems mock <small>· GePG, HESLB, NIDA, MUSE, TAMISEMI · development only</small></h1>
+  <span id="outages"></span>
+</header>
+<nav id="tabs"></nav>
+<main id="main"></main>
+<div id="toast"></div>
+<script>
+const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI'];
+let tab = location.hash.slice(1) || 'GePG';
+const $ = (s) => document.querySelector(s);
+const esc = (v) => v == null ? '' : String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (v) => v == null ? '' : Number(v).toLocaleString('en-GB');
+function toast(t) { const el = $('#toast'); el.textContent = t; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 4000); }
+async function call(method, url) {
+  const r = await fetch(url, { method });
+  const text = await r.text();
+  let body; try { body = JSON.parse(text); } catch { body = text; }
+  if (!r.ok) { toast((body && body.error) || ('HTTP ' + r.status)); throw new Error(text); }
+  return body;
+}
+function table(cols, rows, empty) {
+  if (!rows.length) return `<div class="empty">${empty}</div>`;
+  return `<div class="scroll"><table><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr>${rows.map(r => `<tr>${cols.map(c => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+}
+function renderTabs() {
+  $('#tabs').innerHTML = TABS.map(t => `<button class="${t === tab ? 'on' : ''}" onclick="go('${t}')">${t}</button>`).join('');
+}
+function go(t) { tab = t; location.hash = t; renderTabs(); load(); }
+async function outages() {
+  const s = await call('GET', '/mock/status');
+  $('#outages').innerHTML = Object.entries(s).map(([k, v]) =>
+    `<span class="pill ${v ? 'down' : 'up'}" style="cursor:pointer" title="Click to switch" onclick="outage('${k}', ${!v})">${k} ${v ? 'down' : 'up'}</span>`).join(' ');
+}
+async function outage(sys, on) { await call('POST', `/mock/outage?system=${sys}&on=${on}`); outages(); }
+
+async function gepg() {
+  const s = await call('GET', '/mock/gepg');
+  return `
+  <div class="bar">
+    <label><input type="checkbox" ${s.rejectBills ? 'checked' : ''} onchange="call('POST','/mock/gepg/reject-bills?on='+this.checked).then(load)"> Refuse new bills (no control number)</label>
+    <label><input type="checkbox" ${s.strayPayment ? 'checked' : ''} onchange="call('POST','/mock/gepg/stray-payment?on='+this.checked).then(load)"> Add a payment CIMS does not know to the next reconciliation</label>
+    <button onclick="if(confirm('Forget all bills and payments?')) call('POST','/mock/gepg/reset').then(load)">Reset</button>
+  </div>
+  <div class="card"><h2>Bills received</h2>${table([
+    ['Bill id', b => `<code>${esc(b.billId)}</code>`], ['SP / sub SP', b => esc(b.spCode) + ' / ' + esc(b.subSpCode)], ['Payer', b => esc(b.payerName)],
+    ['Description', b => esc(b.description)], ['Amount', b => esc(b.currency) + ' ' + money(b.amount)], ['Paid', b => money(b.paid)],
+    ['GFS', b => b.items.map(i => esc(i.gfsCode)).join(', ')], ['Control no.', b => b.controlNo ? `<code>${b.controlNo}</code>` : '<span class="bad">refused</span>'],
+    ['Status', b => `<span class="${b.status === 'PAID' ? 'ok' : b.status === 'REJECTED' ? 'bad' : 'warn'}">${b.status}</span>`],
+    ['Callback', b => `<span class="muted">${esc(b.callback)}</span>`],
+    ['', b => b.controlNo && b.status !== 'PAID' ? `<button onclick="pay('${esc(b.billId)}')">Pay in full</button> <button onclick="payPart('${esc(b.billId)}')">Pay part</button>` : '']
+  ], s.bills, 'No bills yet. Ask for a control number in CIMS with CIMS_GEPG_MODE=live.')}</div>
+  <div class="card"><h2>Payments sent to CIMS</h2>${table([
+    ['GePG receipt', p => `<code>${esc(p.payRefId)}</code>`], ['Bill id', p => esc(p.billId)], ['Control no.', p => esc(p.controlNo)],
+    ['Amount', p => money(p.amount)], ['Paid at', p => esc(p.paidAt)], ['Channel', p => esc(p.pspName)], ['Delivered', p => `<span class="muted">${esc(p.delivered)}</span>`],
+    ['', p => `<button onclick="call('POST','/mock/gepg/payments/${esc(p.payRefId)}/resend').then(load)">Send again</button>`]
+  ], s.payments, 'No payments yet.')}</div>
+  <div class="card"><h2>Reconciliation requests</h2>${table([
+    ['Request id', r => esc(r.requestId)], ['SP', r => esc(r.spCode)], ['Date', r => esc(r.date)], ['Transactions', r => r.transactions],
+    ['Received', r => esc(r.receivedAt)], ['Delivered', r => `<span class="muted">${esc(r.delivered)}</span>`]
+  ], s.reconciliations, 'None yet. Use “Ask GePG” on the reconciliation page in CIMS.')}</div>`;
+}
+async function pay(id) { await call('POST', `/mock/gepg/bills/${encodeURIComponent(id)}/pay`); toast('Payment sent to CIMS'); load(); }
+async function payPart(id) { const a = prompt('Amount to pay'); if (a) { await call('POST', `/mock/gepg/bills/${encodeURIComponent(id)}/pay?amount=${encodeURIComponent(a)}`); load(); } }
+
+async function heslb() {
+  const s = await call('GET', '/mock/heslb');
+  return `
+  <div class="card"><h2>Disburse to an institution</h2><div class="body bar">
+    <input id="hInst" placeholder="Institution code" size="12"> <input id="hYear" placeholder="2027/2028" size="10">
+    <button onclick="call('POST','/mock/heslb/disburse?institutionCode='+encodeURIComponent($('#hInst').value)+'&academicYear='+encodeURIComponent($('#hYear').value)).then(()=>{toast('Disbursed');load()})">Disburse half of tuition</button>
+    <span class="muted">Add a beneficiary:</span> <input id="hIdx" placeholder="CSEE index S0101/0002" size="16">
+    <button onclick="call('POST','/mock/heslb/beneficiaries?institutionCode='+encodeURIComponent($('#hInst').value)+'&academicYear='+encodeURIComponent($('#hYear').value)+'&indexNumber='+encodeURIComponent($('#hIdx').value)).then(load)">Add</button>
+    <button onclick="if(confirm('Forget everything?')) call('POST','/mock/heslb/reset').then(load)">Reset</button>
+  </div></div>
+  <div class="card"><h2>Beneficiaries</h2>${table([
+    ['Institution', b => esc(b.institutionCode)], ['Year', b => esc(b.academicYear)], ['Index no.', b => esc(b.indexNumber)], ['Reg. no.', b => esc(b.registrationNo)],
+    ['Name', b => esc(b.fullName)], ['Loan no.', b => esc(b.loanNumber)], ['Tuition', b => money(b.tuition)], ['Disbursed', b => money(b.disbursed)], ['From', b => esc(b.source)]
+  ], s.beneficiaries, 'None yet. Send registration data from CIMS: students whose index number ends in an even digit become beneficiaries.')}</div>
+  <div class="card"><h2>Disbursements</h2>${table([
+    ['Batch', d => esc(d.batchNo)], ['Institution', d => esc(d.institutionCode)], ['Year', d => esc(d.academicYear)], ['Date', d => esc(d.disbursedOn)],
+    ['Students', d => d.students.length], ['Amount', d => money(d.amount)]
+  ], s.disbursements, 'None yet.')}</div>
+  <div class="card"><h2>Registration and continuation data received</h2>${table([
+    ['Ref', x => esc(x.ref)], ['Kind', x => esc(x.kind)], ['Institution', x => esc(x.institutionCode)], ['Year', x => esc(x.academicYear)],
+    ['Received', x => x.received], ['Accepted', x => x.accepted], ['Rejected', x => x.rejected.length]
+  ], s.submissions, 'None yet.')}</div>`;
+}
+async function nida() {
+  const s = await call('GET', '/mock/nida');
+  return `<div class="card"><h2>NIN checks</h2><div class="body muted">A NIN is 20 digits starting with the birth date (YYYYMMDD). Ending in 9: not found; birth date differs: mismatch; otherwise valid.
+    Example for a student born 2005-03-14: <code>20050314-11111-00001-12</code></div>${table([
+    ['NIN', c => esc(c.nin)], ['Result', c => `<span class="${c.status === 'VALID' ? 'ok' : 'bad'}">${c.status}</span>`], ['At', c => esc(c.at)]
+  ], s.checks, 'No checks yet.')}</div>`;
+}
+async function muse() {
+  const s = await call('GET', '/mock/muse');
+  return `<div class="bar"><button onclick="if(confirm('Forget all journals?')) call('POST','/mock/muse/reset').then(load)">Reset</button></div>
+  <div class="card"><h2>Journals posted</h2>${table([
+    ['Batch ref', j => esc(j.batch_ref)], ['Vote', j => esc(j.vote_code)], ['MUSE ref', j => esc(j.muse_ref)], ['Lines', j => j.lines], ['Total', j => money(j.total)], ['Received', j => esc(j.received_at)]
+  ], s.journals, 'No journals yet. Post fee collections from CIMS (Finance overview → MUSE).')}</div>`;
+}
+async function tamisemi() {
+  const s = await call('GET', '/mock/tamisemi');
+  return `<div class="card"><h2>Add selections</h2><div class="body bar">
+    <input id="tInst" placeholder="Institution code" size="12"> <input id="tProg" placeholder="Programme code" size="10">
+    <input id="tYear" placeholder="Year e.g. ${new Date().getFullYear()}" size="10"> <input id="tCount" type="number" value="5" style="width:70px">
+    <input id="tIdx" placeholder="or one index no." size="14">
+    <button onclick="addSel()">Add</button>
+    <button onclick="if(confirm('Forget all selections?')) call('POST','/mock/tamisemi/reset').then(load)">Reset</button>
+  </div></div>
+  <div class="card"><h2>Selections</h2>${table([
+    ['Institution', x => esc(x.institution_code)], ['Year', x => x.selection_year], ['Index no.', x => esc(x.index_number) + '/' + x.exam_year], ['Name', x => esc(x.first_name + ' ' + x.surname)],
+    ['Sex', x => x.sex], ['Programme', x => esc(x.programme_code)], ['Reference', x => esc(x.reference)]
+  ], s.selections, 'None yet.')}</div>`;
+}
+async function addSel() {
+  const q = new URLSearchParams({ institutionCode: $('#tInst').value, programmeCode: $('#tProg').value, count: $('#tCount').value });
+  if ($('#tYear').value) q.set('year', $('#tYear').value);
+  if ($('#tIdx').value) q.set('indexNumber', $('#tIdx').value);
+  await call('POST', '/mock/tamisemi/selections?' + q); load();
+}
+async function load() {
+  try {
+    outages();
+    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi })[tab]();
+    $('#main').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+renderTabs(); load(); setInterval(() => { if (tab === 'GePG' || tab === 'NIDA') load(); }, 4000);
+</script>
+</body>
+</html>

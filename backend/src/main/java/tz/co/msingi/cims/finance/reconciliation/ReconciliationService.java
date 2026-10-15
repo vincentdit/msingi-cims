@@ -46,8 +46,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Daily GePG reconciliation (FR-FIN-05): GePG's file for a date is matched against CIMS payments by GePG receipt
- * number. Exceptions are listed for the Accountant: payments GePG reports that CIMS never received (posted from the
+ * Daily reconciliation (FR-FIN-05): GePG's file for a date (public institutions), or the payment collector's or bank's statement
+ * (private and faith-based institutions), is matched against CIMS payments by receipt or transaction number. Exceptions are listed for the Accountant: payments GePG reports that CIMS never received (posted from the
  * file), CIMS payments GePG does not report, amount differences, duplicates and unknown bills. Days are closed once
  * every exception is resolved, and the Bursar signs off each month.
  */
@@ -69,7 +69,13 @@ public class ReconciliationService {
             Map.entry("ccy", "currency"), Map.entry("currency", "currency"),
             Map.entry("trxdttm", "paidAt"), Map.entry("paidat", "paidAt"), Map.entry("date", "paidAt"),
             Map.entry("usdpaychnl", "channel"), Map.entry("channel", "channel"),
-            Map.entry("pyrcellnum", "phone"), Map.entry("phone", "phone"));
+            Map.entry("pyrcellnum", "phone"), Map.entry("phone", "phone"),
+            // statements from a payment collector, mobile money operator or bank (private and faith-based institutions)
+            Map.entry("transactionid", "receipt"), Map.entry("transid", "receipt"), Map.entry("trxid", "receipt"), Map.entry("receiptnumber", "receipt"),
+            Map.entry("reference", "control"), Map.entry("paymentreference", "control"), Map.entry("accountreference", "control"),
+            Map.entry("billreference", "control"), Map.entry("ref", "control"),
+            Map.entry("provider", "psp"), Map.entry("operator", "psp"), Map.entry("bank", "psp"),
+            Map.entry("transactiondate", "paidAt"), Map.entry("paymentdate", "paidAt"), Map.entry("msisdn", "phone"));
 
     private final GepgReconciliationRepository reconciliations;
     private final ReconciliationItemRepository items;
@@ -78,6 +84,8 @@ public class ReconciliationService {
     private final ControlNumberRepository controlNumbers;
     private final BillingService billing;
     private final AuditService audit;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final tz.co.msingi.cims.finance.gepg.GepgGateway gepg;
 
     private record Line(int lineNo, String receipt, String bill, String control, String pspReceipt, String psp, BigDecimal amount,
                         OffsetDateTime paidAt, String channel, String phone) {
@@ -90,7 +98,56 @@ public class ReconciliationService {
         if (date.isAfter(LocalDate.now(ZONE))) {
             throw new BusinessRuleException("FUTURE_DATE", "A day can be reconciled only once it has started");
         }
-        List<Line> lines = parse(csv, date);
+        return importLines(date, fileName, parse(csv, date), GepgReconciliation.Source.FILE, CurrentUser.name());
+    }
+
+    /** One transaction of GePG's reconciliation answer (live GePG, {@code gepgSpReconcResp}). */
+    public record GepgTransaction(String receipt, String billId, String controlNo, String pspReceipt, String psp, BigDecimal amount,
+                                  OffsetDateTime paidAt, String channel, String phone) {
+    }
+
+    /**
+     * Asks GePG for a day's transactions (live GePG): GePG answers by callback, and the answer is matched exactly as an imported
+     * file would be. The request id carries the institution so the callback finds it.
+     */
+    @Transactional
+    public Map<String, Object> requestFromGepg(LocalDate date) {
+        if (!date.isBefore(LocalDate.now(ZONE).plusDays(1))) {
+            throw new BusinessRuleException("FUTURE_DATE", "A day can be reconciled only once it has started");
+        }
+        reconciliations.findByReconDate(date).filter(r -> r.getStatus() == GepgReconciliation.Status.CLOSED).ifPresent(r -> {
+            throw new BusinessRuleException("RECONCILIATION_CLOSED", "The reconciliation for " + date + " is closed");
+        });
+        Integer n = jdbc.queryForObject("select count(*) from gepg_recon_requests where recon_date = ?", Integer.class, date);
+        String requestId = tz.co.msingi.cims.platform.tenancy.TenantContext.requireTenantId() + "-" + date.toString().replace("-", "") + "-" + ((n == null ? 0 : n) + 1);
+        if (!gepg.requestReconciliation(requestId, date)) {
+            throw new BusinessRuleException("GEPG_FILE_ONLY",
+                    "Asking GePG directly needs the live GePG connection. Download GePG's reconciliation file for the day and import it instead.");
+        }
+        jdbc.update("insert into gepg_recon_requests (tenant_id, request_id, recon_date, requested_by_name) values (cims_current_tenant(), ?, ?, ?)",
+                requestId, date, CurrentUser.name());
+        audit.record("GEPG_RECONCILIATION_REQUESTED", "GepgReconciliation", null, Map.of("date", date.toString(), "requestId", requestId));
+        return Map.of("requestId", requestId, "date", date.toString(), "status", "REQUESTED");
+    }
+
+    /** GePG's answer to a reconciliation request: matched as a file would be. Returns a line for the integration log. */
+    @Transactional
+    public String importFromGepg(String requestId, List<GepgTransaction> transactions) {
+        List<Map<String, Object>> req = jdbc.queryForList("select recon_date, status from gepg_recon_requests where request_id = ?", requestId);
+        if (req.isEmpty()) throw new NotFoundException("Reconciliation request", requestId);
+        LocalDate date = ((java.sql.Date) req.get(0).get("recon_date")).toLocalDate();
+        List<Line> lines = new ArrayList<>();
+        int i = 1;
+        for (GepgTransaction t : transactions) {
+            if (t.receipt() == null || t.amount() == null) continue;
+            lines.add(new Line(i++, t.receipt(), t.billId(), t.controlNo(), t.pspReceipt(), t.psp(), t.amount(), t.paidAt(), t.channel(), t.phone()));
+        }
+        ReconciliationView v = importLines(date, "GePG " + requestId, lines, GepgReconciliation.Source.API, "GePG");
+        jdbc.update("update gepg_recon_requests set status = 'RECEIVED', transactions = ?, received_at = now() where request_id = ?", lines.size(), requestId);
+        return "Reconciliation of " + date + ": " + lines.size() + " transaction(s), " + v.exceptionCount() + " exception(s)";
+    }
+
+    private ReconciliationView importLines(LocalDate date, String fileName, List<Line> lines, GepgReconciliation.Source source, String by) {
         GepgReconciliation r = reconciliations.findByReconDate(date).orElse(null);
         if (r != null) {
             if (r.getStatus() == GepgReconciliation.Status.CLOSED) {
@@ -106,10 +163,10 @@ public class ReconciliationService {
             r = new GepgReconciliation();
             r.setReconDate(date);
         }
-        r.setSource(GepgReconciliation.Source.FILE);
+        r.setSource(source);
         r.setFileName(fileName);
         r.setImportedAt(OffsetDateTime.now());
-        r.setImportedByName(CurrentUser.name());
+        r.setImportedByName(by);
         reconciliations.saveAndFlush(r);
 
         List<ReconciliationItem> out = new ArrayList<>();
@@ -255,7 +312,7 @@ public class ReconciliationService {
         LocalDate first = ym.atDay(1), last = ym.atEndOfMonth();
         List<Payment> list = payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAtAsc(
                 first.atStartOfDay(ZONE).toOffsetDateTime(), last.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime()).stream()
-                .filter(p -> p.getSource() == Payment.Source.GEPG).toList();   // only GePG payments appear in GePG's files
+                .filter(Payment::isReconciled).toList();   // only GePG or collector payments appear in the day's file
         Map<LocalDate, List<Payment>> byDay = list.stream().collect(Collectors.groupingBy(
                 p -> p.getPaidAt().atZoneSameInstant(ZONE).toLocalDate(), TreeMap::new, Collectors.toList()));
         Map<LocalDate, GepgReconciliation> recs = reconciliations.findByReconDateBetweenOrderByReconDateAsc(first, last).stream()
@@ -372,7 +429,8 @@ public class ReconciliationService {
             if (key != null) col.putIfAbsent(key, c);
         }
         if (!col.containsKey("receipt") || !col.containsKey("amount") || !(col.containsKey("bill") || col.containsKey("control"))) {
-            throw new BusinessRuleException("INVALID_FILE", "The file needs at least PayRefId, PaidAmt and SpBillId or BillCtrNum columns. Expected: " + HEADER);
+            throw new BusinessRuleException("INVALID_FILE", "The file needs at least PayRefId, PaidAmt and SpBillId or BillCtrNum columns (GePG: " + HEADER
+                    + "), or TransactionId, Amount and Reference for a mobile money, collector or bank statement");
         }
         List<String> errors = new ArrayList<>();
         List<Line> out = new ArrayList<>();
@@ -447,7 +505,7 @@ public class ReconciliationService {
     private List<Payment> paymentsOn(LocalDate date) {
         return payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAtAsc(
                 date.atStartOfDay(ZONE).toOffsetDateTime(), date.plusDays(1).atStartOfDay(ZONE).toOffsetDateTime()).stream()
-                .filter(p -> p.getSource() == Payment.Source.GEPG).toList();
+                .filter(Payment::isReconciled).toList();
     }
 
     private GepgReconciliation require(Long id) {

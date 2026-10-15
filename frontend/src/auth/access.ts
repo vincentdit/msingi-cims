@@ -27,9 +27,9 @@ const EXAMS_READERS = [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS, R.MANAGEMENT];
 const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 
 export type PageKey =
-  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'semesterRegistrations' | 'graduations'
+  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution';
+  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
@@ -40,6 +40,7 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   programmes: [R.ADMIN, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   students: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.ADMISSIONS, R.HOD, R.EXAMS, R.MANAGEMENT],
   statusChanges: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
+  transfers: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   semesterRegistrations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   graduations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
   calendar: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.ADMISSIONS, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
@@ -66,17 +67,22 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   users: [R.ADMIN, R.AUDITOR],
   audit: [R.AUDITOR, R.ADMIN],
   institution: [R.ADMIN],
+  security: [R.ADMIN, R.REGISTRAR],
+  letters: [R.ADMIN, R.ADMISSIONS, R.IPT, R.REGISTRAR],
+  imports: [R.ADMIN, R.REGISTRAR, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.ADMISSIONS],
+  alumni: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
+  integrations: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.REGISTRAR, R.ADMISSIONS, R.EXAMS],
 };
 
 export const can = (roles: readonly string[] | undefined, page: PageKey) => !!roles?.some((r) => PAGE_ROLES[page].includes(r));
 
 /** The page a path belongs to (the first segment after /staff). */
 const PATH_PAGE: Record<string, PageKey> = {
-  '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges',
+  '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges', transfers: 'transfers',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
   'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
-  institution: 'institution',
+  institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {

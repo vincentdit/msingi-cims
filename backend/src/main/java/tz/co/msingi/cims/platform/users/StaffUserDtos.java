@@ -27,7 +27,7 @@ public final class StaffUserDtos {
 
     public record StaffUserView(Long id, String username, String fullName, String jobTitle, String email, String phone, String status,
                                 boolean mustChangePassword, OffsetDateTime lastLoginAt, OffsetDateTime createdAt, String createdByName,
-                                List<RoleGrantView> roles, boolean self) {
+                                List<RoleGrantView> roles, boolean self, boolean mfaEnabled) {
     }
 
     public record StaffUserRequest(
@@ -47,7 +47,7 @@ public final class StaffUserDtos {
     }
 
     public record ChangePasswordRequest(@NotBlank String currentPassword,
-                                        @NotBlank @Pattern(regexp = AdmissionDtos.PASSWORD_RULE, message = AdmissionDtos.PASSWORD_MESSAGE) String newPassword) {
+                                        @NotBlank @Pattern(regexp = AdmissionDtos.PASSWORD_RULE, message = AdmissionDtos.PASSWORD_MESSAGE) @tz.co.msingi.cims.platform.security.NotBreached String newPassword) {
     }
 
     public record Summary(long total, long active, long disabled, long locked, long mustChangePassword) {

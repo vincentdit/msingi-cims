@@ -1,3 +1,4 @@
+import { tr } from '../../locale/ui';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import BuildIcon from '@mui/icons-material/BuildOutlined';
@@ -95,8 +96,8 @@ function AllocationTab({ warden }: { warden: boolean }) {
       </Stack>
       {w && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {w.academicYear} · applications {formatDate(w.opensOn)} – {formatDate(w.closesOn)} · pay within {w.paymentDays} days ·
-          priority: {[w.specialNeedsFirst && 'special needs', w.firstYearsFirst && 'first years', w.paidFeesFirst && 'fees paid'].filter(Boolean).join(', ') || 'none'}, then who applied first
+          {w.academicYear} · applications {formatDate(w.opensOn)} – {formatDate(w.closesOn)} · {`pay within ${w.paymentDays} days`} ·
+          priority: {([w.specialNeedsFirst && 'special needs', w.firstYearsFirst && 'first years', w.paidFeesFirst && 'fees paid'].filter(Boolean) as string[]).map((x) => tr(x)).join(', ') || tr('none')}, then who applied first
         </Typography>
       )}
       {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice(null)}>{notice}</Alert>}
@@ -430,7 +431,7 @@ function WindowsTab({ warden }: { warden: boolean }) {
           <TableBody>
             {q.data?.map((w) => (
               <TableRow key={w.id}>
-                <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{w.name}</Typography><Typography variant="caption" color="text.secondary">{w.academicYear} · pay within {w.paymentDays} days</Typography></TableCell>
+                <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{w.name}</Typography><Typography variant="caption" color="text.secondary">{w.academicYear} · {`pay within ${w.paymentDays} days`}</Typography></TableCell>
                 <TableCell>{formatDate(w.opensOn)} – {formatDate(w.closesOn)} {w.open && <Chip size="small" color="success" label="Open" sx={{ ml: 0.5 }} />}</TableCell>
                 <TableCell align="right">{w.applications}</TableCell><TableCell align="right">{w.allocated}</TableCell>
                 <TableCell align="right">{w.waitlisted}</TableCell><TableCell align="right">{w.checkedIn}</TableCell>

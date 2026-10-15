@@ -17,6 +17,9 @@ import tz.co.msingi.cims.finance.domain.InvoiceLine;
 import tz.co.msingi.cims.finance.domain.Payment;
 import tz.co.msingi.cims.finance.domain.PaymentAllocation;
 import tz.co.msingi.cims.finance.domain.PaymentAllocator;
+import tz.co.msingi.cims.finance.collection.CollectionGateway;
+import tz.co.msingi.cims.finance.collection.PaymentChannelService;
+import tz.co.msingi.cims.finance.collection.PaymentReference;
 import tz.co.msingi.cims.finance.gepg.GepgGateway;
 import tz.co.msingi.cims.finance.gepg.GepgProperties;
 import tz.co.msingi.cims.notification.Messaging;
@@ -30,7 +33,10 @@ import java.time.Year;
 import java.util.List;
 import java.util.Map;
 
-/** Invoices, GePG control numbers and payment posting (BP-06). */
+/**
+ * Invoices, payment numbers and payment posting (BP-06). Public institutions are paid with GePG control numbers; private and
+ * faith-based institutions with CIMS payment references into their own mobile money and bank accounts.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,11 +47,14 @@ public class BillingService {
     private final PaymentRepository payments;
     private final PaymentAllocationRepository allocations;
     private final GepgGateway gepg;
+    private final CollectionGateway collector;
+    private final PaymentChannelService paymentChannels;
     private final GepgProperties gepgProps;
     private final NumberSequenceService sequences;
     private final ApplicationEventPublisher events;
     private final AuditService audit;
     private final Messaging messaging;
+    private final tz.co.msingi.cims.finance.fees.FeeRepositories.FeeItemRepository feeItems;
 
     public record NewInvoice(Invoice.PayerType payerType, Long payerId, String payerName, String payerPhone, String payerEmail,
                              String purpose, Long referenceId, String description, List<Line> lines,
@@ -98,11 +107,18 @@ public class BillingService {
             throw new BusinessRuleException("INVOICE_PAID", "This invoice is already paid");
         }
         List<ControlNumber> existing = controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId);
+        ControlNumber.Issuer issuer = issuerNow();
         for (ControlNumber cn : existing) {
-            if (cn.isUsable()) {
+            if (cn.isUsable() && cn.getIssuer() == issuer) {
+                return cn;
+            }
+            // live GePG answers with the control number a moment later: do not send a second bill while the first is on its way
+            if (cn.getStatus() == ControlNumber.Status.REQUESTED && cn.getIssuer() == issuer && cn.getCreatedAt() != null
+                    && cn.getCreatedAt().isAfter(OffsetDateTime.now().minusMinutes(15))) {
                 return cn;
             }
             if (cn.getStatus() == ControlNumber.Status.ACTIVE) {
+                // expired, or issued before the institution's ownership (and so its way of collecting fees) changed
                 cn.setStatus(ControlNumber.Status.EXPIRED);
             }
         }
@@ -110,9 +126,19 @@ public class BillingService {
         cn.setInvoice(inv);
         cn.setBillId(TenantContext.requireTenantId() + "-" + inv.getId() + "-" + (existing.size() + 1));
         cn.setExpiresAt(OffsetDateTime.now().plus(gepgProps.controlNumberValidity()));
-        GepgGateway.ControlNumberResponse resp = gepg.submitBill(new GepgGateway.BillRequest(
-                cn.getBillId(), inv.getPayerName(), inv.getPayerPhone(), inv.getPayerEmail(),
-                inv.getDescription(), inv.balance(), inv.getCurrency(), cn.getExpiresAt()));
+        if (!paymentChannels.usesGepg()) {
+            return controlNumbers.save(issueReference(inv, cn));
+        }
+        GepgGateway.ControlNumberResponse resp;
+        try {
+            resp = gepg.submitBill(new GepgGateway.BillRequest(cn.getBillId(), inv.getPayerName(), inv.getPayerPhone(), inv.getPayerEmail(),
+                    inv.getDescription(), inv.balance(), inv.getCurrency(), cn.getExpiresAt(), inv.getPayerType().name() + "-" + inv.getPayerId(),
+                    billItems(inv)));
+        } catch (tz.co.msingi.cims.finance.gepg.GepgUnavailableException e) {
+            // nothing reached GePG: a new number is asked for next time
+            log.warn("Bill {} not sent to GePG: {}", cn.getBillId(), e.getMessage());
+            resp = GepgGateway.ControlNumberResponse.error(e.getMessage());
+        }
         if (resp.issued()) {
             cn.setControlNo(resp.controlNo());
             cn.setStatus(ControlNumber.Status.ACTIVE);
@@ -125,6 +151,93 @@ public class BillingService {
             cn.setStatus(ControlNumber.Status.FAILED);
         }
         return controlNumbers.save(cn);
+    }
+
+    /**
+     * What the bill is for, line by line, with the revenue (GFS) code of each fee item: what is still owed on each invoice line,
+     * grouped by GFS code. When the lines do not add up to the balance (e.g. credit applied), one line for the balance is sent.
+     */
+    private List<GepgGateway.BillItem> billItems(Invoice inv) {
+        Map<String, String> gfs = new java.util.HashMap<>();
+        feeItems.findAll().forEach(f -> { if (f.getGfsCode() != null && !f.getGfsCode().isBlank()) gfs.put(f.getCode().toUpperCase(), f.getGfsCode().trim()); });
+        Map<String, BigDecimal> byGfs = new java.util.LinkedHashMap<>();
+        Map<String, String> refs = new java.util.HashMap<>();
+        for (InvoiceLine l : inv.getLines()) {
+            BigDecimal owed = l.getAmount().subtract(l.getPaidAmount() == null ? BigDecimal.ZERO : l.getPaidAmount());
+            if (owed.signum() <= 0) continue;
+            String code = l.getFeeItemCode() == null ? "FEES" : l.getFeeItemCode().toUpperCase();
+            String key = gfs.getOrDefault(code, "");
+            byGfs.merge(key, owed, BigDecimal::add);
+            refs.putIfAbsent(key, code.length() > 30 ? code.substring(0, 30) : code);
+        }
+        List<GepgGateway.BillItem> items = byGfs.entrySet().stream()
+                .map(e -> new GepgGateway.BillItem(refs.get(e.getKey()), e.getValue(), e.getKey().isEmpty() ? null : e.getKey())).toList();
+        BigDecimal sum = items.stream().map(GepgGateway.BillItem::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.compareTo(inv.balance()) != 0) {
+            String main = byGfs.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).filter(k -> !k.isEmpty()).orElse(null);
+            return List.of(new GepgGateway.BillItem("FEES", inv.balance(), main));
+        }
+        return items;
+    }
+
+    /** GePG's control number for a bill, arriving by callback (live GePG). Idempotent; sends the payer the number once. */
+    @Transactional
+    public boolean controlNumberIssued(String billId, String controlNo) {
+        ControlNumber cn = controlNumbers.findByBillId(billId).orElse(null);
+        if (cn == null) return false;
+        if (cn.getStatus() == ControlNumber.Status.ACTIVE && controlNo.equals(cn.getControlNo())) return true;
+        if (cn.getStatus() != ControlNumber.Status.REQUESTED && cn.getStatus() != ControlNumber.Status.FAILED) return true;
+        Invoice inv = cn.getInvoice();
+        cn.setControlNo(controlNo);
+        cn.setStatus(ControlNumber.Status.ACTIVE);
+        cn.setIssuedAt(OffsetDateTime.now());
+        controlNumbers.save(cn);
+        audit.recordAs(null, "GePG", "CONTROL_NUMBER_ISSUED", "Invoice", inv.getId(), Map.of("billId", billId, "controlNo", controlNo));
+        if (inv.getPayerPhone() != null && !inv.isPaid()) {
+            messaging.event("CONTROL_NUMBER", inv.getPayerPhone(), Map.of("controlNo", controlNo, "amount", inv.balance(), "description", inv.getDescription()));
+        }
+        return true;
+    }
+
+    /** GePG refused a bill after accepting it for processing (a {@code gepgBillSubResp} without a control number). */
+    @Transactional
+    public boolean controlNumberRefused(String billId, String code) {
+        ControlNumber cn = controlNumbers.findByBillId(billId).orElse(null);
+        if (cn == null) return false;
+        if (cn.getStatus() == ControlNumber.Status.REQUESTED) {
+            cn.setStatus(ControlNumber.Status.FAILED);
+            controlNumbers.save(cn);
+            audit.recordAs(null, "GePG", "CONTROL_NUMBER_REFUSED", "Invoice", cn.getInvoice().getId(), Map.of("billId", billId, "code", String.valueOf(code)));
+        }
+        return true;
+    }
+
+    /** Private and faith-based institutions: CIMS issues the reference itself, so it is usable at once whether or not the collector answers. */
+    private ControlNumber issueReference(Invoice inv, ControlNumber cn) {
+        String ref;
+        int tries = 0;
+        do {
+            ref = PaymentReference.issue(TenantContext.requireTenantId());
+        } while (controlNumbers.findByControlNo(ref).isPresent() && ++tries < 20);
+        cn.setControlNo(ref);
+        cn.setIssuer(ControlNumber.Issuer.COLLECTION);
+        cn.setStatus(ControlNumber.Status.ACTIVE);
+        cn.setIssuedAt(OffsetDateTime.now());
+        boolean registered = collector.registerBill(new CollectionGateway.Bill(ref, cn.getBillId(), inv.getPayerName(), inv.getPayerPhone(),
+                inv.getDescription(), inv.balance(), inv.getCurrency(), cn.getExpiresAt()));
+        if (!registered) {
+            log.warn("Collector did not take bill {}; reference {} can still be confirmed from the statement", cn.getBillId(), ref);
+        }
+        if (inv.getPayerPhone() != null) {
+            messaging.event("PAYMENT_REFERENCE", inv.getPayerPhone(), Map.of("controlNo", ref, "amount", inv.balance(),
+                    "description", inv.getDescription(), "channels", paymentChannels.summary()));
+        }
+        return cn;
+    }
+
+    /** Who issues new numbers for this institution: GePG for public institutions, CIMS for private and faith-based ones. */
+    private ControlNumber.Issuer issuerNow() {
+        return paymentChannels.usesGepg() ? ControlNumber.Issuer.GEPG : ControlNumber.Issuer.COLLECTION;
     }
 
     public record PaymentNotification(String billId, String controlNo, String gepgReceiptNo, String pspReceiptNo,
@@ -154,6 +267,7 @@ public class BillingService {
         p.setInvoice(inv);
         p.setControlNo(cn.getControlNo());
         p.setGepgReceiptNo(n.gepgReceiptNo());
+        p.setSource(cn.getIssuer() == ControlNumber.Issuer.COLLECTION ? Payment.Source.COLLECTION : Payment.Source.GEPG);
         p.setPspReceiptNo(n.pspReceiptNo());
         p.setPspName(n.pspName());
         p.setChannel(n.channel());
@@ -182,7 +296,8 @@ public class BillingService {
         if (allocation.unallocated().signum() > 0) {
             log.info("Payment {} exceeds the balance of invoice {} by {}: held as credit", n.gepgReceiptNo(), inv.getInvoiceNo(), allocation.unallocated());
         }
-        audit.recordAs(null, "GePG", "PAYMENT_RECEIVED", "Invoice", inv.getId(),
+        audit.recordAs(null, p.getSource() == Payment.Source.COLLECTION ? (n.pspName() == null ? "Collector" : n.pspName()) : "GePG",
+                "PAYMENT_RECEIVED", "Invoice", inv.getId(),
                 Map.of("receiptNo", p.getReceiptNo(), "gepgReceiptNo", n.gepgReceiptNo(), "amount", n.amount(),
                         "credit", allocation.unallocated()));
         events.publishEvent(new PaymentPostedEvent(inv.getId(), inv.getPayerType().name(), inv.getPayerId(), p.getId()));
@@ -203,13 +318,16 @@ public class BillingService {
     @Transactional
     public Payment postDirect(Invoice inv, BigDecimal amount, Payment.Source source, String channel, String reference, String documentNo,
                               OffsetDateTime paidAt) {
-        if (source == Payment.Source.GEPG) throw new IllegalArgumentException("GePG payments come through recordPayment");
+        if (source == Payment.Source.GEPG || source == Payment.Source.COLLECTION) {
+            throw new IllegalArgumentException("Payments against a control number or reference come through recordPayment");
+        }
         if (amount == null || amount.signum() <= 0) throw new BusinessRuleException("INVALID_AMOUNT", "The amount must be positive");
         String code = TenantContext.require().code();
         Payment p = new Payment();
         p.setInvoice(inv);
         p.setControlNo(source.name());
-        p.setGepgReceiptNo(source.name() + "-" + NumberSequenceService.format("", sequences.next("DIRECT-PAYMENT"), 8));
+        // unique across institutions (the column is), so the institution's code is part of it
+        p.setGepgReceiptNo(source.name() + "-" + code + "-" + NumberSequenceService.format("", sequences.next("DIRECT-PAYMENT"), 8));
         p.setPspReceiptNo(reference == null ? null : reference.length() > 60 ? reference.substring(0, 60) : reference);
         p.setPspName(source == Payment.Source.BANK ? "Bank" : null);
         p.setChannel(channel);
@@ -249,8 +367,9 @@ public class BillingService {
     /** Latest control number for the invoice (active or paid), or null if none was issued. */
     @Transactional(readOnly = true)
     public ControlNumber currentControlNumber(Long invoiceId) {
+        ControlNumber.Issuer issuer = issuerNow();
         return controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId).stream()
-                .filter(cn -> cn.getStatus() == ControlNumber.Status.ACTIVE || cn.getStatus() == ControlNumber.Status.PAID)
+                .filter(cn -> (cn.getStatus() == ControlNumber.Status.ACTIVE && cn.getIssuer() == issuer) || cn.getStatus() == ControlNumber.Status.PAID)
                 .findFirst().orElse(null);
     }
 

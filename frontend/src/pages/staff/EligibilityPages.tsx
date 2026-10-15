@@ -12,6 +12,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { EligibilityLine, EligibilityOverview, EligibilityRules, ExemptionView, GenerateEligibilityResult, OfferingEligibilityView } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { tr } from '../../locale/ui';
 import { OFFERING_STAGE, useRoles, useSemesterChoice } from './MarksPages';
 
 const staff = { realm: 'staff' as const };
@@ -21,9 +22,10 @@ function RulesLine({ rules }: { rules: EligibilityRules }) {
   const parts = [`attendance of at least ${pct(rules.minAttendancePercent)}`];
   if (rules.requiresCa) parts.push('every coursework item marked');
   if (rules.requiresClearance) parts.push('examination fees clearance');
+  const list = parts.map((x) => tr(x)).join(', ').replace(/, ([^,]*)$/, ` ${tr('and')} $1`);
   return (
     <Typography variant="body2" color="text.secondary">
-      To sit an examination a student needs {parts.join(', ').replace(/, ([^,]*)$/, ' and $1')}, or an approved exemption.
+      To sit an examination a student needs {list}, or an approved exemption.
       {' '}<Link component={RouterLink} to="/staff/regulations">Change the rules</Link>
     </Typography>
   );

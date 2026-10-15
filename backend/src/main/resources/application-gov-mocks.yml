@@ -1,0 +1,38 @@
+# Live GePG, HESLB, NIDA, MUSE and TAMISEMI adapters against the gov-mocks project (development), and NACTVET student
+# registration and results against nactvet-mock. Start the mocks first:
+#   cd gov-mocks;    .\mvnw.cmd spring-boot:run      (port 8098, dashboard http://localhost:8098)
+#   cd nactvet-mock; .\mvnw.cmd spring-boot:run      (port 8099)
+# then run CIMS with profiles dev,gov-mocks (add nactvet-mock for admission verification too).
+# Enter a GePG SP code, sub SP code, system id and GFS code, and switch on HESLB / NIDA / MUSE / TAMISEMI, under Integrations.
+cims:
+  gepg:
+    mode: live
+    live:
+      base-url: ${CIMS_GEPG_URL:http://localhost:8098}
+      # TEST-ONLY keys (dev-keys/README.md); never used with the real GePG
+      keystore: ${CIMS_GEPG_KEYSTORE:../dev-keys/cims-sp-test.p12}
+      keystore-password: ${CIMS_GEPG_KEYSTORE_PASSWORD:test-only-not-secret}
+      key-alias: ${CIMS_GEPG_KEY_ALIAS:cims-sp}
+      gepg-certificate: ${CIMS_GEPG_CERTIFICATE:../dev-keys/gepg-mock-test.crt}
+  heslb:
+    mode: live
+    base-url: http://localhost:8098
+    api-key: mock-heslb-key
+  nida:
+    mode: live
+    base-url: http://localhost:8098
+    api-key: mock-nida-key
+  muse:
+    mode: live
+    base-url: http://localhost:8098
+    api-key: mock-muse-key
+  tamisemi:
+    mode: live
+    base-url: http://localhost:8098
+    api-key: mock-tamisemi-key
+  nactvet:
+    submission:
+      mode: live
+      base-url: ${CIMS_NACTVET_SUBMISSION_URL:http://localhost:8099}
+      authorization: mock-authorization
+      api-code: MOCK

@@ -11,8 +11,9 @@ import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { tr } from '../../locale/ui';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
-import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { ErrorAlert, Loading, PageTitle, LinkRow } from '../../components/common';
 
 const staff = { realm: 'staff' as const };
 
@@ -102,7 +103,7 @@ export function ExamsOfficePage() {
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                     <Typography variant="h6">Marks and moderation</Typography>
                     <Chip size="small" color={b.marksWindow.state === 'OPEN' ? 'success' : b.marksWindow.state === 'NOT_SET' ? 'warning' : 'default'}
-                      label={`Marks entry: ${WINDOW_LABEL[b.marksWindow.state]}${b.marksWindow.opens ? ` · ${formatDate(b.marksWindow.opens)} – ${formatDate(b.marksWindow.closes)}` : ''}`} />
+                      label={`${tr('Marks entry')}: ${tr(WINDOW_LABEL[b.marksWindow.state], 'label')}${b.marksWindow.opens ? ` · ${formatDate(b.marksWindow.opens)} – ${formatDate(b.marksWindow.closes)}` : ''}`} />
                   </Stack>
                   <Pipeline total={b.modules.total} steps={[['In marks entry', b.modules.draft], ['With Head of Department', b.modules.submitted],
                     ['With Department Board', b.modules.hodApproved], ['Approved', b.modules.boardApproved]]} />
@@ -112,12 +113,12 @@ export function ExamsOfficePage() {
                         <TableHead><TableRow><TableCell>Module</TableCell><TableCell>Lecturer(s)</TableCell><TableCell>Stage</TableCell><TableCell align="right">Students</TableCell></TableRow></TableHead>
                         <TableBody>
                           {b.modules.behind.map((m) => (
-                            <TableRow key={m.offeringId} hover component={RouterLink} to={`/staff/marks/${m.offeringId}`} sx={{ textDecoration: 'none' }}>
+                            <LinkRow key={m.offeringId} to={`/staff/marks/${m.offeringId}`}>
                               <TableCell><Typography variant="body2" fontWeight={600}>{m.code}</Typography><Typography variant="caption" color="text.secondary">{m.title}{m.department ? ` · ${m.department}` : ''}</Typography></TableCell>
                               <TableCell>{m.lecturers ?? <Typography variant="body2" color="warning.main">None allocated</Typography>}</TableCell>
                               <TableCell>{m.status === 'SUBMITTED' ? 'With Head of Department' : 'Marks entry'}</TableCell>
                               <TableCell align="right">{m.students}</TableCell>
-                            </TableRow>
+                            </LinkRow>
                           ))}
                         </TableBody>
                       </Table>
@@ -149,7 +150,7 @@ export function ExamsOfficePage() {
                         <TableHead><TableRow><TableCell>Class</TableCell><TableCell>Round</TableCell><TableCell>Status</TableCell><TableCell align="right">Students</TableCell><TableCell>NACTVET</TableCell></TableRow></TableHead>
                         <TableBody>
                           {b.sheets.sheets.map((s) => (
-                            <TableRow key={s.id} hover component={RouterLink} to={`/staff/results/${s.id}`} sx={{ textDecoration: 'none' }}>
+                            <LinkRow key={s.id} to={`/staff/results/${s.id}`}>
                               <TableCell>{s.programme} year {s.yearOfStudy}</TableCell>
                               <TableCell>{s.round === 'MAIN' ? 'Main' : 'Resit'}</TableCell>
                               <TableCell><Chip size="small" color={s.status === 'PUBLISHED' ? 'success' : s.status === 'CONFIRMED' ? 'info' : 'default'} label={SHEET_LABEL[s.status] ?? s.status} />
@@ -157,7 +158,7 @@ export function ExamsOfficePage() {
                               <TableCell align="right">{s.students}</TableCell>
                               <TableCell>{s.nactvetStatus ? <Chip size="small" variant="outlined" color={s.nactvetStatus === 'QUERIED' ? 'error' : 'success'} label={s.nactvetStatus.toLowerCase()} />
                                 : (s.status === 'CONFIRMED' || s.status === 'PUBLISHED') ? <Typography variant="body2" color="warning.main">Not submitted</Typography> : '—'}</TableCell>
-                            </TableRow>
+                            </LinkRow>
                           ))}
                         </TableBody>
                       </Table>
@@ -192,7 +193,7 @@ function Pipeline({ total, steps, unit = 'modules' }: { total: number; steps: [s
   const done = steps[steps.length - 1][1];
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between"><Typography variant="body2" color="text.secondary">{done} of {total} {unit} through</Typography></Stack>
+      <Stack direction="row" justifyContent="space-between"><Typography variant="body2" color="text.secondary">{`${done} of ${total} ${unit} through`}</Typography></Stack>
       <LinearProgress variant="determinate" value={total ? (done / total) * 100 : 0} sx={{ height: 8, borderRadius: 4, my: 1 }} />
       <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${steps.length}, 1fr)`, gap: 1 }}>
         {steps.map(([label, value]) => (

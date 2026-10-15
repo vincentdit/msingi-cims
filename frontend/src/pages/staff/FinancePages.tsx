@@ -16,11 +16,15 @@ import type {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { useInstitution } from '../../components/InstitutionContext';
+import InstalmentsTab from './InstalmentsTab';
+import PaymentMethodsTab from './PaymentMethodsTab';
+import { NamedListTab, useCategories } from './StructurePages';
 import ReconciliationTab from './ReconciliationTab';
 
 const staff = { realm: 'staff' as const };
 const CATEGORIES = ['TUITION', 'REGISTRATION', 'EXAMINATION', 'ACCOMMODATION', 'CAUTION', 'STUDENT_UNION', 'OTHER'];
-type TabKey = 'structures' | 'items' | 'gates' | 'collections' | 'debtors' | 'reconciliation';
+type TabKey = 'structures' | 'items' | 'categories' | 'instalments' | 'gates' | 'collections' | 'debtors' | 'reconciliation' | 'methods';
 
 function useRoles() {
   const { user } = useSession();
@@ -35,23 +39,32 @@ function useRoles() {
 export default function FinancePage() {
   const [tab, setTab] = useState<TabKey>('structures');
   const { canEdit, isBursar } = useRoles();
+  const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Fees" subtitle="Fee structures approved by the Bursar, billing through GePG, clearance rules, collection reports and daily GePG reconciliation." />
+      <PageTitle title="Fees" subtitle={gepg
+        ? 'Fee structures approved by the Bursar, billing through GePG, clearance rules, collection reports and daily GePG reconciliation.'
+        : 'Fee structures approved by the Bursar, billing with CIMS payment references into the college’s mobile money and bank accounts, clearance rules, collection reports and daily statement reconciliation.'} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }}>
         <Tab value="structures" label="Fee structures" />
         <Tab value="items" label="Fee items" />
+        <Tab value="categories" label="Student categories" />
+        <Tab value="instalments" label="Instalments and reminders" />
         <Tab value="gates" label="Clearance rules" />
         <Tab value="collections" label="Collections" />
         <Tab value="debtors" label="Debtors" />
-        <Tab value="reconciliation" label="GePG reconciliation" />
+        <Tab value="reconciliation" label={gepg ? 'GePG reconciliation' : 'Reconciliation'} />
+        <Tab value="methods" label="Payment methods" />
       </Tabs>
       {tab === 'structures' && <StructuresTab />}
       {tab === 'items' && <ItemsTab />}
+      {tab === 'categories' && <NamedListTab kind="student-categories" canEdit={isBursar} />}
+      {tab === 'instalments' && <InstalmentsTab canEdit={isBursar} />}
       {tab === 'gates' && <GatesTab />}
       {tab === 'collections' && <CollectionsTab />}
       {tab === 'debtors' && <DebtorsTab />}
       {tab === 'reconciliation' && <ReconciliationTab canWork={canEdit} isBursar={isBursar} />}
+      {tab === 'methods' && <PaymentMethodsTab canManage={isBursar} />}
     </Container>
   );
 }
@@ -59,7 +72,7 @@ export default function FinancePage() {
 // ============================================================ fee structures
 
 type LineForm = { feeItemId: string; amount: string; foreignAmount: string; instalment: string };
-type StructureForm = { id?: number; programmeId: string; yearOfStudy: string; notes: string; lines: LineForm[] };
+type StructureForm = { id?: number; programmeId: string; yearOfStudy: string; intakeId: string; categoryId: string; notes: string; lines: LineForm[] };
 
 function useYears() {
   const years = useQuery({ queryKey: ['staff', 'years'], queryFn: () => api<AcademicYear[]>('/api/academic/years', staff) });
@@ -75,6 +88,9 @@ function StructuresTab() {
   const { canEdit, isBursar } = useRoles();
   const { years, yearId, setYearId } = useYears();
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
+  const intakes = useQuery({ queryKey: ['staff', 'intakes'], queryFn: () => api<{ id: number; code: string; name: string }[]>('/api/academic/intakes', staff) });
+  const categories = useCategories();
+  const variant = (x: FeeStructure) => [x.intakeName && `${x.intakeName} intake`, x.studentCategoryName].filter(Boolean).join(' · ');
   const items = useQuery({ queryKey: ['staff', 'fee-items'], queryFn: () => api<FeeItem[]>('/api/finance/fee-items', staff) });
   const list = useQuery({
     queryKey: ['staff', 'fee-structures', yearId], enabled: yearId != null,
@@ -89,7 +105,8 @@ function StructuresTab() {
       const lines = f.lines.map((l) => ({ feeItemId: Number(l.feeItemId), amount: Number(l.amount), foreignAmount: l.foreignAmount === '' ? null : Number(l.foreignAmount), instalment: Number(l.instalment) }));
       return f.id
         ? api<FeeStructure>(`/api/finance/fee-structures/${f.id}`, { method: 'PUT', ...staff, body: { notes: f.notes, lines } })
-        : api<FeeStructure>('/api/finance/fee-structures', { method: 'POST', ...staff, body: { academicYearId: yearId, programmeId: Number(f.programmeId), yearOfStudy: Number(f.yearOfStudy), notes: f.notes, lines } });
+        : api<FeeStructure>('/api/finance/fee-structures', { method: 'POST', ...staff, body: { academicYearId: yearId, programmeId: Number(f.programmeId), yearOfStudy: Number(f.yearOfStudy), notes: f.notes, lines,
+          intakeId: f.intakeId ? Number(f.intakeId) : null, studentCategoryId: f.categoryId ? Number(f.categoryId) : null } });
     },
     onSuccess: (s) => { setForm(null); setNotice(`Draft saved: ${s.programmeName}, year ${s.yearOfStudy}, version ${s.structureVersion}. It needs the Bursar's approval before it is used for invoices.`); refresh(); },
   });
@@ -103,7 +120,7 @@ function StructuresTab() {
   });
   const run = useMutation({
     mutationFn: () => api<{ billed: number; alreadyBilled: number; noStructure: number; programmesWithoutStructure: string[] }>('/api/finance/billing-runs', { method: 'POST', ...staff, body: { academicYearId: yearId } }),
-    onSuccess: (r) => setNotice(`Billing run: ${r.billed} invoice(s) issued with control numbers by SMS; ${r.alreadyBilled} already billed.`
+    onSuccess: (r) => setNotice(`Billing run: ${r.billed} invoice(s) issued with payment numbers by SMS; ${r.alreadyBilled} already billed.`
       + (r.noStructure ? ` ${r.noStructure} not billed — no approved structure for ${r.programmesWithoutStructure.join('; ')}.` : '')),
   });
 
@@ -111,9 +128,10 @@ function StructuresTab() {
   const busy = save.isPending || approve.isPending || revise.isPending || run.isPending;
   const toForm = (s: FeeStructure): StructureForm => ({
     id: s.id, programmeId: String(s.programmeId), yearOfStudy: String(s.yearOfStudy), notes: s.notes ?? '',
+    intakeId: s.intakeId ? String(s.intakeId) : '', categoryId: s.studentCategoryId ? String(s.studentCategoryId) : '',
     lines: s.lines.map((l) => ({ feeItemId: String(l.feeItemId), amount: String(l.amount), foreignAmount: l.foreignAmount == null ? '' : String(l.foreignAmount), instalment: String(l.instalment) })),
   });
-  const blank: StructureForm = { programmeId: '', yearOfStudy: '1', notes: '', lines: [{ feeItemId: '', amount: '', foreignAmount: '', instalment: '1' }] };
+  const blank: StructureForm = { programmeId: '', yearOfStudy: '1', intakeId: '', categoryId: '', notes: '', lines: [{ feeItemId: '', amount: '', foreignAmount: '', instalment: '1' }] };
 
   return (
     <>
@@ -143,7 +161,7 @@ function StructuresTab() {
             <TableBody>
               {list.data?.map((s) => (
                 <TableRow key={s.id} hover sx={{ cursor: 'pointer', opacity: s.status === 'SUPERSEDED' ? 0.55 : 1 }} onClick={() => setViewing(s)}>
-                  <TableCell>{s.programmeName}</TableCell>
+                  <TableCell>{s.programmeName}{variant(s) && <Typography variant="caption" display="block" color="text.secondary">{variant(s)}</Typography>}</TableCell>
                   <TableCell align="center">{s.yearOfStudy}</TableCell>
                   <TableCell align="center">{s.structureVersion}</TableCell>
                   <TableCell><Chip size="small" color={s.status === 'APPROVED' ? 'success' : s.status === 'DRAFT' ? 'warning' : 'default'} label={humanise(s.status)} /></TableCell>
@@ -163,7 +181,7 @@ function StructuresTab() {
       <Dialog open={!!viewing} onClose={() => setViewing(null)} maxWidth="md" fullWidth>
         {viewing && (
           <>
-            <DialogTitle>{viewing.programmeName} — year {viewing.yearOfStudy}, {viewing.academicYear}
+            <DialogTitle>{viewing.programmeName} — year {viewing.yearOfStudy}, {viewing.academicYear}{variant(viewing) ? ` · ${variant(viewing)}` : ''}
               <Chip size="small" sx={{ ml: 1 }} color={viewing.status === 'APPROVED' ? 'success' : viewing.status === 'DRAFT' ? 'warning' : 'default'} label={`Version ${viewing.structureVersion} · ${humanise(viewing.status)}`} />
             </DialogTitle>
             <DialogContent>
@@ -199,6 +217,21 @@ function StructuresTab() {
               <Grid size={{ xs: 12, sm: 4 }}>
                 <TextField select fullWidth label="Year of study" value={form.yearOfStudy} disabled={!!form.id} onChange={(e) => setForm({ ...form, yearOfStudy: e.target.value })}>
                   {[1, 2, 3, 4].map((y) => <MenuItem key={y} value={String(y)}>Year {y}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField select fullWidth label="Intake" value={form.intakeId} disabled={!!form.id} onChange={(e) => setForm({ ...form, intakeId: e.target.value })}
+                  slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
+                  <MenuItem value="">Every intake</MenuItem>
+                  {intakes.data?.map((i) => <MenuItem key={i.id} value={String(i.id)}>{i.name}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField select fullWidth label="Student category" value={form.categoryId} disabled={!!form.id} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                  slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+                  helperText="Students are billed under their intake and category, else the general structure">
+                  <MenuItem value="">Every category</MenuItem>
+                  {categories.data?.filter((c) => c.active).map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
                 </TextField>
               </Grid>
             </Grid>

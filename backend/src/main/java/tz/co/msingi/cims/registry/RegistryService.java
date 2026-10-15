@@ -61,6 +61,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RegistryService {
 
+    private final tz.co.msingi.cims.academic.campus.CampusService campuses;
+
     /** Used when a window has no joining instructions listing documents to bring. */
     static final List<String> DEFAULT_DOCUMENTS = List.of("Original academic certificates", "Original birth certificate");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
@@ -213,6 +215,7 @@ public class RegistryService {
         s.setProgramme(programme);
         s.setEntryAcademicYear(w.getAcademicYear());
         s.setIntake(w.getIntake());
+        s.setCampusId(campuses.defaultCampusFor(programme.getId()));
         s.setNactvetVerificationNo(app.getNactvetVerificationNo());
         s.setAdmissionLetterNo(letters.findByApplicationIdAndStatus(app.getId(), AdmissionLetter.Status.VALID)
                 .map(AdmissionLetter::getLetterNo).orElse(null));
@@ -309,7 +312,25 @@ public class RegistryService {
                 s.getNationality(), s.getEmail(), s.getRegion(), s.getDistrict(), s.getPostalAddress(), s.getDisability(),
                 s.getNextOfKinName(), s.getNextOfKinPhone(), s.getNextOfKinRelation(), s.getProgramme().getAwardName(), ref,
                 s.getNactvetVerificationNo(), s.getAdmissionLetterNo(), s.getAdmittedAt(), s.getAdmittedByName(),
-                FirstRegistrationView.of(firstRegistrations.findByStudentId(s.getId()).orElse(null)));
+                FirstRegistrationView.of(firstRegistrations.findByStudentId(s.getId()).orElse(null)),
+                s.getCampusId() != null ? s.getCampusId() : campuses.defaultCampusFor(s.getProgramme().getId()),
+                campuses.campusName(s.getCampusId() != null ? s.getCampusId() : campuses.defaultCampusFor(s.getProgramme().getId())),
+                s.getStudentCategoryId(), campuses.categoryName(s.getStudentCategoryId()));
+    }
+
+    /** Sets the fee category the student is billed under from now on (FR-FIN-01); invoices already issued keep their amounts. */
+    @Transactional
+    public StudentDetail setCategory(Long studentId, Long categoryId) {
+        Student s = requireStudent(studentId);
+        scope.requireProgramme(s.getProgramme().getId());
+        if (categoryId != null && campuses.categoryName(categoryId) == null) {
+            throw new tz.co.msingi.cims.common.exception.NotFoundException("Student category", categoryId);
+        }
+        Long before = s.getStudentCategoryId();
+        s.setStudentCategoryId(categoryId);
+        audit.record("STUDENT_CATEGORY_SET", "Student", s.getId(), java.util.Map.of("from", String.valueOf(campuses.categoryName(before)),
+                "to", String.valueOf(campuses.categoryName(categoryId))));
+        return detail(s);
     }
 
     /** Class list for a programme (CSV): registered (active) students, or all non-exited ones. */

@@ -70,7 +70,7 @@ class StudentPortalIT {
         aPhone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asText();
 
         // an applicant who has not been handed over is not a student
-        s.call(post("/api/student-auth/login"), null, login(aPhone, "Secret@123")).andExpect(jsonPath("$.code").value("NOT_A_STUDENT"));
+        s.call(post("/api/student-auth/login"), null, login(aPhone, "Kifaru#Mto47")).andExpect(jsonPath("$.code").value("NOT_A_STUDENT"));
 
         JsonNode handover = s.body(s.call(post("/api/registry/windows/" + inst.windowId() + "/handover"), registrar, "{}").andExpect(status().isOk()));
         for (JsonNode st : handover.get("students")) {
@@ -88,9 +88,9 @@ class StudentPortalIT {
     @Test
     void studentsSignInWithTheirRegistrationNumberAndSeeTheirDashboard() throws Exception {
         s.call(post("/api/student-auth/login"), null, login(aRegNo, "wrong")).andExpect(status().isUnauthorized());
-        String token = s.body(s.call(post("/api/student-auth/login"), null, login(aRegNo.toLowerCase(), "Secret@123")).andExpect(status().isOk()))
+        String token = s.body(s.call(post("/api/student-auth/login"), null, login(aRegNo.toLowerCase(), "Kifaru#Mto47")).andExpect(status().isOk()))
                 .get("accessToken").asText();
-        s.call(post("/api/student-auth/login"), null, login("0" + aPhone.substring(3), "Secret@123")).andExpect(status().isOk()); // local phone format
+        s.call(post("/api/student-auth/login"), null, login("0" + aPhone.substring(3), "Kifaru#Mto47")).andExpect(status().isOk()); // local phone format
 
         JsonNode d = s.body(s.call(get("/api/student/dashboard"), token, null).andExpect(status().isOk()));
         assertThat(d.get("registrationNo").asText()).isEqualTo(aRegNo);
@@ -179,7 +179,7 @@ class StudentPortalIT {
         assertThat(profile.get("surname").asText()).isEqualTo("Kisanga");
         assertThat(profile.get("phone").asText()).isEqualTo("255713000111");
         assertThat(profile.get("requests").get(0).get("decisionNote").asText()).isEqualTo("Birth certificate seen");
-        s.call(post("/api/student-auth/login"), null, login("0713000111", "Secret@123")).andExpect(status().isOk()); // sign-in follows the new number
+        s.call(post("/api/student-auth/login"), null, login("0713000111", "Kifaru#Mto47")).andExpect(status().isOk()); // sign-in follows the new number
         assertThat(s.body(s.call(get("/api/registry/students/" + aStudentId), registrar, null)).at("/summary/fullName").asText()).endsWith("Kisanga");
 
         // a request can be withdrawn by the student while pending, or turned down with a reason
@@ -236,7 +236,7 @@ class StudentPortalIT {
     }
 
     private String studentToken(String regNo) throws Exception {
-        return s.body(s.call(post("/api/student-auth/login"), null, login(regNo, "Secret@123")).andExpect(status().isOk())).get("accessToken").asText();
+        return s.body(s.call(post("/api/student-auth/login"), null, login(regNo, "Kifaru#Mto47")).andExpect(status().isOk())).get("accessToken").asText();
     }
 
     private static String login(String login, String password) {

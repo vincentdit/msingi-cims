@@ -28,7 +28,7 @@ public class IntegrationLogQuery {
     public static final Map<ExternalSystem, String> LABELS = Map.of(
             ExternalSystem.NECTA, "NECTA results", ExternalSystem.NACTVET, "NACTVET admission verification",
             ExternalSystem.NACTVET_AWARDS, "NACTVET award verification", ExternalSystem.NACTVET_CATALOGUE, "NACTVET institution catalogue",
-            ExternalSystem.GEPG, "GePG payments",
+            ExternalSystem.GEPG, "GePG payments", ExternalSystem.COLLECTION, "Mobile money and bank collection",
             ExternalSystem.SMS, "SMS gateway");
 
     private final JdbcTemplate jdbc;
@@ -168,7 +168,13 @@ public class IntegrationLogQuery {
             case NACTVET_AWARDS -> NactvetAwardClient.class;
             case NACTVET_CATALOGUE -> tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class;
             case GEPG -> null;
+            case COLLECTION -> tz.co.msingi.cims.finance.collection.CollectionGateway.class;
             case SMS -> SmsGateway.class;
+            case NACTVET_SUBMISSION -> tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.class;
+            case HESLB -> tz.co.msingi.cims.integration.heslb.HeslbClient.class;
+            case NIDA -> tz.co.msingi.cims.integration.nida.NidaClient.class;
+            case MUSE -> tz.co.msingi.cims.integration.muse.MuseClient.class;
+            case TAMISEMI -> tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class;
         };
         if (port == null) return gepg.isSimulated() ? "SIMULATED" : "LIVE";
         try {

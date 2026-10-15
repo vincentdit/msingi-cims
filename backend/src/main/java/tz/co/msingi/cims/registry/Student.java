@@ -91,6 +91,12 @@ public class Student extends BaseEntity {
     @Column(nullable = false)
     private short yearOfStudy = 1;
 
+    /** Campus the student studies at (null = the main campus); changed only by an approved transfer (FR-REG-05). */
+    private Long campusId;
+
+    /** Fee category (regular, evening, …) when the institution prices categories separately (FR-FIN-01). */
+    private Long studentCategoryId;
+
     /** The curriculum version the student follows (set at the first semester registration, then kept). */
     private Long curriculumId;
 

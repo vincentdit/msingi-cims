@@ -34,6 +34,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class FeeService {
 
+    private final tz.co.msingi.cims.academic.domain.AcademicRepositories.IntakeRepository intakes;
+    private final tz.co.msingi.cims.academic.campus.CampusRepositories.StudentCategoryRepository categories;
+
     /** Gates enforced by the modules built so far; the others are stored for the modules that will use them. */
     static final Set<ClearanceGate.Gate> APPLIED_NOW = Set.of(ClearanceGate.Gate.REGISTRATION);
 
@@ -106,16 +109,22 @@ public class FeeService {
             throw new BusinessRuleException("INVALID_YEAR_OF_STUDY", programme.getName() + " runs for "
                     + (programme.getDurationSemesters() + 1) / 2 + " year(s)");
         }
-        if (structures.findByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(year.getId(), programme.getId(),
-                req.yearOfStudy(), FeeStructure.Status.DRAFT).isPresent()) {
+        if (req.intakeId() != null) intakes.findById(req.intakeId()).orElseThrow(() -> new NotFoundException("Intake", req.intakeId()));
+        if (req.studentCategoryId() != null) categories.findById(req.studentCategoryId())
+                .orElseThrow(() -> new NotFoundException("Student category", req.studentCategoryId()));
+        if (exact(structures.findAllByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(year.getId(), programme.getId(),
+                req.yearOfStudy(), FeeStructure.Status.DRAFT), req.intakeId(), req.studentCategoryId()).isPresent()) {
             throw new BusinessRuleException("DRAFT_EXISTS", "There is already a draft for " + programme.getName()
-                    + ", year " + req.yearOfStudy() + ". Edit or approve that draft.");
+                    + ", year " + req.yearOfStudy() + variant(req.intakeId(), req.studentCategoryId()) + ". Edit or approve that draft.");
         }
         FeeStructure f = new FeeStructure();
         f.setAcademicYear(year);
         f.setProgramme(programme);
         f.setYearOfStudy(req.yearOfStudy());
-        f.setStructureVersion((short) (structures.maxVersion(year.getId(), programme.getId(), req.yearOfStudy()) + 1));
+        f.setIntakeId(req.intakeId());
+        f.setStudentCategoryId(req.studentCategoryId());
+        f.setStructureVersion((short) (structures.maxVersion(year.getId(), programme.getId(), req.yearOfStudy(),
+                req.intakeId(), req.studentCategoryId()) + 1));
         f.setNotes(req.notes());
         f.setCreatedBy(CurrentUser.id().orElse(null));
         f.setCreatedByName(CurrentUser.name());
@@ -145,7 +154,7 @@ public class FeeService {
         List<LineRequest> lines = src.getLines().stream()
                 .map(l -> new LineRequest(l.getFeeItem().getId(), l.getAmount(), l.getForeignAmount(), l.getInstalment())).toList();
         return create(new StructureRequest(src.getAcademicYear().getId(), src.getProgramme().getId(), src.getYearOfStudy(),
-                "Revision of version " + src.getStructureVersion(), lines));
+                "Revision of version " + src.getStructureVersion(), lines, src.getIntakeId(), src.getStudentCategoryId()));
     }
 
     /**
@@ -162,8 +171,8 @@ public class FeeService {
             throw new BusinessRuleException("EMPTY_STRUCTURE", "A fee structure needs at least one fee item");
         }
         OffsetDateTime now = OffsetDateTime.now();
-        structures.findByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(f.getAcademicYear().getId(), f.getProgramme().getId(),
-                f.getYearOfStudy(), FeeStructure.Status.APPROVED).ifPresent(old -> {
+        exact(structures.findAllByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(f.getAcademicYear().getId(), f.getProgramme().getId(),
+                f.getYearOfStudy(), FeeStructure.Status.APPROVED), f.getIntakeId(), f.getStudentCategoryId()).ifPresent(old -> {
             old.setStatus(FeeStructure.Status.SUPERSEDED);
             old.setSupersededAt(now);
             structures.saveAndFlush(old);
@@ -214,7 +223,33 @@ public class FeeService {
         return new StructureView(f.getId(), f.getAcademicYear().getId(), f.getAcademicYear().getCode(), f.getProgramme().getId(),
                 f.getProgramme().getCode(), f.getProgramme().getName(), f.getYearOfStudy(), f.getStructureVersion(), f.getStatus().name(),
                 f.getNotes(), f.getCreatedByName(), f.getApprovedAt(), f.getApprovedByName(), f.total(false), f.total(true), first,
-                lines, canApprove);
+                lines, canApprove, f.getIntakeId(), f.getIntakeId() == null ? null : intakes.findById(f.getIntakeId()).map(i -> i.getName()).orElse(null),
+                f.getStudentCategoryId(), f.getStudentCategoryId() == null ? null
+                        : categories.findById(f.getStudentCategoryId()).map(c -> c.getName()).orElse(null));
+    }
+
+    /** The structure for exactly this intake and category (nulls included). */
+    public static java.util.Optional<FeeStructure> exact(List<FeeStructure> list, Long intakeId, Long categoryId) {
+        return list.stream().filter(f -> java.util.Objects.equals(f.getIntakeId(), intakeId)
+                && java.util.Objects.equals(f.getStudentCategoryId(), categoryId)).findFirst();
+    }
+
+    /**
+     * The structure that applies to a payer: the one for their intake and category, else their intake for every category, else their
+     * category for every intake, else the one for everybody (BR-22).
+     */
+    public static java.util.Optional<FeeStructure> best(List<FeeStructure> list, Long intakeId, Long categoryId) {
+        return exact(list, intakeId, categoryId)
+                .or(() -> exact(list, intakeId, null))
+                .or(() -> exact(list, null, categoryId))
+                .or(() -> exact(list, null, null));
+    }
+
+    private String variant(Long intakeId, Long categoryId) {
+        StringBuilder b = new StringBuilder();
+        if (intakeId != null) intakes.findById(intakeId).ifPresent(i -> b.append(", ").append(i.getName()).append(" intake"));
+        if (categoryId != null) categories.findById(categoryId).ifPresent(c -> b.append(", ").append(c.getName()));
+        return b.toString();
     }
 
     private static boolean isPreparer(FeeStructure f) {

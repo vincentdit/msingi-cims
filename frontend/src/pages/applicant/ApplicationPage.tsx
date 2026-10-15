@@ -17,6 +17,25 @@ import type { AdmissionWindow, Application, Profile, Qualification, Statement } 
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import { DetailsStep, FeeStep, ProgrammesStep, ResultsStep, ReviewStep } from './steps';
 import { OtherQualificationsStep } from './OtherQualificationsStep';
+import { DocumentsStep, useAppDocuments } from './DocumentsStep';
+import { HowToPay, usePayWords } from '../../components/HowToPay';
+import EmailCard from '../../components/EmailCard';
+import PrivacyCard from '../../components/PrivacyCard';
+
+/** After submitting: the documents, so one the office did not accept can be uploaded again. */
+function SubmittedDocuments({ appId }: { appId: number }) {
+  const { t } = useTranslation();
+  const docs = useAppDocuments(appId).data ?? [];
+  if (!docs.length) return null;
+  return (
+    <Card sx={{ borderRadius: 3, mt: 3 }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1 }}>{t('docs.title')}</Typography>
+        <DocumentsStep appId={appId} />
+      </CardContent>
+    </Card>
+  );
+}
 
 /** The applicant's home: start an application, then complete it step by step (BP-02). */
 export default function ApplicationPage() {
@@ -55,7 +74,9 @@ export default function ApplicationPage() {
       )}
       {current && (current.status === 'DRAFT' || current.status === 'PAYMENT_PENDING' || amending
         ? <Wizard app={current} onDone={amending ? () => setEditing(false) : undefined} />
-        : <Submitted app={current} onEdit={() => setEditing(true)} />)}
+        : <><Submitted app={current} onEdit={() => setEditing(true)} /><SubmittedDocuments appId={current.id} /></>)}
+      <Box sx={{ mt: 3 }}><EmailCard realm="applicant" /></Box>
+      <Box sx={{ mt: 3 }}><PrivacyCard realm="applicant" /></Box>
     </Container>
   );
 }
@@ -67,17 +88,21 @@ function Wizard({ app, onDone }: { app: Application; onDone?: () => void }) {
   const quals = useQuery({ queryKey: ['applicant', 'qualifications'], queryFn: () => api<Qualification[]>('/api/applicant/qualifications', { realm: 'applicant' }) });
   const profile = useQuery({ queryKey: ['applicant', 'profile'], queryFn: () => api<Profile>('/api/applicant/profile', { realm: 'applicant' }) });
 
+  const docs = useAppDocuments(app.id).data ?? [];
+  const hasDocs = docs.length > 0;
+  const docsDone = docs.every((d) => !d.required || (d.documentId && d.status !== 'REJECTED'));
   const done = [
     !!quals.data?.some((q) => q.verified),
     profile.data ? profile.data.missingFields.length === 0 : false,
     app.feePaid,
     app.feePaid && (!!quals.data?.some((q) => !q.registration) || app.choices.length > 0),
     app.choices.length > 0,
+    ...(hasDocs ? [docsDone] : []),
     false,
   ];
   const firstOpen = onDone ? 1 : Math.max(0, done.findIndex((d) => !d)); // amending: start at the personal details
   const [active, setActive] = useState(firstOpen);
-  useEffect(() => { setActive(firstOpen); }, [quals.isSuccess, profile.isSuccess]); // jump to first incomplete step on load
+  useEffect(() => { setActive(firstOpen); }, [quals.isSuccess, profile.isSuccess, hasDocs]); // jump to first incomplete step on load
 
   const steps = [
     { label: t('app.steps.results'), body: <ResultsStep onNext={() => setActive(1)} /> },
@@ -85,6 +110,7 @@ function Wizard({ app, onDone }: { app: Application; onDone?: () => void }) {
     { label: t('app.steps.fee'), body: <FeeStep app={app} onNext={() => setActive(3)} /> },
     { label: t('app.steps.other'), body: <OtherQualificationsStep app={app} onNext={() => setActive(4)} /> },
     { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(5)} /> },
+    ...(hasDocs ? [{ label: t('app.steps.documents'), body: <DocumentsStep appId={app.id} onNext={() => setActive(6)} /> }] : []),
     { label: t('app.steps.review'), body: <ReviewStep app={app} onDone={onDone} /> },
   ];
 
@@ -203,13 +229,19 @@ function Outcome({ app }: { app: Application }) {
 
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
-/** BP-06: the year's fees with the GePG control number; the first instalment is needed for registration. */
+/** BP-06: the year's fees with the control number or payment reference; the first instalment is needed for registration. */
 function FeesCard() {
   const { t } = useTranslation();
+  const words = usePayWords();
   const qc = useQueryClient();
-  const account = useQuery({ queryKey: ['applicant', 'account'], queryFn: () => api<Statement>('/api/applicant/account', { realm: 'applicant' }) });
+  const [asked, setAsked] = useState(false);
+  const account = useQuery({
+    queryKey: ['applicant', 'account'], queryFn: () => api<Statement>('/api/applicant/account', { realm: 'applicant' }),
+    // live GePG sends the control number a moment after the bill: look again until every unpaid invoice has one
+    refetchInterval: (q) => (asked && q.state.data?.invoices.some((i) => i.balance > 0 && !i.controlNo) ? 3000 : false),
+  });
   const refresh = (st: Statement) => qc.setQueryData(['applicant', 'account'], st);
-  const getCn = useMutation({ mutationFn: (id: number) => api<Statement>(`/api/applicant/invoices/${id}/control-number`, { method: 'POST', realm: 'applicant' }), onSuccess: refresh });
+  const getCn = useMutation({ mutationFn: (id: number) => api<Statement>(`/api/applicant/invoices/${id}/control-number`, { method: 'POST', realm: 'applicant' }), onSuccess: (st) => { setAsked(true); refresh(st); } });
   const simulate = useMutation({
     mutationFn: ({ id, amount }: { id: number; amount?: number }) => api<Statement>(`/api/applicant/invoices/${id}/simulate-payment`, { method: 'POST', realm: 'applicant', body: amount ? { amount } : {} }),
     onSuccess: refresh,
@@ -237,11 +269,12 @@ function FeesCard() {
             {firstDue > 0 && <Alert severity="warning" sx={{ mb: 1.5 }}>{t('fees.firstInstalment', { amount: formatTzs(firstTotal) })}{inv.dueDate && <> {t('fees.due', { date: formatDate(inv.dueDate) })}.</>}</Alert>}
             {inv.controlNo ? (
               <Box>
-                <Typography variant="caption" color="text.secondary">{t('fees.controlNo')}</Typography>
+                <Typography variant="caption" color="text.secondary">{words.number}</Typography>
                 <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
-                <Typography variant="body2" color="text.secondary">{t('fees.payWith')}</Typography>
+                <HowToPay reference={inv.controlNo} amount={inv.balance} />
               </Box>
-            ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{t('fees.getControlNo')}</Button>}
+            ) : asked ? <Alert severity="info">{t('pay.pending')}</Alert>
+              : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.getNumber}</Button>}
             {SHOW_DEV_TOOLS && (
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>
                 {firstDue > 0 && <Button size="small" color="warning" variant="outlined" disabled={simulate.isPending} onClick={() => simulate.mutate({ id: inv.id, amount: firstDue })}>{t('fees.simulateFirst')}</Button>}

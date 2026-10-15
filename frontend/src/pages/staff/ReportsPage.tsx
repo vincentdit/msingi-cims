@@ -2,6 +2,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import LockIcon from '@mui/icons-material/LockOutlined';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import TableChartIcon from '@mui/icons-material/TableChartOutlined';
+import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Container, List, ListItemButton, ListItemText, ListSubheader, MenuItem, Stack, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
@@ -13,6 +14,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type { AcademicYear, AdmissionWindow, CourseModule, Programme, ReportCatalogueEntry, ReportColumnType, ReportResult, Semester } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
+import { ScheduledReports } from './EmailPages';
 
 const staff = { realm: 'staff' as const };
 type Filters = Record<string, string>;
@@ -44,9 +46,12 @@ export default function ReportsPage() {
   }, [catalogue.data]);
   const code = params.get('code') ?? (params.get('area') ? areas.get(params.get('area')!)?.[0]?.code : undefined) ?? catalogue.data?.[0]?.code;
   const selected = catalogue.data?.find((r) => r.code === code);
+  const scheduled = params.get('view') === 'scheduled';
   return (
     <Container maxWidth="xl" disableGutters>
-      <PageTitle title="Reports" subtitle="Standard reports for admissions, registry, finance and governance. Download any of them as Excel or PDF." />
+      <PageTitle title="Reports" subtitle="Standard reports for admissions, registry, finance and governance. Download any of them as Excel or PDF, or have them emailed on a schedule."
+        action={<Button variant={scheduled ? 'contained' : 'outlined'} startIcon={<ScheduleSendIcon />} onClick={() => setParams(scheduled ? {} : { view: 'scheduled' })}>Scheduled</Button>} />
+      {scheduled && catalogue.data && <Box sx={{ mb: 2.5 }}><ScheduledReports catalogue={catalogue.data} /></Box>}
       <ErrorAlert error={catalogue.error} />
       {catalogue.isLoading && <Loading />}
       <Grid container spacing={2.5}>

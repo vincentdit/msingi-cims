@@ -1,0 +1,17 @@
+tz\co\msingi\govmocks\nida\NidaMockController.class
+tz\co\msingi\govmocks\GovMocksApplication.class
+tz\co\msingi\govmocks\gepg\GepgCrypto.class
+tz\co\msingi\govmocks\gepg\GepgMockService$Reconciliation.class
+tz\co\msingi\govmocks\heslb\HeslbMockController$Disbursement.class
+tz\co\msingi\govmocks\gepg\GepgMockService$Payment.class
+tz\co\msingi\govmocks\gepg\GepgXml.class
+tz\co\msingi\govmocks\heslb\HeslbMockController$Beneficiary.class
+tz\co\msingi\govmocks\muse\MuseMockController.class
+tz\co\msingi\govmocks\common\SwitchController.class
+tz\co\msingi\govmocks\gepg\GepgMockService.class
+tz\co\msingi\govmocks\common\MockSwitches.class
+tz\co\msingi\govmocks\tamisemi\TamisemiMockController.class
+tz\co\msingi\govmocks\heslb\HeslbMockController$Submission.class
+tz\co\msingi\govmocks\gepg\GepgMockController.class
+tz\co\msingi\govmocks\heslb\HeslbMockController.class
+tz\co\msingi\govmocks\gepg\GepgMockService$Bill.class

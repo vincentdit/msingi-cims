@@ -99,6 +99,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "DATA_CONFLICT", "The request conflicts with existing data (duplicate or invalid reference).");
     }
 
+    /** A path that does not exist is a 404, not an error to log. */
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.HttpRequestMethodNotSupportedException.class})
+    public ProblemDetail noSuchPath(Exception ex) {
+        if (ex instanceof org.springframework.web.HttpRequestMethodNotSupportedException) {
+            return problem(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "This address does not accept that request.");
+        }
+        return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", "No such address.");
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail unexpected(Exception ex) {
         log.error("Unexpected error", ex);

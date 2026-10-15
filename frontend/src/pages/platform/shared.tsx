@@ -6,6 +6,21 @@ import { useSession } from '../../auth/session';
 
 export const platform = { realm: 'platform' as const };
 
+// ============================================================ ownership (NACTVET's categories) and how fees are collected
+
+export const OWNERSHIPS = [
+  { value: 'PUBLIC', label: 'Public (Government)' },
+  { value: 'PRIVATE', label: 'Private' },
+  { value: 'FBO', label: 'Faith-based (FBO)' },
+] as const;
+
+export const ownershipLabel = (o?: string) => OWNERSHIPS.find((x) => x.value === o)?.label ?? o ?? '—';
+
+/** Only public institutions use GePG; private and faith-based ones are paid into their own mobile money and bank accounts. */
+export const collectionText = (o?: string) => o === 'PUBLIC'
+  ? 'Fees are paid with GePG control numbers.'
+  : 'Fees are paid into the college’s own mobile money and bank accounts (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB, NMB, NBC…) with CIMS payment references. No GePG.';
+
 // ============================================================ types (mirroring the platform API)
 
 export interface PlatformMe { id: number; username: string; fullName: string; mustChangePassword: boolean }
@@ -159,7 +174,7 @@ export interface CatalogueProgramme {
 
 export interface CatalogueDetail {
   institution: CatalogueInstitution;
-  suggestion: { code: string; name: string; shortName?: string; nactvetRegNo?: string; ownership: 'PUBLIC' | 'PRIVATE'; contactPhone?: string };
+  suggestion: { code: string; name: string; shortName?: string; nactvetRegNo?: string; ownership: 'PUBLIC' | 'PRIVATE' | 'FBO'; contactPhone?: string };
   programmes: CatalogueProgramme[];
 }
 

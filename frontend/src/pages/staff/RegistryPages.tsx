@@ -1,3 +1,4 @@
+import EarlierResults from '../../components/EarlierResults';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BadgeIcon from '@mui/icons-material/Badge';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -23,6 +24,8 @@ import { StudentExamCard } from './ExamRecordsPages';
 import { useRoles } from './MarksPages';
 import { ChangeRequestsButton } from './ChangeRequests';
 import { IdCardBatchDialog, StudentIdCard, StudentStatusCard } from './StatusAndCards';
+import NinCard from '../../components/NinCard';
+import { StudentTransferCard } from './TransferPages';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -314,6 +317,8 @@ export function StudentDetailPage() {
   const qc = useQueryClient();
   const canRegister = useCanRegister();
   const canSeeFees = useRoles()(['INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'AUDITOR', 'REGISTRAR']);
+  const canSeeNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'ADMISSIONS_OFFICER']);
+  const canEditNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR']);
   const st = useQuery({ queryKey: ['staff', 'student', id], queryFn: () => api<StudentDetail>(`/api/registry/students/${id}`, staff) });
   const [docs, setDocs] = useState<{ item: string; verified: boolean }[]>([]);
   const [remarks, setRemarks] = useState('');
@@ -403,6 +408,8 @@ export function StudentDetailPage() {
             </Card>
           )}
           <StudentStatusCard studentId={s.id} />
+          <StudentTransferCard student={d} />
+          <EarlierResults path={`/api/registry/students/${s.id}/earlier-results`} realm="staff" />
           <Section title="Personal details">
             <Field label="Full name" value={[d.firstName, d.middleName, d.surname].filter(Boolean).join(' ')} />
             <Field label="Sex" value={s.sex === 'F' ? 'Female' : 'Male'} />
@@ -417,6 +424,7 @@ export function StudentDetailPage() {
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
           <StudentIdCard studentId={s.id} regNo={s.registrationNo} />
+          {canSeeNin && <NinCard studentId={s.id} canEdit={canEditNin} />}
           {canSeeFees && <StudentFeesCard studentId={s.id} />}
           <StudentExamCard studentId={s.id} regNo={s.registrationNo} />
           <Section title="Programme">

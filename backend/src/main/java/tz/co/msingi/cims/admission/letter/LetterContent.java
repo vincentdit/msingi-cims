@@ -30,5 +30,24 @@ public record LetterContent(
         OffsetDateTime acceptedAt,
         JoiningInstructions joining,
         String verificationCode,
-        String verificationUrl) {
+        String verificationUrl,
+        /* the institution's letter wording at issue (FR-ADM-S05); absent on letters issued before it could be edited */
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        java.util.Map<String, String> wording) {
+
+    public LetterContent(String institutionName, String institutionShortName, String institutionNactvetNo, String institutionPhone,
+                         String institutionEmail, String primaryColor, String letterNo, int edition, LocalDate letterDate, String applicantName,
+                         String applicantAddress, String applicationRef, String nactvetVerificationNo, String programmeName, String awardName,
+                         String programmeNactvetCode, int durationSemesters, String academicYear, String intake, OffsetDateTime acceptedAt,
+                         JoiningInstructions joining, String verificationCode, String verificationUrl) {
+        this(institutionName, institutionShortName, institutionNactvetNo, institutionPhone, institutionEmail, primaryColor, letterNo, edition,
+                letterDate, applicantName, applicantAddress, applicationRef, nactvetVerificationNo, programmeName, awardName, programmeNactvetCode,
+                durationSemesters, academicYear, intake, acceptedAt, joining, verificationCode, verificationUrl, null);
+    }
+
+    public LetterContent withWording(java.util.Map<String, String> w) {
+        return new LetterContent(institutionName, institutionShortName, institutionNactvetNo, institutionPhone, institutionEmail, primaryColor,
+                letterNo, edition, letterDate, applicantName, applicantAddress, applicationRef, nactvetVerificationNo, programmeName, awardName,
+                programmeNactvetCode, durationSemesters, academicYear, intake, acceptedAt, joining, verificationCode, verificationUrl, w);
+    }
 }

@@ -314,11 +314,10 @@ public class CatalogueService {
                 (Integer) rs.getObject("withdrawn", Integer.class), rs.getString("error"), rs.getString("started_by"));
     }
 
-    /** What onboarding fills in: a CIMS code from NACTVET's institution code or the initials, PUBLIC for government-owned. */
+    /** What onboarding fills in: a CIMS code from NACTVET's institution code or the initials, and NACTVET's ownership category. */
     static Suggestion suggestion(InstitutionRow r) {
         String code = r.code() != null && r.code().matches("[A-Za-z][A-Za-z0-9]{1,19}") ? r.code().toUpperCase(Locale.ROOT) : initials(r.name());
-        String own = r.ownership() == null ? "" : r.ownership().toLowerCase(Locale.ROOT);
-        String ownership = own.contains("gov") || own.contains("public") || own.contains("parastatal") || own.contains("state") ? "PUBLIC" : "PRIVATE";
+        String ownership = tz.co.msingi.cims.platform.tenancy.Ownership.fromNactvet(r.ownership());
         String shortName = r.code() != null && r.code().length() <= 20 ? r.code().toUpperCase(Locale.ROOT) : code;
         return new Suggestion(code, titleCase(r.name()), shortName, r.registrationNumber(), ownership, r.mobileNumber());
     }

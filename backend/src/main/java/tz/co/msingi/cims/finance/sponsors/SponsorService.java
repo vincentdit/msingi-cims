@@ -198,6 +198,46 @@ public class SponsorService {
         return x;
     }
 
+    /**
+     * A beneficiary reported by a sponsor's own system (HESLB): the sponsor pays up to {@code cap} of the student's fees for the
+     * year. Creates the sponsorship, or updates the cap and reference of the one already there. Returns CREATED, UPDATED or
+     * UNCHANGED; refuses when another sponsor already covers the student for that year.
+     */
+    @Transactional
+    public String fromExchange(Long sponsorId, Long studentId, Long academicYearId, BigDecimal cap, String reference) {
+        requireManager();
+        Sponsor s = require(sponsorId);
+        Student st = students.findById(studentId).orElseThrow(() -> new NotFoundException("Student", studentId));
+        var existing = sponsorships.findByStudentIdAndAcademicYearIdAndStatus(studentId, academicYearId, Sponsorship.Status.ACTIVE);
+        if (existing.isPresent()) {
+            Sponsorship x = existing.get();
+            if (!x.getSponsor().getId().equals(sponsorId)) {
+                throw new BusinessRuleException("ALREADY_SPONSORED", st.getRegistrationNo() + " is already sponsored by " + x.getSponsor().getName());
+            }
+            boolean same = (cap == null ? x.getCapAmount() == null : x.getCapAmount() != null && x.getCapAmount().compareTo(cap) == 0)
+                    && java.util.Objects.equals(x.getReference(), blank(reference));
+            if (same) return "UNCHANGED";
+            x.setCapAmount(cap);
+            x.setReference(blank(reference));
+            sponsorships.saveAndFlush(x);
+            audit.record("SPONSORSHIP_UPDATED", "Sponsorship", x.getId(), Map.of("sponsor", s.getCode(), "student", st.getRegistrationNo(),
+                    "cap", String.valueOf(cap)));
+            return "UPDATED";
+        }
+        AcademicYear y = years.findById(academicYearId).orElseThrow(() -> new NotFoundException("Academic year", academicYearId));
+        create(s, st, y, new BigDecimal("100"), cap, List.of(), reference);
+        messaging.event("SPONSOR_ASSIGNED", st.getPhone(), Map.of("sponsor", s.getName()));
+        return "CREATED";
+    }
+
+    /** The sponsor with this code, created with the given name and kind if the institution does not have it yet. */
+    @Transactional
+    public Long ensureSponsor(String code, String name, Sponsor.Kind kind) {
+        requireManager();
+        return sponsors.findByCodeIgnoreCase(code).map(Sponsor::getId).orElseGet(() ->
+                create(new SponsorRequest(code, name, kind, null, null, null, null, true)).id());
+    }
+
     @Transactional
     public SponsorshipView endSponsorship(Long id) {
         requireManager();

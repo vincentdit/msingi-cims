@@ -1,6 +1,7 @@
 package tz.co.msingi.cims.ipt;
 
 import tz.co.msingi.cims.common.document.HtmlTemplate;
+import tz.co.msingi.cims.common.document.LetterWording;
 import tz.co.msingi.cims.common.document.PdfRenderer;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
 import tz.co.msingi.cims.registry.Student;
@@ -28,7 +29,7 @@ public final class PlacementLetter {
     private PlacementLetter() {
     }
 
-    static Download render(Tenant t, IptPlacement pl, Student s, String institutionSupervisor) {
+    static Download render(Tenant t, IptPlacement pl, Student s, String institutionSupervisor, String intro, String requests) {
         Map<String, String> v = new HashMap<>();
         Map<String, Object> branding = t.getBranding() == null ? Map.of() : t.getBranding();
         String colour = String.valueOf(branding.getOrDefault("primaryColor", ""));
@@ -57,8 +58,16 @@ public final class PlacementLetter {
         v.put("workplaceSupervisor", pl.getWorkplaceSupervisorName() == null ? "To be assigned by the organisation"
                 : pl.getWorkplaceSupervisorName() + (pl.getWorkplaceSupervisorTitle() == null ? "" : ", " + pl.getWorkplaceSupervisorTitle()));
         v.put("institutionSupervisor", institutionSupervisor == null ? "To be assigned" : institutionSupervisor);
-        byte[] pdf = PdfRenderer.render(TEMPLATE.render(v, Map.of()), "placement letter " + pl.getLetterNo());
+        byte[] pdf = render(v, intro, requests, "placement letter " + pl.getLetterNo());
         return new Download("placement-letter-" + pl.getLetterNo().replaceAll("[^A-Za-z0-9]+", "-") + ".pdf", pdf);
+    }
+
+    /** The letter from its values and the institution's wording (also used for the wording preview). */
+    public static byte[] render(Map<String, String> v, String intro, String requests, String what) {
+        Map<String, String> m = new HashMap<>();
+        m.put("introBlock", LetterWording.html(intro, v));
+        m.put("requestsBlock", LetterWording.html(requests, v));
+        return PdfRenderer.render(TEMPLATE.render(v, m), what);
     }
 
     private static String nz(String s) {

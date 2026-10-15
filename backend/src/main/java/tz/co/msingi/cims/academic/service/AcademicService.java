@@ -91,6 +91,7 @@ public class AcademicService {
         d.setCode(req.code());
         d.setName(req.name());
         d.setActive(req.active());
+        d.setFacultyId(req.facultyId());
         d = departments.save(d);
         audit.record(id == null ? "CREATE" : "UPDATE", "Department", d.getId(), Map.of("code", d.getCode()));
         return DepartmentView.of(d);

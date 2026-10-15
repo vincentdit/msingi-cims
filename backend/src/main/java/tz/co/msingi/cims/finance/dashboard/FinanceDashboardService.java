@@ -108,7 +108,7 @@ public class FinanceDashboardService {
         BigDecimal sponsor = sum(rows.stream().map(ProgrammeRow::sponsorPending).toList());
         BigDecimal waived = yid == null ? BigDecimal.ZERO : jdbc.queryForObject("""
                 select coalesce(sum(p.amount), 0) from payments p join invoices i on i.id = p.invoice_id
-                where p.source = 'INTERNAL' and p.channel = 'WAIVER' and i.purpose = 'ANNUAL_FEES' and i.academic_year_id = ?""", BigDecimal.class, yid);
+                where p.source = 'INTERNAL' and p.channel in ('WAIVER', 'DISCOUNT', 'SCHOLARSHIP') and i.purpose = 'ANNUAL_FEES' and i.academic_year_id = ?""", BigDecimal.class, yid);
         BigDecimal percent = pct(paid, billed);
 
         List<Milestone> targets = yid == null ? List.of() : jdbc.query("select due_date, percent from finance_targets where academic_year_id = ? order by due_date",
@@ -162,7 +162,7 @@ public class FinanceDashboardService {
         LocalDate lastSigned = jdbc.queryForList("select max(month) from reconciliation_signoffs", LocalDate.class).stream().filter(java.util.Objects::nonNull)
                 .findFirst().orElse(null);
         LocalDate lastMonth = YearMonth.from(today).minusMonths(1).atDay(1);
-        boolean lastHadPayments = n(jdbc.queryForObject("select count(*) from payments where source = 'GEPG' and paid_at >= ? and paid_at < ?", Long.class,
+        boolean lastHadPayments = n(jdbc.queryForObject("select count(*) from payments where source in ('GEPG', 'COLLECTION') and paid_at >= ? and paid_at < ?", Long.class,
                 lastMonth.atStartOfDay(ZONE).toOffsetDateTime(), lastMonth.plusMonths(1).atStartOfDay(ZONE).toOffsetDateTime())) > 0;
         var open = adjustments.list(true);
         long forMe = open.stream().filter(a -> a.canApprove()).count();

@@ -64,6 +64,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class InstitutionService {
 
+    private final tz.co.msingi.cims.academic.campus.CampusService campusService;
+
     static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
     private static final Pattern HOST = Pattern.compile("^(?=.{1,190}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$");
     private static final Pattern IPV4 = Pattern.compile("^\\d{1,3}(\\.\\d{1,3}){3}$");
@@ -226,6 +228,14 @@ public class InstitutionService {
                 audit.record("CREATE", "StaffUser", u.getId(), Map.of("username", username, "roles", List.of(Role.INSTITUTION_ADMIN.name())));
                 if (req.nactvetInstitutionId() != null && req.importProgrammeIds() != null && !req.importProgrammeIds().isEmpty()) {
                     importer.importInto(req.nactvetInstitutionId(), req.importProgrammeIds());
+                }
+                if (req.campuses() != null) {
+                    int n = 0;
+                    for (InstitutionDtos.CampusSeed c : req.campuses()) {
+                        n++;
+                        campusService.saveCampus(null, new tz.co.msingi.cims.academic.campus.CampusService.CampusRequest(
+                                n == 1 ? "MAIN" : "CAMPUS" + n, c.name().trim(), c.region(), c.district(), null, n == 1, true));
+                    }
                 }
                 return u.getId();
             });
@@ -480,16 +490,23 @@ public class InstitutionService {
             boolean fees = Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from fee_structures)", Boolean.class));
             boolean window = Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from admission_windows)", Boolean.class));
             boolean photo = Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from institution_photos)", Boolean.class));
-            return List.of(
+            boolean channels = Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from payment_channels where active)", Boolean.class));
+            List<SetupStep> steps = new java.util.ArrayList<>(List.of(
                     new SetupStep("DOMAIN", "Web address", hasDomain, "Add the address its portals are reached at"),
                     new SetupStep("ADMIN", "Administrator signed in", adminSignedIn, "The administrator signs in and chooses their own password"),
                     new SetupStep("STAFF", "Staff accounts", u.staffTotal() > 1, "The administrator adds staff on Users & roles"),
                     new SetupStep("PROGRAMMES", "Programmes", u.programmes() > 0, "Departments and programmes with NACTVET codes"),
                     new SetupStep("CALENDAR", "Academic year and intake", years, "Set on the academic calendar"),
-                    new SetupStep("FEES", "Fee structure", fees, "Fees per programme and year, for invoices and control numbers"),
+                    new SetupStep("FEES", "Fee structure", fees, "Fees per programme and year, for invoices and payment numbers"),
                     new SetupStep("ADMISSION", "Admission window", window, "The first window applicants apply in"),
                     new SetupStep("BRANDING", "Campus photo", photo, "Shown on the portal home page"),
-                    new SetupStep("SMS", "SMS bundle", u.smsBalance() > 0, "Credit an SMS bundle so applicants and students get messages"));
+                    new SetupStep("SMS", "SMS bundle", u.smsBalance() > 0, "Credit an SMS bundle so applicants and students get messages")));
+            if (!t.usesGepg()) {
+                // Private and faith-based institutions do not use GePG: fees are paid into their own mobile money and bank accounts.
+                steps.add(6, new SetupStep("PAYMENTS", "Payment accounts", channels,
+                        "The Bursar lists the mobile money and bank accounts fees are paid into (Finance › Payment methods)"));
+            }
+            return steps;
         });
     }
 

@@ -68,9 +68,12 @@ public class ExamController {
     private static final String ALLOCATORS = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER')";
     private static final String EXAMS_OFFICE = "hasAnyRole('INSTITUTION_ADMIN','EXAMINATIONS_OFFICER')";
     private static final String COMMITTEE = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC')";
+    private static final String STAGE_ROLES = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER','MANAGEMENT_VIEWER','PROGRAMME_COORDINATOR')";
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final RegulationService regulations;
+    private final ApprovalStageService approvalStages;
+    private final ResultTrendsService trends;
     private final OfferingService offerings;
     private final ResultSheetService sheets;
     private final ResitService resits;
@@ -202,6 +205,37 @@ public class ExamController {
         return offerings.boardApprove(id);
     }
 
+    @PostMapping("/api/exams/offerings/{id}/approve-stage")
+    @PreAuthorize(STAGE_ROLES)
+    public OfferingView approveStage(@PathVariable Long id, @RequestBody(required = false) OptionalNote req) {
+        return offerings.approveStage(id, req == null ? null : req.note());
+    }
+
+    @PutMapping("/api/exams/semesters/{id}/component-windows")
+    @PreAuthorize(EXAMS_OFFICE)
+    public java.util.Map<String, Integer> componentWindows(@PathVariable Long id, @RequestBody ExamDtos.ComponentWindowRequest req) {
+        return java.util.Map.of("items", offerings.componentWindow(id, req.offeringId(), req.componentId(), req.name(), req.opens(), req.closes()));
+    }
+
+    @GetMapping("/api/exams/approval-stages")
+    @PreAuthorize(RESULTS)
+    public ApprovalStageService.Routes approvalStages() {
+        return approvalStages.routes();
+    }
+
+    @PutMapping("/api/exams/approval-stages/{flow}")
+    @PreAuthorize(EXAMS_OFFICE)
+    public ApprovalStageService.Routes saveApprovalStages(@PathVariable ApprovalStageService.Flow flow,
+                                                          @Valid @RequestBody java.util.List<ApprovalStageService.StageRequest> stages) {
+        return approvalStages.save(flow, stages);
+    }
+
+    @GetMapping("/api/exams/analytics/trends")
+    @PreAuthorize(RESULTS)
+    public ResultTrendsService.Trends trends(@RequestParam(required = false) Long programmeId, @RequestParam(required = false) Integer yearOfStudy) {
+        return trends.trends(programmeId, yearOfStudy);
+    }
+
     @PostMapping("/api/exams/offerings/{id}/return")
     @PreAuthorize(ALLOCATORS)
     public OfferingView returnToLecturer(@PathVariable Long id, @Valid @RequestBody NoteRequest req) {
@@ -240,6 +274,12 @@ public class ExamController {
         return sheets.recommend(id, req == null ? null : req.note());
     }
 
+    @PostMapping("/api/exams/sheets/{id}/approve-stage")
+    @PreAuthorize(STAGE_ROLES)
+    public SheetView approveSheetStage(@PathVariable Long id, @RequestBody(required = false) OptionalNote req) {
+        return sheets.approveStage(id, req == null ? null : req.note());
+    }
+
     @PostMapping("/api/exams/sheets/{id}/confirm")
     @PreAuthorize("hasRole('INSTITUTION_ADMIN')")
     public SheetView confirm(@PathVariable Long id) {
@@ -247,7 +287,7 @@ public class ExamController {
     }
 
     @PostMapping("/api/exams/sheets/{id}/return")
-    @PreAuthorize(COMMITTEE)
+    @PreAuthorize(STAGE_ROLES)
     public SheetView returnSheet(@PathVariable Long id, @Valid @RequestBody NoteRequest req) {
         return sheets.returnSheet(id, req.note());
     }
@@ -401,6 +441,18 @@ public class ExamController {
     @PreAuthorize(EXAMS_OFFICE)
     public SubmissionView nactvetSubmit(@PathVariable Long id, @Valid @RequestBody SubmissionRequest req) {
         return nactvet.submit(id, req.reference(), req.note());
+    }
+
+    @PostMapping("/api/exams/sheets/{id}/nactvet-api")
+    @PreAuthorize(EXAMS_OFFICE)
+    public SubmissionView nactvetSendOnline(@PathVariable Long id) {
+        return nactvet.submitOnline(id);
+    }
+
+    @PostMapping("/api/exams/nactvet-submissions/{id}/refresh")
+    @PreAuthorize(EXAMS_OFFICE)
+    public SubmissionView nactvetRefresh(@PathVariable Long id) {
+        return nactvet.refreshOnline(id);
     }
 
     @PutMapping("/api/exams/nactvet-submissions/{id}")

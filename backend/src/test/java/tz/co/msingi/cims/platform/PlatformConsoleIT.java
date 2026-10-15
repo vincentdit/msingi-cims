@@ -125,7 +125,7 @@ class PlatformConsoleIT {
         assertThat(issued.at("/institution/domains/0/host").asText()).isEqualTo(host);
         assertThat(issued.at("/institution/administrators/0/mustChangePassword").asBoolean()).isTrue();
         assertThat(issued.at("/institution/primaryColor").asText()).isEqualTo("#0B6E4F");
-        assertThat(issued.at("/institution/setup").size()).isEqualTo(9);
+        assertThat(issued.at("/institution/setup").size()).isEqualTo(10);   // private: also "Payment accounts"
         assertThat(issued.get("signInUrl").asText()).contains(host);
 
         // the same code or address cannot be used twice; addresses must be bare host names
@@ -191,7 +191,7 @@ class PlatformConsoleIT {
         assertThat(audit.findValuesAsText("action")).contains("INSTITUTION_ONBOARDED", "INSTITUTION_SUSPENDED", "INSTITUTION_REACTIVATED",
                 "INSTITUTION_ADMIN_PASSWORD_RESET", "DOMAIN_ADDED", "DOMAIN_REMOVED", "SMS_BUNDLE_CREDITED", "INSTITUTION_UPDATED");
         assertThat(audit.at("/content/0/actorName").asText()).isEqualTo("Platform ops" + suffix);
-        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(6));
+        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(12));
     }
 
     @Test

@@ -17,6 +17,8 @@ import type { StudentDashboard } from '../api/types';
 import { useSession } from '../auth/session';
 import { setLanguage } from '../i18n';
 import { useInstitution } from './InstitutionContext';
+import IdleSignOut from './IdleSignOut';
+import { useCallback } from 'react';
 
 const TABS = [
   { to: '/student', key: 'navHome', icon: <HomeIcon /> },
@@ -40,9 +42,11 @@ export default function StudentLayout() {
     : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
   const label = (key: string) => t(`student.${key}`);
+  const idleOut = useCallback(() => { signOut('student'); navigate('/student/login?idle=1'); }, [signOut, navigate]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: wide ? 4 : 9 }}>
+      <IdleSignOut kind="student" onSignOut={idleOut} />
       <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 1.5 }}>
           <Avatar sx={{ bgcolor: 'primary.main', fontFamily: 'Sora', fontWeight: 700, width: 36, height: 36, fontSize: 11 }}>

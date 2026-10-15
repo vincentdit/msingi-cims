@@ -1,3 +1,4 @@
+import EarlierResults from '../../components/EarlierResults';
 import StudentCompetenceCard from './StudentCompetenceCard';
 import DownloadIcon from '@mui/icons-material/Download';
 import LockIcon from '@mui/icons-material/LockOutlined';
@@ -30,6 +31,7 @@ export default function StudentResultsPage() {
       <ResitsCard />
       <AppealsCard />
       <StudentCompetenceCard />
+      <EarlierResults path="/api/student/earlier-results" realm="student" />
       {list.map((r) => (
         <Card key={r.id} sx={{ borderRadius: 3 }}>
           <CardContent>

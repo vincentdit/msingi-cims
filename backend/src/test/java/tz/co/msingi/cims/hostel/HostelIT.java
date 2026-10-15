@@ -279,7 +279,7 @@ class HostelIT {
         for (int i = 0; i < 4; i++) {
             String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Secret@123\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
         }
         long dId = ids.get(regNos[3]);
         TenantContext.runAs(inst.info(), () -> tx.executeWithoutResult(t -> studentRepo.findById(dId).orElseThrow().setSex("M")));

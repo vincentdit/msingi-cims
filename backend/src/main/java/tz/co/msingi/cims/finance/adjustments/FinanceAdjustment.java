@@ -12,14 +12,22 @@ import tz.co.msingi.cims.common.BaseEntity;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/** A waiver (credit note against an invoice) or a refund of a student's credit, approved at one or two levels (FR-FIN-08/10). */
+/**
+ * A waiver, discount or scholarship (each a credit note against an invoice) or a refund of a student's credit, approved at one or two
+ * levels (FR-FIN-08/10).
+ */
 @Getter
 @Setter
 @Entity
 @Table(name = "finance_adjustments")
 public class FinanceAdjustment extends BaseEntity {
 
-    public enum Kind { WAIVER, REFUND }
+    public enum Kind { WAIVER, REFUND, DISCOUNT, SCHOLARSHIP }
+
+    /** Kinds posted as a credit note against an invoice. */
+    public boolean isCredit() {
+        return kind != Kind.REFUND;
+    }
 
     public enum Status { PENDING, ENDORSED, APPROVED, REJECTED, PAID }
 
@@ -34,6 +42,9 @@ public class FinanceAdjustment extends BaseEntity {
     private Long studentId;
 
     private Long invoiceId;
+
+    /** The discount or scholarship scheme the amount was worked out from, if any. */
+    private Long schemeId;
 
     @Column(nullable = false)
     private BigDecimal amount;

@@ -4,6 +4,8 @@ import { Link as RouterLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/session';
 import { setLanguage } from '../i18n';
 import { useInstitution } from './InstitutionContext';
+import IdleSignOut from './IdleSignOut';
+import { useCallback } from 'react';
 
 function initials(name: string) {
   return name.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).slice(0, 2).map((w) => w[0]).join('');
@@ -16,9 +18,11 @@ export default function PortalLayout() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const applicant = user('applicant');
+  const idleOut = useCallback(() => { signOut('applicant'); navigate('/login?idle=1'); }, [signOut, navigate]);
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {applicant && <IdleSignOut kind="applicant" onSignOut={idleOut} />}
       <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 1.5 }}>
           <Stack direction="row" spacing={1.5} alignItems="center" component={RouterLink} to="/" sx={{ textDecoration: 'none', color: 'inherit', flexGrow: 1, minWidth: 0 }}>

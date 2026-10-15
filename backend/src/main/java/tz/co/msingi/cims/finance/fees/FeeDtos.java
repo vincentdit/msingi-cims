@@ -40,8 +40,13 @@ public final class FeeDtos {
                               @PositiveOrZero BigDecimal foreignAmount, @Min(1) @Max(4) short instalment) {
     }
 
+    /** intakeId / studentCategoryId: null = the structure applies to every intake / category. */
     public record StructureRequest(@NotNull Long academicYearId, @NotNull Long programmeId, @Min(1) @Max(8) short yearOfStudy,
-                                   @Size(max = 500) String notes, @NotEmpty @Size(max = 40) List<@Valid LineRequest> lines) {
+                                   @Size(max = 500) String notes, @NotEmpty @Size(max = 40) List<@Valid LineRequest> lines,
+                                   Long intakeId, Long studentCategoryId) {
+        public StructureRequest(Long academicYearId, Long programmeId, short yearOfStudy, String notes, List<LineRequest> lines) {
+            this(academicYearId, programmeId, yearOfStudy, notes, lines, null, null);
+        }
     }
 
     public record LinesRequest(@Size(max = 500) String notes, @NotEmpty @Size(max = 40) List<@Valid LineRequest> lines) {
@@ -54,7 +59,8 @@ public final class FeeDtos {
     public record StructureView(Long id, Long academicYearId, String academicYear, Long programmeId, String programmeCode,
                                 String programmeName, int yearOfStudy, int structureVersion, String status, String notes,
                                 String createdByName, OffsetDateTime approvedAt, String approvedByName, BigDecimal total,
-                                BigDecimal foreignTotal, BigDecimal firstInstalment, List<LineView> lines, boolean canApprove) {
+                                BigDecimal foreignTotal, BigDecimal firstInstalment, List<LineView> lines, boolean canApprove,
+                                Long intakeId, String intakeName, Long studentCategoryId, String studentCategoryName) {
     }
 
     public record GateRequest(boolean enabled, @NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal minPercentPaid,

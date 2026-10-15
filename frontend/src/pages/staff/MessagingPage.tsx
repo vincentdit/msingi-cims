@@ -17,9 +17,10 @@ import type {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
+import { EmailTab } from './EmailPages';
 
 const staff = { realm: 'staff' as const };
-type TabKey = 'overview' | 'send' | 'sent' | 'log' | 'templates';
+type TabKey = 'overview' | 'send' | 'sent' | 'log' | 'templates' | 'email';
 const STUDENT_STATUSES = ['ADMITTED', 'ACTIVE', 'POSTPONED', 'SUSPENDED', 'COMPLETED', 'GRADUATED'];
 const APPLICATION_STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'SELECTED', 'NOT_SELECTED', 'PENDING_VERIFICATION', 'QUERIED', 'NACTVET_REJECTED',
   'OFFERED', 'ACCEPTED', 'DECLINED', 'OFFER_LAPSED', 'PAYMENT_PENDING'];
@@ -53,19 +54,21 @@ export default function MessagingPage() {
   const { canSend } = useRoles();
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Messages" subtitle="SMS to applicants and students: automatic event messages, bulk messages to groups, delivery and cost." />
+      <PageTitle title="Messages" subtitle="SMS and email to applicants and students: automatic event messages, bulk messages to groups, delivery and cost." />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }}>
         <Tab value="overview" label="Overview" />
         {canSend && <Tab value="send" label="Send a message" />}
         <Tab value="sent" label="Sent bulk messages" />
         <Tab value="log" label="Message log" />
         <Tab value="templates" label="Event messages" />
+        <Tab value="email" label="Email" />
       </Tabs>
       {tab === 'overview' && <OverviewTab />}
       {tab === 'send' && <SendTab onSent={() => setTab('sent')} />}
       {tab === 'sent' && <SentTab />}
       {tab === 'log' && <LogTab />}
       {tab === 'templates' && <TemplatesTab />}
+      {tab === 'email' && <EmailTab />}
     </Container>
   );
 }

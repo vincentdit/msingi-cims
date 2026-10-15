@@ -84,6 +84,7 @@ public class OfferingService {
     private static final SemesterRegistration.Status APPROVED = SemesterRegistration.Status.APPROVED;
 
     private final ModuleOfferingRepository offerings;
+    private final ApprovalStageService stages;
     private final AssessmentScoreRepository scores;
     private final ModuleResultRepository results;
     private final ExamRegistrationQueries registrations;
@@ -516,7 +517,8 @@ public class OfferingService {
         ModuleOffering o = require(id);
         if (o.getStatus() != ModuleOffering.Status.SUBMITTED) throw new BusinessRuleException("WRONG_STAGE", "Only submitted results can be moderated");
         if (!access.moderates(o.getModule())) throw new AccessDeniedException("Only the module's Head of Department approves its results");
-        o.setStatus(regulations.settings().isUseDepartmentBoard() ? ModuleOffering.Status.HOD_APPROVED : ModuleOffering.Status.BOARD_APPROVED);
+        o.setStatus(stages.stages(ApprovalStageService.Flow.MODULE_RESULTS).isEmpty() ? ModuleOffering.Status.BOARD_APPROVED : ModuleOffering.Status.HOD_APPROVED);
+        o.setStageNo((short) 0);
         o.setHodByName(CurrentUser.name());
         o.setHodAt(OffsetDateTime.now());
         o.setReturnedNote(null);
@@ -524,17 +526,35 @@ public class OfferingService {
         return view(o);
     }
 
+    /** The next approval stage after the Head of Department (the Department Board by default), as the institution set them. */
     @Transactional
     public OfferingView boardApprove(Long id) {
+        return approveStage(id, null);
+    }
+
+    @Transactional
+    public OfferingView approveStage(Long id, String note) {
         ModuleOffering o = require(id);
         if (o.getStatus() != ModuleOffering.Status.HOD_APPROVED) {
-            throw new BusinessRuleException("WRONG_STAGE", "The Head of Department approves the results before the Department Board");
+            throw new BusinessRuleException("WRONG_STAGE", "The Head of Department approves the results before the next stage");
         }
-        if (!canBoard(o)) throw new AccessDeniedException("The Head of Department or Examinations Officer records the Department Board's approval");
-        o.setStatus(ModuleOffering.Status.BOARD_APPROVED);
-        o.setBoardByName(CurrentUser.name());
-        o.setBoardAt(OffsetDateTime.now());
-        audit.record("RESULTS_BOARD_APPROVED", "ModuleOffering", o.getId(), Map.of("module", o.getModule().getCode()));
+        List<ApprovalStageService.Stage> list = stages.stages(ApprovalStageService.Flow.MODULE_RESULTS);
+        if (o.getStageNo() >= list.size()) {
+            throw new BusinessRuleException("WRONG_STAGE", "These results have passed every stage");
+        }
+        ApprovalStageService.Stage stage = list.get(o.getStageNo());
+        if (!stages.canAct(stage, o.getModule(), null)) throw new AccessDeniedException("Not in charge of the stage \"" + stage.name() + "\"");
+        stages.record(ApprovalStageService.Flow.MODULE_RESULTS, o.getId(), stage, note);
+        o.setStageNo((short) (o.getStageNo() + 1));
+        if (o.getStageNo() >= list.size()) {
+            o.setStatus(ModuleOffering.Status.BOARD_APPROVED);
+            o.setBoardByName(CurrentUser.name());
+            o.setBoardAt(OffsetDateTime.now());
+        }
+        audit.record("RESULTS_STAGE_APPROVED", "ModuleOffering", o.getId(), Map.of("module", o.getModule().getCode(), "stage", stage.name()));
+        if (o.getStatus() == ModuleOffering.Status.BOARD_APPROVED) {
+            audit.record("RESULTS_BOARD_APPROVED", "ModuleOffering", o.getId(), Map.of("module", o.getModule().getCode()));
+        }
         return view(o);
     }
 
@@ -546,6 +566,7 @@ public class OfferingService {
             throw new BusinessRuleException("RESULTS_LOCKED", "These results are confirmed by the Governing Board and can only change by amendment");
         }
         o.setStatus(ModuleOffering.Status.DRAFT);
+        o.setStageNo((short) 0);
         o.setReturnedNote(note.trim());
         o.setReturnedByName(CurrentUser.name());
         o.setReturnedAt(OffsetDateTime.now());
@@ -623,6 +644,7 @@ public class OfferingService {
                     r == null ? Remark.INCOMPLETE.name() : r.getRemark().name(), reason, el));
         }
         Window w = window(o.getSemester());
+        List<ApprovalStageService.Stage> stageList = stages.stages(ApprovalStageService.Flow.MODULE_RESULTS);
         boolean lecturer = isMine(o, access.me()) && o.getStatus() == ModuleOffering.Status.DRAFT;
         Map<Long, String> names = staffNames(o.getStaff().stream().map(OfferingStaff::getUserId).collect(Collectors.toSet()));
         Permissions can = new Permissions(canEditPlan(o), lecturer && w.caOpen(), lecturer && w.seOpen(), lecturer && !rows.isEmpty(),
@@ -634,10 +656,14 @@ public class OfferingService {
                 o.getModule().getTitle(), o.getModule().getCredits(), o.getModule().getDepartment() == null ? null : o.getModule().getDepartment().getName(),
                 o.getStatus().name(), people(o, names), rs.getId(), rs.getName(), rs.getCaWeight(), rs.getSeWeight(), Grading.caPassMark(rs),
                 Grading.sePassMark(rs), RegulationService.bands(rs), sem.getMarksEntryOpens(), sem.getMarksEntryCloses(), w.note(),
-                regulations.settings().isUseDepartmentBoard(),
-                o.getComponents().stream().map(c -> new ComponentDto(c.getId(), c.getName(), c.getCategory(), c.getWeight(), c.getMaxScore())).toList(),
+                !stageList.isEmpty(),
+                o.getComponents().stream().map(c -> new ComponentDto(c.getId(), c.getName(), c.getCategory(), c.getWeight(), c.getMaxScore(),
+                        c.getEntryOpens(), c.getEntryCloses(), componentNote(w, c))).toList(),
                 rows, stats(rs, rows), o.getSubmittedByName(), o.getSubmittedAt(), o.getHodByName(), o.getHodAt(), o.getBoardByName(), o.getBoardAt(),
-                o.getReturnedNote(), o.getReturnedByName(), o.getReturnedAt(), can);
+                o.getReturnedNote(), o.getReturnedByName(), o.getReturnedAt(), can, stageList,
+                o.getStatus() == ModuleOffering.Status.HOD_APPROVED && o.getStageNo() < stageList.size() ? stageList.get(o.getStageNo()).name() : null,
+                stages.approvals(ApprovalStageService.Flow.MODULE_RESULTS, o.getId(),
+                        o.getStatus() == ModuleOffering.Status.BOARD_APPROVED ? stageList.size() : o.getStatus() == ModuleOffering.Status.HOD_APPROVED ? o.getStageNo() : 0));
     }
 
     /** Grade distribution and the flags a moderator should look at (BP-08 step 4). */
@@ -695,8 +721,51 @@ public class OfferingService {
     }
 
     private static void checkWindow(Window w, AssessmentComponent c) {
+        if (c.getEntryOpens() != null || c.getEntryCloses() != null) {
+            // this item has its own window (FR-EXM-02)
+            if (!componentOpen(c)) throw new BusinessRuleException("MARKS_ENTRY_CLOSED", componentNote(w, c));
+            return;
+        }
         if (c.getCategory() == AssessmentComponent.Category.CA && !w.caOpen()) throw new BusinessRuleException("MARKS_ENTRY_CLOSED", w.note());
         if (c.getCategory() == AssessmentComponent.Category.SE && !w.seOpen()) throw new BusinessRuleException("SE_ENTRY_NOT_OPEN", w.note());
+    }
+
+    static boolean componentOpen(AssessmentComponent c) {
+        LocalDate today = LocalDate.now(ZONE);
+        return (c.getEntryOpens() == null || !today.isBefore(c.getEntryOpens())) && (c.getEntryCloses() == null || !today.isAfter(c.getEntryCloses()));
+    }
+
+    /** How marks entry stands for one assessment item, in words. */
+    static String componentNote(Window w, AssessmentComponent c) {
+        if (c.getEntryOpens() == null && c.getEntryCloses() == null) {
+            return c.getCategory() == AssessmentComponent.Category.CA ? (w.caOpen() ? "Open" : "Closed") : (w.seOpen() ? "Open" : "Not open yet");
+        }
+        LocalDate today = LocalDate.now(ZONE);
+        if (c.getEntryOpens() != null && today.isBefore(c.getEntryOpens())) return c.getName() + " marks open on " + c.getEntryOpens();
+        if (c.getEntryCloses() != null && today.isAfter(c.getEntryCloses())) return c.getName() + " marks closed on " + c.getEntryCloses() + ". Ask the Examinations Officer to extend it.";
+        return "Open" + (c.getEntryCloses() == null ? "" : " until " + c.getEntryCloses());
+    }
+
+    /** The Examinations Officer sets marks entry for one assessment item, or for every item of that name in the semester (FR-EXM-02). */
+    @Transactional
+    public int componentWindow(Long semesterId, Long offeringId, Long componentId, String name, LocalDate opens, LocalDate closes) {
+        access.require("set marks entry for assessment items", ExamAccess.EXAMS_OFFICE);
+        if (opens != null && closes != null && closes.isBefore(opens)) throw new BusinessRuleException("INVALID_DATES", "Marks entry must close after it opens");
+        List<AssessmentComponent> targets = new ArrayList<>();
+        if (componentId != null) {
+            ModuleOffering o = require(offeringId);
+            o.getComponents().stream().filter(c -> c.getId().equals(componentId)).findFirst().ifPresent(targets::add);
+            if (targets.isEmpty()) throw new NotFoundException("Assessment item", componentId);
+        } else {
+            if (name == null || name.isBlank()) throw new BusinessRuleException("NAME_REQUIRED", "Name the assessment item, e.g. Test 1");
+            offerings.findBySemesterIdOrderByIdAsc(semesterId).forEach(o -> o.getComponents().stream()
+                    .filter(c -> c.getName().trim().equalsIgnoreCase(name.trim())).forEach(targets::add));
+            if (targets.isEmpty()) throw new BusinessRuleException("NO_SUCH_ITEM", "No module of the semester has an assessment item called " + name.trim());
+        }
+        targets.forEach(c -> { c.setEntryOpens(opens); c.setEntryCloses(closes); });
+        audit.record("COMPONENT_WINDOW_SET", "Semester", semesterId, Map.of("item", componentId != null ? targets.get(0).getName() : name.trim(),
+                "modules", targets.size(), "opens", String.valueOf(opens), "closes", String.valueOf(closes)));
+        return targets.size();
     }
 
     private static void checkScore(AssessmentComponent c, BigDecimal score, boolean absent) {
@@ -723,8 +792,11 @@ public class OfferingService {
                 || access.moderates(o.getModule()));
     }
 
+    /** Whether the signed-in person can act for the stage these results wait at. */
     private boolean canBoard(ModuleOffering o) {
-        return access.moderates(o.getModule()) || access.has(Role.EXAMINATIONS_OFFICER, Role.INSTITUTION_ADMIN);
+        if (o.getStatus() != ModuleOffering.Status.HOD_APPROVED) return access.moderates(o.getModule()) || access.has(Role.EXAMINATIONS_OFFICER, Role.INSTITUTION_ADMIN);
+        List<ApprovalStageService.Stage> list = stages.stages(ApprovalStageService.Flow.MODULE_RESULTS);
+        return o.getStageNo() < list.size() && stages.canAct(list.get(o.getStageNo()), o.getModule(), null);
     }
 
     private boolean canReturn(ModuleOffering o) {

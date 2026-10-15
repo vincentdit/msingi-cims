@@ -27,6 +27,10 @@ import tz.co.msingi.cims.admission.eligibility.EntryRules.Pathway;
 import tz.co.msingi.cims.platform.security.Role;
 import tz.co.msingi.cims.platform.security.UserAccount;
 import tz.co.msingi.cims.platform.security.UserAccountRepository;
+import tz.co.msingi.cims.academic.campus.CampusService;
+import tz.co.msingi.cims.finance.collection.PaymentChannel;
+import tz.co.msingi.cims.finance.collection.PaymentChannelRepository;
+import tz.co.msingi.cims.finance.collection.PaymentProvider;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
 import tz.co.msingi.cims.platform.tenancy.TenantDomain;
@@ -60,12 +64,18 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final AdmissionWindowRepository windows;
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate tx;
+    private final PaymentChannelRepository paymentChannels;
+    private final CampusService campusService;
 
     @Override
     public void run(ApplicationArguments args) {
         Tenant tenant = tx.execute(s -> tenants.findByCodeIgnoreCase("DEMO").orElseGet(this::createTenant));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedInstitution()));
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> scopeDemoHeads()));
+        if (!tenant.usesGepg()) {
+            TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedPaymentChannels()));
+        }
+        TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedCampuses()));
         log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026, principal / Principal@2026, auditor / Auditor@2026, assessor / Assessor@2026, coordinator / Coordinator@2026 (header X-Tenant: DEMO)");
     }
 
@@ -90,6 +100,38 @@ public class DemoDataSeeder implements ApplicationRunner {
             }
         }
         return t;
+    }
+
+    /** The demo college is private, so it is paid into its own accounts: two mobile money business numbers and two banks (made-up numbers). */
+    private void seedPaymentChannels() {
+        if (paymentChannels.count() > 0) return;
+        Object[][] rows = {
+                {PaymentProvider.MPESA, "555123", null},
+                {PaymentProvider.MIXX_BY_YAS, "555124", null},
+                {PaymentProvider.CRDB, "0150123456700", "Azikiwe Branch, Dar es Salaam"},
+                {PaymentProvider.NMB, "20110012345", "Bank House Branch, Dar es Salaam"}};
+        int order = 1;
+        for (Object[] r : rows) {
+            PaymentChannel c = new PaymentChannel();
+            c.setProvider((PaymentProvider) r[0]);
+            c.setKind(((PaymentProvider) r[0]).kind());
+            c.setAccountName("Msingi Demo Technical College");
+            c.setAccountNumber((String) r[1]);
+            c.setBranch((String) r[2]);
+            c.setSortOrder(order++);
+            paymentChannels.save(c);
+        }
+    }
+
+    /** Two campuses and two fee categories, so transfers and category pricing can be tried. */
+    private void seedCampuses() {
+        if (campusService.mainCampus() != null) return;
+        campusService.saveCampus(null, new CampusService.CampusRequest("MAIN", "Main Campus", "Dar es Salaam", "Kinondoni",
+                "Plot 12, Bagamoyo Road", true, true));
+        campusService.saveCampus(null, new CampusService.CampusRequest("ARUSHA", "Arusha Campus", "Arusha", "Arusha City",
+                "Njiro Road", false, true));
+        campusService.saveCategory(null, new CampusService.NamedRequest("REGULAR", "Regular (day)", true));
+        campusService.saveCategory(null, new CampusService.NamedRequest("EVENING", "Evening", true));
     }
 
     private void seedInstitution() {

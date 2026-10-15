@@ -2,6 +2,7 @@ import AssignmentIcon from '@mui/icons-material/AssignmentInd';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import MoveUpIcon from '@mui/icons-material/MoveUp';
 import SmsIcon from '@mui/icons-material/Sms';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
@@ -36,11 +37,19 @@ import OfficeIcon from '@mui/icons-material/FactCheck';
 import AppealIcon from '@mui/icons-material/Gavel';
 import { Badge } from '@mui/material';
 import KeyIcon from '@mui/icons-material/Key';
-import { Alert, Button } from '@mui/material';
+import SecurityIcon from '@mui/icons-material/Security';
+import LetterIcon from '@mui/icons-material/HistoryEdu';
+import IntegrationIcon from '@mui/icons-material/Hub';
+import AlumniIcon from '@mui/icons-material/Diversity3';
+import ImportIcon from '@mui/icons-material/DriveFolderUpload';
+import IdleSignOut from './IdleSignOut';
+import { Alert, Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { setLanguage } from '../i18n';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -65,8 +74,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   { title: 'Registry', items: [
     { page: 'students', to: '/staff/students', label: 'Students', icon: <BadgeIcon /> },
     { page: 'statusChanges', to: '/staff/status-changes', label: 'Status changes', icon: <SwapHorizIcon /> },
+    { page: 'transfers', to: '/staff/transfers', label: 'Transfers', icon: <MoveUpIcon /> },
     { page: 'semesterRegistrations', to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
     { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
+    { page: 'alumni', to: '/staff/alumni', label: 'Alumni', icon: <AlumniIcon /> },
   ] },
   { title: 'Teaching', items: [
     { page: 'myTeaching', to: '/staff/my-teaching', label: 'My teaching', icon: <MyTeachingIcon /> },
@@ -102,6 +113,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   { title: 'Administration', items: [
     { page: 'users', to: '/staff/users', label: 'Users & roles', icon: <UsersIcon /> },
     { page: 'audit', to: '/staff/audit', label: 'Audit trail', icon: <AuditIcon /> },
+    { page: 'imports', to: '/staff/imports', label: 'Data import', icon: <ImportIcon /> },
+    { page: 'letters', to: '/staff/letters', label: 'Letter wording', icon: <LetterIcon /> },
+    { page: 'integrations', to: '/staff/integrations', label: 'Integrations', icon: <IntegrationIcon /> },
+    { page: 'security', to: '/staff/security', label: 'Security & privacy', icon: <SecurityIcon /> },
     { page: 'institution', to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon /> },
   ] },
 ];
@@ -131,6 +146,14 @@ export default function StaffLayout() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const me = user('staff');
+  // English or Kiswahili (BR-40): kept with the account, so it follows the person to another device
+  const { i18n } = useTranslation();
+  const lang = i18n.language === 'sw' ? 'sw' : 'en';
+  const chooseLanguage = (v: 'en' | 'sw' | null) => {
+    if (!v || v === lang) return;
+    setLanguage(v);
+    api('/api/account/language', { realm: 'staff', method: 'PUT', body: { language: v } }).catch(() => { /* kept on this device anyway */ });
+  };
   // a Head of Department or Programme Coordinator limited to part of the institution sees it named under their roles
   const scope = useQuery({ queryKey: ['staff', 'scope', me?.id], enabled: !!me && !me.mustChangePassword, staleTime: 300_000,
     queryFn: () => api<{ all: boolean; departments: string[]; programmes: string[] }>('/api/auth/scope', { realm: 'staff' }) }).data;
@@ -141,8 +164,9 @@ export default function StaffLayout() {
     refetchInterval: 60_000, queryFn: () => api<{ actionable: number }>('/api/approvals/count', { realm: 'staff' }) }).data?.actionable ?? 0;
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
   const page = pageOf(location.pathname);
+  const idleOut = useCallback(() => { signOut('staff'); navigate('/staff/login?idle=1'); }, [signOut, navigate]);
   const onPassword = location.pathname.startsWith('/staff/password');
-  if (me?.mustChangePassword && !onPassword) return <Navigate to="/staff/password" replace />;
+  if ((me?.mustChangePassword || me?.mfaSetupRequired) && !onPassword) return <Navigate to="/staff/password" replace />;
   if (location.pathname === '/staff' && !can(roles, 'dashboard')) return <Navigate to={homeFor(roles)} replace />;
   const allowed = onPassword || !page || can(roles, page);
 
@@ -181,6 +205,12 @@ export default function StaffLayout() {
         ))}
       </List>
       <Box sx={{ p: 2 }}>
+        <ToggleButtonGroup size="small" exclusive value={lang} onChange={(_, v) => chooseLanguage(v)} aria-label="Language"
+          sx={{ mb: 1.5, '& .MuiToggleButton-root': { color: 'rgba(230,235,242,0.75)', borderColor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.25, textTransform: 'none' },
+            '& .Mui-selected': { color: '#fff !important', bgcolor: 'rgba(255,255,255,0.16) !important' } }}>
+          <ToggleButton value="en" lang="en">English</ToggleButton>
+          <ToggleButton value="sw" lang="sw">Kiswahili</ToggleButton>
+        </ToggleButtonGroup>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{me?.fullName}</Typography>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>{me?.roles.map((r) => ROLE_LABEL[r] ?? r).join(', ')}</Typography>
         {scope && !scope.all && (
@@ -190,7 +220,7 @@ export default function StaffLayout() {
         )}
         <ListItemButton component={NavLink} to="/staff/password" sx={{ mt: 1, borderRadius: 2, px: 1, color: 'inherit' }} onClick={() => setOpen(false)}>
           <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><KeyIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary="Change password" />
+          <ListItemText primary="My account" />
         </ListItemButton>
         <ListItemButton sx={{ borderRadius: 2, px: 1 }} onClick={() => { signOut('staff'); navigate('/staff/login'); }}>
           <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><LogoutIcon fontSize="small" /></ListItemIcon>
@@ -202,6 +232,7 @@ export default function StaffLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <IdleSignOut kind="staff" onSignOut={idleOut} />
       {!desktop && (
         <AppBar position="fixed" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
           <Toolbar>
@@ -219,7 +250,8 @@ export default function StaffLayout() {
         {drawer}
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, mt: { xs: 8, md: 0 }, minWidth: 0 }}>
-        {allowed ? <Outlet /> : (
+        {/* a new language redraws the page in it (keyed), without reloading data */}
+        {allowed ? <Box key={lang}><Outlet /></Box> : (
           <Alert severity="info" sx={{ maxWidth: 640 }} action={<Button color="inherit" onClick={() => navigate(homeFor(roles))}>Go to my pages</Button>}>
             This page is not part of your role. Ask the institution administrator if you need it.
           </Alert>

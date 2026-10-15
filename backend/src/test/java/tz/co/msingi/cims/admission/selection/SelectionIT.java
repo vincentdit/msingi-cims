@@ -170,7 +170,7 @@ class SelectionIT {
     private String applicantToken(String index) throws Exception {
         String phone = String.format("0744%06d", ++phoneSeq + (Math.abs(tenant.hashCode()) % 9000) * 100);
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null,
-                "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Secret@123\",\"acceptPrivacyNotice\":true}")
+                "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Kifaru#Mto47\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
         return body(call(post("/api/applicant-auth/verify"), null,
                 "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")).get("accessToken").asText();

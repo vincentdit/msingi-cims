@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, FormControlLabel
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePayWords } from '../../components/HowToPay';
 import { api, formatDate, formatTzs } from '../../api/client';
 import type { MyHostel, RoomType } from '../../api/types';
 import { ErrorAlert } from '../../components/common';
@@ -13,6 +14,7 @@ const TYPES: RoomType[] = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'DORMITORY'];
 /** Hostel application and allocation on the student portal (FR-HST-02, FR-STU-04). */
 export default function StudentHostelCard() {
   const { t } = useTranslation();
+  const words = usePayWords();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['student', 'hostel'], queryFn: () => api<MyHostel>('/api/student/hostel', student) });
   const d = q.data;
@@ -63,7 +65,7 @@ export default function StudentHostelCard() {
                 {al.status === 'ALLOCATED' && al.invoiceStatus !== 'PAID' && al.fee > 0 && (
                   <>
                     <Typography variant="body2" sx={{ mt: 1 }}>{t('hostel.payBy', { amount: formatTzs(al.balance), date: formatDate(al.payBy) })}</Typography>
-                    {al.controlNo && <Typography variant="body2">{t('hostel.controlNo')}: <strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{al.controlNo}</strong></Typography>}
+                    {al.controlNo && <Typography variant="body2">{words.number}: <strong style={{ fontFamily: 'monospace', fontSize: 15 }}>{al.controlNo}</strong></Typography>}
                   </>
                 )}
                 {al.invoiceStatus === 'PAID' && al.status === 'ALLOCATED' && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>{t('hostel.paid')}</Typography>}

@@ -7,6 +7,13 @@ import InstitutionPage from './pages/staff/InstitutionPage';
 import UsersPage from './pages/staff/UsersPage';
 import AuditPage from './pages/staff/AuditPage';
 import ApprovalsPage from './pages/staff/ApprovalsPage';
+import SecurityPage from './pages/staff/SecurityPages';
+import LetterTemplatesPage from './pages/staff/LetterTemplatesPage';
+import ImportsPage from './pages/staff/ImportsPage';
+import StaffIntegrationsPage from './pages/staff/IntegrationsPage';
+import AlumniPage from './pages/staff/AlumniPage';
+import { TracerSurveyPage, WorkplaceAssessmentPage } from './pages/portal/PublicForms';
+import ResultTrendsPage from './pages/staff/ResultTrendsPage';
 import ChangePasswordPage from './pages/staff/ChangePasswordPage';
 import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProfilePage } from './pages/student/StudentPages';
 import SemesterRegistrationPage from './pages/student/SemesterRegistrationPage';
@@ -36,6 +43,7 @@ import SelectionPage from './pages/staff/SelectionPage';
 import VerificationPage from './pages/staff/VerificationPage';
 import { HandoverPage, StudentDetailPage, StudentsPage } from './pages/staff/RegistryPages';
 import { StatusChangesPage } from './pages/staff/StatusAndCards';
+import { TransfersPage } from './pages/staff/TransferPages';
 import { AppealsPage, ExamsOfficePage } from './pages/staff/ExamsOfficePages';
 import PlatformLayout from './pages/platform/PlatformLayout';
 import { PlatformLoginPage, PlatformPasswordPage } from './pages/platform/PlatformAuth';
@@ -61,6 +69,8 @@ export default function App() {
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="verify" element={<DocumentVerifyPage />} />
         <Route path="verify/:code" element={<DocumentVerifyPage />} />
+        <Route path="ipt-assessment/:token" element={<WorkplaceAssessmentPage />} />
+        <Route path="survey/:token" element={<TracerSurveyPage />} />
         <Route path="application" element={<RequireAuth realm="applicant"><ApplicationPage /></RequireAuth>} />
       </Route>
       <Route path="student/login" element={<StudentLoginPage />} />
@@ -98,6 +108,7 @@ export default function App() {
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="status-changes" element={<StatusChangesPage />} />
+        <Route path="transfers" element={<TransfersPage />} />
         <Route path="semester-registrations" element={<SemesterRegistrationsPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="marks" element={<MarksPage />} />
@@ -117,6 +128,7 @@ export default function App() {
         <Route path="graduations/:id" element={<GraduationPage />} />
         <Route path="results" element={<ResultSheetsPage />} />
         <Route path="results/:id" element={<ResultSheetPage />} />
+        <Route path="results-trends" element={<ResultTrendsPage />} />
         <Route path="exams-office" element={<ExamsOfficePage />} />
         <Route path="appeals" element={<AppealsPage />} />
         <Route path="regulations" element={<RegulationsPage />} />
@@ -137,6 +149,11 @@ export default function App() {
         <Route path="audit" element={<AuditPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="password" element={<ChangePasswordPage />} />
+        <Route path="security" element={<SecurityPage />} />
+        <Route path="letters" element={<LetterTemplatesPage />} />
+        <Route path="imports" element={<ImportsPage />} />
+        <Route path="integrations" element={<StaffIntegrationsPage />} />
+        <Route path="alumni" element={<AlumniPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

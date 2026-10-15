@@ -181,6 +181,24 @@ public class FinanceExtrasController {
         return adjustments.markPaid(id, req.reference());
     }
 
+    @GetMapping("/api/finance/fee-schemes")
+    @PreAuthorize(FINANCE)
+    public List<AdjustmentDtos.SchemeView> schemes() {
+        return adjustments.schemes();
+    }
+
+    @PostMapping("/api/finance/fee-schemes")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public AdjustmentDtos.SchemeView createScheme(@Valid @RequestBody AdjustmentDtos.SchemeRequest req) {
+        return adjustments.saveScheme(null, req);
+    }
+
+    @PutMapping("/api/finance/fee-schemes/{id}")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public AdjustmentDtos.SchemeView updateScheme(@PathVariable Long id, @Valid @RequestBody AdjustmentDtos.SchemeRequest req) {
+        return adjustments.saveScheme(id, req);
+    }
+
     @GetMapping("/api/finance/settings")
     @PreAuthorize(FINANCE)
     public AdjustmentDtos.SettingsView settings() {

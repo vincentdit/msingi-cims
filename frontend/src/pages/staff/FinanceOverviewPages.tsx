@@ -11,6 +11,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, MenuItem,
   Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography,
+  FormControlLabel, Switch,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -619,11 +620,16 @@ function RemittanceDialog({ invoice, onClose, onDone }: { invoice: SponsorInvoic
 // ============================================================ waivers and refunds (FR-FIN-08/10)
 
 interface Adjustment {
-  id: number; adjustmentNo: string; kind: 'WAIVER' | 'REFUND'; studentId: number; registrationNo: string; studentName: string; invoiceNo?: string; amount: number;
+  id: number; adjustmentNo: string; kind: AdjKind; schemeName?: string; studentId: number; registrationNo: string; studentName: string; invoiceNo?: string; amount: number;
   reason: string; evidenceRef: string; status: 'PENDING' | 'ENDORSED' | 'APPROVED' | 'REJECTED' | 'PAID'; needsSecondLevel: boolean; requestedByName: string; requestedAt: string;
   firstByName?: string; firstAt?: string; secondByName?: string; secondAt?: string; decisionNote?: string; documentNo?: string; paidReference?: string; paidAt?: string;
   waitingFor?: string; canApprove: boolean; canReject: boolean; canMarkPaid: boolean;
 }
+type AdjKind = 'WAIVER' | 'REFUND' | 'DISCOUNT' | 'SCHOLARSHIP';
+const KIND_NAME: Record<AdjKind, string> = { WAIVER: 'Waiver', REFUND: 'Refund', DISCOUNT: 'Discount', SCHOLARSHIP: 'Scholarship' };
+interface Scheme { id: number; code: string; name: string; kind: 'DISCOUNT' | 'SCHOLARSHIP'; basis: 'PERCENT' | 'FIXED'; value: number; feeCategory?: string; description?: string; active: boolean }
+const schemeText = (x: Scheme) => `${x.basis === 'PERCENT' ? `${x.value}%` : formatTzs(x.value)} of ${x.feeCategory ? `${x.feeCategory.toLowerCase()} fees` : 'the invoice'}`;
+
 const ADJ_STATUS: Record<Adjustment['status'], { label: string; colour: 'default' | 'info' | 'warning' | 'success' | 'error' }> = {
   PENDING: { label: 'Waiting for the Bursar', colour: 'warning' }, ENDORSED: { label: 'Waiting for the Principal', colour: 'info' },
   APPROVED: { label: 'Approved', colour: 'success' }, REJECTED: { label: 'Rejected', colour: 'error' }, PAID: { label: 'Paid out', colour: 'success' },
@@ -632,26 +638,27 @@ const ADJ_STATUS: Record<Adjustment['status'], { label: string; colour: 'default
 export function WaiversPage() {
   const can = useRoles();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'open' | 'all'>('open');
+  const [tab, setTab] = useState<'open' | 'all' | 'schemes'>('open');
   const [creating, setCreating] = useState(false);
   const [deciding, setDeciding] = useState<{ a: Adjustment; approve: boolean } | null>(null);
   const [paying, setPaying] = useState<Adjustment | null>(null);
-  const list = useQuery({ queryKey: ['staff', 'adjustments', tab], queryFn: () => api<Adjustment[]>(`/api/finance/adjustments${tab === 'open' ? '?open=true' : ''}`, staff) });
+  const list = useQuery({ queryKey: ['staff', 'adjustments', tab], enabled: tab !== 'schemes', queryFn: () => api<Adjustment[]>(`/api/finance/adjustments${tab === 'open' ? '?open=true' : ''}`, staff) });
   const settings = useQuery({ queryKey: ['staff', 'finance-settings'], queryFn: () => api<{ approvalThreshold: number }>('/api/finance/settings', staff) });
   const refresh = () => qc.invalidateQueries({ queryKey: ['staff'] });
   return (
     <>
-      <PageTitle title="Waivers and refunds" subtitle={`Requested by the bursary with evidence; approved by the Bursar, and by the Principal as well above ${settings.data ? formatTzs(settings.data.approvalThreshold) : 'the threshold'}.`}
+      <PageTitle title="Waivers, discounts and refunds" subtitle={`Waivers, discounts, scholarships and refunds: requested by the bursary with evidence; approved by the Bursar, and by the Principal as well above ${settings.data ? formatTzs(settings.data.approvalThreshold) : 'the threshold'}.`}
         action={<Stack direction="row" spacing={1}>
           {can(BURSAR) && settings.data && <ThresholdButton value={settings.data.approvalThreshold} onDone={refresh} />}
           {can(BURSARY) && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>New request</Button>}
         </Stack>} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab value="open" label="Waiting" /><Tab value="all" label="All" />
+        <Tab value="open" label="Waiting" /><Tab value="all" label="All" /><Tab value="schemes" label="Discount and scholarship schemes" />
       </Tabs>
       <ErrorAlert error={list.error} />
       {list.isLoading && <Loading />}
-      {list.data && (
+      {tab === 'schemes' && <SchemesTab canEdit={can(BURSAR)} />}
+      {tab !== 'schemes' && list.data && (
         <TableContainer component={Card}>
           <Table size="small">
             <TableHead><TableRow>
@@ -661,7 +668,8 @@ export function WaiversPage() {
               {list.data.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell sx={{ maxWidth: 360 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{a.kind === 'WAIVER' ? 'Waiver' : 'Refund'} · {a.adjustmentNo}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{KIND_NAME[a.kind]} · {a.adjustmentNo}</Typography>
+                    {a.schemeName && <Typography variant="caption" display="block">Scheme: {a.schemeName}</Typography>}
                     <Typography variant="caption" color="text.secondary" display="block">{a.reason}</Typography>
                     <Typography variant="caption" color="text.secondary">Evidence: {a.evidenceRef}{a.invoiceNo ? ` · invoice ${a.invoiceNo}` : ''} · by {a.requestedByName}, {formatDateTime(a.requestedAt)}</Typography>
                   </TableCell>
@@ -671,7 +679,7 @@ export function WaiversPage() {
                     <Chip size="small" color={ADJ_STATUS[a.status].colour} label={ADJ_STATUS[a.status].label} variant={a.status === 'PENDING' || a.status === 'ENDORSED' ? 'outlined' : 'filled'} />
                     {a.firstByName && <Typography variant="caption" display="block" color="text.secondary">{a.status === 'REJECTED' && !a.secondByName ? 'Rejected' : 'Approved'} by {a.firstByName}</Typography>}
                     {a.secondByName && <Typography variant="caption" display="block" color="text.secondary">{a.status === 'REJECTED' ? 'Rejected' : 'Approved'} by {a.secondByName}</Typography>}
-                    {a.documentNo && <Typography variant="caption" display="block">{a.kind === 'WAIVER' ? 'Credit note' : 'Voucher'} {a.documentNo}</Typography>}
+                    {a.documentNo && <Typography variant="caption" display="block">{a.kind === 'REFUND' ? 'Voucher' : 'Credit note'} {a.documentNo}</Typography>}
                     {a.decisionNote && <Typography variant="caption" display="block" color="text.secondary">“{a.decisionNote}”</Typography>}
                     {a.paidReference && <Typography variant="caption" display="block" color="text.secondary">Paid: {a.paidReference}</Typography>}
                   </TableCell>
@@ -690,6 +698,74 @@ export function WaiversPage() {
       {creating && <AdjustmentDialog onClose={() => setCreating(false)} onDone={() => { setCreating(false); refresh(); }} />}
       {deciding && <DecideDialog a={deciding.a} approve={deciding.approve} onClose={() => setDeciding(null)} onDone={() => { setDeciding(null); refresh(); }} />}
       {paying && <PaidDialog a={paying} onClose={() => setPaying(null)} onDone={() => { setPaying(null); refresh(); }} />}
+    </>
+  );
+}
+
+/** Discount and scholarship schemes the Bursar offers (FR-FIN-08). */
+function SchemesTab({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['staff', 'fee-schemes'], queryFn: () => api<Scheme[]>('/api/finance/fee-schemes', staff) });
+  const empty = { id: 0, code: '', name: '', kind: 'DISCOUNT' as Scheme['kind'], basis: 'PERCENT' as Scheme['basis'], value: '', feeCategory: '', description: '', active: true };
+  const [f, setF] = useState<typeof empty | null>(null);
+  const save = useMutation({
+    mutationFn: (x: typeof empty) => api(x.id ? `/api/finance/fee-schemes/${x.id}` : '/api/finance/fee-schemes', { ...staff, method: x.id ? 'PUT' : 'POST',
+      body: { code: x.code, name: x.name, kind: x.kind, basis: x.basis, value: Number(x.value), feeCategory: x.feeCategory || null, description: x.description || null, active: x.active } }),
+    onSuccess: () => { setF(null); qc.invalidateQueries({ queryKey: ['staff', 'fee-schemes'] }); },
+  });
+  return (
+    <>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+        <Typography variant="body2" color="text.secondary">A scheme works out the amount: a percentage of a fee category (e.g. 10% of tuition) or a fixed sum. Each grant is still approved like a waiver.</Typography>
+        {canEdit && <Button variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0, ml: 2 }} onClick={() => setF(empty)}>New scheme</Button>}
+      </Stack>
+      <ErrorAlert error={q.error} />
+      <TableContainer component={Card}><Table size="small">
+        <TableHead><TableRow><TableCell>Scheme</TableCell><TableCell>Kind</TableCell><TableCell>Gives</TableCell><TableCell /></TableRow></TableHead>
+        <TableBody>
+          {q.data?.map((x) => (
+            <TableRow key={x.id} hover={canEdit} sx={{ cursor: canEdit ? 'pointer' : 'default' }}
+              onClick={() => canEdit && setF({ ...x, value: String(x.value), feeCategory: x.feeCategory ?? '', description: x.description ?? '' })}>
+              <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{x.name}</Typography><Typography variant="caption" color="text.secondary">{x.code}{x.description ? ` · ${x.description}` : ''}</Typography></TableCell>
+              <TableCell>{KIND_NAME[x.kind]}</TableCell><TableCell>{schemeText(x)}</TableCell>
+              <TableCell align="right">{!x.active && <Chip size="small" label="Inactive" />}</TableCell>
+            </TableRow>
+          ))}
+          {q.data?.length === 0 && <TableRow><TableCell colSpan={4}><Typography color="text.secondary">No schemes yet.</Typography></TableCell></TableRow>}
+        </TableBody>
+      </Table></TableContainer>
+      <Dialog open={!!f} onClose={() => setF(null)} fullWidth maxWidth="sm">
+        <DialogTitle>{f?.id ? f.name : 'New scheme'}</DialogTitle>
+        {f && (
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1}>
+                <TextField size="small" label="Code" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} sx={{ width: 150 }} />
+                <TextField size="small" fullWidth label="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+              </Stack>
+              <Stack direction="row" spacing={1}>
+                <TextField select size="small" fullWidth label="Kind" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as Scheme['kind'] })}>
+                  <MenuItem value="DISCOUNT">Discount</MenuItem><MenuItem value="SCHOLARSHIP">Scholarship</MenuItem>
+                </TextField>
+                <TextField select size="small" fullWidth label="Basis" value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value as Scheme['basis'] })}>
+                  <MenuItem value="PERCENT">Percentage</MenuItem><MenuItem value="FIXED">Fixed amount</MenuItem>
+                </TextField>
+                <TextField size="small" fullWidth type="number" label={f.basis === 'PERCENT' ? 'Percent' : 'Amount (TZS)'} value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} />
+              </Stack>
+              <TextField select size="small" label="Applies to" value={f.feeCategory} onChange={(e) => setF({ ...f, feeCategory: e.target.value })}
+                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
+                <MenuItem value="">The whole invoice</MenuItem>
+                {['TUITION', 'REGISTRATION', 'EXAMINATION', 'ACCOMMODATION', 'OTHER'].map((c) => <MenuItem key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()} fees only</MenuItem>)}
+              </TextField>
+              <TextField size="small" label="Description (optional)" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+              <FormControlLabel control={<Switch checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} />} label="Offered" />
+              <ErrorAlert error={save.error} />
+            </Stack>
+          </DialogContent>
+        )}
+        <DialogActions><Button onClick={() => setF(null)}>Cancel</Button>
+          <Button variant="contained" disabled={!f?.code || !f?.name.trim() || !Number(f?.value) || save.isPending} onClick={() => f && save.mutate(f)}>Save</Button></DialogActions>
+      </Dialog>
     </>
   );
 }
@@ -717,7 +793,12 @@ function ThresholdButton({ value, onDone }: { value: number; onDone: () => void 
 interface Options { studentId: number; registrationNo: string; name: string; credit: number; refundable: number; invoices: { id: number; invoiceNo: string; description: string; balance: number; waivable: number }[] }
 
 function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [kind, setKind] = useState<'WAIVER' | 'REFUND'>('WAIVER');
+  const [kind, setKind] = useState<AdjKind>('WAIVER');
+  const [schemeId, setSchemeId] = useState<number | ''>('');
+  const schemes = useQuery({ queryKey: ['staff', 'fee-schemes'], queryFn: () => api<Scheme[]>('/api/finance/fee-schemes', staff) });
+  const offered = schemes.data?.filter((x) => x.active && x.kind === kind) ?? [];
+  const credit = kind !== 'REFUND';
+  const byScheme = credit && kind !== 'WAIVER' && schemeId !== '';
   const [regNo, setRegNo] = useState('');
   const [lookup, setLookup] = useState('');
   const [invoiceId, setInvoiceId] = useState<number | ''>('');
@@ -727,22 +808,31 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
   const opts = useQuery({ queryKey: ['staff', 'adjustment-options', lookup], enabled: !!lookup, retry: false,
     queryFn: () => api<Options>(`/api/finance/adjustments/options?registrationNo=${encodeURIComponent(lookup)}`, staff) });
   const o = opts.data;
-  const max = kind === 'WAIVER' ? o?.invoices.find((i) => i.id === invoiceId)?.waivable : o?.refundable;
+  const max = credit ? o?.invoices.find((i) => i.id === invoiceId)?.waivable : o?.refundable;
   const save = useMutation({
-    mutationFn: () => api('/api/finance/adjustments', { ...staff, method: 'POST', body: { kind, studentId: o!.studentId, invoiceId: kind === 'WAIVER' ? invoiceId : undefined,
-      amount: Number(amount), reason: reason.trim(), evidenceRef: evidence.trim() } }),
+    mutationFn: () => api('/api/finance/adjustments', { ...staff, method: 'POST', body: { kind, studentId: o!.studentId, invoiceId: credit ? invoiceId : undefined,
+      amount: byScheme ? undefined : Number(amount), schemeId: byScheme ? schemeId : undefined, reason: reason.trim(), evidenceRef: evidence.trim() } }),
     onSuccess: onDone,
   });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>New waiver or refund</DialogTitle>
+      <DialogTitle>New waiver, discount, scholarship or refund</DialogTitle>
       <DialogContent>
         <ErrorAlert error={opts.error ?? save.error} />
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField select size="small" label="Kind" value={kind} onChange={(e) => setKind(e.target.value as 'WAIVER' | 'REFUND')}>
+          <TextField select size="small" label="Kind" value={kind} onChange={(e) => { setKind(e.target.value as AdjKind); setSchemeId(''); }}>
             <MenuItem value="WAIVER">Waiver (reduces what is owed on an invoice)</MenuItem>
+            <MenuItem value="DISCOUNT">Discount (from a discount scheme, or an amount)</MenuItem>
+            <MenuItem value="SCHOLARSHIP">Scholarship (from a scholarship scheme)</MenuItem>
             <MenuItem value="REFUND">Refund (pays back the student's credit)</MenuItem>
           </TextField>
+          {(kind === 'DISCOUNT' || kind === 'SCHOLARSHIP') && (
+            <TextField select size="small" label="Scheme" value={schemeId} onChange={(e) => setSchemeId(e.target.value === '' ? '' : Number(e.target.value))}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} helperText={offered.length ? 'The amount is worked out from the scheme' : 'The Bursar sets schemes on the Schemes tab'}>
+              {kind === 'DISCOUNT' && <MenuItem value="">No scheme: type the amount</MenuItem>}
+              {offered.map((x) => <MenuItem key={x.id} value={x.id}>{x.name} · {schemeText(x)}</MenuItem>)}
+            </TextField>
+          )}
           <Stack direction="row" spacing={1}>
             <TextField size="small" fullWidth label="Registration number" value={regNo} onChange={(e) => setRegNo(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setLookup(regNo.trim()); }} />
             <Button onClick={() => setLookup(regNo.trim())} disabled={!regNo.trim()}>Find</Button>
@@ -750,14 +840,14 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
           {o && (
             <>
               <Typography variant="body2"><strong>{o.name}</strong> · credit {formatTzs(o.credit)}{o.refundable !== o.credit ? ` (${formatTzs(o.refundable)} refundable)` : ''}</Typography>
-              {kind === 'WAIVER' && (
+              {credit && (
                 <TextField select size="small" label="Invoice" value={invoiceId} onChange={(e) => setInvoiceId(Number(e.target.value))}>
                   {o.invoices.map((i) => <MenuItem key={i.id} value={i.id}>{i.invoiceNo} · {i.description} · owes {formatTzs(i.balance)}</MenuItem>)}
                   {!o.invoices.length && <MenuItem disabled value="">No invoice with a balance</MenuItem>}
                 </TextField>
               )}
-              <TextField size="small" type="number" label="Amount (TZS)" value={amount} onChange={(e) => setAmount(e.target.value)}
-                helperText={max != null ? `At most ${formatTzs(max)}` : undefined} error={max != null && Number(amount) > max} />
+              {!byScheme && <TextField size="small" type="number" label="Amount (TZS)" value={amount} onChange={(e) => setAmount(e.target.value)}
+                helperText={max != null ? `At most ${formatTzs(max)}` : undefined} error={max != null && Number(amount) > max} />}
               <TextField size="small" multiline minRows={2} label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
               <TextField size="small" label="Evidence" placeholder="e.g. board minute, letter reference" value={evidence} onChange={(e) => setEvidence(e.target.value)} />
             </>
@@ -765,7 +855,7 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
         </Stack>
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => save.mutate()} disabled={!o || !Number(amount) || reason.trim().length < 10 || !evidence.trim() || (kind === 'WAIVER' && !invoiceId) || save.isPending}>Submit</Button></DialogActions>
+        <Button variant="contained" onClick={() => save.mutate()} disabled={!o || (!byScheme && !Number(amount)) || (kind === 'SCHOLARSHIP' && !byScheme) || reason.trim().length < 10 || !evidence.trim() || (credit && !invoiceId) || save.isPending}>Submit</Button></DialogActions>
     </Dialog>
   );
 }

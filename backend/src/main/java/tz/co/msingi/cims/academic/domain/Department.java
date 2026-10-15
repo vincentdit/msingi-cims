@@ -21,4 +21,7 @@ public class Department extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    /** Optional faculty or school the department belongs to (FR-ACA-01). */
+    private Long facultyId;
 }

@@ -1,6 +1,7 @@
-import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, TableRow, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 
 export function Loading({ label }: { label?: string }) {
@@ -68,4 +69,18 @@ export function statusColour(status: string) {
 export function humanise(status: string) {
   if (STATUS_LABELS[status]) return STATUS_LABELS[status];
   return status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ');
+}
+
+/**
+ * A table row that opens a page, by click or by Enter. A row cannot be a link (<a> is not allowed inside <tbody>), so it
+ * navigates itself and is announced as a link.
+ */
+export function LinkRow({ to, children }: { to: string; children: ReactNode }) {
+  const navigate = useNavigate();
+  return (
+    <TableRow hover role="link" tabIndex={0} onClick={() => navigate(to)}
+      onKeyDown={(e) => { if (e.key === 'Enter') navigate(to); }} sx={{ cursor: 'pointer' }}>
+      {children}
+    </TableRow>
+  );
 }

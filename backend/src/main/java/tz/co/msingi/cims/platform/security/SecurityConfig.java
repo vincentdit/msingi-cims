@@ -42,10 +42,14 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/public/**",
             "/api/auth/login",
+            "/api/auth/mfa/verify",
+            "/api/auth/mfa/sms",
+            "/api/oauth/token",
             "/api/platform/auth/login",
             "/api/applicant-auth/**",
             "/api/student-auth/**",
             "/api/integrations/gepg/**",
+            "/api/integrations/collections/**",
             "/api/integrations/sms/**",
             "/actuator/health/**",
             "/v3/api-docs/**",
@@ -149,6 +153,11 @@ public class SecurityConfig {
             }
             if (roles != null) {
                 roles.forEach(r -> authorities.add(new SimpleGrantedAuthority("ROLE_" + r)));
+            }
+            // scopes only count on API client tokens, which carry no roles
+            List<String> scopes = jwt.getClaimAsStringList(tz.co.msingi.cims.integration.api.ApiClientService.CLAIM_SCOPES);
+            if (scopes != null && tz.co.msingi.cims.integration.api.ApiClientService.TYPE_API.equals(jwt.getClaimAsString(TokenService.CLAIM_USER_TYPE))) {
+                scopes.forEach(sc -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + sc)));
             }
             return new JwtAuthenticationToken(jwt, authorities, jwt.getClaimAsString(TokenService.CLAIM_NAME));
         }

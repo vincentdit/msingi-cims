@@ -41,12 +41,16 @@ public final class AcademicDtos {
         }
     }
 
-    public record DepartmentRequest(@NotBlank @Pattern(regexp = "[A-Z0-9_]{2,20}") String code, @NotBlank String name, boolean active) {
+    public record DepartmentRequest(@NotBlank @Pattern(regexp = "[A-Z0-9_]{2,20}") String code, @NotBlank String name, boolean active,
+                                    Long facultyId) {
+        public DepartmentRequest(String code, String name, boolean active) {
+            this(code, name, active, null);
+        }
     }
 
-    public record DepartmentView(Long id, String code, String name, boolean active) {
+    public record DepartmentView(Long id, String code, String name, boolean active, Long facultyId) {
         public static DepartmentView of(Department d) {
-            return new DepartmentView(d.getId(), d.getCode(), d.getName(), d.isActive());
+            return new DepartmentView(d.getId(), d.getCode(), d.getName(), d.isActive(), d.getFacultyId());
         }
     }
 

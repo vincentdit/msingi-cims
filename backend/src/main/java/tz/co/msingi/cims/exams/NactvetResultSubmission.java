@@ -41,4 +41,13 @@ public class NactvetResultSubmission extends TenantScopedEntity {
     private OffsetDateTime submittedAt = OffsetDateTime.now();
     private String responseByName;
     private OffsetDateTime responseAt;
+
+    /** FILE: the results file was sent outside CIMS; API: sent to NACTVET's results service, NACTVET's batch in externalRef. */
+    @Column(nullable = false)
+    private String channel = "FILE";
+    private String externalRef;
+    /** NACTVET's queries on individual students, as JSON [{registrationNo, reason}]. */
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String queries;
 }

@@ -31,10 +31,12 @@ This repository holds Release 1 build slices (**Foundation, Online Admission, Se
 | Clearance and graduation (FR-GRD-01..04, BR-29/30, BP-15, UC-18) | Finalists are found from published results: the latest published semester (after resits where there are any) is the programme's last, with a Pass and nothing outstanding; award, classification, GPA and credits are taken from it. Clearance offices are configured by Registry: the Head of the student's department, finance (cleared automatically when the student owes nothing and meets the graduation fees gate) and offices with assigned officers (library, hostel, sports and games by default). The student starts clearance on the portal (or Registry starts it); each office clears or holds with a reason, shown to the student and sent by SMS; the clearance completes when every office has cleared (SMS). Officers work from their office's queue; clearance officers and wardens see only Clearance. Graduations: Registry generates the graduand list from finalists with the award and full clearance (and sees who is not ready and why), sends it to the Governing Board; another administrator records the Board's approval with the minute reference or returns it; students become graduates and get an SMS. NACTVET graduand Excel file and a record of the submission and NACTVET's response. Award certificates: numbered once with a verification code and QR code, printed one by one or all together as A4 landscape PDF, every print logged and reprints marked and needing a reason; verifiable on the public verification page with minimal personal data. Reports GRD-01 (clearance status) and GRD-02 (graduand list) |
 | Hostels (FR-HST-01..05, BR-28, BRU-18, BP-12, UC-16) | Bed inventory kept by the warden: fee categories (per bed per academic year), hostels designated female, male or mixed (each room of a mixed hostel female or male), rooms with block, floor, type, accessibility and status, beds that can be put out of service; live occupancy per hostel. Application windows per academic year with the payment period and priority rules. Active students apply on the portal with up to three hostel choices, a room type and special needs, and can change or withdraw until allocated. Allocation, automatic or manual: never against the room's gender, special needs, first years and students meeting the hostel fees gate first (each rule can be switched off), then who applied first; preferred hostels, accessible rooms and the room type are tried in that order; those without a bed go on the waiting list (SMS). The database itself refuses a second active allocation of a bed. The hostel fee is invoiced with a GePG control number (SMS with the bed, amount, control number and pay-by date); allocations still unpaid after the payment period are released every morning (or on demand), their invoice cancelled, and the beds offered to the waiting list. Check-in once the fee is paid, with the room's condition; check-out with condition, damages and a damage charge invoiced. Wardens see only Hostels, Clearance and Reports. Reports HST-01 (occupancy by hostel and gender) and HST-02 (allocations) |
 | Industrial practical training (FR-IPT-01..03, BP-13) | The IPT Coordinator keeps placement organisations with contacts and how many students each can take, and IPT periods per semester linked to the IPT module, with the weights of the three marks (workplace supervisor, institution supervisor, logbook; adding up to 100) and how many logbook weeks must be approved first. Students propose a placement on the portal (an organisation in the list or a new one) until requests close; the coordinator confirms it with an institution supervisor (never beyond the organisation's capacity) or declines it with a note, or places students directly; both are sent by SMS. Numbered placement letters as PDF for the coordinator and the student. Students keep a weekly electronic logbook (no future weeks or weeks outside the placement), save drafts and submit; the institution supervisor approves or returns with a comment (SMS), records supervision visits and the marks; the IPT mark is computed when all three are in. The coordinator sends the IPT marks to the IPT module's results, which then go through the usual moderation, approval and publication. Lecturers see the students they supervise; the IPT Coordinator sees only Industrial training and Reports. Reports IPT-01 (placements by organisation) and IPT-02 (placement list) |
-| Finance | Itemised invoices, **GePG control numbers**, signed payment callback (idempotent), receipts, fee-paid event → application |
+| Finance | Itemised invoices, **GePG control numbers** for public institutions, signed payment callback (idempotent), receipts, fee-paid event → application |
+| Fee collection without GePG (private and faith-based institutions) | Ownership follows NACTVET (Public, Private, Faith-based/FBO; onboarding maps the catalogue's text). Only public institutions use GePG. Private and FBO institutions get a 12-digit **CIMS payment reference** per invoice ("8", institution id, six random digits, Luhn check digit) and list their own **payment methods** (Bursar, Finance › Payment methods): mobile money business numbers (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, Ezy Pesa, T-Pesa) and bank accounts (CRDB, NMB, NBC, Stanbic, Exim, Absa, Azania, DTB, Equity, KCB, TCB, PBZ, Amana, Mkombozi, others). Portals show step-by-step instructions per account in English and Kiswahili; SMS `PAYMENT_REFERENCE`. Payments are confirmed by the collector's HMAC-signed callback (`/api/integrations/collections/payment-notification`) or by importing the day's mobile money or bank statement on the reconciliation page; numbers issued before an ownership change are replaced on the next request |
 | Portal (React) | Branded, bilingual (English/Kiswahili), mobile-first admission portal and a staff back-office (dashboard, applications, windows, programmes) |
+| Back-office in Kiswahili (BR-40) | Every staff screen in English or Kiswahili, chosen on the staff sign-in page or in the menu (English/Kiswahili) and saved with the account (`user_accounts.language`, `PUT /api/account/language`), so it follows the person to another device and applies at sign-in; switching takes effect at once, without reloading. The staff screens are written in English and translated as React renders them: a JSX runtime of our own (`frontend/src/locale`, the `cims-jsx` import source) looks up text and label props (`label`, `title`, `placeholder`, `helperText`, …) in a dictionary of about 4,000 entries (`staff-sw.json`), including messages the server sends (errors, dashboard to-dos, report names and headings) and patterns for text built from values ("{0} result amendment(s) wait for the administrator."). Values, names, codes and anything typed are never translated; text with no entry stays in English, so a new screen is untranslated, never blank. Dates follow the language (Okt, Des). MUI's pagination and autocomplete wording is translated too |
 
-NECTA, NACTVET, GePG and SMS are **simulated** in development (see *What is simulated*).
+NECTA, NACTVET, GePG, the payment collector and SMS are **simulated** in development (see *What is simulated*).
 
 ---
 
@@ -45,16 +47,21 @@ backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
   src/main/java/tz/co/msingi/cims/
     platform/      tenancy, security, audit, numbering
     console/       Msingi platform console: platform users and sign-in, institutions, integration health, platform audit
-    integration/   NECTA and NACTVET clients; log/ records every call to outside systems
+    integration/   NECTA, NACTVET, HESLB, NIDA, MUSE and TAMISEMI clients (simulated and live); settings/; log/ records every call to outside systems
     academic/      years, intakes, departments, programmes
     admission/     windows, applicants, applications, eligibility engine
     registry/      students, registration numbers, hand-over, first registration
     finance/       fees, billing, invoices, control numbers, payments, GePG, clearance, reports
     notification/  SMS
     dev/           demo data seeder (dev profile only)
-  src/main/resources/db/migration/   V1–V38 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation, V12 = student portal, V13 = messaging, V14 = curricula, calendar and semester registration, V15 = examinations and results, V16 = resits, amendments, transcripts and NACTVET results submissions, V17 = class sessions, attendance and examination eligibility, V18 = clearance offices, clearances, graduations, graduands and certificates, V19 = hostels, rooms, beds, windows, applications and allocations, V20 = placement organisations, IPT periods, placements, logbooks, visits and assessments, V21 = admission window opening and closing record, V22 = applicants registered by NECTA index number, V23 = ward, village/street and fuller next-of-kin details, V24 = education history, V25 = NTA awards from NACTVET and other awards, V26 = qualification checks, V27 = changes after submission, V28 = programme entry level, V29 = institution photos, V30 = staff user management, V31 = student status changes, photos and ID cards, V32 = platform console: platform users, platform audit trail, integration log, V33 = NACTVET institution/programme catalogue, V34 = remarks and appeals, V35 = self check-in, V36 = NVA competence, V37 = sponsors, waivers/refunds and finance targets, V38 = hostel wardens and repairs)
-frontend/   React 18 · TypeScript · Vite · MUI
-nactvet-mock/  stand-in NACTVET admission verification server for trying the live adapter (see nactvet-mock/README.md)
+  src/main/resources/db/migration/   V1–V39 (V5 = row-level security, V6 = selection, V7 = NACTVET verification and offers, V8 = admission letters, V9 = students, V10 = fees, V11 = GePG reconciliation, V12 = student portal, V13 = messaging, V14 = curricula, calendar and semester registration, V15 = examinations and results, V16 = resits, amendments, transcripts and NACTVET results submissions, V17 = class sessions, attendance and examination eligibility, V18 = clearance offices, clearances, graduations, graduands and certificates, V19 = hostels, rooms, beds, windows, applications and allocations, V20 = placement organisations, IPT periods, placements, logbooks, visits and assessments, V21 = admission window opening and closing record, V22 = applicants registered by NECTA index number, V23 = ward, village/street and fuller next-of-kin details, V24 = education history, V25 = NTA awards from NACTVET and other awards, V26 = qualification checks, V27 = changes after submission, V28 = programme entry level, V29 = institution photos, V30 = staff user management, V31 = student status changes, photos and ID cards, V32 = platform console: platform users, platform audit trail, integration log, V33 = NACTVET institution/programme catalogue, V34 = remarks and appeals, V35 = self check-in, V36 = NVA competence, V37 = sponsors, waivers/refunds and finance targets, V38 = hostel wardens and repairs, V39 = FBO ownership, payment methods and payment references, … V48 = government integrations: settings, NIN, HESLB, MUSE, TAMISEMI, NACTVET registration and results by API)
+frontend/   React 18 · TypeScript · Vite 8 · MUI 6 · React Router 7
+nactvet-mock/  stand-in NACTVET server: admission verification, student registration, results (see nactvet-mock/README.md)
+gov-mocks/  stand-in GePG, HESLB, NIDA, MUSE and TAMISEMI servers for trying the live adapters (see gov-mocks/README.md)
+dev-keys/   TEST-ONLY GePG key pairs for CIMS and the GePG mock (never used with the real GePG)
+deploy/     production compose file, TLS proxy, PostgreSQL with WAL archiving, encrypted backups and restore (see deploy/README.md)
+loadtest/   k6 and Locust load tests for NFR-PER (see loadtest/README.md)
+.github/workflows/  CI (tests, build, images) and a manual load-test workflow
 docs/       Concept Note, BRD, SRS, Business Processes, Database Design, Architecture, Plan & Cost
 docker/db-init/  database role and databases for Docker (non-superuser app role)
 docker-compose.yml
@@ -63,7 +70,7 @@ docker-compose.yml
 ## Prerequisites
 
 - JDK 21 and Maven 3.9+
-- Node.js 20+ (22 recommended)
+- Node.js 22.12 or newer (Vite 8 and Vitest 5 need it; check with `node -v`)
 - PostgreSQL 16 (local install or via Docker)
 
 ## Quick start with Docker
@@ -171,6 +178,15 @@ cd backend
 .\mvnw.cmd test "-DskipITs"  # unit tests only
 ```
 
+Frontend unit tests (the Kiswahili dictionary and runtime):
+
+```bash
+cd frontend
+npm test
+```
+
+To add or correct Kiswahili for a staff screen, add the English text as it appears in the code (or as the server sends it) and its Kiswahili to `frontend/src/locale/staff-sw.json`; for text built from values use `{0}`, `{1}` … in both (`"{0} students": "Wanafunzi {0}"`). A status on a chip can be worded differently from a button with a `[label] ` key (`"[label] Open": "Wazi"`, `"Open": "Fungua"`).
+
 Integration tests run against real PostgreSQL so that row-level security, triggers and constraints are exercised. They include:
 
 - `TenantIsolationIT` — one institution cannot read or write another's rows (repository, native SQL, and API token checks);
@@ -224,12 +240,17 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `PORT` | `8085` | Backend HTTP port |
 | `CIMS_TEST_DB_URL` | `jdbc:postgresql://localhost:5434/cims_test` | Test database |
 | `CIMS_CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
-| `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter |
+| `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter (public institutions) |
+| `CIMS_EMAIL_MODE` / `CIMS_EMAIL_FROM` / `CIMS_SMTP_HOST` / `CIMS_SMTP_PORT` / `CIMS_SMTP_USERNAME` / `CIMS_SMTP_PASSWORD` | `simulated` / `no-reply@cims.msingi.co.tz` / `localhost` / `1027` | Email channel: `simulated` writes to the log and the outbox; `smtp` sends through the mail server. In development run `docker compose up -d mailpit` and use `CIMS_EMAIL_MODE=smtp` to read every email at http://localhost:8027 |
+| `CIMS_COLLECTION_MODE` / `CIMS_COLLECTION_CALLBACK_SECRET` | `simulated` / `change-me` | Private and FBO institutions: `statement` in production until a collector adapter is added (payments confirmed from statements and the signed callback) |
 | `CIMS_NECTA_MODE` | `simulated` | NECTA results: `simulated` or `live` (the NECTA results API, `POST /api/results/individual`) |
 | `NECTA_API_KEY` | — | NECTA results API key; required when `CIMS_NECTA_MODE=live`. For development it can sit in `backend/config/application-dev.yml` (not committed; copy `application-dev.yml.example`), which makes the dev profile use live NECTA |
 | `CIMS_NECTA_BASE_URL` | `https://api.necta.go.tz` | NECTA results API address |
 | `CIMS_NACTVET_MODE` | `simulated` | NACTVET admission verification: `simulated` (in CIMS) or `live` (HTTP, NOAS style). Live uses `CIMS_NACTVET_VERIFICATION_URL` (default the NACTE base URL) and `CIMS_NACTVET_VERIFICATION_AUTHORIZATION` / `CIMS_NACTVET_VERIFICATION_API_CODE` (default `NACTE_AUTHORIZATION` / `NACTE_API_CODE`); the paths are placeholders until NACTVET publishes the API (`CIMS_NACTVET_SUBMIT_PATH`, `CIMS_NACTVET_RESULTS_PATH`, `CIMS_NACTVET_CONFIRM_PATH`). The `nactvet-mock` profile points live mode at the `nactvet-mock` server on port 8099 |
 | `CIMS_NACTVET_AWARDS_MODE` / `NACTE_AUTHORIZATION` / `NACTE_API_CODE` | `simulated` / — / — | Applicants' NTA awards from NACTVET's particulars service (`live` needs the NACTE credentials; for development they can sit in `backend/config/application-dev.yml`, not committed) |
+| `CIMS_DATA_KEY` | development key (warning in the log) | Encrypts staff authenticator-app secrets: base64 of 32 random bytes (`openssl rand -base64 32`). **Set in production** and keep it safe — without it, staff must set up two-step sign-in again |
+| `CIMS_PORTAL_URL` | `https://{host}` (dev: `http://localhost:5173`) | The portal address in personal links sent by SMS and email (workplace assessment, tracer surveys) |
+| `CIMS_RETENTION_CRON` | `0 0 2 1 * *` | When retention runs (monthly, only for institutions that switched it on; `-` disables) |
 | `CIMS_OFFER_EXPIRY_CRON` | `0 5 * * * *` | When expired offers are closed (`-` disables) |
 | `CIMS_VERIFICATION_URL` | `https://{host}/verify/{code}` (dev: `http://localhost:5173/verify/{code}`) | Link encoded in letter QR codes; `{host}` is the institution's primary domain |
 
@@ -240,6 +261,69 @@ Behind a reverse proxy, set `server.forward-headers-strategy=native` (or `framew
 | `cims.platform.staff-login-url` | `https://{host}/staff/login` | Staff sign-in address shown to the platform console after onboarding |
 | `VITE_TENANT` (frontend) | — | Force an institution code in development |
 | `CIMS_API_URL` (frontend dev server) | `http://127.0.0.1:8085` | Where the Vite proxy sends `/api` |
+
+## Security and privacy
+
+- **Two-step sign-in (staff):** authenticator app (TOTP, RFC 6238) with 10 single-use recovery codes and an SMS code as a fall-back. The institution administrator chooses who must use it (Security & privacy → Sign-in & sessions): optional, privileged roles, or all staff. A lost phone is handled by another administrator (Users & roles → Reset two-step sign-in).
+- **Idle sign-out:** minutes without activity per user type (staff, students, applicants), with a minute's warning.
+- **Common passwords** (e.g. `Tanzania@2024`, `P@ssw0rd1`) are refused on sign-up, change and reset, even when they meet the complexity rule.
+- **Personal data (PDPA 2022):** everyone can download their data from their account and send a request (copy, correction, erasure, objection); the Registrar or administrator answers within 30 days. Erasure applies to applicants who never became students. Retention anonymises such applicants and clears old SMS/email texts after the periods the institution sets, with a preview first.
+
+## Data migration and external selections
+
+Staff → **Data import** brings records in from CSV or Excel (.xlsx); each tab has a template. Every row is checked first and the problems can be downloaded; nothing changes until **someone other than the uploader** signs the file off, when it is checked again and applied whole or not at all.
+
+| File | Who | What it does |
+|---|---|---|
+| Students | Registrar, administrator | Students from before CIMS (academic years not yet in CIMS are added). Each gets a student-portal sign-in by registration number; they set a password with *Forgot password* and their phone |
+| Earlier results | Registrar, Examinations Officer | One row per module, with the semester GPA and decision; shown with the student's record, on the student portal and in the results across years |
+| Opening balances | Bursar, Accountant | Positive = owed (an invoice); negative = paid in excess (credit used against the next invoice) |
+| External selections | Admissions Officer | Students selected by TAMISEMI or another body join a window as *selected*: NECTA results are fetched, they go to NACTVET verification and offers like any applicant, and an SMS asks them to sign up with their index number |
+
+## Government integrations
+
+Each outside system has a simulated adapter (development, tests) and a live one, chosen per deployment with
+`CIMS_<SYSTEM>_MODE=live`. Each institution enters its own codes and switches the optional exchanges on under
+**Administration → Integrations**. Every call is logged (platform console → Integrations, and the auditor's log).
+`gov-mocks` and `nactvet-mock` answer the live adapters on a developer's computer (profiles `dev,gov-mocks,nactvet-mock`).
+
+| System | What CIMS does | Live adapter |
+|---|---|---|
+| GePG (FR-INT-03) | Bill per invoice with a line per GFS code; control number by signed callback (pending until it arrives, SMS when it does); signed payment notifications; reconciliation asked for by API (*Ask GePG* on the reconciliation page) or imported from GePG's file | `LiveGepgGateway`: XML signed SHA1withRSA with the deployment's keystore, GePG's answers checked against its certificate; per-institution SP code, sub SP code, system id, default GFS code |
+| NACTVET registration (FR-REG-07) | Registrar sends the year's new students as a batch; each is registered or queried; queried students are corrected and sent again | `LiveNactvetSubmissionClient` (NOAS style, placeholder paths) |
+| NACTVET results (FR-EXM-11) | *Send to NACTVET* on a confirmed result sheet; NACTVET's acceptance or queries per student; the file route remains | as above |
+| HESLB (FR-INT-05) | Registration and continuation data out; beneficiaries in as HESLB sponsorships capped at what HESLB pays the institution; disbursements in, recorded against the HESLB sponsor invoice | `LiveHeslbClient` (JSON + API key, placeholder paths) |
+| NIDA (FR-INT-06) | NIN kept encrypted (AES-256-GCM, last four digits shown, keyed hash against duplicates); checked with NIDA against name and birth date when the institution uses it; entered by the student or the Registrar | `LiveNidaClient` |
+| MUSE (FR-INT-07) | Preview and post a period's collections: bank debited, revenue credited per GFS code; each period once | `LiveMuseClient` |
+| TAMISEMI (FR-INT-08) | Fetches the year's selections into a selections import awaiting a second person's sign-off | `LiveTamisemiClient` |
+
+## Deployment, CI and load tests
+
+- **Production**: `deploy/docker-compose.prod.yml` (PostgreSQL with WAL archiving, backend, web app, TLS proxy, encrypted
+  backups kept 35 days and 12 months, restore script). Start-up refuses development-only settings under the `prod`
+  profile. See `deploy/README.md`.
+- **CI**: `.github/workflows/ci.yml` runs the backend tests against PostgreSQL 16 with a non-superuser role, the mocks'
+  tests, the web app's type check and build, shell and compose checks, and builds the Docker images (pushed to GHCR on
+  version tags).
+- **Load tests**: `loadtest/k6/cims.js` and `loadtest/locust/locustfile.py` with the NFR-PER-01 thresholds; results in
+  `loadtest/README.md`.
+
+## Integration API (connected systems)
+
+Other systems (an LMS, accounting, a library system) read CIMS with OAuth2 client credentials. The administrator adds the system under Security & privacy → Connected systems, chooses what it may read and hands over the client ID and secret (shown once).
+
+```bash
+# a token (the institution comes from the host name, or X-Tenant in development)
+curl -s -X POST https://apply.college.ac.tz/api/oauth/token -u "$CLIENT_ID:$CLIENT_SECRET" -d grant_type=client_credentials
+# then, with "Authorization: Bearer <access_token>"
+GET /api/integration/v1/programmes                       # programmes:read
+GET /api/integration/v1/students?updatedSince=…&page=0   # students:read
+GET /api/integration/v1/students/{regNo}                 # students:read
+GET /api/integration/v1/students/{regNo}/results         # results:read (published results)
+GET /api/integration/v1/payments?since=2026-01-01T00:00:00Z   # payments:read
+```
+
+Tokens last an hour, work only on `/api/integration/v1/**`, and stop at once when the administrator switches the system off.
 
 ## How multi-tenancy works
 
@@ -257,13 +341,15 @@ Production notes: connect the application with a role that is **not** a superuse
 | Component | Now | Next |
 |---|---|---|
 | NECTA | `SimulatedNectaClient`; `LiveNectaClient` for the NECTA results API (switch with `CIMS_NECTA_MODE=live` and `NECTA_API_KEY`) | Caching NECTA answers; matching the names on later sittings with the registered names |
-| GePG | `SimulatedGepgGateway`, HMAC-signed callback; daily reconciliation by file import | Live adapter: signed bill submission and RSA signature verification per the GePG specification; fetching the reconciliation file through GePG's API on a schedule |
+| GePG | `SimulatedGepgGateway`; `LiveGepgGateway` (signed XML, control number and payment callbacks, reconciliation by API), tried end to end against `gov-mocks` | GePG UAT on-boarding (keys, SP codes) and a scheduled daily reconciliation request |
+| Payment collector (private/FBO) | `SimulatedCollectionGateway`; `StatementCollectionGateway` for production; generic HMAC-signed callback; statement import | An adapter for the chosen aggregator (e.g. Selcom, AzamPay, ClickPesa) or bank collection API with its own signature scheme and USSD push |
 | SMS | `SimulatedSmsGateway` (log only; 000 = unreachable, 999 = refused), outbox, delivery-report callback | Aggregator adapter (`SmsGateway`) for the chosen provider; email channel |
-| NACTVET | `SimulatedNactvetGateway` (outcomes by index number); `LiveNactvetGateway` over HTTP, tried end to end against the `nactvet-mock` server (processing delays, queries, multiple-admission confirmation, outages, wrong credentials) | NACTVET's real admission verification endpoints and field names (configuration only) |
+| NACTVET | Admission verification, student registration and results by API: simulated and live adapters, tried end to end against `nactvet-mock` | NACTVET's real endpoints and field names (configuration only) |
+| HESLB, NIDA, MUSE, TAMISEMI | Simulated and live adapters, tried end to end against `gov-mocks` | Each body's interface document and access (configuration only) |
 | Letters | HTML template (`templates/admission-letter.html`) → PDF | Per-institution letter templates and logo upload; email delivery |
 | Reconciliation | Daily GePG file import, exception handling, day close and Bursar sign-off (FR-FIN-05); sponsors, waivers and refunds | Bank statement reconciliation; instalment plans |
-| Registration | Hand-over, first registration, student requests to correct details, semester and module registration with fee clearance, status changes with HoD recommendation and Deputy Principal approval (FR-REG-04, BP-14), student photos and ID cards with QR verification and batch printing (FR-REG-06) | Carry-over and repeat modules (needs results), late-registration fee, NACTVET student registration (FR-REG-07) |
-| Examinations | NTA marks, moderation, approval, GPA, decisions, publication, supplementary and special examinations, amendments, statements of results, NACTVET results file (indicative layout) | Registering carried-over modules in the next year's semester registration, NVA competence records (FR-EXM-09), NACTVET's official results template and API, examination analytics across years (FR-EXM-14), final award transcripts at graduation |
+| Registration | Hand-over, first registration, student requests to correct details, semester and module registration with fee clearance, status changes with HoD recommendation and Deputy Principal approval (FR-REG-04, BP-14), student photos and ID cards with QR verification and batch printing (FR-REG-06) | Carry-over and repeat modules (needs results), late-registration fee |
+| Examinations | NTA marks, moderation, approval, GPA, decisions, publication, supplementary and special examinations, amendments, statements of results, NACTVET results file (indicative layout) | Registering carried-over modules in the next year's semester registration, NVA competence records (FR-EXM-09), NACTVET's official results template, examination analytics across years (FR-EXM-14), final award transcripts at graduation |
 | Teaching | Sessions and attendance entered by the lecturer, kept on the device while offline, eligibility lists and exemptions | Timetabling, check-in limited to the classroom (Wi-Fi or location), partitioning attendance by academic year at scale |
 | Graduation | Online clearance, graduand lists and Board approval, certificates with QR verification | Alumni contacts and tracer surveys (FR-GRD-05), signature images and security features on printed certificates, a final award transcript distinct from the statement of results |
 | Hostels | Inventory, applications, allocation, invoices, release of unpaid beds, check-in and check-out, wardens per hostel, repairs (FR-HST-06) | Room changes and swaps, refunds when a paid allocation is cancelled, discipline holds |

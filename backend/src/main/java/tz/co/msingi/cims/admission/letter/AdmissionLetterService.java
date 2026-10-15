@@ -25,6 +25,7 @@ import tz.co.msingi.cims.platform.tenancy.TenantContext;
 import tz.co.msingi.cims.platform.tenancy.TenantDomainRepository;
 import tz.co.msingi.cims.platform.tenancy.TenantRepository;
 
+import tz.co.msingi.cims.platform.letters.LetterTemplateService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -47,6 +48,9 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 public class AdmissionLetterService {
+
+    private final tz.co.msingi.cims.notification.email.EmailService email;
+    private final LetterTemplateService letterTemplates;
 
     private static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
 
@@ -158,7 +162,11 @@ public class AdmissionLetterService {
                 tenant.getContactPhone(), tenant.getContactEmail(), String.valueOf(branding.getOrDefault("primaryColor", "")),
                 letterNo, edition, LocalDate.now(ZONE), ap.fullName(), address(ap), app.getReferenceNo(), app.getNactvetVerificationNo(),
                 p.getName(), p.getAwardName(), p.getNactvetCode(), p.getDurationSemesters(), w.getAcademicYear().getCode(),
-                w.getIntake().getName(), app.getOfferRespondedAt(), w.getJoiningInstructions(), code, verificationUrl(tenant, code));
+                w.getIntake().getName(), app.getOfferRespondedAt(), w.getJoiningInstructions(), code, verificationUrl(tenant, code))
+                .withWording(Map.of(
+                        LetterTemplateService.ADMISSION_INTRO, letterTemplates.body(LetterTemplateService.ADMISSION_INTRO),
+                        LetterTemplateService.ADMISSION_TERMS, letterTemplates.body(LetterTemplateService.ADMISSION_TERMS),
+                        LetterTemplateService.ADMISSION_PAYMENT, letterTemplates.body(LetterTemplateService.ADMISSION_PAYMENT)));
 
         AdmissionLetter l = new AdmissionLetter();
         l.setApplication(app);
@@ -176,6 +184,16 @@ public class AdmissionLetterService {
                 reissueReason == null ? Map.of("letterNo", letterNo, "edition", edition)
                         : Map.of("letterNo", letterNo, "edition", edition, "reason", reissueReason));
         messaging.event(edition == 1 ? "LETTER_ISSUED" : "LETTER_REISSUED", ap.getPhone(), Map.of("programme", p.getName(), "verificationCode", code));
+        // the letter itself by email to a verified address (FR-ADM-13)
+        email.verifiedEmailForPhone(ap.getPhone()).ifPresent(to -> email.queue(to, ap.fullName(),
+                tz.co.msingi.cims.notification.email.EmailMessage.Kind.LETTER, edition == 1 ? "LETTER_ISSUED" : "LETTER_REISSUED",
+                (edition == 1 ? "Your admission letter — " : "Your corrected admission letter — ") + tenant.getName(),
+                "Dear " + ap.fullName() + ",\n\nYour admission letter for " + p.getName() + " (" + w.getAcademicYear().getCode() + ", "
+                        + w.getIntake().getName() + " intake) is attached, with the joining instructions.\n\nLetter number: " + letterNo
+                        + "\nVerification code: " + code + "\nAnyone can check the letter at " + verificationUrl(tenant, code)
+                        + "\n\n" + tenant.getName() + "\n(Sent by CIMS; please do not reply to this email.)",
+                new tz.co.msingi.cims.notification.email.EmailService.Attachment(letterNo.replaceAll("[^A-Za-z0-9]+", "-") + ".pdf",
+                        "application/pdf", AdmissionLetterRenderer.pdf(content))));
         return l;
     }
 

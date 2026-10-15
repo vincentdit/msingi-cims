@@ -1,0 +1,22 @@
+package tz.co.msingi.cims.academic.campus;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import tz.co.msingi.cims.common.BaseEntity;
+
+/** An optional faculty or school grouping departments (FR-ACA-01). */
+@Getter
+@Setter
+@Entity
+@Table(name = "faculties")
+public class Faculty extends BaseEntity {
+    @Column(nullable = false)
+    private String code;
+    @Column(nullable = false)
+    private String name;
+    @Column(nullable = false)
+    private boolean active = true;
+}

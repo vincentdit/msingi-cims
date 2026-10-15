@@ -41,6 +41,7 @@ public class Tenant {
     /** Registration number pattern (FR-REG-02); null means the default pattern. */
     private String registrationNoPattern;
 
+    /** NACTVET ownership: PUBLIC (government), PRIVATE or FBO (faith-based). It decides how fees are collected. */
     @Column(nullable = false)
     private String ownership = "PRIVATE";
 
@@ -84,5 +85,10 @@ public class Tenant {
 
     public TenantContext.TenantInfo toInfo() {
         return new TenantContext.TenantInfo(id, code);
+    }
+
+    /** Public institutions collect through GePG; private and faith-based ones into their own mobile money and bank accounts. */
+    public boolean usesGepg() {
+        return "PUBLIC".equals(ownership);
     }
 }

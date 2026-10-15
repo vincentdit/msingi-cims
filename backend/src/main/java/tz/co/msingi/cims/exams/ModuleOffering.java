@@ -53,6 +53,10 @@ public class ModuleOffering extends BaseEntity {
     private Status status = Status.DRAFT;
 
     private String returnedNote;
+
+    /** Approval stages passed after the Head of Department (FR-EXM-05). */
+    @Column(nullable = false)
+    private short stageNo;
     private String returnedByName;
     private OffsetDateTime returnedAt;
     private String submittedByName;

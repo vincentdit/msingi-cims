@@ -52,6 +52,8 @@ public class ApprovalsService {
         COMPETENCE_VERIFY("Competence outcomes (NVA)", "Head of Department"),
         STATUS_RECOMMEND("Student status change", "Head of Department"),
         STATUS_DECISION("Student status change", "Deputy Principal (Academic)"),
+        TRANSFER_RECOMMEND("Programme transfer", "Head of Department"),
+        TRANSFER_DECISION("Transfer", "Deputy Principal (Academic)"),
         APPEAL_ASSIGN("Remark or appeal", "Examinations Office"),
         APPEAL_FORWARD("Remark or appeal", "Examinations Office"),
         FIN_ADJUSTMENT("Waiver or refund", "Bursar"),
@@ -197,6 +199,32 @@ public class ApprovalsService {
                 }
             });
         }
+        if (hod.any() || committee) {
+            jdbc.query("""
+                    select t.id, t.kind, t.state, t.requested_by_student, t.requested_by_id, t.requested_by_name, t.requested_at,
+                           t.recommended_by_name, s.registration_no, s.first_name, s.surname, tp.code as to_code, tp.department_id
+                    from student_transfers t join students s on s.id = t.student_id join programmes tp on tp.id = t.to_programme_id
+                    where t.state in ('REQUESTED', 'RECOMMENDED')""", p, rs -> {
+                Long dept = rs.getObject("department_id") == null ? null : rs.getLong("department_id");
+                String kind = rs.getString("kind");
+                String title = (kind.equals("CAMPUS") ? "Campus transfer" : "Transfer to " + rs.getString("to_code")) + " · "
+                        + rs.getString("registration_no") + " " + rs.getString("first_name") + " " + rs.getString("surname");
+                boolean requested = "REQUESTED".equals(rs.getString("state"));
+                String who = rs.getBoolean("requested_by_student") ? "asked by the student" : "requested by Registry";
+                if (committee) {
+                    boolean own = !rs.getBoolean("requested_by_student")
+                            && Objects.equals(rs.getObject("requested_by_id") == null ? null : rs.getLong("requested_by_id"), me);
+                    String detail = who + (kind.equals("CAMPUS") ? "" : requested ? " · not yet recommended by the Head of Department"
+                            : " · recommended by " + rs.getString("recommended_by_name"));
+                    out.add(item(Kind.TRANSFER_DECISION, rs.getLong("id"), title, detail, rs.getString("requested_by_name"),
+                            rs.getObject("requested_at", OffsetDateTime.class), "/staff/transfers", !own,
+                            own ? "You requested this transfer; someone else decides it." : null));
+                } else if (requested && !kind.equals("CAMPUS") && hod.covers(dept)) {
+                    out.add(item(Kind.TRANSFER_RECOMMEND, rs.getLong("id"), title, who + " · into your department", rs.getString("requested_by_name"),
+                            rs.getObject("requested_at", OffsetDateTime.class), "/staff/transfers", true, null));
+                }
+            });
+        }
         if (examsOffice) {
             jdbc.query("""
                     select a.id, a.status, a.kind, a.requested_at, a.marked_at, a.examiner_name, s.registration_no, m.code,
@@ -224,7 +252,7 @@ public class ApprovalsService {
                 if ((pending && !bursar) || (!pending && !principal)) return;
                 boolean own = Objects.equals(rs.getLong("requested_by_id"), me)
                         || (!pending && Objects.equals(rs.getObject("first_by_id") == null ? null : rs.getLong("first_by_id"), me));
-                String what = ("WAIVER".equals(rs.getString("kind")) ? "Waiver" : "Refund") + " · " + rs.getString("registration_no") + " · TZS "
+                String what = (rs.getString("kind").charAt(0) + rs.getString("kind").substring(1).toLowerCase()) + " · " + rs.getString("registration_no") + " · TZS "
                         + String.format(java.util.Locale.ENGLISH, "%,.0f", rs.getBigDecimal("amount"));
                 out.add(item(pending ? Kind.FIN_ADJUSTMENT : Kind.FIN_ADJUSTMENT_SECOND, rs.getLong("id"), what,
                         pending ? rs.getString("adjustment_no") + " · requested" : rs.getString("adjustment_no") + " · approved by the Bursar; above the threshold",

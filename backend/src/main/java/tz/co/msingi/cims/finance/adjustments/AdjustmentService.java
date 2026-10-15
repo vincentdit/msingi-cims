@@ -11,6 +11,8 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.AdjustmentRequest;
 import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.AdjustmentView;
 import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.InvoiceOption;
+import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.SchemeRequest;
+import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.SchemeView;
 import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.SettingsView;
 import tz.co.msingi.cims.finance.adjustments.AdjustmentDtos.StudentOptions;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.InvoiceRepository;
@@ -102,19 +104,36 @@ public class AdjustmentService {
     public AdjustmentView request(AdjustmentRequest req) {
         if (!has(Role.INSTITUTION_ADMIN, Role.BURSAR, Role.ACCOUNTANT)) throw new AccessDeniedException("Only the bursary records waivers and refunds");
         Student s = student(req.studentId(), req.registrationNo());
-        BigDecimal amount = req.amount().setScale(2, RoundingMode.HALF_UP);
+        SchemeView scheme = null;
+        if (req.schemeId() != null) {
+            scheme = scheme(req.schemeId());
+            if (!scheme.active()) throw new BusinessRuleException("SCHEME_INACTIVE", scheme.name() + " is no longer offered");
+            if (!scheme.kind().equals(req.kind().name())) throw new BusinessRuleException("SCHEME_KIND", scheme.name() + " is a " + scheme.kind().toLowerCase());
+        } else if (req.kind() == FinanceAdjustment.Kind.SCHOLARSHIP) {
+            throw new BusinessRuleException("SCHEME_REQUIRED", "Choose the scholarship scheme");
+        }
+        if (req.amount() == null && scheme == null) throw new BusinessRuleException("AMOUNT_REQUIRED", "Give the amount");
+        BigDecimal amount = req.amount() == null ? null : req.amount().setScale(2, RoundingMode.HALF_UP);
         Invoice inv = null;
-        if (req.kind() == FinanceAdjustment.Kind.WAIVER) {
-            if (req.invoiceId() == null) throw new BusinessRuleException("INVOICE_REQUIRED", "Choose the invoice to waive");
+        if (req.kind() != FinanceAdjustment.Kind.REFUND) {
+            if (req.invoiceId() == null) throw new BusinessRuleException("INVOICE_REQUIRED", "Choose the invoice");
             inv = invoices.findById(req.invoiceId()).orElseThrow(() -> new NotFoundException("Invoice", req.invoiceId()));
             if (inv.getPayerType() != Invoice.PayerType.STUDENT || !inv.getPayerId().equals(s.getId())) {
                 throw new BusinessRuleException("NOT_STUDENTS_INVOICE", "That invoice is not " + s.getRegistrationNo() + "'s");
             }
             if (VOID.contains(inv.getStatus())) throw new BusinessRuleException("INVOICE_VOID", "That invoice is cancelled");
             BigDecimal room = waivable(inv);
+            if (scheme != null) {
+                BigDecimal computed = schemeAmount(scheme, inv).min(room);
+                if (computed.signum() <= 0) {
+                    throw new BusinessRuleException("NOTHING_TO_DISCOUNT", scheme.name() + " gives nothing on " + inv.getInvoiceNo()
+                            + (scheme.feeCategory() == null ? "" : " (it covers only " + scheme.feeCategory().toLowerCase() + " fees)"));
+                }
+                amount = computed;
+            }
             if (amount.compareTo(room) > 0) {
                 throw new BusinessRuleException("WAIVER_TOO_LARGE", "At most TZS " + tzs(room) + " of " + inv.getInvoiceNo()
-                        + " can be waived (what the student still owes, less sponsor shares and other waivers waiting)");
+                        + " can be credited (what the student still owes, less sponsor shares and other requests waiting)");
             }
         } else {
             BigDecimal room = refundable(s.getId(), credit(s.getId()));
@@ -128,6 +147,7 @@ public class AdjustmentService {
         a.setKind(req.kind());
         a.setStudentId(s.getId());
         a.setInvoiceId(inv == null ? null : inv.getId());
+        a.setSchemeId(scheme == null ? null : scheme.id());
         a.setAmount(amount);
         a.setReason(req.reason().trim());
         a.setEvidenceRef(req.evidenceRef().trim());
@@ -195,14 +215,14 @@ public class AdjustmentService {
     /** The approved waiver is posted to the invoice as a credit note; the approved refund becomes a voucher and uses up the credit. */
     private void apply(FinanceAdjustment a) {
         Student s = students.findById(a.getStudentId()).orElseThrow();
-        if (a.getKind() == FinanceAdjustment.Kind.WAIVER) {
+        if (a.isCredit()) {
             Invoice inv = invoices.findById(a.getInvoiceId()).orElseThrow();
             BigDecimal room = inv.balance().subtract(invoices.sponsorPending(inv.getId()));
             if (a.getAmount().compareTo(room) > 0) {
                 throw new BusinessRuleException("WAIVER_TOO_LARGE", "The invoice now has only TZS " + tzs(room.max(BigDecimal.ZERO)) + " to waive; reject this request and record a new one");
             }
             a.setDocumentNo(number("CN"));
-            billing.postDirect(inv, a.getAmount(), Payment.Source.INTERNAL, "WAIVER", a.getAdjustmentNo(), a.getDocumentNo(), OffsetDateTime.now());
+            billing.postDirect(inv, a.getAmount(), Payment.Source.INTERNAL, a.getKind().name(), a.getAdjustmentNo(), a.getDocumentNo(), OffsetDateTime.now());
         } else {
             BigDecimal left = a.getAmount();
             List<Payment> withCredit = studentPayments(s.getId()).stream().filter(p -> p.getUnallocatedAmount().signum() > 0)
@@ -260,7 +280,8 @@ public class AdjustmentService {
                 a.getRequestedByName(), a.getRequestedAt(), a.getFirstByName(), a.getFirstAt(), a.getSecondByName(), a.getSecondAt(), a.getDecisionNote(),
                 a.getDocumentNo(), a.getPaidReference(), a.getPaidAt(), waitingFor(a), can, can,
                 a.getKind() == FinanceAdjustment.Kind.REFUND && a.getStatus() == FinanceAdjustment.Status.APPROVED
-                        && has(Role.INSTITUTION_ADMIN, Role.BURSAR, Role.ACCOUNTANT));
+                        && has(Role.INSTITUTION_ADMIN, Role.BURSAR, Role.ACCOUNTANT),
+                a.getSchemeId(), a.getSchemeId() == null ? null : schemeName(a.getSchemeId()));
     }
 
     static String waitingFor(FinanceAdjustment a) {
@@ -323,7 +344,69 @@ public class AdjustmentService {
     }
 
     private static String label(FinanceAdjustment.Kind k) {
-        return k == FinanceAdjustment.Kind.WAIVER ? "waiver" : "refund";
+        return k.name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    // ------------------------------------------------------------------ discount and scholarship schemes (FR-FIN-08)
+
+    @Transactional(readOnly = true)
+    public List<SchemeView> schemes() {
+        return jdbc.query("select id, code, name, kind, basis, value, fee_category, description, active from fee_schemes order by kind, name", (rs, i) -> schemeRow(rs));
+    }
+
+    @Transactional
+    public SchemeView saveScheme(Long id, SchemeRequest req) {
+        if (!has(Role.INSTITUTION_ADMIN, Role.BURSAR)) throw new AccessDeniedException("Only the Bursar sets discount and scholarship schemes");
+        if (req.kind() != FinanceAdjustment.Kind.DISCOUNT && req.kind() != FinanceAdjustment.Kind.SCHOLARSHIP) {
+            throw new BusinessRuleException("SCHEME_KIND", "A scheme is a discount or a scholarship");
+        }
+        if ("PERCENT".equals(req.basis()) && req.value().compareTo(new BigDecimal("100")) > 0) {
+            throw new BusinessRuleException("PERCENT_TOO_HIGH", "A percentage cannot be more than 100");
+        }
+        String category = req.feeCategory() == null || req.feeCategory().isBlank() ? null : req.feeCategory().trim().toUpperCase(java.util.Locale.ROOT);
+        try {
+            if (id == null) {
+                id = jdbc.queryForObject("""
+                        insert into fee_schemes (tenant_id, code, name, kind, basis, value, fee_category, description, active)
+                        values (cims_current_tenant(), ?, ?, ?, ?, ?, ?, ?, ?) returning id""", Long.class,
+                        req.code(), req.name().trim(), req.kind().name(), req.basis(), req.value(), category, blank(req.description()), req.active());
+            } else if (jdbc.update("""
+                    update fee_schemes set code = ?, name = ?, kind = ?, basis = ?, value = ?, fee_category = ?, description = ?, active = ?,
+                    updated_at = now(), version = version + 1 where id = ?""", req.code(), req.name().trim(), req.kind().name(), req.basis(), req.value(),
+                    category, blank(req.description()), req.active(), id) == 0) {
+                throw new NotFoundException("Scheme", id);
+            }
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw new BusinessRuleException("CODE_EXISTS", "Scheme code " + req.code() + " is already used");
+        }
+        audit.record(id == null ? "CREATE" : "UPDATE", "FeeScheme", id, Map.of("code", req.code(), "kind", req.kind().name(), "basis", req.basis(), "value", req.value()));
+        return scheme(id);
+    }
+
+    private SchemeView scheme(Long id) {
+        return jdbc.query("select id, code, name, kind, basis, value, fee_category, description, active from fee_schemes where id = ?", (rs, i) -> schemeRow(rs), id)
+                .stream().findFirst().orElseThrow(() -> new NotFoundException("Scheme", id));
+    }
+
+    private String schemeName(Long id) {
+        return jdbc.queryForList("select name from fee_schemes where id = ?", String.class, id).stream().findFirst().orElse(null);
+    }
+
+    /** What a scheme gives on an invoice: a percentage of the lines it covers (by fee category) or a fixed amount, never more than they cost. */
+    private BigDecimal schemeAmount(SchemeView sc, Invoice inv) {
+        Map<Long, String> categories = new java.util.HashMap<>();
+        jdbc.query("select id, category from fee_items", rs -> { categories.put(rs.getLong(1), rs.getString(2)); });
+        BigDecimal base = inv.getLines().stream()
+                .filter(l -> !"PENALTY".equals(l.getFeeItemCode()))
+                .filter(l -> sc.feeCategory() == null || (l.getFeeItemId() != null && sc.feeCategory().equals(categories.get(l.getFeeItemId()))))
+                .map(l -> l.getAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal v = "PERCENT".equals(sc.basis()) ? base.multiply(sc.value()).divide(new BigDecimal("100"), 0, RoundingMode.HALF_UP) : sc.value();
+        return v.min(base).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static SchemeView schemeRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new SchemeView(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getBigDecimal(6),
+                rs.getString(7), rs.getString(8), rs.getBoolean(9));
     }
 
     static String tzs(BigDecimal v) {

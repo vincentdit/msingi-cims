@@ -22,14 +22,16 @@ public final class FeeRepositories {
         @EntityGraph(attributePaths = {"programme", "academicYear", "lines", "lines.feeItem"})
         List<FeeStructure> findByAcademicYearIdOrderByProgrammeCodeAscYearOfStudyAscStructureVersionDesc(Long academicYearId);
 
-        @EntityGraph(attributePaths = {"programme", "academicYear", "lines", "lines.feeItem"})
-        Optional<FeeStructure> findByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(Long academicYearId, Long programmeId,
-                                                                                          short yearOfStudy, FeeStructure.Status status);
-
         @Query("""
                 select coalesce(max(f.structureVersion), 0) from FeeStructure f
-                where f.academicYear.id = :academicYearId and f.programme.id = :programmeId and f.yearOfStudy = :yearOfStudy""")
-        int maxVersion(Long academicYearId, Long programmeId, short yearOfStudy);
+                where f.academicYear.id = :academicYearId and f.programme.id = :programmeId and f.yearOfStudy = :yearOfStudy
+                  and coalesce(f.intakeId, 0) = coalesce(:intakeId, 0) and coalesce(f.studentCategoryId, 0) = coalesce(:categoryId, 0)""")
+        int maxVersion(Long academicYearId, Long programmeId, short yearOfStudy, Long intakeId, Long categoryId);
+
+        /** Structures of one programme and year of study in a status, across intakes and categories (callers pick the variant). */
+        @EntityGraph(attributePaths = {"programme", "academicYear", "lines", "lines.feeItem"})
+        List<FeeStructure> findAllByAcademicYearIdAndProgrammeIdAndYearOfStudyAndStatus(Long academicYearId, Long programmeId,
+                                                                                         short yearOfStudy, FeeStructure.Status status);
     }
 
     public interface ClearanceGateRepository extends JpaRepository<ClearanceGate, Long> {

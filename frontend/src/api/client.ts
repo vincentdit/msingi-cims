@@ -177,8 +177,11 @@ export async function upload<T>(path: string, realm: Realm, file: File): Promise
 export const formatTzs = (n: number | undefined | null) =>
   n == null ? '—' : `TZS ${Number(n).toLocaleString('en-TZ', { maximumFractionDigits: 0 })}`;
 
+/** Dates in the language on screen: "14 Oct 2026" or "14 Okt 2026" (BR-40). */
+const dateLocale = () => (document.documentElement.lang === 'sw' ? 'sw-TZ' : 'en-GB');
+
 export const formatDate = (iso?: string) =>
-  iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  iso ? new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 export const formatDateTime = (iso?: string) =>
-  iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  iso ? new Date(iso).toLocaleString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
