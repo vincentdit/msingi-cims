@@ -27,7 +27,7 @@ test('the document verification page opens', async ({ page }) => {
 test('a student signs in and opens each tab', async ({ page }) => {
   const errors = watchErrors(page);
   await studentSignIn(page);
-  for (const path of ['/student/fees', '/student/results', '/student/register', '/student/notices', '/student/profile']) {
+  for (const path of ['/student/fees', '/student/timetable', '/student/results', '/student/register', '/student/notices', '/student/profile']) {
     await page.goto(path);
     await expectPageWorks(page);
   }

@@ -94,6 +94,9 @@ public class OfferingService {
     private final ExamAccess access;
     private final AuditService audit;
     private final tz.co.msingi.cims.teaching.TeachingRepositories.ExamEligibilityRepository eligibility;
+    private final tz.co.msingi.cims.academic.curriculum.CurriculumRepositories.ModuleRepository modules;
+    private final tz.co.msingi.cims.academic.domain.AcademicRepositories.ProgrammeRepository programmes;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // ------------------------------------------------------------------ set-up and allocation
 
@@ -141,6 +144,58 @@ public class OfferingService {
             created++;
         }
         audit.record("MODULE_OFFERINGS_SET_UP", "Semester", semesterId, Map.of("created", created, "skipped", skipped.size()));
+        return new SetupResult(created, skipped);
+    }
+
+    /**
+     * Creates an offering for every graded module the approved curricula place in this semester (by semester number), before students
+     * register, so lecturers can be allocated and the timetable planned (FR-TCH-01, FR-TCH-05). The regulations are those of the first
+     * NTA programme that has the module; modules already offered are left as they are.
+     */
+    @Transactional
+    public SetupResult fromCurricula(Long semesterId) {
+        access.require("set up module offerings", ExamAccess.ALLOCATORS);
+        Semester sem = semesters.findById(semesterId).orElseThrow(() -> new NotFoundException("Semester", semesterId));
+        int created = 0;
+        List<String> skipped = new ArrayList<>();
+        Map<Long, Long> programmeOf = new java.util.LinkedHashMap<>();
+        jdbc.query("""
+                select cm.module_id, p.id from curriculum_modules cm join curricula c on c.id = cm.curriculum_id and c.status = 'APPROVED'
+                join programmes p on p.id = c.programme_id join modules m on m.id = cm.module_id
+                where cm.semester_no = ? and m.active order by m.code, (p.award_family = 'NTA') desc, p.code""",
+                r -> {
+                    programmeOf.putIfAbsent(r.getLong(1), r.getLong(2));
+                }, sem.getSemesterNo());
+        for (Map.Entry<Long, Long> e : programmeOf.entrySet()) {
+            if (offerings.findBySemesterIdAndModuleId(semesterId, e.getKey()).isPresent()) continue;
+            Module m = modules.findById(e.getKey()).orElseThrow();
+            if (!access.has(Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.DEPUTY_PRINCIPAL_ACADEMIC) && !access.moderates(m)) continue;
+            if (m.getAssessmentType() == Module.AssessmentType.COMPETENCE) {
+                skipped.add(m.getCode() + ": competence-based (NVA) assessment is recorded separately");
+                continue;
+            }
+            Programme p = programmes.findById(e.getValue()).orElseThrow();
+            if (p.getAwardFamily() != Programme.AwardFamily.NTA) {
+                skipped.add(m.getCode() + ": NVA programmes are assessed by competence, recorded separately");
+                continue;
+            }
+            RegulationSet rs;
+            try {
+                rs = regulations.forLevel(p.getAwardFamily(), p.getAwardLevel(), sem.getAcademicYear());
+            } catch (BusinessRuleException ex) {
+                skipped.add(m.getCode() + ": " + ex.getMessage());
+                continue;
+            }
+            ModuleOffering o = new ModuleOffering();
+            o.setSemester(sem);
+            o.setModule(m);
+            o.setRegulationSet(rs);
+            if (rs.getCaWeight().signum() > 0) o.getComponents().add(component(o, "Coursework", AssessmentComponent.Category.CA, rs.getCaWeight(), 0));
+            if (rs.getSeWeight().signum() > 0) o.getComponents().add(component(o, "Semester examination", AssessmentComponent.Category.SE, rs.getSeWeight(), 1));
+            offerings.save(o);
+            created++;
+        }
+        audit.record("MODULE_OFFERINGS_FROM_CURRICULA", "Semester", semesterId, Map.of("created", created, "skipped", skipped.size()));
         return new SetupResult(created, skipped);
     }
 

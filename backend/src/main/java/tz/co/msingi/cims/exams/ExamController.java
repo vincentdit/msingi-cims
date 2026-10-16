@@ -128,6 +128,13 @@ public class ExamController {
         return offerings.setup(req.semesterId());
     }
 
+    /** Offerings for the modules the approved curricula place in the semester, before students register (to allocate and timetable). */
+    @PostMapping("/api/exams/offerings/from-curricula")
+    @PreAuthorize(ALLOCATORS)
+    public SetupResult fromCurricula(@Valid @RequestBody SetupRequest req) {
+        return offerings.fromCurricula(req.semesterId());
+    }
+
     @PutMapping("/api/exams/semesters/{id}/marks-window")
     @PreAuthorize(EXAMS_OFFICE)
     public void marksWindow(@PathVariable Long id, @RequestBody MarksWindowRequest req) {

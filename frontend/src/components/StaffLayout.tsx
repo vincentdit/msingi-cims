@@ -42,6 +42,8 @@ import LetterIcon from '@mui/icons-material/HistoryEdu';
 import IntegrationIcon from '@mui/icons-material/Hub';
 import AlumniIcon from '@mui/icons-material/Diversity3';
 import ImportIcon from '@mui/icons-material/DriveFolderUpload';
+import TimetableIcon from '@mui/icons-material/ViewWeek';
+import ExamTimetableIcon from '@mui/icons-material/EventNote';
 import IdleSignOut from './IdleSignOut';
 import { Alert, Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -81,6 +83,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   ] },
   { title: 'Teaching', items: [
     { page: 'myTeaching', to: '/staff/my-teaching', label: 'My teaching', icon: <MyTeachingIcon /> },
+    { page: 'timetable', to: '/staff/timetable', label: 'Timetable', icon: <TimetableIcon /> },
     { page: 'calendar', to: '/staff/calendar', label: 'Academic calendar', icon: <CalendarIcon /> },
     { page: 'curricula', to: '/staff/curricula', label: 'Curricula', icon: <CurriculumIcon /> },
     { page: 'teaching', to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon /> },
@@ -89,6 +92,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
   ] },
   { title: 'Examinations', items: [
     { page: 'examsOffice', to: '/staff/exams-office', label: 'Examinations office', icon: <OfficeIcon /> },
+    { page: 'examTimetable', to: '/staff/exam-timetable', label: 'Exam timetable', icon: <ExamTimetableIcon /> },
     { page: 'eligibility', to: '/staff/eligibility', label: 'Exam eligibility', icon: <EligibleIcon /> },
     { page: 'results', to: '/staff/results', label: 'Results', icon: <ResultsIcon /> },
     { page: 'appeals', to: '/staff/appeals', label: 'Remarks & appeals', icon: <AppealIcon /> },

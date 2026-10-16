@@ -1,5 +1,6 @@
 import NotificationsIcon from '@mui/icons-material/NotificationsOutlined';
 import ResultsIcon from '@mui/icons-material/GradingOutlined';
+import TimetableIcon from '@mui/icons-material/CalendarViewWeekOutlined';
 import HomeIcon from '@mui/icons-material/HomeOutlined';
 import RegisterIcon from '@mui/icons-material/HowToRegOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -23,6 +24,7 @@ import { useCallback } from 'react';
 const TABS = [
   { to: '/student', key: 'navHome', icon: <HomeIcon /> },
   { to: '/student/register', key: 'navRegister', icon: <RegisterIcon /> },
+  { to: '/student/timetable', key: 'navTimetable', icon: <TimetableIcon /> },
   { to: '/student/results', key: 'navResults', icon: <ResultsIcon /> },
   { to: '/student/fees', key: 'navFees', icon: <PaymentsIcon /> },
   { to: '/student/profile', key: 'navProfile', icon: <PersonIcon /> },
@@ -91,7 +93,7 @@ export default function StudentLayout() {
           <BottomNavigation showLabels value={current} onChange={(_, v) => navigate(v)}>
             {TABS.map((x) => (
               <BottomNavigationAction key={x.to} value={x.to} label={t(`student.${x.key}`)}
-                icon={x.icon} />
+                icon={x.icon} sx={{ minWidth: 0, px: 0.5, '& .MuiBottomNavigationAction-label': { fontSize: 11 } }} />
             ))}
           </BottomNavigation>
         </Paper>

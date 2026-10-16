@@ -53,4 +53,10 @@ public class Semester extends BaseEntity {
         if (lateRegistrationCloses != null && !today.isAfter(lateRegistrationCloses)) return Window.LATE;
         return Window.CLOSED;
     }
+
+    // ---- timetables (FR-TCH-05, FR-EXM-15): students see each one once it is published
+    private java.time.OffsetDateTime classTimetablePublishedAt;
+    private String classTimetablePublishedBy;
+    private java.time.OffsetDateTime examTimetablePublishedAt;
+    private String examTimetablePublishedBy;
 }

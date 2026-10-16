@@ -6,6 +6,7 @@ import { StudentFees, StudentHome, StudentLoginPage, StudentNotices, StudentProf
 import SemesterRegistrationPage from '../pages/student/SemesterRegistrationPage';
 import StudentResultsPage from '../pages/student/StudentResultsPage';
 import CheckInPage from '../pages/student/CheckInPage';
+import StudentTimetablePage from '../pages/student/StudentTimetablePage';
 
 export default function StudentApp() {
   return (
@@ -14,6 +15,7 @@ export default function StudentApp() {
       <Route element={<RequireAuth realm="student"><StudentLayout /></RequireAuth>}>
         <Route index element={<StudentHome />} />
         <Route path="register" element={<SemesterRegistrationPage />} />
+        <Route path="timetable" element={<StudentTimetablePage />} />
         <Route path="results" element={<StudentResultsPage />} />
         <Route path="check-in" element={<CheckInPage />} />
         <Route path="fees" element={<StudentFees />} />

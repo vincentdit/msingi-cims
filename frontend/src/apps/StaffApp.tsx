@@ -27,6 +27,7 @@ import { HostelPage } from '../pages/staff/HostelPages';
 import { IptPage } from '../pages/staff/IptPages';
 import { QualificationChecksPage } from '../pages/staff/QualificationChecks';
 import EntryTestPage from '../pages/staff/EntryTestPage';
+import { ExamTimetablePage, TimetablePage } from '../pages/staff/TimetablePages';
 import NoticesPage from '../pages/staff/NoticesPage';
 import MessagingPage from '../pages/staff/MessagingPage';
 import DashboardPage from '../pages/staff/DashboardPage';
@@ -68,6 +69,8 @@ export default function StaffApp() {
         <Route path="teaching/:id" element={<AttendancePage />} />
         <Route path="teaching/check-in/:sessionId" element={<CheckInScreenPage />} />
         <Route path="my-teaching" element={<MyTeachingPage />} />
+        <Route path="timetable" element={<TimetablePage />} />
+        <Route path="exam-timetable" element={<ExamTimetablePage />} />
         <Route path="competence" element={<CompetencePage />} />
         <Route path="competence/:id" element={<CompetenceUnitPage />} />
         <Route path="eligibility" element={<EligibilityPage />} />

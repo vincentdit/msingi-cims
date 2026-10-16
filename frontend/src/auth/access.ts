@@ -28,7 +28,7 @@ const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 
 export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'graduations'
-  | 'calendar' | 'curricula' | 'myTeaching' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
+  | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
   | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
@@ -46,6 +46,8 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   calendar: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.ADMISSIONS, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   curricula: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   myTeaching: [R.LECTURER, R.ASSESSOR, R.HOD, R.COORDINATOR, R.EXAMS],
+  timetable: [...TEACHING, R.REGISTRAR],
+  examTimetable: [...TEACHING, R.REGISTRAR],
   teaching: TEACHING,
   competence: TEACHING,
   marks: TEACHING,
@@ -80,7 +82,7 @@ export const can = (roles: readonly string[] | undefined, page: PageKey) => !!ro
 const PATH_PAGE: Record<string, PageKey> = {
   '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges', transfers: 'transfers',
   'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
-  'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
+  'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', timetable: 'timetable', 'exam-timetable': 'examTimetable', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations',
 };
