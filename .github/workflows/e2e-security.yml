@@ -117,4 +117,30 @@ jobs:
           docker run --rm -v "$PWD:/src" -w /src aquasec/trivy:0.58.1 fs \
             --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed \
             --skip-dirs dev-keys --skip-dirs frontend/node_modules --ignorefile .trivyignore.yaml \
-            --exit-code 1 .
+            --format json --output trivy.json --exit-code 1 .
+      - name: Findings as annotations and summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, collections
+          try:
+              data = json.load(open('trivy.json'))
+          except Exception as e:
+              print(f'::warning::No Trivy report ({e})'); raise SystemExit(0)
+          lines, per_target = [], collections.defaultdict(list)
+          for r in data.get('Results', []):
+              t = r.get('Target')
+              for v in r.get('Vulnerabilities') or []:
+                  per_target[t].append(f"{v['PkgName']} {v.get('InstalledVersion','')} -> {v.get('FixedVersion','?')} [{v['Severity']}] {v['VulnerabilityID']}")
+              for m in r.get('Misconfigurations') or []:
+                  if m.get('Status') == 'FAIL':
+                      per_target[t].append(f"{m.get('ID')} [{m.get('Severity')}] {m.get('Title')}")
+              for s in r.get('Secrets') or []:
+                  per_target[t].append(f"secret {s.get('RuleID')} [{s.get('Severity')}] line {s.get('StartLine')}")
+          for t, items in per_target.items():
+              # one annotation per file keeps within GitHub's annotation limits
+              print(f"::error file={t}::{len(items)} finding(s): " + ' | '.join(sorted(set(items)))[:60000])
+              lines += [f'- **{t}**: {i}' for i in sorted(set(items))]
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('## Trivy findings\n\n' + ('\n'.join(lines) if lines else 'None.') + '\n')
+          PY
