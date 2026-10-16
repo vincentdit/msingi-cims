@@ -13,7 +13,11 @@ export const STUDENT = {
 /** Fails the test on any uncaught error in the page. */
 export function watchErrors(page: Page): string[] {
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  // WebKit reports "Importing a module script failed." when a script load is cut short by the next navigation; a page
+  // whose code really failed to load is still caught by expectPageWorks (blank page or the error screen).
+  page.on('pageerror', (e) => {
+    if (!/^Importing a module script failed\.?$/.test(e.message)) errors.push(e.message);
+  });
   return errors;
 }
 
