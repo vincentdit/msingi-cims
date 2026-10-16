@@ -1,6 +1,7 @@
 # Java / Maven
 backend/target/
 nactvet-mock/target/
+gov-mocks/target/
 nactvet-mock/data/
 *.class
 *.log
