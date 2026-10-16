@@ -49,7 +49,7 @@ server:
 
 management:
   cloudfoundry:
-    enabled: false          # CIMS does not run on Cloud Foundry; also keeps CVE-2026-22733 out of reach
+    enabled: false          # CIMS does not run on Cloud Foundry
   endpoints:
     web:
       exposure:

@@ -43,7 +43,7 @@ NECTA, NACTVET, GePG, the payment collector and SMS are **simulated** in develop
 ## Project layout
 
 ```
-backend/    Spring Boot 3.3 · Java 21 · PostgreSQL 16 · Flyway
+backend/    Spring Boot 3.5 · Java 21 · PostgreSQL 16 · Flyway
   src/main/java/tz/co/msingi/cims/
     platform/      tenancy, security, audit, numbering
     console/       Msingi platform console: platform users and sign-in, institutions, integration health, platform audit
