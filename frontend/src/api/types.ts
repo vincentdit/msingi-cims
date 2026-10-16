@@ -2153,3 +2153,52 @@ export interface Transfer {
   recommendationNote?: string; decidedByName?: string; decidedAt?: string; decisionNote?: string;
   canRecommend: boolean; canDecide: boolean; canCancel: boolean;
 }
+
+// ============================================================ timetables (FR-TCH-05, FR-EXM-15)
+
+export type VenueKind = 'LECTURE_HALL' | 'CLASSROOM' | 'LABORATORY' | 'COMPUTER_LAB' | 'WORKSHOP' | 'OTHER';
+export interface VenueView {
+  id: number; code: string; name: string; kind: VenueKind; capacity: number; examCapacity?: number | null; examSeats: number;
+  campusId?: number | null; campusName?: string | null; active: boolean;
+}
+export interface SlotView {
+  id: number; offeringId: number; moduleCode: string; moduleTitle: string; kind: SessionKind; dayOfWeek: number; startTime: string; endTime: string;
+  venueId: number; venueCode: string; venueName: string; lecturerId?: number | null; lecturerName?: string | null; groupLabel?: string | null;
+  note?: string | null; students: number; changedSincePublished: boolean;
+}
+export interface TimetableCohort { programmeId: number; programmeCode: string; yearOfStudy: number; category: 'CORE' | 'ELECTIVE' }
+export interface TimetableOffering {
+  id: number; code: string; title: string; departmentName?: string | null; lecturers: Person[]; students: number; cohorts: TimetableCohort[];
+  minutesPerWeek: number; slots: number; canEdit: boolean;
+}
+export interface TimetableWarning { kind: string; severity: 'error' | 'warning' | 'info'; message: string; ids: number[] }
+export interface SemesterTimetable {
+  semesterId: number; semesterName: string; startDate: string; endDate: string; publishedAt?: string | null; publishedBy?: string | null;
+  canEdit: boolean; canPublish: boolean; offerings: TimetableOffering[]; slots: SlotView[]; venues: VenueView[]; warnings: TimetableWarning[];
+}
+export interface SlotRequest {
+  offeringId: number; kind: SessionKind; dayOfWeek: number; startTime: string; endTime: string; venueId: number; lecturerId?: number | null;
+  groupLabel?: string; note?: string;
+}
+export interface VenueRef { id: number; code: string; name: string; seats: number }
+export interface SittingView {
+  id: number; offeringId: number; moduleCode: string; moduleTitle: string; paper: string; date: string; startTime: string; endTime: string;
+  venues: VenueRef[]; invigilators: Person[]; candidates: number; seats: number; note?: string | null; changedSincePublished: boolean;
+}
+export interface ExamOffering { id: number; code: string; title: string; departmentName?: string | null; candidates: number; papers: number }
+export interface ExamTimetable {
+  semesterId: number; semesterName: string; startDate: string; endDate: string; publishedAt?: string | null; publishedBy?: string | null;
+  canEdit: boolean; offerings: ExamOffering[]; sittings: SittingView[]; venues: VenueView[]; staff: Person[]; warnings: TimetableWarning[];
+}
+export interface SittingRequest {
+  offeringId: number; paper?: string; date: string; startTime: string; endTime: string; venueIds: number[]; invigilatorIds: number[]; note?: string;
+}
+export interface TimetableSemesterOption { id: number; name: string; yearCode?: string | null; startDate: string; endDate: string }
+export interface MyTimetable {
+  semesters: TimetableSemesterOption[]; semester?: TimetableSemesterOption | null; classPublished: boolean; examPublished: boolean;
+  slots: SlotView[]; exams: { sitting: SittingView; invigilating: boolean }[];
+}
+export interface StudentTimetable {
+  semesterId?: number | null; semesterName?: string | null; classPublished: boolean; classPublishedAt?: string | null; examPublished: boolean;
+  examPublishedAt?: string | null; slots: SlotView[]; exams: SittingView[]; unscheduled: string[];
+}

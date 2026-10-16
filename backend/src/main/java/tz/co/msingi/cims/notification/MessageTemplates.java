@@ -201,6 +201,14 @@ public final class MessageTemplates {
                 List.of("module", "percent", "threshold", "institution"), Set.of(),
                 "Your attendance in {module} is {percent}. You need at least {threshold} to sit the examination. Please attend all classes.",
                 "Mahudhurio yako katika {module} ni {percent}. Unahitaji angalau {threshold} ili kufanya mtihani. Tafadhali hudhuria vipindi vyote.", s);
+        add("TIMETABLE_PUBLISHED", "Class timetable published", "Academic management publishes the class timetable of a semester", "Teaching",
+                List.of("semester", "institution"), Set.of(),
+                "{institution}: the class timetable for {semester} is out. See your classes and venues under Timetable on the student portal.",
+                "{institution}: ratiba ya vipindi ya {semester} imetoka. Angalia vipindi na kumbi zako kwenye Ratiba katika tovuti ya mwanafunzi.", s);
+        add("EXAM_TIMETABLE_PUBLISHED", "Examination timetable published", "The Examinations Office publishes the examination timetable of a semester", "Examinations",
+                List.of("semester", "institution"), Set.of(),
+                "{institution}: the examination timetable for {semester} is out. See the dates and venues of your papers under Timetable on the student portal.",
+                "{institution}: ratiba ya mitihani ya {semester} imetoka. Angalia tarehe na kumbi za mitihani yako kwenye Ratiba katika tovuti ya mwanafunzi.", s);
         add("EXAM_NOT_ELIGIBLE", "Not eligible for an examination", "The eligibility list shows a student may not sit a module's examination", "Examinations",
                 List.of("module", "semester", "reason", "institution"), Set.of(),
                 "You are not eligible to sit the {module} examination for {semester}: {reason}. Contact the Examinations Office.",

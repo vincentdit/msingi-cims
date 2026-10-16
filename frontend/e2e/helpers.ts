@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 /** Demo accounts seeded by the backend's dev profile (README › Demo data). */
 export const STAFF_PASSWORD: Record<string, string> = {
-  admin: 'Admin@2026', bursar: 'Bursar@2026', registry: 'Registry@2026', exams: 'Exams@2026', lecturer: 'Lecturer@2026',
+  admin: 'Admin@2026', bursar: 'Bursar@2026', registry: 'Registry@2026', exams: 'Exams@2026', lecturer: 'Lecturer@2026', academic: 'Academic@2026',
 };
 /** The student made by global-setup.ts (signs in with the mobile number). */
 export const STUDENT = {
