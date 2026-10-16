@@ -52,7 +52,7 @@ jobs:
         run: mvn -B -ntp verify
       - name: Test reports
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: backend-surefire-reports
           path: backend/target/surefire-reports/

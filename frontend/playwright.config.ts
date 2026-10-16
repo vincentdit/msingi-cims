@@ -7,6 +7,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // a fresh database has no students: make one through the API first (see e2e/global-setup.ts)
+  globalSetup: './e2e/global-setup.ts',
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

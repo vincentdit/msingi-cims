@@ -186,7 +186,11 @@ npm test
 ```
 
 End-to-end and accessibility tests (Playwright with axe, WCAG 2.1 A/AA) run against a running demo institution — start the
-backend with the dev profile and `npm run dev` first. CI runs them in Chromium, Firefox and WebKit and at phone size:
+backend with the dev profile and `npm run dev` first. CI runs them in Chromium, Firefox and WebKit and at phone size.
+Before the tests, `e2e/global-setup.ts` makes a demo student through the API if there is none (sign-up at simulated NECTA,
+application, selection, simulated NACTVET verification, offer, hand-over and first registration), so the tests also work on a
+fresh database; the student signs in with mobile number `0754990004` and password `Kifaru#Mto47`. In CI each failed test, and
+each Trivy finding, also appears as an annotation on the run:
 
 ```bash
 cd frontend

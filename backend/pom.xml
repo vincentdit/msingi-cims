@@ -19,6 +19,8 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- PostgreSQL JDBC driver above Spring Boot 3.3's default: fixes CVE-2025-49146, CVE-2026-42198 and CVE-2026-54291 -->
+        <postgresql.version>42.7.12</postgresql.version>
         <springdoc.version>2.6.0</springdoc.version>
         <junit-jupiter.version>5.10.5</junit-jupiter.version>
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>

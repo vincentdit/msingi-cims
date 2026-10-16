@@ -48,6 +48,8 @@ server:
     include-stacktrace: never
 
 management:
+  cloudfoundry:
+    enabled: false          # CIMS does not run on Cloud Foundry; also keeps CVE-2026-22733 out of reach
   endpoints:
     web:
       exposure:

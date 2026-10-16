@@ -1,5 +1,13 @@
 # Trivy findings accepted on purpose, each with its reason (trivy --ignorefile .trivyignore.yaml).
 # dev-keys/ is skipped in the workflow: TEST-ONLY GePG keys, password test-only-not-secret (dev-keys/README.md).
+vulnerabilities:
+  - id: CVE-2026-22733
+    paths:
+      - "backend/pom.xml"
+    statement: >-
+      Authentication bypass under the Actuator Cloud Foundry endpoints. It needs an authenticated endpoint mapped under
+      /cloudfoundryapplication; CIMS has none, and the Cloud Foundry endpoints are switched off (management.cloudfoundry.enabled:
+      false). Fixed properly by the Spring Boot 3.5 upgrade (3.5.12 or later), which is planned.
 misconfigurations:
   - id: DS002
     paths:
