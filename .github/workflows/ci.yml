@@ -49,7 +49,12 @@ jobs:
           cache: maven
       - name: Test
         working-directory: backend
-        run: mvn -B -ntp verify
+        run: |
+          set -o pipefail
+          mvn -B -ntp verify | tee build.log
+      - name: Compile errors and failed tests as annotations
+        if: failure()
+        run: python3 .github/scripts/maven-annotations.py backend backend/build.log
       - name: Test reports
         if: failure()
         uses: actions/upload-artifact@v6
@@ -74,7 +79,12 @@ jobs:
           cache: maven
       - name: Test
         working-directory: ${{ matrix.project }}
-        run: mvn -B -ntp verify
+        run: |
+          set -o pipefail
+          mvn -B -ntp verify | tee build.log
+      - name: Compile errors and failed tests as annotations
+        if: failure()
+        run: python3 .github/scripts/maven-annotations.py ${{ matrix.project }} ${{ matrix.project }}/build.log
 
   frontend:
     name: Web app

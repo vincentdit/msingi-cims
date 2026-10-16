@@ -23,3 +23,6 @@ backend/config/*.yml
 frontend/playwright-report/
 frontend/test-results/
 zap/
+
+# Maven output kept by CI
+build.log
