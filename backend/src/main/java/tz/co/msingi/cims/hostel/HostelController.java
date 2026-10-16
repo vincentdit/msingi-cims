@@ -50,6 +50,7 @@ public class HostelController {
     private final InventoryService inventory;
     private final AllocationService allocation;
     private final RepairService repairs;
+    private final BedChangeService bedChanges;
 
     // ------------------------------------------------------------------ repairs (FR-HST-06)
 
@@ -231,6 +232,20 @@ public class HostelController {
     @PreAuthorize(WARDENS)
     public AllocationView checkOut(@PathVariable Long id, @Valid @RequestBody CheckOutRequest req) {
         return allocation.checkOut(id, req);
+    }
+
+    /** Moves the student to another free bed (BP-12); the fee difference for the rest of the period is charged, waived or refunded. */
+    @PostMapping("/api/hostel/allocations/{id}/move")
+    @PreAuthorize(WARDENS)
+    public AllocationView move(@PathVariable Long id, @Valid @RequestBody HostelDtos.MoveRequest req) {
+        bedChanges.move(id, req.bedId(), req.reason());
+        return allocation.view(id);
+    }
+
+    @GetMapping("/api/hostel/allocations/{id}/changes")
+    @PreAuthorize(WARDENS)
+    public List<HostelDtos.BedChangeView> changes(@PathVariable Long id) {
+        return bedChanges.changes(id);
     }
 
     // ------------------------------------------------------------------ student portal

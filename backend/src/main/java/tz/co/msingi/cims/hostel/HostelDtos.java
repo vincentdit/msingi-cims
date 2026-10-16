@@ -80,7 +80,8 @@ public final class HostelDtos {
                                  String invoiceNo, String invoiceStatus, BigDecimal balance, String controlNo, LocalDate payBy, String method,
                                  String allocatedByName, OffsetDateTime allocatedAt, OffsetDateTime checkedInAt, String checkedInByName,
                                  String checkInCondition, OffsetDateTime checkedOutAt, String checkedOutByName, String checkOutCondition,
-                                 String damages, BigDecimal damageCharge, String damageInvoiceNo, OffsetDateTime releasedAt, String releaseReason) {
+                                 String damages, BigDecimal damageCharge, String damageInvoiceNo, OffsetDateTime releasedAt, String releaseReason,
+                                 RefundView refund, int bedChanges) {
     }
 
     public record ApplicationView(Long id, Long windowId, Long studentId, String registrationNo, String studentName, String sex,
@@ -104,7 +105,25 @@ public final class HostelDtos {
     public record ReasonRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
-    public record CheckOutRequest(@Size(max = 500) String condition, @Size(max = 500) String damages, @DecimalMin("0") BigDecimal damageCharge) {
+    /** refundUnused: raise a refund of the unused part of the paid fee (the rest of the occupancy period) for the bursary to decide. */
+    public record CheckOutRequest(@Size(max = 500) String condition, @Size(max = 500) String damages, @DecimalMin("0") BigDecimal damageCharge,
+                                  Boolean refundUnused) {
+        public CheckOutRequest(String condition, String damages, BigDecimal damageCharge) {
+            this(condition, damages, damageCharge, null);
+        }
+    }
+
+    public record MoveRequest(@NotNull Long bedId, @NotBlank @Size(min = 5, max = 500) String reason) {
+    }
+
+    /** A move to another bed and what it did to the fee: charged on a new invoice, or waived or refunded once the bursary approves. */
+    public record BedChangeView(Long id, String fromBed, String toBed, BigDecimal oldFee, BigDecimal newFee, BigDecimal difference,
+                                String invoiceNo, String adjustmentNo, String adjustmentKind, String adjustmentStatus, String reason,
+                                String changedByName, OffsetDateTime changedAt) {
+    }
+
+    /** What happened to the money when a stay ended early or was cancelled after paying. */
+    public record RefundView(String adjustmentNo, BigDecimal amount, String status) {
     }
 
     public record FreeBed(Long bedId, String hostel, String room, String bed, String roomType, String gender, boolean accessible, BigDecimal fee) {

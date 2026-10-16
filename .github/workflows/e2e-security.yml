@@ -24,7 +24,7 @@ permissions:
 jobs:
   e2e:
     name: Browsers, accessibility and ZAP baseline
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     services:
       postgres:
@@ -41,7 +41,7 @@ jobs:
       CIMS_DB_PASSWORD: cims
       E2E_BASE_URL: http://127.0.0.1:5173
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Application role and database, as in production
         env:
@@ -51,7 +51,7 @@ jobs:
             -c "CREATE ROLE cims LOGIN PASSWORD 'cims' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS" \
             -c "CREATE DATABASE cims OWNER cims"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -64,7 +64,7 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:8085/api/public/institution > /dev/null && exit 0; sleep 3; done
           echo "backend did not start"; tail -100 ../backend.log; exit 1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -95,7 +95,7 @@ jobs:
 
       - name: Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-and-zap-reports
           path: |
@@ -108,13 +108,13 @@ jobs:
 
   trivy:
     name: Trivy (dependencies, secrets, Dockerfiles)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Scan the repository
         run: |
           docker run --rm -v "$PWD:/src" -w /src aquasec/trivy:0.58.1 fs \
             --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed \
-            --skip-dirs dev-keys --skip-dirs frontend/node_modules --ignorefile .trivyignore \
+            --skip-dirs dev-keys --skip-dirs frontend/node_modules --ignorefile .trivyignore.yaml \
             --exit-code 1 .

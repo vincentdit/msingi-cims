@@ -245,6 +245,95 @@ class HostelIT {
         s.call(post("/api/hostel/repairs"), warden2, "{\"hostelId\":" + kili + ",\"category\":\"PLUMBING\",\"description\":\"Tap leaks\"}").andExpect(status().isForbidden());
     }
 
+    @Test
+    void bedChangesChargeOrRefundTheDifferenceAndEndingAStayEarlyIsRefunded() throws Exception {
+        data.staff(inst.tenant(), "bursar", Role.BURSAR);
+        String bursar = s.staffToken("bursar");
+        Students st = students();
+        long std = s.body(s.call(post("/api/hostel/fee-categories"), warden, "{\"code\":\"STD\",\"name\":\"Standard\",\"amount\":300000}")).get("id").asLong();
+        long prm = s.body(s.call(post("/api/hostel/fee-categories"), warden, "{\"code\":\"PRM\",\"name\":\"Premium\",\"amount\":420000}")).get("id").asLong();
+        long kili = hostel("KILI", "Kilimanjaro", "FEMALE"), sere = hostel("SERE", "Serengeti", "MALE");
+        long bedA1 = s.body(s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "1", "DOUBLE", null, std, false, "AVAILABLE", 2))).at("/beds/0/id").asLong();
+        long bedA2 = s.body(s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "2", "SINGLE", null, prm, false, "AVAILABLE", 1))).at("/beds/0/id").asLong();
+        long bedA3 = s.body(s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "3", "SINGLE", null, std, false, "AVAILABLE", 1))).at("/beds/0/id").asLong();
+        long bedS1 = s.body(s.call(post("/api/hostel/rooms"), warden, room(sere, "", "1", "SINGLE", null, std, false, "AVAILABLE", 1))).at("/beds/0/id").asLong();
+        // occupancy period of 100 days, 10 of them gone: 90% of the year is left today
+        long win = s.body(s.call(post("/api/hostel/windows"), warden, "{\"academicYearId\":" + yearId + ",\"name\":\"Hostels 2027/2028\",\"opensOn\":\""
+                + TODAY.minusDays(1) + "\",\"closesOn\":\"" + TODAY.plusDays(10) + "\",\"occupancyStarts\":\"" + TODAY.minusDays(10)
+                + "\",\"occupancyEnds\":\"" + TODAY.plusDays(89) + "\",\"paymentDays\":7}")).get("id").asLong();
+        for (String t : List.of(st.aToken, st.bToken, st.cToken)) s.call(post("/api/student/hostel/applications"), t, apply(win, kili, false)).andExpect(status().isOk());
+        Map<String, JsonNode> apps = byRegNo(s.body(s.call(get("/api/hostel/windows/" + win + "/applications"), warden, null)));
+        long aAlloc = s.body(s.call(post("/api/hostel/allocations"), warden, "{\"applicationId\":" + apps.get(st.a).get("id").asLong() + ",\"bedId\":" + bedA1 + "}"))
+                .get("id").asLong();
+        s.call(post("/api/student/invoices/" + allocation(win, st.a).get("invoiceId").asLong() + "/simulate-payment"), st.aToken, "{}").andExpect(status().isOk());
+
+        // a moves to the premium room: 90% of the 120,000 difference is billed on a new invoice
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), lecturer, "{\"bedId\":" + bedA2 + ",\"reason\":\"Asked for a single room\"}").andExpect(status().isForbidden());
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedA1 + ",\"reason\":\"No change at all\"}").andExpect(jsonPath("$.code").value("SAME_BED"));
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedS1 + ",\"reason\":\"Wrong hostel here\"}").andExpect(jsonPath("$.code").value("GENDER_MISMATCH"));
+        JsonNode moved = s.body(s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedA2 + ",\"reason\":\"Asked for a single room\"}")
+                .andExpect(status().isOk()));
+        assertThat(moved.get("room").asText()).isEqualTo("A · Room 2");
+        assertThat(moved.get("bedChanges").asInt()).isEqualTo(1);
+        assertThat(moved.get("fee").decimalValue()).isEqualByComparingTo("408000");
+        JsonNode changes = s.body(s.call(get("/api/hostel/allocations/" + aAlloc + "/changes"), warden, null));
+        assertThat(changes.at("/0/difference").decimalValue()).isEqualByComparingTo("108000");
+        assertThat(changes.at("/0/invoiceNo").asText()).isNotBlank();
+        assertThat(changes.at("/0/fromBed").asText()).isEqualTo("Kilimanjaro, A · Room 1, bed A");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode")).contains("HOSTEL_BED_CHANGED");
+
+        // and back to a standard room: the paid fee is now too high, so a refund of 108,000 waits for the bursary
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedA3 + ",\"reason\":\"Prefers to share costs\"}").andExpect(status().isOk());
+        JsonNode back = s.body(s.call(get("/api/hostel/allocations/" + aAlloc + "/changes"), warden, null)).get(0);
+        assertThat(back.get("difference").decimalValue()).isEqualByComparingTo("-108000");
+        assertThat(back.get("adjustmentKind").asText()).isEqualTo("REFUND");
+        assertThat(back.get("adjustmentStatus").asText()).isEqualTo("PENDING");
+        long refundId = s.body(s.call(get("/api/finance/adjustments"), bursar, null)).findParents("adjustmentNo").stream()
+                .filter(x -> x.get("adjustmentNo").asText().equals(back.get("adjustmentNo").asText())).findFirst().orElseThrow().get("id").asLong();
+        long hostelInvoice = allocation(win, st.a).get("invoiceId").asLong();
+        JsonNode done = s.body(s.call(post("/api/finance/adjustments/" + refundId + "/approve"), bursar, "{}").andExpect(status().isOk()));
+        assertThat(done.get("status").asText()).isEqualTo("APPROVED");
+        assertThat(done.get("documentNo").asText()).contains("RFV");
+        assertThat(invoiceTotals(hostelInvoice)).containsExactly(new BigDecimal("192000.00"), new BigDecimal("192000.00"));
+
+        // checked in, then out a day later with the unused part refunded (89 of 100 days of what was paid)
+        s.call(post("/api/hostel/allocations/" + aAlloc + "/check-in"), warden, "{}").andExpect(jsonPath("$.status").value("CHECKED_IN"));
+        JsonNode out = s.body(s.call(post("/api/hostel/allocations/" + aAlloc + "/check-out"), warden, "{\"condition\":\"Clean\",\"refundUnused\":true}")
+                .andExpect(status().isOk()));
+        assertThat(out.at("/refund/amount").decimalValue()).isEqualByComparingTo("170880");
+        assertThat(out.at("/refund/status").asText()).isEqualTo("PENDING");
+
+        // b paid and is cancelled before check-in: everything paid is offered back
+        long bAlloc = s.body(s.call(post("/api/hostel/allocations"), warden, "{\"applicationId\":" + apps.get(st.b).get("id").asLong() + ",\"bedId\":" + bedA1 + "}"))
+                .get("id").asLong();
+        s.call(post("/api/student/invoices/" + allocation(win, st.b).get("invoiceId").asLong() + "/simulate-payment"), st.bToken, "{}").andExpect(status().isOk());
+        JsonNode cancelled = s.body(s.call(post("/api/hostel/allocations/" + bAlloc + "/cancel"), warden, "{\"reason\":\"Moving to family in town\"}").andExpect(status().isOk()));
+        assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(cancelled.at("/refund/amount").decimalValue()).isEqualByComparingTo("300000");
+
+        // c has an unpaid bed and withdraws: the bed is released and its invoice cancelled
+        long cAlloc = s.body(s.call(post("/api/hostel/allocations"), warden, "{\"applicationId\":" + apps.get(st.c).get("id").asLong() + ",\"bedId\":" + bedA1 + "}"))
+                .get("id").asLong();
+        long cId = TenantContext.callAs(inst.info(), () -> tx.execute(t -> jdbc.queryForObject("select id from students where registration_no = ?", Long.class, st.c)));
+        long change = s.body(s.call(post("/api/registry/students/" + cId + "/status-changes"), registrar,
+                "{\"type\":\"WITHDRAWAL\",\"reason\":\"Joined another college\",\"effectiveDate\":\"" + TODAY + "\"}")).get("id").asLong();
+        s.call(post("/api/registry/status-changes/" + change + "/decision"), dpa, "{\"approve\":true}").andExpect(jsonPath("$.state").value("APPLIED"));
+        JsonNode cView = allocation(win, st.c);
+        assertThat(cView.get("id").asLong()).isEqualTo(cAlloc);
+        assertThat(cView.get("status").asText()).isEqualTo("RELEASED");
+        assertThat(cView.get("invoiceStatus").asText()).isEqualTo("CANCELLED");
+    }
+
+    private JsonNode allocation(long window, String regNo) throws Exception {
+        return s.body(s.call(get("/api/hostel/windows/" + window + "/allocations"), warden, null)).findParents("registrationNo").stream()
+                .filter(x -> x.get("registrationNo").asText().equals(regNo)).findFirst().orElseThrow();
+    }
+
+    private List<BigDecimal> invoiceTotals(long invoiceId) {
+        return TenantContext.callAs(inst.info(), () -> tx.execute(t -> jdbc.queryForObject("select total_amount, paid_amount from invoices where id = ?",
+                (rs, n) -> List.of(rs.getBigDecimal(1), rs.getBigDecimal(2)), invoiceId)));
+    }
+
     private long userId(String username) {
         return TenantContext.callAs(inst.info(), () -> tx.execute(t -> jdbc.queryForObject("select id from user_accounts where username = ?", Long.class, username)));
     }

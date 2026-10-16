@@ -121,7 +121,9 @@ export default function SemesterRegistrationsPage() {
                       <TableCell>{r.yearOfStudy}</TableCell>
                       <TableCell align="right">{r.modules.length}</TableCell>
                       <TableCell align="right">{num(r.totalCredits)}</TableCell>
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(r.submittedAt)}{r.late && <Chip size="small" color="warning" variant="outlined" label="Late" sx={{ ml: 1 }} />}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(r.submittedAt)}{r.late && <Chip size="small" color="warning" variant="outlined" label="Late" sx={{ ml: 1 }} />}
+                        {r.lateFee && r.lateFee.status !== 'CANCELLED' && <Chip size="small" variant="outlined" sx={{ ml: 0.5 }}
+                          color={r.lateFee.balance > 0 ? 'warning' : 'success'} label={r.lateFee.balance > 0 ? 'Late fee unpaid' : 'Late fee paid'} />}</TableCell>
                       <TableCell><Chip size="small" color={STATUS_COLOUR[r.status]} label={STATUS_LABEL[r.status]} /></TableCell>
                     </TableRow>
                   ))}
@@ -169,6 +171,12 @@ function RegistrationDialog({ reg, canDecide, onClose, onDone }: { reg: Semester
             <Typography variant="body2" sx={{ fontWeight: 700 }}>{num(reg.totalCredits)}</Typography>
           </Stack>
         </Stack>
+        {reg.lateFee && reg.lateFee.status !== 'CANCELLED' && (
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            <strong>Late registration fee:</strong> {formatTzs(reg.lateFee.amount)} on invoice {reg.lateFee.invoiceNo}
+            {reg.lateFee.balance > 0 ? ` · ${formatTzs(reg.lateFee.balance)} unpaid` : ' · paid'}
+          </Typography>
+        )}
         <Typography variant="body2" sx={{ mt: 2 }}>
           <strong>Fee clearance when submitted:</strong>{' '}
           {!c || c.enabled === false ? 'not required' : c.cleared ? 'cleared' : `not cleared${c.amountNeeded ? ` (${formatTzs(c.amountNeeded)} to pay)` : ''}`}

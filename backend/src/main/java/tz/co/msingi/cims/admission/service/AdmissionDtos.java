@@ -192,7 +192,12 @@ public final class AdmissionDtos {
             @NotNull @PositiveOrZero BigDecimal applicationFee,
             @Min(1) @Max(10) short maxChoices,
             @Min(1) @Max(90) Short offerAcceptanceDays,
-            String instructions) {
+            String instructions,
+            Boolean feeReminders) {
+        public WindowRequest(Long academicYearId, Long intakeId, String name, OffsetDateTime opensAt, OffsetDateTime closesAt,
+                             BigDecimal applicationFee, short maxChoices, Short offerAcceptanceDays, String instructions) {
+            this(academicYearId, intakeId, name, opensAt, closesAt, applicationFee, maxChoices, offerAcceptanceDays, instructions, null);
+        }
     }
 
     public record WindowProgrammeRequest(@NotNull Long programmeId, @Min(1) int capacity, @NotNull @Valid EntryRules entryRules) {
@@ -212,13 +217,14 @@ public final class AdmissionDtos {
     public record WindowView(Long id, String name, Long academicYearId, String academicYear, Long intakeId, String intake,
                              OffsetDateTime opensAt, OffsetDateTime closesAt, BigDecimal applicationFee, short maxChoices,
                              short offerAcceptanceDays, String status, boolean open, String instructions,
-                             JoiningInstructions joiningInstructions, List<WindowProgrammeView> programmes, String state) {
+                             JoiningInstructions joiningInstructions, List<WindowProgrammeView> programmes, String state, boolean feeReminders) {
         public static WindowView of(AdmissionWindow w, List<WindowProgramme> programmes) {
             return new WindowView(w.getId(), w.getName(), w.getAcademicYear().getId(), w.getAcademicYear().getCode(),
                     w.getIntake().getId(), w.getIntake().getName(), w.getOpensAt(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), w.getOfferAcceptanceDays(), w.getStatus().name(), w.isOpen(OffsetDateTime.now()), w.getInstructions(),
                     w.getJoiningInstructions(),
-                    programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList(), w.state(OffsetDateTime.now()));
+                    programmes == null ? null : programmes.stream().map(WindowProgrammeView::of).toList(), w.state(OffsetDateTime.now()),
+                    w.isFeeReminders());
         }
     }
 

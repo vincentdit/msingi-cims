@@ -48,6 +48,15 @@ public class AdmissionAdminController {
     private final tz.co.msingi.cims.admission.service.QualificationCheckService qualificationChecks;
     private final ApplicationService applications;
     private final tz.co.msingi.cims.admission.service.ApplicantFileService files;
+    private final tz.co.msingi.cims.admission.service.EntryTestService entryTests;
+
+    /** Entry-rule test tool: a sample applicant's results against every programme of the window (nothing is saved). */
+    @PostMapping("/windows/{id}/entry-test")
+    @PreAuthorize(READ)
+    public tz.co.msingi.cims.admission.service.EntryTestService.TestResult entryTest(@PathVariable Long id,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody tz.co.msingi.cims.admission.service.EntryTestService.TestRequest req) {
+        return entryTests.test(id, req);
+    }
 
     @GetMapping("/windows")
     @PreAuthorize(READ)

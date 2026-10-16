@@ -57,6 +57,10 @@ public class AdmissionWindow extends BaseEntity {
     @Column(nullable = false)
     private short maxChoices = 3;
 
+    /** Applicants who asked for a control number but have not paid are reminded by SMS (BP-02). */
+    @Column(nullable = false)
+    private boolean feeReminders = true;
+
     /** Days a verified applicant has to accept the offer (BP-04). */
     @Column(nullable = false)
     private short offerAcceptanceDays = 14;

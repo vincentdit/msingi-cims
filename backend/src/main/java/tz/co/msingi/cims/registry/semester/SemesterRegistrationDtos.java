@@ -26,7 +26,12 @@ public final class SemesterRegistrationDtos {
     }
 
     public record SemesterInfo(Long id, String name, String academicYear, short semesterNo, LocalDate startDate, LocalDate endDate,
-                               LocalDate registrationOpens, LocalDate registrationCloses, LocalDate lateRegistrationCloses, String window) {
+                               LocalDate registrationOpens, LocalDate registrationCloses, LocalDate lateRegistrationCloses, String window,
+                               BigDecimal lateRegistrationFee) {
+    }
+
+    /** The late-registration fee charged for a registration made in the late period (BP-05). */
+    public record LateFee(Long invoiceId, String invoiceNo, BigDecimal amount, BigDecimal balance, String status, String controlNo) {
     }
 
     public record ModuleOption(Long moduleId, String code, String title, BigDecimal credits, String category, String assessmentType, boolean selected) {
@@ -39,7 +44,7 @@ public final class SemesterRegistrationDtos {
                                    Long semesterId, String semesterName, short yearOfStudy, String status, boolean late, BigDecimal totalCredits,
                                    Map<String, Object> clearance, boolean detailsConfirmed, OffsetDateTime submittedAt, String submittedByName,
                                    OffsetDateTime decidedAt, String decidedByName, String decisionNote, String curriculum,
-                                   List<RegisteredModule> modules) {
+                                   List<RegisteredModule> modules, LateFee lateFee) {
     }
 
     /**

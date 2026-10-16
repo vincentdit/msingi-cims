@@ -71,6 +71,9 @@ public class HostelAllocation extends BaseEntity {
     private OffsetDateTime releasedAt;
     private String releaseReason;
 
+    /** The refund of the unused part of a paid fee raised at check-out or cancellation, waiting for or decided by the bursary. */
+    private Long refundAdjustmentId;
+
     public boolean active() {
         return status == Status.ALLOCATED || status == Status.CHECKED_IN;
     }

@@ -51,6 +51,10 @@ public final class MessageTemplates {
                 List.of("referenceNo", "institution"), Set.of("referenceNo"),
                 "Your application {referenceNo} has been received. We will notify you of the outcome by SMS.",
                 "Maombi yako {referenceNo} yamepokelewa. Tutakujulisha matokeo kwa SMS.", s);
+        add("APPLICATION_FEE_REMINDER", "Application fee reminder", "An applicant has not paid the application fee two days after getting a control number, or the window closes within three days", "Admission",
+                List.of("window", "amount", "controlNo", "deadline", "institution"), Set.of(),
+                "Your application to {institution} ({window}) is not complete: pay {amount} with control number {controlNo} before {deadline}.",
+                "Maombi yako {institution} ({window}) hayajakamilika: lipa {amount} kwa namba ya malipo {controlNo} kabla ya {deadline}.", s);
         add("ADMISSION_WINDOW_CLOSED", "Admission window closed early", "The Admissions Office closes a window before its closing date", "Admission",
                 List.of("window", "reason", "institution"), Set.of("window"),
                 "{institution}: applications for {window} have closed. Your application was not submitted. {reason}",
@@ -221,6 +225,10 @@ public final class MessageTemplates {
                 List.of("place", "amount", "deadline", "controlNo", "institution"), Set.of(),
                 "You have been allocated {place}. Pay {amount} with control number {controlNo} by {deadline}, or the bed will be released.",
                 "Umepangiwa {place}. Lipa {amount} kwa namba ya malipo {controlNo} kabla ya {deadline}, la sivyo nafasi itatolewa kwa mwingine.", s);
+        add("HOSTEL_BED_CHANGED", "Hostel bed changed", "The hostel office moves a student to another bed", "Hostel",
+                List.of("place", "institution"), Set.of(),
+                "Your hostel bed has been changed to {place}. Any change in the hostel fee is shown under Fees in the student portal.",
+                "Nafasi yako ya hosteli imebadilishwa kwenda {place}. Mabadiliko yoyote ya ada ya hosteli yanaonekana kwenye Ada katika tovuti ya mwanafunzi.", s);
         add("HOSTEL_WAITLISTED", "Hostel waiting list", "No suitable bed is free for a hostel applicant", "Hostel",
                 List.of("window", "institution"), Set.of(),
                 "No hostel bed is free for you yet ({window}). You are on the waiting list and will get an SMS if one becomes free.",

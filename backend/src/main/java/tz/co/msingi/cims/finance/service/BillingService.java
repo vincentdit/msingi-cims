@@ -30,6 +30,7 @@ import tz.co.msingi.cims.platform.tenancy.TenantContext;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -371,6 +372,59 @@ public class BillingService {
         return controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId).stream()
                 .filter(cn -> (cn.getStatus() == ControlNumber.Status.ACTIVE && cn.getIssuer() == issuer) || cn.getStatus() == ControlNumber.Status.PAID)
                 .findFirst().orElse(null);
+    }
+
+    /**
+     * Cancels an invoice nothing has been paid on (its control number stops being usable). Returns false, changing nothing, when
+     * something was paid or it is already cancelled.
+     */
+    @Transactional
+    public boolean cancelIfUnpaid(Long invoiceId, String reason) {
+        Invoice inv = invoices.findById(invoiceId).orElse(null);
+        if (inv == null || inv.getStatus() != Invoice.Status.ISSUED || inv.getPaidAmount().signum() > 0) return false;
+        inv.setStatus(Invoice.Status.CANCELLED);
+        ControlNumber cn = currentControlNumber(inv.getId());
+        if (cn != null && cn.getStatus() == ControlNumber.Status.ACTIVE) cn.setStatus(ControlNumber.Status.EXPIRED);
+        audit.record("INVOICE_CANCELLED", "Invoice", inv.getId(), Map.of("invoiceNo", inv.getInvoiceNo(), "reason", reason));
+        return true;
+    }
+
+    /**
+     * For a refund of fees paid on an invoice (BP-17): reduces the invoice by the amount (a credit note), taking it from the lines paid
+     * last, and turns that part of the payments into the payer's credit, which the refund voucher then pays out.
+     */
+    @Transactional
+    public void releasePaidAsCredit(Invoice inv, BigDecimal amount, String documentNo) {
+        if (amount == null || amount.signum() <= 0) throw new BusinessRuleException("INVALID_AMOUNT", "The amount must be positive");
+        if (amount.compareTo(inv.getPaidAmount()) > 0) {
+            throw new BusinessRuleException("REFUND_TOO_LARGE", "Only TZS " + inv.getPaidAmount().toPlainString() + " was paid on " + inv.getInvoiceNo());
+        }
+        BigDecimal left = amount;
+        List<InvoiceLine> lines = new ArrayList<>(inv.getLines());
+        lines.sort(java.util.Comparator.comparing(InvoiceLine::getPriority).reversed()
+                .thenComparing(InvoiceLine::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+        for (InvoiceLine line : lines) {
+            if (left.signum() == 0) break;
+            BigDecimal take = line.getPaidAmount().min(left);
+            if (take.signum() <= 0) continue;
+            line.setPaidAmount(line.getPaidAmount().subtract(take));
+            line.setAmount(line.getAmount().subtract(take));
+            left = left.subtract(take);
+            BigDecimal fromLine = take;
+            for (PaymentAllocation pa : allocations.findByInvoiceLineIdOrderByIdDesc(line.getId())) {
+                if (fromLine.signum() == 0) break;
+                BigDecimal t = pa.getAmount().min(fromLine);
+                pa.setAmount(pa.getAmount().subtract(t));
+                Payment p = pa.getPayment();
+                p.setUnallocatedAmount(p.getUnallocatedAmount().add(t));
+                fromLine = fromLine.subtract(t);
+                if (pa.getAmount().signum() == 0) allocations.delete(pa);
+            }
+        }
+        inv.setTotalAmount(inv.getTotalAmount().subtract(amount));
+        inv.setPaidAmount(inv.getPaidAmount().subtract(amount));
+        audit.record("INVOICE_CREDIT_NOTE", "Invoice", inv.getId(), Map.of("invoiceNo", inv.getInvoiceNo(), "amount", amount,
+                "document", documentNo == null ? "" : documentNo));
     }
 
     @Transactional(readOnly = true)

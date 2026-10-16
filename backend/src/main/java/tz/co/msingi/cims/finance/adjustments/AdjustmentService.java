@@ -94,8 +94,9 @@ public class AdjustmentService {
     public StudentOptions options(Long studentId, String registrationNo) {
         Student s = student(studentId, registrationNo);
         List<InvoiceOption> open = invoices.findByPayerTypeAndPayerIdOrderByCreatedAtDesc(Invoice.PayerType.STUDENT, s.getId()).stream()
-                .filter(i -> !VOID.contains(i.getStatus()) && i.balance().signum() > 0)
-                .map(i -> new InvoiceOption(i.getId(), i.getInvoiceNo(), i.getDescription(), i.balance(), waivable(i))).toList();
+                .filter(i -> !VOID.contains(i.getStatus()) && (i.balance().signum() > 0 || i.getPaidAmount().signum() > 0))
+                .map(i -> new InvoiceOption(i.getId(), i.getInvoiceNo(), i.getDescription(), i.balance(), waivable(i), i.getPaidAmount(),
+                        refundableFrom(i))).toList();
         BigDecimal credit = credit(s.getId());
         return new StudentOptions(s.getId(), s.getRegistrationNo(), s.fullName(), credit, refundable(s.getId(), credit), open);
     }
@@ -115,7 +116,17 @@ public class AdjustmentService {
         if (req.amount() == null && scheme == null) throw new BusinessRuleException("AMOUNT_REQUIRED", "Give the amount");
         BigDecimal amount = req.amount() == null ? null : req.amount().setScale(2, RoundingMode.HALF_UP);
         Invoice inv = null;
-        if (req.kind() != FinanceAdjustment.Kind.REFUND) {
+        if (req.kind() == FinanceAdjustment.Kind.REFUND && req.invoiceId() != null) {
+            inv = invoices.findById(req.invoiceId()).orElseThrow(() -> new NotFoundException("Invoice", req.invoiceId()));
+            if (inv.getPayerType() != Invoice.PayerType.STUDENT || !inv.getPayerId().equals(s.getId())) {
+                throw new BusinessRuleException("NOT_STUDENTS_INVOICE", "That invoice is not " + s.getRegistrationNo() + "'s");
+            }
+            BigDecimal room = refundableFrom(inv);
+            if (amount.compareTo(room) > 0) {
+                throw new BusinessRuleException("REFUND_TOO_LARGE", room.signum() == 0 ? "Nothing paid on " + inv.getInvoiceNo() + " is left to refund"
+                        : "At most TZS " + tzs(room) + " paid on " + inv.getInvoiceNo() + " can be refunded");
+            }
+        } else if (req.kind() != FinanceAdjustment.Kind.REFUND) {
             if (req.invoiceId() == null) throw new BusinessRuleException("INVOICE_REQUIRED", "Choose the invoice");
             inv = invoices.findById(req.invoiceId()).orElseThrow(() -> new NotFoundException("Invoice", req.invoiceId()));
             if (inv.getPayerType() != Invoice.PayerType.STUDENT || !inv.getPayerId().equals(s.getId())) {
@@ -224,6 +235,16 @@ public class AdjustmentService {
             a.setDocumentNo(number("CN"));
             billing.postDirect(inv, a.getAmount(), Payment.Source.INTERNAL, a.getKind().name(), a.getAdjustmentNo(), a.getDocumentNo(), OffsetDateTime.now());
         } else {
+            if (a.getInvoiceId() != null) {
+                // a refund of fees paid on an invoice: the invoice is reduced by a credit note and that part of the payment becomes credit
+                Invoice inv = invoices.findById(a.getInvoiceId()).orElseThrow();
+                if (a.getAmount().compareTo(inv.getPaidAmount()) > 0) {
+                    throw new BusinessRuleException("REFUND_TOO_LARGE", "Only TZS " + tzs(inv.getPaidAmount()) + " is now paid on " + inv.getInvoiceNo()
+                            + "; reject this request and record a new one");
+                }
+                billing.releasePaidAsCredit(inv, a.getAmount(), a.getAdjustmentNo());
+                payments.flush();
+            }
             BigDecimal left = a.getAmount();
             List<Payment> withCredit = studentPayments(s.getId()).stream().filter(p -> p.getUnallocatedAmount().signum() > 0)
                     .sorted(Comparator.comparing(Payment::getPaidAt)).toList();
@@ -281,7 +302,7 @@ public class AdjustmentService {
                 a.getDocumentNo(), a.getPaidReference(), a.getPaidAt(), waitingFor(a), can, can,
                 a.getKind() == FinanceAdjustment.Kind.REFUND && a.getStatus() == FinanceAdjustment.Status.APPROVED
                         && has(Role.INSTITUTION_ADMIN, Role.BURSAR, Role.ACCOUNTANT),
-                a.getSchemeId(), a.getSchemeId() == null ? null : schemeName(a.getSchemeId()));
+                a.getSchemeId(), a.getSchemeId() == null ? null : schemeName(a.getSchemeId()), a.getOrigin() == null ? null : a.getOrigin().name());
     }
 
     static String waitingFor(FinanceAdjustment a) {
@@ -301,8 +322,47 @@ public class AdjustmentService {
     }
 
     private BigDecimal waivable(Invoice inv) {
-        BigDecimal pending = adjustments.findByInvoiceIdAndStatusIn(inv.getId(), OPEN).stream().map(FinanceAdjustment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pending = adjustments.findByInvoiceIdAndStatusIn(inv.getId(), OPEN).stream().filter(FinanceAdjustment::isCredit)
+                .map(FinanceAdjustment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         return inv.balance().subtract(invoices.sponsorPending(inv.getId())).subtract(pending).max(BigDecimal.ZERO);
+    }
+
+    /** What paid on the invoice can still be refunded: the paid amount less refunds from it waiting for a decision. */
+    public BigDecimal refundableFrom(Invoice inv) {
+        BigDecimal pending = adjustments.findByInvoiceIdAndStatusIn(inv.getId(), OPEN).stream().filter(x -> x.getKind() == FinanceAdjustment.Kind.REFUND)
+                .map(FinanceAdjustment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return inv.getPaidAmount().subtract(pending).max(BigDecimal.ZERO);
+    }
+
+    /** What can still be waived on the invoice (balance less sponsor shares and credit requests waiting). */
+    public BigDecimal waivableOn(Invoice inv) {
+        return waivable(inv);
+    }
+
+    /**
+     * A waiver or a refund raised by CIMS itself after an event elsewhere (a status change, a hostel bed change or check-out). It waits
+     * for the bursary like any other request: approving posts it, rejecting (with a note) leaves the invoice as it is.
+     */
+    @Transactional
+    public FinanceAdjustment raise(FinanceAdjustment.Kind kind, Student s, Invoice inv, BigDecimal amount, String reason, String evidenceRef,
+                                   FinanceAdjustment.Origin origin, Long originId, Long requestedById, String requestedByName) {
+        FinanceAdjustment a = new FinanceAdjustment();
+        a.setAdjustmentNo(number("ADJ"));
+        a.setKind(kind);
+        a.setStudentId(s.getId());
+        a.setInvoiceId(inv == null ? null : inv.getId());
+        a.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
+        a.setReason(reason.length() > 1000 ? reason.substring(0, 1000) : reason);
+        a.setEvidenceRef(evidenceRef.length() > 300 ? evidenceRef.substring(0, 300) : evidenceRef);
+        a.setOrigin(origin);
+        a.setOriginId(originId);
+        a.setRequestedById(requestedById);
+        a.setRequestedByName(requestedByName);
+        a.setRequestedAt(OffsetDateTime.now());
+        adjustments.saveAndFlush(a);
+        audit.record(kind + "_RAISED", "FinanceAdjustment", a.getId(), Map.of("no", a.getAdjustmentNo(), "student", s.getRegistrationNo(),
+                "amount", a.getAmount(), "origin", origin.name()));
+        return a;
     }
 
     private BigDecimal credit(Long studentId) {

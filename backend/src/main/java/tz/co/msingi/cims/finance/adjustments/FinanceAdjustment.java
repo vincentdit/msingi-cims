@@ -31,6 +31,14 @@ public class FinanceAdjustment extends BaseEntity {
 
     public enum Status { PENDING, ENDORSED, APPROVED, REJECTED, PAID }
 
+    /** Where CIMS raised the request itself (the bursary still decides it); null when someone in the bursary recorded it. */
+    public enum Origin { STATUS_CHANGE, HOSTEL_CHANGE, HOSTEL_CHECKOUT, HOSTEL_CANCEL }
+
+    @Enumerated(EnumType.STRING)
+    private Origin origin;
+
+    private Long originId;
+
     @Column(nullable = false)
     private String adjustmentNo;
 

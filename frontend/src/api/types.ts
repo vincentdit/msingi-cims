@@ -105,6 +105,8 @@ export interface AdmissionWindow {
   open: boolean;
   instructions?: string;
   programmes?: WindowProgramme[];
+  /** Applicants who asked for a control number and have not paid are reminded by SMS (BP-02). */
+  feeReminders: boolean;
 }
 
 export type WindowState = 'DRAFT' | 'SCHEDULED' | 'OPEN' | 'CLOSED';
@@ -874,6 +876,8 @@ export interface Semester {
   marksEntryOpens?: string;
   marksEntryCloses?: string;
   window: SemesterWindow;
+  /** Charged when a student registers in the late period (BP-05); 0 for none. */
+  lateRegistrationFee: number;
 }
 
 export const CALENDAR_EVENT_KINDS = ['REGISTRATION', 'TEACHING', 'MARKS_ENTRY', 'EXAMINATIONS', 'RESULTS', 'HOLIDAY', 'GRADUATION', 'OTHER'] as const;
@@ -988,6 +992,17 @@ export interface SemesterInfo {
   registrationCloses: string;
   lateRegistrationCloses?: string;
   window: SemesterWindow;
+  lateRegistrationFee: number;
+}
+
+/** The late-registration fee billed for a registration made in the late period. */
+export interface LateFee {
+  invoiceId: number;
+  invoiceNo: string;
+  amount: number;
+  balance: number;
+  status: string;
+  controlNo?: string;
 }
 
 export interface ModuleOption {
@@ -1031,6 +1046,7 @@ export interface SemesterRegistration {
   decisionNote?: string;
   curriculum?: string;
   modules: RegisteredModule[];
+  lateFee?: LateFee;
 }
 
 export type StudentRegistrationState = 'NO_SEMESTER' | 'NOT_ACTIVE' | 'NO_CURRICULUM' | 'NOT_OPEN' | 'OPEN' | 'LATE' | 'CLOSED' | 'NOTHING_TO_REGISTER';
@@ -2001,6 +2017,15 @@ export interface HostelAllocationView {
   invoiceNo?: string; invoiceStatus?: string; balance: number; controlNo?: string; payBy: string; method: 'AUTO' | 'MANUAL'; allocatedByName: string;
   allocatedAt: string; checkedInAt?: string; checkedInByName?: string; checkInCondition?: string; checkedOutAt?: string; checkedOutByName?: string;
   checkOutCondition?: string; damages?: string; damageCharge?: number; damageInvoiceNo?: string; releasedAt?: string; releaseReason?: string;
+  /** Refund of the unused part raised at check-out or cancellation; the bursary decides it. */
+  refund?: { adjustmentNo: string; amount: number; status: string } | null;
+  bedChanges: number;
+}
+
+/** A move to another bed and what it did to the fee. */
+export interface HostelBedChange {
+  id: number; fromBed: string; toBed: string; oldFee: number; newFee: number; difference: number; invoiceNo?: string; adjustmentNo?: string;
+  adjustmentKind?: string; adjustmentStatus?: string; reason: string; changedByName: string; changedAt: string;
 }
 
 export interface HostelApplicationView {

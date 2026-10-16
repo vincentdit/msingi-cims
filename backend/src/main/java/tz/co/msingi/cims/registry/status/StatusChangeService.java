@@ -38,7 +38,8 @@ import java.util.Objects;
  * Student status changes (FR-REG-04, BP-14). Registry requests a change with a reason and effective date; the Head of the
  * student's department recommends it; the Deputy Principal (Academic) approves or rejects it (never the person who requested
  * it); an approved change is applied on its effective date — at once if that date has come, otherwise by the morning job.
- * Applying sets the student's status, tells the student by SMS and, when their studies end, revokes their ID card.
+ * Applying sets the student's status, tells the student by SMS and, when their studies end, revokes their ID card; the bursary and
+ * the hostel office follow up through {@link StudentStatusAppliedEvent}.
  */
 @Slf4j
 @Service
@@ -57,6 +58,7 @@ public class StatusChangeService {
     private final Messaging messaging;
     private final AuditService audit;
     private final IdCardService idCards;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public StatusOptions options(Long studentId) {
@@ -207,6 +209,8 @@ public class StatusChangeService {
         c.setAppliedAt(OffsetDateTime.now());
         Map<String, Object> d = details(c);
         audit.record("STUDENT_STATUS_CHANGED", "Student", s.getId(), d);
+        events.publishEvent(new StudentStatusAppliedEvent(c.getId(), s.getId(), c.getType(), c.getEffectiveDate(),
+                c.getReference() == null ? "Status change " + c.getId() : c.getReference(), c.getDecidedById(), c.getDecidedByName()));
         if (c.getType().ends()) {
             idCards.revokeAll(s, "Studies ended: " + label(c.getType()) + " effective " + DAY.format(c.getEffectiveDate()));
         }

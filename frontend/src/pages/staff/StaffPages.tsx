@@ -566,6 +566,7 @@ export function WindowDetailPage() {
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
+          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/entry-test`}>Test entry rules</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/qualification-checks`}>Qualification checks</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
           <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>

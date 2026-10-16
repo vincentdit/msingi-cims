@@ -88,6 +88,11 @@ public class AcademicCalendarService {
         if (req.lateRegistrationCloses() != null && req.lateRegistrationCloses().isBefore(req.registrationCloses())) {
             throw new BusinessRuleException("INVALID_DATES", "Late registration must end after normal registration closes");
         }
+        java.math.BigDecimal lateFee = req.lateRegistrationFee() == null ? java.math.BigDecimal.ZERO : req.lateRegistrationFee();
+        if (lateFee.signum() > 0 && req.lateRegistrationCloses() == null) {
+            throw new BusinessRuleException("LATE_FEE_WITHOUT_LATE_PERIOD", "Set the date late registration ends before giving a late registration fee");
+        }
+        s.setLateRegistrationFee(lateFee.setScale(2, java.math.RoundingMode.HALF_UP));
         s.setSemesterNo(req.semesterNo());
         s.setName(req.name().trim());
         s.setStartDate(req.startDate());

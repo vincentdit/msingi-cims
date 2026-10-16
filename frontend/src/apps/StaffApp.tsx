@@ -26,6 +26,7 @@ import { GraduationPage, GraduationsPage } from '../pages/staff/GraduationPages'
 import { HostelPage } from '../pages/staff/HostelPages';
 import { IptPage } from '../pages/staff/IptPages';
 import { QualificationChecksPage } from '../pages/staff/QualificationChecks';
+import EntryTestPage from '../pages/staff/EntryTestPage';
 import NoticesPage from '../pages/staff/NoticesPage';
 import MessagingPage from '../pages/staff/MessagingPage';
 import DashboardPage from '../pages/staff/DashboardPage';
@@ -54,6 +55,7 @@ export default function StaffApp() {
         <Route path="windows/:id/qualification-checks" element={<QualificationChecksPage />} />
         <Route path="windows/:id/verification" element={<VerificationPage />} />
         <Route path="windows/:id/handover" element={<HandoverPage />} />
+        <Route path="windows/:id/entry-test" element={<EntryTestPage />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="status-changes" element={<StatusChangesPage />} />

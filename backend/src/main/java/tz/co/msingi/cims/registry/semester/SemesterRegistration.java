@@ -54,6 +54,9 @@ public class SemesterRegistration extends BaseEntity {
     private Status status = Status.SUBMITTED;
 
     private boolean late;
+
+    /** The invoice for the late-registration fee, when the registration was made in the late period and the semester charges one. */
+    private Long lateFeeInvoiceId;
     @Column(nullable = false)
     private BigDecimal totalCredits = BigDecimal.ZERO;
 

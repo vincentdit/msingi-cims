@@ -1,0 +1,9 @@
+# Trivy findings accepted on purpose, each with its reason (trivy --ignorefile .trivyignore.yaml).
+# dev-keys/ is skipped in the workflow: TEST-ONLY GePG keys, password test-only-not-secret (dev-keys/README.md).
+misconfigurations:
+  - id: DS002
+    paths:
+      - "deploy/backup/Dockerfile"
+    statement: >-
+      The backup container runs busybox crond, which must run as root to switch to its schedule. It publishes no port,
+      is reachable by no other service, and only holds encrypted backups.

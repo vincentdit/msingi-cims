@@ -22,6 +22,7 @@ import tz.co.msingi.cims.platform.security.CurrentUser;
 import tz.co.msingi.cims.registry.RegistryRepositories.StudentRepository;
 import tz.co.msingi.cims.registry.Student;
 import tz.co.msingi.cims.registry.semester.SemesterRegistrationDtos.ApproveAllResult;
+import tz.co.msingi.cims.registry.semester.SemesterRegistrationDtos.LateFee;
 import tz.co.msingi.cims.registry.semester.SemesterRegistrationDtos.ModuleOption;
 import tz.co.msingi.cims.registry.semester.SemesterRegistrationDtos.RegisteredModule;
 import tz.co.msingi.cims.registry.semester.SemesterRegistrationDtos.RegistrationView;
@@ -63,6 +64,10 @@ public class SemesterRegistrationService {
     private final AccountService accounts;
     private final Messaging messaging;
     private final AuditService audit;
+    private final tz.co.msingi.cims.finance.service.BillingService billing;
+
+    /** Invoice purpose of the late-registration fee (BP-05). */
+    public static final String LATE_FEE_PURPOSE = "LATE_REGISTRATION";
 
     // ------------------------------------------------------------------ student
 
@@ -109,7 +114,8 @@ public class SemesterRegistrationService {
             case "NOT_OPEN" -> "Registration for " + sem.getName() + " opens on " + sem.getRegistrationOpens() + ".";
             case "CLOSED" -> "Registration for " + sem.getName() + " has closed. Contact Registry if you have not registered.";
             case "LATE" -> "The registration deadline has passed: you can still register until " + sem.getLateRegistrationCloses()
-                    + ", and the registration will be marked late.";
+                    + ", and the registration will be marked late" + (sem.getLateRegistrationFee().signum() > 0
+                    ? ". A late registration fee of TZS " + tzs(sem.getLateRegistrationFee()) + " will be billed when you submit." : ".");
             case "NOTHING_TO_REGISTER" -> "Your curriculum has no modules for year " + s.getYearOfStudy() + " semester " + sem.getSemesterNo() + ".";
             default -> "Registration is open until " + sem.getRegistrationCloses() + ".";
         };
@@ -182,6 +188,7 @@ public class SemesterRegistrationService {
         }
         r.setTotalCredits(total);
         registrations.save(r);
+        if (r.isLate() && sem.getLateRegistrationFee().signum() > 0 && r.getLateFeeInvoiceId() == null) billLateFee(r, s, sem);
         audit.record("SEMESTER_REGISTRATION_SUBMITTED", "SemesterRegistration", r.getId(), Map.of("semester", sem.getName(),
                 "modules", r.getModules().size(), "late", r.isLate()));
         return mine();
@@ -194,8 +201,37 @@ public class SemesterRegistrationService {
                 .orElseThrow(() -> new NotFoundException("Registration", registrationId));
         if (r.getStatus() == SemesterRegistration.Status.APPROVED) throw new BusinessRuleException("ALREADY_APPROVED", "An approved registration can only be changed by Registry");
         r.setStatus(SemesterRegistration.Status.CANCELLED);
+        // a late fee not yet paid goes with the registration; one paid (even in part) stays, and a waiver or refund is the bursary's decision
+        if (r.getLateFeeInvoiceId() != null && billing.cancelIfUnpaid(r.getLateFeeInvoiceId(), "Semester registration cancelled by the student")) {
+            r.setLateFeeInvoiceId(null);
+        }
         audit.record("SEMESTER_REGISTRATION_CANCELLED", "SemesterRegistration", r.getId(), Map.of());
         return mine();
+    }
+
+    /** Bills the late-registration fee once per registration and asks for its control number (sent to the student by SMS). */
+    private void billLateFee(SemesterRegistration r, Student s, Semester sem) {
+        var inv = billing.createInvoice(new tz.co.msingi.cims.finance.service.BillingService.NewInvoice(
+                tz.co.msingi.cims.finance.domain.Invoice.PayerType.STUDENT, s.getId(), s.fullName(), s.getPhone(), s.getEmail(), LATE_FEE_PURPOSE,
+                r.getId(), "Late registration fee, " + semesterLabel(sem),
+                List.of(new tz.co.msingi.cims.finance.service.BillingService.NewInvoice.Line("LATE_REG", "Late registration, " + semesterLabel(sem),
+                        sem.getLateRegistrationFee())), sem.getAcademicYear().getId(), null));
+        r.setLateFeeInvoiceId(inv.getId());
+        billing.ensureControlNumber(inv.getId());
+        audit.record("LATE_REGISTRATION_FEE_BILLED", "SemesterRegistration", r.getId(), Map.of("invoiceNo", inv.getInvoiceNo(),
+                "amount", sem.getLateRegistrationFee()));
+    }
+
+    private LateFee lateFee(SemesterRegistration r) {
+        if (r.getLateFeeInvoiceId() == null) return null;
+        var inv = billing.get(r.getLateFeeInvoiceId());
+        var cn = inv.isPaid() ? null : billing.currentControlNumber(inv.getId());
+        return new LateFee(inv.getId(), inv.getInvoiceNo(), inv.getTotalAmount(), inv.balance(), inv.getStatus().name(),
+                cn == null ? null : cn.getControlNo());
+    }
+
+    private static String tzs(BigDecimal v) {
+        return new java.text.DecimalFormat("#,##0").format(v);
     }
 
     // ------------------------------------------------------------------ Registry
@@ -312,7 +348,7 @@ public class SemesterRegistrationService {
 
     private static SemesterInfo info(Semester s, LocalDate today) {
         return new SemesterInfo(s.getId(), s.getName(), s.getAcademicYear().getCode(), s.getSemesterNo(), s.getStartDate(), s.getEndDate(),
-                s.getRegistrationOpens(), s.getRegistrationCloses(), s.getLateRegistrationCloses(), s.window(today).name());
+                s.getRegistrationOpens(), s.getRegistrationCloses(), s.getLateRegistrationCloses(), s.window(today).name(), s.getLateRegistrationFee());
     }
 
     private static String semesterLabel(Semester s) {
@@ -336,7 +372,7 @@ public class SemesterRegistrationService {
                 r.getDecisionNote(), label(r.getCurriculum()),
                 r.getModules().stream().sorted(Comparator.comparing((ModuleRegistration m) -> m.getCategory()).thenComparing(m -> m.getModule().getCode()))
                         .map(m -> new RegisteredModule(m.getModule().getId(), m.getModule().getCode(), m.getModule().getTitle(), m.getCredits(),
-                                m.getCategory().name(), m.getAttempt().name())).toList());
+                                m.getCategory().name(), m.getAttempt().name())).toList(), lateFee(r));
     }
 
     private SemesterRegistration require(Long id) {

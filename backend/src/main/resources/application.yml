@@ -184,6 +184,8 @@ cims:
     portal-url: ${CIMS_PORTAL_URL:https://{host}}
   offers:
     expiry-cron: ${CIMS_OFFER_EXPIRY_CRON:0 5 * * * *}   # close expired offers hourly; "-" disables
+  admission:
+    fee-reminder-cron: ${CIMS_FEE_REMINDER_CRON:0 0 9 * * *}   # application-fee reminders each morning; "-" disables
   sms:
     mode: ${CIMS_SMS_MODE:simulated}             # simulated = messages written to the log; live = aggregator adapter
     callback-secret: ${CIMS_SMS_CALLBACK_SECRET:change-me}   # HMAC key for delivery reports

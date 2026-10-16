@@ -57,6 +57,7 @@ export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWind
     applicationFee: String(win?.applicationFee ?? 10000), maxChoices: String(win?.maxChoices ?? 3),
     offerAcceptanceDays: String(win?.offerAcceptanceDays ?? 14), instructions: win?.instructions ?? '',
   });
+  const [feeReminders, setFeeReminders] = useState(win?.feeReminders ?? true);
   const year = f.academicYearId || years.data?.find((y) => y.current)?.id || years.data?.[0]?.id || 0;
   const intake = f.intakeId || intakes.data?.[0]?.id || 0;
   const valid = f.name.trim() && year && intake && f.opensAt && f.closesAt && new Date(f.closesAt) > new Date(f.opensAt);
@@ -64,7 +65,7 @@ export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWind
     mutationFn: () => api<AdmissionWindow>(win ? `/api/admission/windows/${win.id}` : '/api/admission/windows', { ...staff, method: win ? 'PUT' : 'POST', body: {
       name: f.name.trim(), academicYearId: year, intakeId: intake, opensAt: open ? win!.opensAt : fromLocal(f.opensAt), closesAt: fromLocal(f.closesAt),
       applicationFee: Number(f.applicationFee), maxChoices: Number(f.maxChoices), offerAcceptanceDays: Number(f.offerAcceptanceDays),
-      instructions: f.instructions.trim() || null } }),
+      instructions: f.instructions.trim() || null, feeReminders } }),
     onSuccess: onSaved,
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
@@ -96,6 +97,10 @@ export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWind
           <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth type="number" label="Programme choices" value={f.maxChoices} onChange={set('maxChoices')} slotProps={{ htmlInput: { min: 1, max: 10 } }} /></Grid>
           <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth type="number" label="Days to accept an offer" value={f.offerAcceptanceDays} onChange={set('offerAcceptanceDays')} /></Grid>
           <Grid size={12}><TextField fullWidth multiline minRows={2} label="Instructions shown to applicants (optional)" value={f.instructions} onChange={set('instructions')} /></Grid>
+          <Grid size={12}>
+            <FormControlLabel control={<Checkbox checked={feeReminders} onChange={(e) => setFeeReminders(e.target.checked)} />}
+              label="Remind applicants by SMS who got a control number but have not paid (after two days, and again three days before closing)" />
+          </Grid>
         </Grid>
         <ErrorAlert error={save.error} />
       </DialogContent>

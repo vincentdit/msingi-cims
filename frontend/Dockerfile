@@ -5,7 +5,8 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine
+# run as the unprivileged nginx user (Trivy DS002): this image listens on 8080 instead of 80
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080

@@ -86,6 +86,7 @@ public class AllocationService {
     private final HostelScope scope;
     private final Messaging messaging;
     private final AuditService audit;
+    private final BedChangeService bedChanges;
 
     // ------------------------------------------------------------------ windows
 
@@ -355,7 +356,8 @@ public class AllocationService {
         }
         Invoice inv = al.getInvoiceId() == null ? null : invoices.findById(al.getInvoiceId()).orElse(null);
         if (inv != null && inv.getPaidAmount().signum() > 0) {
-            throw new BusinessRuleException("FEE_PAID", "The student has paid towards this bed. Move them with a manual allocation after a refund decision.");
+            // paid (in part or in full): the bed is freed and what was paid is offered back as a refund for the bursary to decide
+            bedChanges.settleCancelled(al, "Hostel allocation cancelled before check-in: " + reason.trim());
         }
         release(al, inv, reason.trim());
         al.setStatus(HostelAllocation.Status.CANCELLED);
@@ -421,6 +423,11 @@ public class AllocationService {
                     List.of(new BillingService.NewInvoice.Line("HOSTEL_DAMAGE", damages, charge)), null, null));
             al.setDamageInvoiceId(inv.getId());
             billing.ensureControlNumber(inv.getId());
+        }
+        if (Boolean.TRUE.equals(req.refundUnused())) {
+            var refund = bedChanges.refundUnused(al, LocalDate.now(ZONE).plusDays(1), "Checked out early on " + DATE.format(LocalDate.now(ZONE))
+                    + ": the unused part of the hostel fee", tz.co.msingi.cims.finance.adjustments.FinanceAdjustment.Origin.HOSTEL_CHECKOUT);
+            if (refund == null) throw new BusinessRuleException("NOTHING_TO_REFUND", "Nothing paid is left to refund for the rest of the occupancy period");
         }
         audit.record("HOSTEL_CHECKED_OUT", "HostelAllocation", al.getId(), Map.of("student", s.getRegistrationNo(), "damages", String.valueOf(damages),
                 "charge", charge));
@@ -524,7 +531,16 @@ public class AllocationService {
                 inv == null ? null : inv.getInvoiceNo(), inv == null ? null : inv.getStatus().name(), inv == null ? BigDecimal.ZERO : inv.balance(),
                 cn == null ? null : cn.getControlNo(), a.getPayBy(), a.getMethod().name(), a.getAllocatedByName(), a.getAllocatedAt(), a.getCheckedInAt(),
                 a.getCheckedInByName(), a.getCheckInCondition(), a.getCheckedOutAt(), a.getCheckedOutByName(), a.getCheckOutCondition(), a.getDamages(),
-                a.getDamageCharge(), dmg == null ? null : dmg.getInvoiceNo(), a.getReleasedAt(), a.getReleaseReason());
+                a.getDamageCharge(), dmg == null ? null : dmg.getInvoiceNo(), a.getReleasedAt(), a.getReleaseReason(), bedChanges.refundView(a),
+                bedChanges.changeCount(a.getId()));
+    }
+
+    @Transactional(readOnly = true)
+    public AllocationView view(Long allocationId) {
+        access.require("see hostel allocations", InventoryService.VIEWERS);
+        HostelAllocation al = require(allocationId);
+        scope.require(al.getBed().getRoom().getHostel().getId());
+        return allocationView(al, students.findById(al.getStudentId()).orElseThrow());
     }
 
     private HostelAllocation require(Long id) {

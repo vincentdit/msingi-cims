@@ -9,7 +9,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import UploadIcon from '@mui/icons-material/UploadFile';
 import WarningIcon from '@mui/icons-material/Warning';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, MenuItem,
+  Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, MenuItem,
   Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography,
   FormControlLabel, Switch,
 } from '@mui/material';
@@ -624,7 +624,13 @@ interface Adjustment {
   reason: string; evidenceRef: string; status: 'PENDING' | 'ENDORSED' | 'APPROVED' | 'REJECTED' | 'PAID'; needsSecondLevel: boolean; requestedByName: string; requestedAt: string;
   firstByName?: string; firstAt?: string; secondByName?: string; secondAt?: string; decisionNote?: string; documentNo?: string; paidReference?: string; paidAt?: string;
   waitingFor?: string; canApprove: boolean; canReject: boolean; canMarkPaid: boolean;
+  /** Raised by CIMS itself after a status change or a hostel bed change, check-out or cancellation. */
+  origin?: 'STATUS_CHANGE' | 'HOSTEL_CHANGE' | 'HOSTEL_CHECKOUT' | 'HOSTEL_CANCEL';
 }
+const ORIGIN_LABEL: Record<NonNullable<Adjustment['origin']>, string> = {
+  STATUS_CHANGE: 'Raised after a status change', HOSTEL_CHANGE: 'Raised after a hostel bed change', HOSTEL_CHECKOUT: 'Raised at hostel check-out',
+  HOSTEL_CANCEL: 'Raised when a paid hostel bed was cancelled',
+};
 type AdjKind = 'WAIVER' | 'REFUND' | 'DISCOUNT' | 'SCHOLARSHIP';
 const KIND_NAME: Record<AdjKind, string> = { WAIVER: 'Waiver', REFUND: 'Refund', DISCOUNT: 'Discount', SCHOLARSHIP: 'Scholarship' };
 interface Scheme { id: number; code: string; name: string; kind: 'DISCOUNT' | 'SCHOLARSHIP'; basis: 'PERCENT' | 'FIXED'; value: number; feeCategory?: string; description?: string; active: boolean }
@@ -670,6 +676,7 @@ export function WaiversPage() {
                   <TableCell sx={{ maxWidth: 360 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{KIND_NAME[a.kind]} · {a.adjustmentNo}</Typography>
                     {a.schemeName && <Typography variant="caption" display="block">Scheme: {a.schemeName}</Typography>}
+                    {a.origin && <Chip size="small" variant="outlined" color="info" label={ORIGIN_LABEL[a.origin]} sx={{ my: 0.25 }} />}
                     <Typography variant="caption" color="text.secondary" display="block">{a.reason}</Typography>
                     <Typography variant="caption" color="text.secondary">Evidence: {a.evidenceRef}{a.invoiceNo ? ` · invoice ${a.invoiceNo}` : ''} · by {a.requestedByName}, {formatDateTime(a.requestedAt)}</Typography>
                   </TableCell>
@@ -790,7 +797,10 @@ function ThresholdButton({ value, onDone }: { value: number; onDone: () => void 
   );
 }
 
-interface Options { studentId: number; registrationNo: string; name: string; credit: number; refundable: number; invoices: { id: number; invoiceNo: string; description: string; balance: number; waivable: number }[] }
+interface Options {
+  studentId: number; registrationNo: string; name: string; credit: number; refundable: number;
+  invoices: { id: number; invoiceNo: string; description: string; balance: number; waivable: number; paid: number; refundable: number }[];
+}
 
 function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [kind, setKind] = useState<AdjKind>('WAIVER');
@@ -802,15 +812,18 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
   const [regNo, setRegNo] = useState('');
   const [lookup, setLookup] = useState('');
   const [invoiceId, setInvoiceId] = useState<number | ''>('');
+  /** A refund of fees paid on an invoice (e.g. hostel fees for a stay that ended) rather than of the student's credit. */
+  const [fromInvoice, setFromInvoice] = useState(false);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [evidence, setEvidence] = useState('');
   const opts = useQuery({ queryKey: ['staff', 'adjustment-options', lookup], enabled: !!lookup, retry: false,
     queryFn: () => api<Options>(`/api/finance/adjustments/options?registrationNo=${encodeURIComponent(lookup)}`, staff) });
   const o = opts.data;
-  const max = credit ? o?.invoices.find((i) => i.id === invoiceId)?.waivable : o?.refundable;
+  const chosen = o?.invoices.find((i) => i.id === invoiceId);
+  const max = credit ? chosen?.waivable : fromInvoice ? chosen?.refundable : o?.refundable;
   const save = useMutation({
-    mutationFn: () => api('/api/finance/adjustments', { ...staff, method: 'POST', body: { kind, studentId: o!.studentId, invoiceId: credit ? invoiceId : undefined,
+    mutationFn: () => api('/api/finance/adjustments', { ...staff, method: 'POST', body: { kind, studentId: o!.studentId, invoiceId: credit || fromInvoice ? invoiceId : undefined,
       amount: byScheme ? undefined : Number(amount), schemeId: byScheme ? schemeId : undefined, reason: reason.trim(), evidenceRef: evidence.trim() } }),
     onSuccess: onDone,
   });
@@ -824,7 +837,7 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
             <MenuItem value="WAIVER">Waiver (reduces what is owed on an invoice)</MenuItem>
             <MenuItem value="DISCOUNT">Discount (from a discount scheme, or an amount)</MenuItem>
             <MenuItem value="SCHOLARSHIP">Scholarship (from a scholarship scheme)</MenuItem>
-            <MenuItem value="REFUND">Refund (pays back the student's credit)</MenuItem>
+            <MenuItem value="REFUND">Refund (pays money back: the student's credit, or fees paid on an invoice)</MenuItem>
           </TextField>
           {(kind === 'DISCOUNT' || kind === 'SCHOLARSHIP') && (
             <TextField select size="small" label="Scheme" value={schemeId} onChange={(e) => setSchemeId(e.target.value === '' ? '' : Number(e.target.value))}
@@ -842,8 +855,18 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
               <Typography variant="body2"><strong>{o.name}</strong> · credit {formatTzs(o.credit)}{o.refundable !== o.credit ? ` (${formatTzs(o.refundable)} refundable)` : ''}</Typography>
               {credit && (
                 <TextField select size="small" label="Invoice" value={invoiceId} onChange={(e) => setInvoiceId(Number(e.target.value))}>
-                  {o.invoices.map((i) => <MenuItem key={i.id} value={i.id}>{i.invoiceNo} · {i.description} · owes {formatTzs(i.balance)}</MenuItem>)}
-                  {!o.invoices.length && <MenuItem disabled value="">No invoice with a balance</MenuItem>}
+                  {o.invoices.filter((i) => i.balance > 0).map((i) => <MenuItem key={i.id} value={i.id}>{i.invoiceNo} · {i.description} · owes {formatTzs(i.balance)}</MenuItem>)}
+                  {!o.invoices.some((i) => i.balance > 0) && <MenuItem disabled value="">No invoice with a balance</MenuItem>}
+                </TextField>
+              )}
+              {!credit && (
+                <FormControlLabel control={<Checkbox checked={fromInvoice} onChange={(e) => { setFromInvoice(e.target.checked); setInvoiceId(''); }} />}
+                  label="Refund fees paid on an invoice (the invoice is reduced by a credit note), not the student's credit" />
+              )}
+              {!credit && fromInvoice && (
+                <TextField select size="small" label="Invoice paid" value={invoiceId} onChange={(e) => setInvoiceId(Number(e.target.value))}>
+                  {o.invoices.filter((i) => i.refundable > 0).map((i) => <MenuItem key={i.id} value={i.id}>{i.invoiceNo} · {i.description} · paid {formatTzs(i.paid)}</MenuItem>)}
+                  {!o.invoices.some((i) => i.refundable > 0) && <MenuItem disabled value="">No invoice with a payment to refund</MenuItem>}
                 </TextField>
               )}
               {!byScheme && <TextField size="small" type="number" label="Amount (TZS)" value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -855,7 +878,7 @@ function AdjustmentDialog({ onClose, onDone }: { onClose: () => void; onDone: ()
         </Stack>
       </DialogContent>
       <DialogActions><Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => save.mutate()} disabled={!o || (!byScheme && !Number(amount)) || (kind === 'SCHOLARSHIP' && !byScheme) || reason.trim().length < 10 || !evidence.trim() || (credit && !invoiceId) || save.isPending}>Submit</Button></DialogActions>
+        <Button variant="contained" onClick={() => save.mutate()} disabled={!o || (!byScheme && !Number(amount)) || (kind === 'SCHOLARSHIP' && !byScheme) || reason.trim().length < 10 || !evidence.trim() || ((credit || fromInvoice) && !invoiceId) || save.isPending}>Submit</Button></DialogActions>
     </Dialog>
   );
 }

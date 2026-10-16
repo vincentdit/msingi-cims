@@ -57,6 +57,9 @@ public final class FinanceRepositories {
     public interface PaymentAllocationRepository extends JpaRepository<PaymentAllocation, Long> {
         @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"invoiceLine", "payment"})
         List<PaymentAllocation> findByPaymentIdIn(java.util.Collection<Long> paymentIds);
+
+        @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"payment"})
+        List<PaymentAllocation> findByInvoiceLineIdOrderByIdDesc(Long invoiceLineId);
     }
 
     public interface PaymentRepository extends JpaRepository<Payment, Long> {

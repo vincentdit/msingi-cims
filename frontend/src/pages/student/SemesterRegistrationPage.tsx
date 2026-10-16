@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
-import { api, formatDate, formatDateTime } from '../../api/client';
+import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { ModuleOption, SemesterRegistration, StudentSemesterRegistration } from '../../api/types';
 import { ErrorAlert, Loading } from '../../components/common';
 import { ClearanceRow } from './StudentPages';
@@ -79,7 +79,8 @@ export default function SemesterRegistrationPage() {
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
                   {t('semReg.opens', { date: formatDate(sem.registrationOpens) })} · {t('semReg.closes', { date: formatDate(sem.registrationCloses) })}
                 </Typography>
-                {sem.lateRegistrationCloses && <Typography variant="body2" color="text.secondary">{t('semReg.lateUntil', { date: formatDate(sem.lateRegistrationCloses) })}</Typography>}
+                {sem.lateRegistrationCloses && <Typography variant="body2" color="text.secondary">{t('semReg.lateUntil', { date: formatDate(sem.lateRegistrationCloses) })}
+                  {sem.lateRegistrationFee > 0 && <> · {t('semReg.lateFee', { amount: formatTzs(sem.lateRegistrationFee) })}</>}</Typography>}
                 {d.curriculum && <Typography variant="caption" color="text.secondary">{t('semReg.curriculum')}: {d.curriculum}</Typography>}
               </Box>
             </Stack>
@@ -92,7 +93,8 @@ export default function SemesterRegistrationPage() {
           {t(`semReg.state${d.state}`, { semester: sem?.name ?? '', date: sem ? formatDate(sem.registrationOpens) : '', defaultValue: d.message })}
         </Alert>
       )}
-      {d.state === 'LATE' && canEdit && <Alert severity="warning">{t('semReg.lateNote')}</Alert>}
+      {d.state === 'LATE' && canEdit && <Alert severity="warning">{t('semReg.lateNote')}
+        {sem && sem.lateRegistrationFee > 0 && !reg?.lateFee && <> {t('semReg.lateFeeNote', { amount: formatTzs(sem.lateRegistrationFee) })}</>}</Alert>}
       {done && reg?.status === 'SUBMITTED' && <Alert severity="success" onClose={() => setDone(false)}>{t('semReg.submitted')}</Alert>}
 
       {reg && <RegistrationCard reg={reg} canCancel={reg.status === 'SUBMITTED' && canEdit} onCancel={() => {
@@ -246,6 +248,12 @@ function RegistrationCard({ reg, canCancel, onCancel, busy }: { reg: SemesterReg
               <Typography variant="body2" sx={{ fontWeight: 700 }}>{credits(reg.totalCredits)}</Typography>
             </Stack>
           </Stack>
+        )}
+        {reg.lateFee && reg.lateFee.status !== 'CANCELLED' && (
+          <Alert severity={reg.lateFee.balance > 0 ? 'warning' : 'success'} sx={{ mt: 1 }}>
+            {t('semReg.lateFeeBilled', { amount: formatTzs(reg.lateFee.amount), invoice: reg.lateFee.invoiceNo })}{' '}
+            {reg.lateFee.balance > 0 ? (reg.lateFee.controlNo ? t('semReg.lateFeePay', { controlNo: reg.lateFee.controlNo }) : '') : t('semReg.lateFeePaid')}
+          </Alert>
         )}
         {reg.status === 'APPROVED' && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>{t('semReg.approvedHint')}</Typography>}
         {canCancel && <Button color="inherit" size="small" sx={{ mt: 1 }} onClick={onCancel} disabled={busy}>{t('semReg.cancel')}</Button>}

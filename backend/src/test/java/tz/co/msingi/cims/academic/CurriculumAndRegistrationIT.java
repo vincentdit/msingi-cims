@@ -252,6 +252,74 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/student/semester-registration"), tok, submit(closed, List.of(), true)).andExpect(jsonPath("$.code").value("REGISTRATION_CLOSED"));
     }
 
+    @Test
+    void lateRegistrationIsBilledOnceAndAWithdrawalProposesWaiversOfWhatIsUnpaid() throws Exception {
+        long m1 = module(hod, "ITU 04101", 12), m2 = module(hod, "ITU 04201", 12);
+        long cid = s.body(s.call(post("/api/academic/curricula"), hod, curriculum(List.of(slot(m1, 1, 1, "CORE"), slot(m2, 1, 2, "CORE")), ""))).get("id").asLong();
+        s.call(post("/api/academic/curricula/" + cid + "/approve"), dpa, null).andExpect(status().isOk());
+        // a late fee needs a late period
+        s.call(post("/api/academic/semesters"), dpa, semester(1, "2027-09-27", "2028-02-10", TODAY.minusDays(20), TODAY.minusDays(5), null, 20000))
+                .andExpect(jsonPath("$.code").value("LATE_FEE_WITHOUT_LATE_PERIOD"));
+        JsonNode sem = s.body(s.call(post("/api/academic/semesters"), dpa, semester(1, "2027-09-27", "2028-02-10", TODAY.minusDays(20), TODAY.minusDays(5),
+                TODAY.plusDays(5), 20000)).andExpect(status().isCreated()));
+        assertThat(sem.get("lateRegistrationFee").decimalValue()).isEqualByComparingTo("20000");
+        assertThat(sem.get("window").asText()).isEqualTo("LATE");
+        long semId = sem.get("id").asLong();
+
+        Applicant a = s.apply("S0101/0001");
+        s.admit(officer, dpa, a);
+        // annual fees billed (no clearance gate): they stay unpaid
+        long reg = s.body(s.call(post("/api/finance/fee-items"), accountant,
+                "{\"code\":\"REG\",\"name\":\"Registration fee\",\"category\":\"REGISTRATION\",\"allocationPriority\":10,\"active\":true}")).get("id").asLong();
+        long st = s.body(s.call(post("/api/finance/fee-structures"), accountant, "{\"academicYearId\":" + yearId + ",\"programmeId\":" + s.inst.programmeId()
+                + ",\"yearOfStudy\":1,\"lines\":[{\"feeItemId\":" + reg + ",\"amount\":50000,\"instalment\":1}]}")).get("id").asLong();
+        s.call(post("/api/finance/fee-structures/" + st + "/approve"), bursar, null).andExpect(status().isOk());
+        s.call(post("/api/finance/billing-runs"), accountant, "{\"academicYearId\":" + yearId + "}").andExpect(status().isOk());
+        long id = s.body(s.call(post("/api/registry/windows/" + s.inst.windowId() + "/handover"), registrar, "{}")).at("/students/0/studentId").asLong();
+        String regNo = s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/registrationNo").asText();
+        firstRegistration(id);
+        String tok = studentToken(regNo);
+
+        JsonNode page = s.body(s.call(get("/api/student/semester-registration"), tok, null));
+        assertThat(page.get("state").asText()).isEqualTo("LATE");
+        assertThat(page.get("message").asText()).contains("TZS 20,000");
+        String url = "/api/student/semester-registration";
+        JsonNode r1 = s.body(s.call(post(url), tok, submit(semId, List.of(), true)).andExpect(status().isOk())).get("registration");
+        assertThat(r1.get("late").asBoolean()).isTrue();
+        assertThat(r1.at("/lateFee/amount").decimalValue()).isEqualByComparingTo("20000");
+        assertThat(r1.at("/lateFee/status").asText()).isEqualTo("ISSUED");
+        assertThat(r1.at("/lateFee/controlNo").asText()).isNotBlank();
+        long firstInvoice = r1.at("/lateFee/invoiceId").asLong();
+        // cancelling the registration cancels the unpaid late fee; registering again bills it again, once
+        s.call(post(url + "/" + r1.get("id").asLong() + "/cancel"), tok, null).andExpect(status().isOk());
+        JsonNode r2 = s.body(s.call(post(url), tok, submit(semId, List.of(), true))).get("registration");
+        long secondInvoice = r2.at("/lateFee/invoiceId").asLong();
+        assertThat(secondInvoice).isNotEqualTo(firstInvoice);
+        assertThat(s.body(s.call(post(url), tok, submit(semId, List.of(), true))).at("/registration/lateFee/invoiceId").asLong()).isEqualTo(secondInvoice);
+        JsonNode account = s.body(s.call(get("/api/student/account"), tok, null));
+        assertThat(account.get("invoices").findParents("purpose").stream().filter(i -> i.get("purpose").asText().equals("LATE_REGISTRATION"))
+                .map(i -> i.get("status").asText()).toList()).containsExactlyInAnyOrder("CANCELLED", "ISSUED");
+        assertThat(s.body(s.call(get("/api/registry/semester-registrations/" + r2.get("id").asLong()), registrar, null)).at("/lateFee/balance").decimalValue())
+                .isEqualByComparingTo("20000");
+
+        // the student withdraws: the bursary is asked to waive what is unpaid (annual fees and the late fee), and decides
+        long change = s.body(s.call(post("/api/registry/students/" + id + "/status-changes"), registrar,
+                "{\"type\":\"WITHDRAWAL\",\"reason\":\"Moved abroad with family\",\"reference\":\"WD/3/2027\",\"effectiveDate\":\"" + TODAY + "\"}")).get("id").asLong();
+        s.call(post("/api/registry/status-changes/" + change + "/decision"), dpa, "{\"approve\":true}").andExpect(jsonPath("$.state").value("APPLIED"));
+        JsonNode list = s.body(s.call(get("/api/finance/adjustments"), bursar, null));
+        List<JsonNode> raised = list.findParents("origin").stream().filter(x -> "STATUS_CHANGE".equals(x.get("origin").asText())).toList();
+        assertThat(raised).hasSize(2);
+        assertThat(raised.stream().map(x -> x.get("amount").decimalValue().intValue()).toList()).containsExactlyInAnyOrder(50000, 20000);
+        assertThat(raised.get(0).get("kind").asText()).isEqualTo("WAIVER");
+        assertThat(raised.get(0).get("status").asText()).isEqualTo("PENDING");
+        assertThat(raised.get(0).get("evidenceRef").asText()).isEqualTo("WD/3/2027");
+        assertThat(raised.get(0).get("reason").asText()).contains("withdrew");
+        long lateWaiver = raised.stream().filter(x -> x.get("amount").decimalValue().intValue() == 20000).findFirst().orElseThrow().get("id").asLong();
+        s.call(post("/api/finance/adjustments/" + lateWaiver + "/approve"), bursar, "{}").andExpect(jsonPath("$.status").value("APPROVED"));
+        assertThat(s.body(s.call(get("/api/registry/semester-registrations/" + r2.get("id").asLong()), registrar, null)).at("/lateFee/balance").decimalValue())
+                .isZero();
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private long module(String token, String code, int credits) throws Exception {
@@ -275,6 +343,11 @@ class CurriculumAndRegistrationIT {
         return "{\"academicYearId\":" + yearId + ",\"semesterNo\":" + no + ",\"name\":\"Semester " + no + "\",\"startDate\":\"" + start + "\",\"endDate\":\""
                 + end + "\",\"registrationOpens\":\"" + opens + "\",\"registrationCloses\":\"" + closes + "\",\"lateRegistrationCloses\":"
                 + (late == null ? "null" : "\"" + late + "\"") + "}";
+    }
+
+    private String semester(int no, String start, String end, LocalDate opens, LocalDate closes, LocalDate late, int lateFee) {
+        String base = semester(no, start, end, opens, closes, late);
+        return base.substring(0, base.length() - 1) + ",\"lateRegistrationFee\":" + lateFee + "}";
     }
 
     private static String submit(long semesterId, List<Long> electives, boolean confirmed) {

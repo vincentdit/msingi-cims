@@ -25,16 +25,22 @@ public final class CurriculumDtos {
     public record SemesterRequest(@NotNull Long academicYearId, @Min(1) @Max(3) short semesterNo, @NotBlank @Size(max = 60) String name,
                                   @NotNull LocalDate startDate, @NotNull LocalDate endDate, @NotNull LocalDate registrationOpens,
                                   @NotNull LocalDate registrationCloses, LocalDate lateRegistrationCloses,
-                                  LocalDate marksEntryOpens, LocalDate marksEntryCloses) {
+                                  LocalDate marksEntryOpens, LocalDate marksEntryCloses,
+                                  @jakarta.validation.constraints.DecimalMin("0") java.math.BigDecimal lateRegistrationFee) {
+        public SemesterRequest(Long academicYearId, short semesterNo, String name, LocalDate startDate, LocalDate endDate, LocalDate registrationOpens,
+                               LocalDate registrationCloses, LocalDate lateRegistrationCloses, LocalDate marksEntryOpens, LocalDate marksEntryCloses) {
+            this(academicYearId, semesterNo, name, startDate, endDate, registrationOpens, registrationCloses, lateRegistrationCloses,
+                    marksEntryOpens, marksEntryCloses, null);
+        }
     }
 
     public record SemesterView(Long id, Long academicYearId, String academicYear, short semesterNo, String name, LocalDate startDate,
                                LocalDate endDate, LocalDate registrationOpens, LocalDate registrationCloses, LocalDate lateRegistrationCloses,
-                               LocalDate marksEntryOpens, LocalDate marksEntryCloses, String window) {
+                               LocalDate marksEntryOpens, LocalDate marksEntryCloses, String window, java.math.BigDecimal lateRegistrationFee) {
         static SemesterView of(Semester s, LocalDate today) {
             return new SemesterView(s.getId(), s.getAcademicYear().getId(), s.getAcademicYear().getCode(), s.getSemesterNo(), s.getName(),
                     s.getStartDate(), s.getEndDate(), s.getRegistrationOpens(), s.getRegistrationCloses(), s.getLateRegistrationCloses(),
-                    s.getMarksEntryOpens(), s.getMarksEntryCloses(), s.window(today).name());
+                    s.getMarksEntryOpens(), s.getMarksEntryCloses(), s.window(today).name(), s.getLateRegistrationFee());
         }
     }
 

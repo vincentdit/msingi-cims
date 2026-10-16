@@ -3,19 +3,19 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import BuildIcon from '@mui/icons-material/BuildOutlined';
 import {
-  Alert, Box, Button, Card, CardActionArea, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
+  Alert, Box, Button, Card, CardActionArea, CardContent, Checkbox, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
   IconButton, LinearProgress, MenuItem, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField,
   Tooltip, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { api, formatDate, formatTzs } from '../../api/client';
+import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
-  AcademicYear, FreeBed, HostelAllocationView, HostelRepair, HostelApplicationView, HostelDetail, HostelFeeCategory, HostelRoomView, HostelSummary, HostelWindow,
+  AcademicYear, FreeBed, HostelAllocationView, HostelBedChange, HostelRepair, HostelApplicationView, HostelDetail, HostelFeeCategory, HostelRoomView, HostelSummary, HostelWindow,
   RoomType,
 } from '../../api/types';
-import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
 import { useRoles } from './MarksPages';
 
 const staff = { realm: 'staff' as const };
@@ -60,6 +60,7 @@ function AllocationTab({ warden }: { warden: boolean }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [manual, setManual] = useState<HostelApplicationView | null>(null);
   const [action, setAction] = useState<{ kind: 'in' | 'out' | 'cancel'; a: HostelAllocationView } | null>(null);
+  const [moving, setMoving] = useState<HostelAllocationView | null>(null);
   const apps = useQuery({
     queryKey: ['staff', 'hostel-applications', windowId], enabled: !!windowId,
     queryFn: () => api<HostelApplicationView[]>(`/api/hostel/windows/${windowId}/applications`, staff),
@@ -145,6 +146,10 @@ function AllocationTab({ warden }: { warden: boolean }) {
                             : `${formatTzs(al.balance)} to pay by ${formatDate(al.payBy)}`) : 'No fee'}
                         </Typography>
                         {al.damageCharge != null && <Typography variant="caption" color="error.main" sx={{ display: 'block' }}>Damages {formatTzs(al.damageCharge)}: {al.damages}</Typography>}
+                        {al.refund && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          Refund {formatTzs(al.refund.amount)} ({al.refund.adjustmentNo}): {humanise(al.refund.status).toLowerCase()}</Typography>}
+                        {al.bedChanges > 0 && <Chip size="small" variant="outlined" label={al.bedChanges === 1 ? 'Moved once' : `Moved ${al.bedChanges} times`}
+                          onClick={() => setMoving(al)} sx={{ mt: 0.5 }} />}
                       </> : '—'}
                     </TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -154,6 +159,8 @@ function AllocationTab({ warden }: { warden: boolean }) {
                         <Button size="small" variant="contained" onClick={() => setAction({ kind: 'in', a: al })} sx={{ ml: 0.5 }}>Check in</Button>
                       </>}
                       {warden && al?.status === 'CHECKED_IN' && <Button size="small" variant="outlined" onClick={() => setAction({ kind: 'out', a: al })}>Check out</Button>}
+                      {warden && (al?.status === 'ALLOCATED' || al?.status === 'CHECKED_IN') && a.status === 'ALLOCATED'
+                        && <Button size="small" onClick={() => setMoving(al)} sx={{ ml: 0.5 }}>Move</Button>}
                     </TableCell>
                   </TableRow>
                 );
@@ -165,6 +172,8 @@ function AllocationTab({ warden }: { warden: boolean }) {
       )}
       {manual && <ManualDialog app={manual} onClose={() => setManual(null)} onDone={() => { setManual(null); setNotice('Bed allocated and invoiced.'); refresh(); }} />}
       {action && <ActionDialog kind={action.kind} a={action.a} onClose={() => setAction(null)} onDone={(m) => { setAction(null); setNotice(m); refresh(); }} />}
+      {moving && <MoveDialog a={moving} canMove={warden && (moving.status === 'ALLOCATED' || moving.status === 'CHECKED_IN')} onClose={() => setMoving(null)}
+        onDone={(m) => { setMoving(null); setNotice(m); refresh(); }} />}
     </>
   );
 }
@@ -206,11 +215,15 @@ function ActionDialog({ kind, a, onClose, onDone }: { kind: 'in' | 'out' | 'canc
   const [note, setNote] = useState('');
   const [damages, setDamages] = useState('');
   const [charge, setCharge] = useState('');
+  const [refundUnused, setRefundUnused] = useState(false);
+  const paid = a.invoiceStatus === 'PAID' || (a.fee > 0 && a.balance < a.fee);
   const m = useMutation({
     mutationFn: () => kind === 'in' ? api(`/api/hostel/allocations/${a.id}/check-in`, { ...staff, method: 'POST', body: { note: note || null } })
-      : kind === 'out' ? api(`/api/hostel/allocations/${a.id}/check-out`, { ...staff, method: 'POST', body: { condition: note || null, damages: damages || null, damageCharge: charge ? Number(charge) : null } })
+      : kind === 'out' ? api(`/api/hostel/allocations/${a.id}/check-out`, { ...staff, method: 'POST', body: { condition: note || null, damages: damages || null, damageCharge: charge ? Number(charge) : null, refundUnused } })
         : api(`/api/hostel/allocations/${a.id}/cancel`, { ...staff, method: 'POST', body: { reason: note } }),
-    onSuccess: () => onDone(kind === 'in' ? `${a.studentName} checked in.` : kind === 'out' ? `${a.studentName} checked out${charge ? '; damages invoiced' : ''}.` : 'Allocation cancelled; the student was told by SMS.'),
+    onSuccess: () => onDone(kind === 'in' ? `${a.studentName} checked in.`
+      : kind === 'out' ? `${a.studentName} checked out${charge ? '; damages invoiced' : ''}${refundUnused ? '; the refund waits for the bursary' : ''}.`
+        : `Allocation cancelled; the student was told by SMS.${paid ? ' What was paid is offered back as a refund, which waits for the bursary.' : ''}`),
   });
   const heading = kind === 'in' ? 'Check in' : kind === 'out' ? 'Check out' : 'Cancel allocation';
   return (
@@ -226,13 +239,78 @@ function ActionDialog({ kind, a, onClose, onDone }: { kind: 'in' | 'out' | 'canc
           {kind === 'out' && <>
             <TextField label="Damages (if any)" value={damages} onChange={(e) => setDamages(e.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
             <TextField label="Damage charge (TZS)" type="number" value={charge} onChange={(e) => setCharge(e.target.value)} helperText="Invoiced to the student with a control number" />
+            <FormControlLabel control={<Checkbox checked={refundUnused} onChange={(e) => setRefundUnused(e.target.checked)} />}
+              label="Refund the unused part of the hostel fee (the rest of the occupancy period)" />
+            {refundUnused && <Alert severity="info">CIMS works out the amount from the window's occupancy dates and raises a refund request; the bursary approves it and pays it out.</Alert>}
           </>}
+          {kind === 'cancel' && paid && <Alert severity="info">The student has paid towards this bed: cancelling raises a refund of what was paid (and a waiver of anything still owed) for the bursary to decide.</Alert>}
           <ErrorAlert error={m.error} />
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
         <Button variant="contained" color={kind === 'cancel' ? 'warning' : 'primary'} disabled={m.isPending || (kind === 'cancel' && !note.trim())} onClick={() => m.mutate()}>{heading}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function MoveDialog({ a, canMove, onClose, onDone }: { a: HostelAllocationView; canMove: boolean; onClose: () => void; onDone: (m: string) => void }) {
+  const beds = useQuery({ queryKey: ['staff', 'free-beds', a.applicationId], enabled: canMove,
+    queryFn: () => api<FreeBed[]>(`/api/hostel/applications/${a.applicationId}/free-beds`, staff) });
+  const history = useQuery({ queryKey: ['staff', 'bed-changes', a.id], queryFn: () => api<HostelBedChange[]>(`/api/hostel/allocations/${a.id}/changes`, staff) });
+  const [bedId, setBedId] = useState<number>();
+  const [reason, setReason] = useState('');
+  const m = useMutation({
+    mutationFn: () => api<HostelAllocationView>(`/api/hostel/allocations/${a.id}/move`, { ...staff, method: 'POST', body: { bedId, reason: reason.trim() } }),
+    onSuccess: (x) => onDone(`${a.studentName} moved to ${x.hostel}, ${x.room}, bed ${x.bed}. The student was told by SMS.`),
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{canMove ? 'Move to another bed' : 'Bed changes'} · {a.registrationNo} {a.studentName}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Now: {a.hostel}, {a.room}, bed {a.bed}</Typography>
+        {canMove && <>
+          <Typography variant="body2" sx={{ mb: 1 }}>A dearer or cheaper room changes the fee for the rest of the occupancy period: the difference is billed on a new invoice,
+            or waived or refunded once the bursary approves.</Typography>
+          {beds.isLoading && <Loading />}
+          {beds.data && !beds.data.length && <Alert severity="warning">No free bed for this student.</Alert>}
+          <Stack spacing={0.5} sx={{ maxHeight: 260, overflowY: 'auto' }}>
+            {beds.data?.map((b) => (
+              <Card key={b.bedId} variant="outlined" sx={{ borderColor: bedId === b.bedId ? 'primary.main' : undefined, borderWidth: bedId === b.bedId ? 2 : 1 }}>
+                <CardActionArea onClick={() => setBedId(b.bedId)} sx={{ px: 1.5, py: 1 }}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{b.hostel}, {b.room}, bed {b.bed}</Typography>
+                      <Typography variant="caption" color="text.secondary">{title(b.roomType)}{b.accessible ? ' · accessible' : ''}</Typography>
+                    </Box>
+                    <Typography variant="body2">{formatTzs(b.fee)}</Typography>
+                  </Stack>
+                </CardActionArea>
+              </Card>
+            ))}
+          </Stack>
+          <TextField fullWidth label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} sx={{ mt: 2 }} required
+            slotProps={{ htmlInput: { maxLength: 500 } }} helperText="Kept with the move, e.g. Asked for a single room on medical advice" />
+        </>}
+        {!!history.data?.length && <>
+          <Typography variant="subtitle2" sx={{ mt: 2 }}>Earlier moves</Typography>
+          {history.data.map((c) => (
+            <Box key={c.id} sx={{ py: 0.75, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="body2">{c.fromBed} → {c.toBed}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatDateTime(c.changedAt)} · {c.changedByName} · {c.reason}
+                {c.difference > 0 ? ` · ${formatTzs(c.difference)} billed (${c.invoiceNo})` : c.difference < 0
+                  ? ` · ${formatTzs(-c.difference)} ${c.adjustmentKind === 'REFUND' ? 'refund' : 'waiver'} ${c.adjustmentNo ?? ''}: ${humanise(c.adjustmentStatus ?? '').toLowerCase()}` : ' · same fee'}
+              </Typography>
+            </Box>
+          ))}
+        </>}
+        <ErrorAlert error={beds.error ?? history.error ?? m.error} />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        {canMove && <Button variant="contained" disabled={!bedId || reason.trim().length < 5 || m.isPending} onClick={() => m.mutate()}>Move</Button>}
       </DialogActions>
     </Dialog>
   );

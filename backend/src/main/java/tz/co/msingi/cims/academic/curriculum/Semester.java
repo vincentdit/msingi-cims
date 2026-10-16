@@ -39,6 +39,9 @@ public class Semester extends BaseEntity {
     @Column(nullable = false)
     private LocalDate registrationCloses;
     private LocalDate lateRegistrationCloses;
+    /** Charged to a student who registers in the late period (BP-05); zero for none. */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal lateRegistrationFee = java.math.BigDecimal.ZERO;
     /** From this date lecturers may enter semester-examination marks (FR-EXM-02). */
     private LocalDate marksEntryOpens;
     /** After this date no marks can be entered. */

@@ -1,2 +1,0 @@
-# Trivy findings accepted on purpose, one ID per line with the reason above it.
-# dev-keys/ is skipped in the workflow: TEST-ONLY GePG keys, password test-only-not-secret (dev-keys/README.md).

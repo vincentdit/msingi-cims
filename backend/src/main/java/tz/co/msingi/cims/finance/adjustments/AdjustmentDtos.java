@@ -49,7 +49,7 @@ public final class AdjustmentDtos {
                                  boolean needsSecondLevel, String requestedByName, OffsetDateTime requestedAt, String firstByName,
                                  OffsetDateTime firstAt, String secondByName, OffsetDateTime secondAt, String decisionNote, String documentNo,
                                  String paidReference, OffsetDateTime paidAt, String waitingFor, boolean canApprove, boolean canReject,
-                                 boolean canMarkPaid, Long schemeId, String schemeName) {
+                                 boolean canMarkPaid, Long schemeId, String schemeName, String origin) {
     }
 
     /** What can be waived or refunded for a student: open invoices and credit. */
@@ -57,6 +57,8 @@ public final class AdjustmentDtos {
                                  List<InvoiceOption> invoices) {
     }
 
-    public record InvoiceOption(Long id, String invoiceNo, String description, BigDecimal balance, BigDecimal waivable) {
+    /** An invoice of the student: what can be waived on it, and what paid on it can be refunded. */
+    public record InvoiceOption(Long id, String invoiceNo, String description, BigDecimal balance, BigDecimal waivable, BigDecimal paid,
+                                BigDecimal refundable) {
     }
 }

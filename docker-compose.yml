@@ -41,7 +41,7 @@ services:
   frontend:
     build: ./frontend
     depends_on: [backend]
-    ports: ["8081:80"]
+    ports: ["8081:8080"]
 
   # Development stand-ins for the government systems (profile "mocks"):  docker compose --profile mocks up -d gov-mocks nactvet-mock
   # then run the backend with profiles dev,gov-mocks,nactvet-mock. Dashboards: http://localhost:8098 and http://localhost:8099
