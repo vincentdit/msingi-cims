@@ -13,7 +13,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type {
   AdmissionWindow, NactvetSubmission, OutcomeResult, VerificationApplicantRow, VerificationOverview,
@@ -21,6 +21,7 @@ import type {
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
 import { ROLES } from '../../auth/access';
 import { useSession } from '../../auth/session';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const OFFER_STATUSES = ['OFFERED', 'ACCEPTED', 'DECLINED', 'OFFER_LAPSED'];
@@ -123,7 +124,7 @@ export default function VerificationPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{win.data?.name}</Button>
+      <Button component={StaffLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{win.data?.name}</Button>
       <PageTitle
         title="NACTVET verification & offers"
         subtitle={<>Submit approved selections to NACTVET, record outcomes, and follow offers to acceptance. Offers stay open for <strong>{d.offerAcceptanceDays} days</strong> after verification.</>}
@@ -242,7 +243,7 @@ export default function VerificationPage() {
             ? <Alert severity="info" action={<Button color="inherit" size="small" disabled={busy} onClick={() => issueLetters.mutate()}>Issue {d.lettersPending} letter(s)</Button>}>
                 {d.lettersPending} accepted applicant(s) do not have an admission letter yet.
               </Alert>
-            : <Alert severity="warning" action={<Button color="inherit" size="small" component={RouterLink} to={`/staff/windows/${id}`}>Set up</Button>}>
+            : <Alert severity="warning" action={<Button color="inherit" size="small" component={StaffLink} to={`/staff/windows/${id}`}>Set up</Button>}>
                 {d.lettersPending} accepted applicant(s) are waiting for their admission letter. Set the joining instructions for this window first.
               </Alert>)}
           <Section empty={!offers.length} emptyText="No offers yet. Offers are issued automatically when NACTVET verifies an applicant.">

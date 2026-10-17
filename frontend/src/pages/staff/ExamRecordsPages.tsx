@@ -6,11 +6,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type { AcademicDocumentView, Amendment, StudentModuleRecord } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const num = (n?: number | null) => (n == null ? '—' : Number(n).toLocaleString('en-GB', { maximumFractionDigits: 2 }));
@@ -77,7 +77,7 @@ function AmendmentCard({ a, onDecide }: { a: Amendment; onDecide: (approve: bool
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" sx={{ fontSize: 17 }}>{a.moduleCode} · {a.moduleTitle}</Typography>
             <Typography variant="body2" color="text.secondary">
-              <RouterLink to={`/staff/students/${a.studentId}`}>{a.registrationNo}</RouterLink> {a.studentName} · {a.semester}
+              <StaffLink to={`/staff/students/${a.studentId}`}>{a.registrationNo}</StaffLink> {a.studentName} · {a.semester}
             </Typography>
             <Table size="small" sx={{ my: 1, maxWidth: 420 }}>
               <TableHead><TableRow><TableCell /><TableCell align="right">CA</TableCell><TableCell align="right">SE</TableCell><TableCell align="right">Total</TableCell><TableCell>Grade</TableCell></TableRow></TableHead>

@@ -2,10 +2,10 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Alert, Box, Button, Card, CardContent, Chip, Container, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { Programme } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 interface YearRow { academicYear: string; students: number; passed: number; passRate?: number; meanGpa?: number; decisions: Record<string, number>; grades: Record<string, number>; beforeCims: boolean }
@@ -24,7 +24,7 @@ export default function ResultTrendsPage() {
   const grades = t ? [...new Set(t.rows.flatMap((r) => Object.keys(r.grades)))].sort() : [];
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/results" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Results</Button>
+      <Button component={StaffLink} to="/staff/results" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Results</Button>
       <PageTitle title="Results across years" subtitle="Pass rates, mean GPA, grades and module performance year on year, from confirmed results and results brought in from before CIMS." />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
         <TextField select size="small" label="Programme" value={programmeId} onChange={(e) => setProgrammeId(e.target.value)} sx={{ minWidth: 320 }}>

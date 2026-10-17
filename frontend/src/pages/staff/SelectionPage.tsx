@@ -9,10 +9,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api, download, formatDateTime } from '../../api/client';
 import type { AdmissionWindow, SelectionRoundDetail, SelectionRoundSummary, SelectionRow } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const ROUND_COLOUR: Record<string, 'warning' | 'success' | 'default'> = { PROPOSED: 'warning', APPROVED: 'success', CANCELLED: 'default' };
@@ -66,7 +67,7 @@ export default function SelectionPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{win.data?.name}</Button>
+      <Button component={StaffLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{win.data?.name}</Button>
       <PageTitle
         title="Selection"
         subtitle="Rank eligible applicants by merit, allocate places within capacity, and record the Admissions Committee decision."

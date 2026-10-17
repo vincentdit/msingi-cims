@@ -7,12 +7,12 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDate, formatDateTime } from '../../api/client';
 import type { StudentDetail, Transfer, TransferOptions } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
 import { useCategories } from './StructurePages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -242,7 +242,7 @@ export function TransfersPage() {
             {rows.map((t) => (
               <TableRow key={t.id} hover sx={{ verticalAlign: 'top' }}>
                 <TableCell>
-                  <Link component={RouterLink} to={`/staff/students/${t.studentId}`} fontWeight={600} underline="hover">{t.studentName}</Link>
+                  <Link component={StaffLink} to={`/staff/students/${t.studentId}`} fontWeight={600} underline="hover">{t.studentName}</Link>
                   <Box sx={{ fontFamily: 'monospace', fontSize: 13 }}>{t.registrationNo}</Box>
                 </TableCell>
                 <TableCell sx={{ minWidth: 260 }}>{KIND_LABEL[t.kind]}<Move t={t} /><Box sx={{ fontSize: 13, color: 'text.secondary' }}>effective {formatDate(t.effectiveDate)}</Box></TableCell>

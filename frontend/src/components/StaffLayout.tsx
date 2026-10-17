@@ -45,6 +45,7 @@ import ImportIcon from '@mui/icons-material/DriveFolderUpload';
 import TimetableIcon from '@mui/icons-material/ViewWeek';
 import ExamTimetableIcon from '@mui/icons-material/EventNote';
 import IdleSignOut from './IdleSignOut';
+import { disabledLinkStyles } from './StaffLink';
 import { Alert, Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from '../i18n';
@@ -55,7 +56,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { can, pageOf, ROLE_LABEL, type PageKey } from '../auth/access';
+import { can, canOpen, ROLE_LABEL, type PageKey } from '../auth/access';
 import { useSession } from '../auth/session';
 import { useInstitution } from './InstitutionContext';
 
@@ -167,12 +168,11 @@ export default function StaffLayout() {
   const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: can(roles, 'approvals') && !me?.mustChangePassword,
     refetchInterval: 60_000, queryFn: () => api<{ actionable: number }>('/api/approvals/count', { realm: 'staff' }) }).data?.actionable ?? 0;
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
-  const page = pageOf(location.pathname);
   const idleOut = useCallback(() => { signOut('staff'); navigate('/staff/login?idle=1'); }, [signOut, navigate]);
   const onPassword = location.pathname.startsWith('/staff/password');
   if ((me?.mustChangePassword || me?.mfaSetupRequired) && !onPassword) return <Navigate to="/staff/password" replace />;
   if (location.pathname === '/staff' && !can(roles, 'dashboard')) return <Navigate to={homeFor(roles)} replace />;
-  const allowed = onPassword || !page || can(roles, page);
+  const allowed = onPassword || canOpen(roles, location.pathname);
 
   const drawer = (
     <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0F1B2D', color: '#E6EBF2' }}>
@@ -236,6 +236,7 @@ export default function StaffLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {disabledLinkStyles}
       <IdleSignOut kind="staff" onSignOut={idleOut} />
       {!desktop && (
         <AppBar position="fixed" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>

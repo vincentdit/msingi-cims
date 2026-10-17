@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { setLanguage } from '../../i18n';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
   AdmissionWindow, ApplicantRow, ApplicationDetail, ApplicationSummary, Department, EntryRules, Page, Programme, TokenResponse, WindowStats,
@@ -30,6 +30,7 @@ import { ApplicationDocumentsSection, WindowDocumentsCard } from './ApplicationD
 import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './QualificationChecks';
 import { CampusPicker, CampusesTab, DepartmentsTab, NamedListTab, useCampuses, useProgrammeCampuses } from './StructurePages';
 import { WindowFormDialog, WindowHistoryCard, WindowLifecycle, WindowStateChip, useWindowRoles } from './WindowAdmin';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 
@@ -82,7 +83,7 @@ export function StaffLoginPage() {
                 <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
                 <ErrorAlert error={m.error} />
                 <Button type="submit" variant="contained" size="large" disabled={m.isPending}>Sign in</Button>
-                <Button component={RouterLink} to="/">Back to admission portal</Button>
+                <Button component={StaffLink} to="/">Back to admission portal</Button>
               </Stack>
             </form>
           ) : (
@@ -139,7 +140,7 @@ export function StaffDashboard() {
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
             <Typography variant="h6">Latest applications</Typography>
-            <Button component={RouterLink} to="/staff/applications">View all</Button>
+            <Button component={StaffLink} to="/staff/applications">View all</Button>
           </Stack>
           <ApplicationsTable rows={recent.data?.content ?? []} />
         </CardContent>
@@ -513,7 +514,7 @@ export function WindowsPage() {
       {list.data && !list.data.length && <Alert severity="info">No admission windows yet.</Alert>}
       <Stack spacing={2}>
         {list.data?.map((w) => (
-          <Card key={w.id} component={RouterLink} to={`/staff/windows/${w.id}`} sx={{ textDecoration: 'none' }}>
+          <Card key={w.id} component={StaffLink} to={`/staff/windows/${w.id}`} sx={{ textDecoration: 'none' }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" spacing={2}>
                 <Box>
@@ -562,15 +563,18 @@ export function WindowDetailPage() {
   if (w.isLoading) return <Loading />;
   const win = w.data;
   if (!win) return <ErrorAlert error={w.error} />;
+  // the steps that work on applications are ready once the window has opened (applications can exist)
+  const notOpenYet = win.state === 'DRAFT' || win.state === 'SCHEDULED' ? 'Ready once the window opens for applications.' : undefined;
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
         action={<Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
-          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/entry-test`}>Test entry rules</Button>
-          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/qualification-checks`}>Qualification checks</Button>
-          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/selection`}>Selection</Button>
-          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/verification`}>NACTVET &amp; offers</Button>
-          <Button variant="outlined" component={RouterLink} to={`/staff/windows/${id}/handover`}>Registration hand-over</Button>
+          <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/entry-test`}
+            disabledReason={win.programmes?.length ? undefined : 'Add a programme to the window first.'}>Test entry rules</Button>
+          <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/qualification-checks`} disabledReason={notOpenYet}>Qualification checks</Button>
+          <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/selection`} disabledReason={notOpenYet}>Selection</Button>
+          <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/verification`} disabledReason={notOpenYet}>NACTVET &amp; offers</Button>
+          <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/handover`} disabledReason={notOpenYet}>Registration hand-over</Button>
           {canConfigure && win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
         </Stack>} />
       <WindowLifecycle win={win} onEdit={() => setEditing(true)} />

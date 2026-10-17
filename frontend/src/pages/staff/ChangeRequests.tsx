@@ -5,10 +5,10 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { ChangeRequest } from '../../api/types';
 import { ErrorAlert, Loading } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 
@@ -58,7 +58,7 @@ function ChangeRequestsDialog({ canDecide, onClose }: { canDecide: boolean; onCl
               <CardContent>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }} sx={{ mb: 1 }}>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography sx={{ fontWeight: 700 }} component={RouterLink} to={`/staff/students/${r.studentId}`} onClick={onClose} color="inherit">
+                    <Typography sx={{ fontWeight: 700 }} component={StaffLink} to={`/staff/students/${r.studentId}`} onClick={onClose} color="inherit">
                       {r.studentName}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">{r.registrationNo} · {r.programmeName} · sent {formatDateTime(r.submittedAt)}</Typography>

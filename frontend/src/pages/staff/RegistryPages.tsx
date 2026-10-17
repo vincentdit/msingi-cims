@@ -13,7 +13,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
   Clearance, HandoverOverview, Page, Programme, RegistrySettings, Statement, StudentDetail, StudentSummary,
@@ -26,6 +26,7 @@ import { ChangeRequestsButton } from './ChangeRequests';
 import { IdCardBatchDialog, StudentIdCard, StudentStatusCard } from './StatusAndCards';
 import NinCard from '../../components/NinCard';
 import { StudentTransferCard } from './TransferPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -66,7 +67,7 @@ export function HandoverPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{d.windowName}</Button>
+      <Button component={StaffLink} to={`/staff/windows/${id}`} startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>{d.windowName}</Button>
       <PageTitle title="Registration hand-over"
         subtitle="Applicants who accepted their offer become students: their record is created from the application, with a registration number. They complete registration when they report with their original documents."
         action={canRegister && pending.length > 0 && (
@@ -123,7 +124,7 @@ export function HandoverPage() {
                       <TableCell>{formatDate(r.acceptedAt)}</TableCell>
                       <TableCell>{r.letterNo ?? <Typography variant="body2" color="text.secondary">Not issued</Typography>}</TableCell>
                       <TableCell>{r.studentId
-                        ? <Typography component={RouterLink} to={`/staff/students/${r.studentId}`} sx={{ fontFamily: 'monospace', fontWeight: 600, color: 'primary.main', textDecoration: 'none' }}>{r.registrationNo}</Typography>
+                        ? <Typography component={StaffLink} to={`/staff/students/${r.studentId}`} sx={{ fontFamily: 'monospace', fontWeight: 600, color: 'primary.main', textDecoration: 'none' }}>{r.registrationNo}</Typography>
                         : '—'}</TableCell>
                       <TableCell>{r.studentStatus
                         ? <Chip size="small" color={statusColour(r.studentStatus)} label={humanise(r.studentStatus)} />
@@ -350,7 +351,7 @@ export function StudentDetailPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/students" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Students</Button>
+      <Button component={StaffLink} to="/staff/students" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Students</Button>
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'flex-start' }} spacing={1} sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h5" component="h1">{s.fullName}</Typography>

@@ -11,7 +11,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import {
   DECISIONS, type AcademicYear, type ClassificationBand, type Decision, type GradeBand, type Regulation, type ResultSheet, type SheetRow,
@@ -19,6 +19,7 @@ import {
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles, useSemesterChoice } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 export const DECISION_LABEL: Record<Decision, string> = {
@@ -51,7 +52,7 @@ export function ResultSheetsPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Results" subtitle="Class result sheets: computed by the Examinations Officer, reviewed by the Academic Committee, confirmed by the Governing Board, then published."
-        action={<Stack direction="row" spacing={1} alignItems="center"><Button component={RouterLink} to="/staff/results-trends" sx={{ whiteSpace: 'nowrap' }}>Across years</Button>{picker}</Stack>} />
+        action={<Stack direction="row" spacing={1} alignItems="center"><Button component={StaffLink} to="/staff/results-trends" sx={{ whiteSpace: 'nowrap' }}>Across years</Button>{picker}</Stack>} />
       <ErrorAlert error={semesters.error ?? list.error ?? compute.error} />
       {semesterId && <ResitSessionCard semesterId={semesterId} canEdit={officer} />}
       {list.isLoading && <Loading />}
@@ -84,7 +85,7 @@ export function ResultSheetsPage() {
                         onClick={() => compute.mutate(x)}>{x.status === 'NOT_COMPUTED' ? 'Compute results' : 'Recompute'}</Button></span>
                     </Tooltip>
                   )}
-                  {x.id && <Button component={RouterLink} to={`/staff/results/${x.id}`}>Open</Button>}
+                  {x.id && <Button component={StaffLink} to={`/staff/results/${x.id}`}>Open</Button>}
                 </Stack>
               </Stack>
             </CardContent>
@@ -128,7 +129,7 @@ export function ResultSheetPage() {
   const exportUrl = `/api/reports/EXM-02/export?format=xlsx&semesterId=${s.semesterId}&programmeId=${s.programmeId}&yearOfStudy=${s.yearOfStudy}`;
   return (
     <Container maxWidth="xl" disableGutters>
-      <Button component={RouterLink} to="/staff/results" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Results</Button>
+      <Button component={StaffLink} to="/staff/results" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Results</Button>
       <PageTitle title={`${s.programmeCode} year ${s.yearOfStudy} · ${s.semesterName} ${s.academicYear}${s.round === 'RESIT' ? ' · after resits' : ''}`}
         subtitle={<>{s.programmeName} · {s.rows.length} student{s.rows.length === 1 ? '' : 's'} · {s.regulation}</>}
         action={s.round === 'MAIN' &&

@@ -11,10 +11,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles, useSemesterChoice } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const ALLOCATORS = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC'];
@@ -249,7 +250,7 @@ export function CompetenceUnitPage() {
   const u = v.data;
   return (
     <>
-      <Button component={RouterLink} to="/staff/competence" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Competence assessment</Button>
+      <Button component={StaffLink} to="/staff/competence" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Competence assessment</Button>
       <ErrorAlert error={v.error ?? act.error} />
       {v.isLoading && <Loading />}
       {u && (

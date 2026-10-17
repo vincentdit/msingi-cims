@@ -16,11 +16,12 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs, upload } from '../../api/client';
 import { BarList, ColumnChart } from '../../components/charts';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const BURSAR = ['INSTITUTION_ADMIN', 'BURSAR'];
@@ -103,7 +104,7 @@ export function FinanceOverviewPage() {
                       <Stack key={i} direction="row" spacing={1.5} alignItems="center" sx={{ py: 1 }}>
                         {SEV_ICON[s.severity]}
                         <Typography variant="body2" sx={{ flex: 1 }}>{s.text}</Typography>
-                        {s.link && <Button size="small" component={RouterLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
+                        {s.link && <Button size="small" component={StaffLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
                       </Stack>
                     ))}
                   </Stack>
@@ -244,7 +245,7 @@ function WorkRow({ label, value, hint, link, warn }: { label: string; value: num
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.5 }}>
       <Typography variant="body2" color={zero ? 'text.secondary' : undefined}>{label}{hint && <Typography component="span" variant="caption" color="text.secondary"> · {hint}</Typography>}</Typography>
-      <Button size="small" component={RouterLink} to={link} color={!zero && warn ? 'warning' : 'primary'} sx={{ minWidth: 0, fontWeight: 700 }}>{value}</Button>
+      <Button size="small" component={StaffLink} to={link} color={!zero && warn ? 'warning' : 'primary'} sx={{ minWidth: 0, fontWeight: 700 }}>{value}</Button>
     </Stack>
   );
 }
@@ -420,7 +421,7 @@ export function SponsorDetailPage() {
   const officer = can(['SPONSOR_OFFICER']) && !can([...BURSARY, 'MANAGEMENT_VIEWER', 'AUDITOR']);
   return (
     <>
-      {!officer && <Button component={RouterLink} to="/staff/sponsors" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Sponsors</Button>}
+      {!officer && <Button component={StaffLink} to="/staff/sponsors" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Sponsors</Button>}
       <ErrorAlert error={q.error ?? invoice.error ?? end.error ?? control.error ?? err} />
       {q.isLoading && <Loading />}
       {d && (

@@ -15,11 +15,12 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type { CheckInScreen, ClassSessionView, MyModule, MyTeaching, SessionKind } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, LinkRow } from '../../components/common';
 import { OFFERING_STAGE } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const SEV_ICON = { success: <CheckCircleIcon color="success" />, info: <InfoIcon color="info" />, warning: <WarningIcon color="warning" />, error: <ErrorIcon color="error" /> };
@@ -75,7 +76,7 @@ export function MyTeachingPage() {
                       <Stack key={i} direction="row" spacing={1.5} alignItems="center" sx={{ py: 1 }}>
                         {SEV_ICON[s.severity]}
                         <Typography variant="body2" sx={{ flex: 1 }}>{s.text}</Typography>
-                        {s.link && <Button size="small" component={RouterLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
+                        {s.link && <Button size="small" component={StaffLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
                       </Stack>
                     ))}
                   </Stack>
@@ -111,7 +112,7 @@ export function MyTeachingPage() {
                 <Card>
                   <CardContent>
                     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Assigned to you</Typography>
-                      <Button size="small" component={RouterLink} to="/staff/appeals">Remarks & appeals</Button></Stack>
+                      <Button size="small" component={StaffLink} to="/staff/appeals">Remarks & appeals</Button></Stack>
                     {b.remarks.map((r) => (
                       <Typography key={r.id} variant="body2" sx={{ mt: 1 }}>
                         {r.kind === 'REMARK' ? 'Re-mark' : 'Appeal'} · <strong>{r.moduleCode}</strong> {r.moduleTitle}
@@ -149,7 +150,7 @@ export function MyTeachingPage() {
                         </Stack>
                       </CardContent>
                       <CardActions sx={{ px: 2, pb: 1.5 }}>
-                        <Button size="small" variant="contained" component={RouterLink} to={`/staff/competence/${u.id}`}>Assess</Button>
+                        <Button size="small" variant="contained" component={StaffLink} to={`/staff/competence/${u.id}`}>Assess</Button>
                       </CardActions>
                     </Card>
                   </Grid>
@@ -211,7 +212,7 @@ function ModuleCard({ m, onCheckIn }: { m: MyModule; onCheckIn: () => void }) {
           <Alert severity="error" sx={{ mt: 1.5, py: 0 }}>Returned{m.returnedByName ? ` by ${m.returnedByName}` : ''}: {m.returnedNote}</Alert>
         )}
         {m.openCheckInSessionId && (
-          <Alert severity="info" sx={{ mt: 1.5, py: 0 }} action={<Button size="small" color="inherit" component={RouterLink} to={`/staff/teaching/check-in/${m.openCheckInSessionId}`}>Show code</Button>}>
+          <Alert severity="info" sx={{ mt: 1.5, py: 0 }} action={<Button size="small" color="inherit" component={StaffLink} to={`/staff/teaching/check-in/${m.openCheckInSessionId}`}>Show code</Button>}>
             Self check-in is open.
           </Alert>
         )}
@@ -446,5 +447,5 @@ export function CheckInScreenPage() {
 function CloseLink({ sessionId, toOffering }: { sessionId: number; toOffering: (id: number) => string }) {
   const s = useQuery({ queryKey: ['staff', 'class-session', sessionId], queryFn: () => api<ClassSessionView>(`/api/teaching/sessions/${sessionId}`, staff) });
   if (!s.data) return null;
-  return <Button color="inherit" size="small" component={RouterLink} to={toOffering(s.data.offeringId)}>Open the register</Button>;
+  return <Button color="inherit" size="small" component={StaffLink} to={toOffering(s.data.offeringId)}>Open the register</Button>;
 }

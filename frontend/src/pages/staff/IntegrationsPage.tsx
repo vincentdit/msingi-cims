@@ -5,11 +5,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { AdmissionWindow } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 
@@ -316,7 +316,7 @@ function TamisemiTab() {
           <Button variant="contained" disabled={!windowId || fetch.isPending} onClick={() => fetch.mutate()}>Fetch selections</Button>
         </Stack>
         <ErrorAlert error={fetch.error} />
-        {fetch.data && <Alert severity="success" sx={{ mt: 1 }} action={<Button component={RouterLink} to="/staff/imports" size="small">Open import</Button>}>
+        {fetch.data && <Alert severity="success" sx={{ mt: 1 }} action={<Button component={StaffLink} to="/staff/imports" size="small">Open import</Button>}>
           {fetch.data.summary} (import {fetch.data.batchNo})</Alert>}
       </CardContent></Card>
       <Card>

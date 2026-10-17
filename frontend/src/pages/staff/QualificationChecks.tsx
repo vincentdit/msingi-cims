@@ -3,11 +3,12 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { AdmissionWindow, Qualification } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const DECIDE = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER'];
@@ -75,7 +76,7 @@ export function QualificationChecksPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Qualification checks" subtitle={`${win.data?.name ?? ''} · awards applicants declared, checked against their certificates. Results from NECTA and NACTVET are verified at source.`}
-        action={<Button component={RouterLink} to={`/staff/windows/${id}`}>Back to window</Button>} />
+        action={<Button component={StaffLink} to={`/staff/windows/${id}`}>Back to window</Button>} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Tab value="PENDING" label="Waiting" />
         <Tab value="VERIFIED" label="Verified" />

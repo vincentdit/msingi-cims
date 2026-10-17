@@ -10,11 +10,11 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, privateImageUrl, uploadForm } from '../../api/client';
 import type { Programme } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle, humanise } from '../../components/common';
 import { useRoles } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -282,7 +282,7 @@ export function StatusChangesPage() {
                 {rows.map((c) => (
                   <TableRow key={c.id} hover sx={{ verticalAlign: 'top' }}>
                     <TableCell>
-                      <Link component={RouterLink} to={`/staff/students/${c.studentId}`} fontWeight={600} underline="hover">{c.studentName}</Link>
+                      <Link component={StaffLink} to={`/staff/students/${c.studentId}`} fontWeight={600} underline="hover">{c.studentName}</Link>
                       <Box sx={{ fontFamily: 'monospace', fontSize: 13 }}>{c.registrationNo}</Box>
                       <Box sx={{ fontSize: 13, color: 'text.secondary' }}>{c.programmeCode}{c.departmentName ? ` · ${c.departmentName}` : ''}</Box>
                     </TableCell>

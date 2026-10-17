@@ -92,6 +92,25 @@ export function pageOf(pathname: string): PageKey | undefined {
   return PATH_PAGE[seg];
 }
 
+/**
+ * Pages inside a page whose roles are narrower than the page's own (the API refuses the others): the admission window's
+ * selection and NACTVET steps are not open to the Auditor, the hand-over not to the Auditor either.
+ */
+const SUBPAGE_ROLES: { re: RegExp; roles: readonly string[] }[] = [
+  { re: /^\/staff\/windows\/[^/]+\/(selection|verification|handover)$/, roles: [R.ADMIN, R.ADMISSIONS, R.ACADEMIC, R.REGISTRAR, R.MANAGEMENT] },
+];
+
+/** Whether the signed-in person may open a back-office address (a path, with or without ?query). Other portals' addresses are always allowed. */
+export function canOpen(roles: readonly string[] | undefined, to: string): boolean {
+  const path = to.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  if (!path.startsWith('/staff')) return true;
+  if (path === '/staff/password' || path === '/staff/login') return true;
+  const page = pageOf(path);
+  if (page && !can(roles, page)) return false;
+  const sub = SUBPAGE_ROLES.find((x) => x.re.test(path));
+  return !sub || !!roles?.some((r) => sub.roles.includes(r));
+}
+
 /** Role names as people use them. */
 export const ROLE_LABEL: Record<string, string> = {
   INSTITUTION_ADMIN: 'Institution Administrator', MANAGEMENT_VIEWER: 'Principal / Management', DEPUTY_PRINCIPAL_ACADEMIC: 'Deputy Principal (Academic)',

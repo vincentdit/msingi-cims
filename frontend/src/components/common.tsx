@@ -1,3 +1,4 @@
+import { NO_ACCESS, useCanOpen } from './StaffLink';
 import { Alert, Box, Button, CircularProgress, Stack, TableRow, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,8 +76,11 @@ export function humanise(status: string) {
  * A table row that opens a page, by click or by Enter. A row cannot be a link (<a> is not allowed inside <tbody>), so it
  * navigates itself and is announced as a link.
  */
-export function LinkRow({ to, children }: { to: string; children: ReactNode }) {
+export function LinkRow({ to, children, disabledReason }: { to: string; children: ReactNode; disabledReason?: string }) {
   const navigate = useNavigate();
+  const allowed = useCanOpen()(to);
+  const reason = disabledReason ?? (allowed ? undefined : NO_ACCESS);
+  if (reason) return <TableRow title={reason} aria-disabled="true" sx={{ opacity: 0.55, cursor: 'not-allowed' }}>{children}</TableRow>;
   return (
     <TableRow hover role="link" tabIndex={0} onClick={() => navigate(to)}
       onKeyDown={(e) => { if (e.key === 'Enter') navigate(to); }} sx={{ cursor: 'pointer' }}>
