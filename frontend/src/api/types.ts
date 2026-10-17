@@ -164,6 +164,8 @@ export interface Profile {
   olevelFromNecta?: boolean;
   alevelSchool?: string;
   alevelFromNecta?: boolean;
+  /** NECTA's PREM number for the candidate (from the CSEE results) */
+  premNumber?: string;
 }
 
 export interface Qualification {
@@ -191,6 +193,8 @@ export interface Qualification {
   checkNote?: string;
   checkedByName?: string;
   checkedAt?: string;
+  /** NECTA's PREM number, as sent with these results */
+  premNumber?: string;
 }
 
 export interface Choice {
@@ -219,6 +223,8 @@ export interface Application {
   submittedAt?: string;
   choices: Choice[];
   blockers: string[];
+  /** The same steps as codes, worded in the applicant's language (blockers is the English). */
+  todo?: { code: string; items: string[] }[];
   selectedProgramme?: string;
   offer?: Offer;
   letter?: AdmissionLetterInfo;
@@ -458,7 +464,11 @@ export interface NactvetSubmission {
   batchNo: number;
   channel: 'API' | 'FILE';
   status: 'SUBMITTED' | 'COMPLETED';
+  /** API batch: NACTVET application year and intake of the feedback, e.g. 2026/SEPTEMBER */
   externalRef?: string;
+  paymentReference?: string;
+  /** Only right after submitting: programmes NACTVET refused, still selected */
+  notSent?: string[];
   submittedAt: string;
   submittedByName: string;
   lastOutcomeAt?: string;
@@ -587,6 +597,7 @@ export interface StudentDetail {
   nextOfKinRelation?: string;
   awardName: string;
   applicationRef?: string;
+  premNumber?: string;
   nactvetVerificationNo?: string;
   admissionLetterNo?: string;
   admittedAt: string;
@@ -783,7 +794,7 @@ export interface StudentProfile {
   phone: string; email?: string; region?: string; district?: string; postalAddress?: string; disability?: string;
   nextOfKinName?: string; nextOfKinPhone?: string; nextOfKinRelation?: string;
   programmeName: string; programmeCode: string; awardName: string; academicYear: string; intake: string; yearOfStudy: number; status: string;
-  nactvetVerificationNo?: string; admissionLetterNo?: string;
+  nactvetVerificationNo?: string; admissionLetterNo?: string; premNumber?: string;
   editableFields: Record<string, string>; requests: ChangeRequest[];
 }
 
@@ -1064,6 +1075,8 @@ export interface StudentSemesterRegistration {
   clearance?: Clearance;
   registration?: SemesterRegistration;
   history: SemesterRegistration[];
+  /** The institution requires health insurance (NHIF) and the student is not covered yet */
+  healthCoverMissing?: boolean;
 }
 
 export interface SemesterRegistrationSummary {

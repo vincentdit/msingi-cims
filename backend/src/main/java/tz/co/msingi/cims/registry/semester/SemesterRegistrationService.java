@@ -65,6 +65,7 @@ public class SemesterRegistrationService {
     private final Messaging messaging;
     private final AuditService audit;
     private final tz.co.msingi.cims.finance.service.BillingService billing;
+    private final tz.co.msingi.cims.health.HealthCoverService health;
 
     /** Invoice purpose of the late-registration fee (BP-05). */
     public static final String LATE_FEE_PURPOSE = "LATE_REGISTRATION";
@@ -75,6 +76,14 @@ public class SemesterRegistrationService {
     @Transactional(readOnly = true)
     public StudentRegistration mine() {
         Student s = me();
+        StudentRegistration r = mine(s);
+        boolean open = "OPEN".equals(r.state()) || "LATE".equals(r.state());
+        if (!open || r.semester() == null) return r;
+        Long yearId = semesters.findById(r.semester().id()).orElseThrow().getAcademicYear().getId();
+        return health.coveredForRegistration(s.getId(), yearId) ? r : r.withHealthCoverMissing(true);
+    }
+
+    private StudentRegistration mine(Student s) {
         LocalDate today = LocalDate.now(ZONE);
         Semester sem = currentSemester(today);
         List<RegistrationView> history = registrations.findByStudentIdOrderBySubmittedAtDesc(s.getId()).stream().map(this::view).toList();
@@ -150,6 +159,10 @@ public class SemesterRegistrationService {
         }
         Clearance clearance = accounts.evaluate(s, ClearanceGate.Gate.REGISTRATION, sem.getAcademicYear());
         if (clearance.enabled() && !clearance.cleared()) throw new BusinessRuleException("FINANCIAL_CLEARANCE_REQUIRED", clearance.reason());
+        if (!health.coveredForRegistration(s.getId(), sem.getAcademicYear().getId())) {
+            throw new BusinessRuleException("HEALTH_COVER_REQUIRED", "Health insurance is needed before semester registration: give your NHIF card number, "
+                    + "or ask to be registered with NHIF through the institution and pay the contribution (Health insurance in the student portal).");
+        }
 
         SemesterRegistration r = registrations.findByStudentIdAndSemesterId(s.getId(), sem.getId()).orElse(null);
         if (r != null && r.getStatus() == SemesterRegistration.Status.APPROVED) {

@@ -18,6 +18,7 @@ import AmendIcon from '@mui/icons-material/PublishedWithChanges';
 import CalendarIcon from '@mui/icons-material/CalendarMonth';
 import CurriculumIcon from '@mui/icons-material/MenuBook';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import HealthIcon from '@mui/icons-material/HealthAndSafety';
 import TeachingIcon from '@mui/icons-material/CoPresent';
 import MyTeachingIcon from '@mui/icons-material/LocalLibrary';
 import CompetenceIcon from '@mui/icons-material/Construction';
@@ -79,6 +80,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'statusChanges', to: '/staff/status-changes', label: 'Status changes', icon: <SwapHorizIcon /> },
     { page: 'transfers', to: '/staff/transfers', label: 'Transfers', icon: <MoveUpIcon /> },
     { page: 'semesterRegistrations', to: '/staff/semester-registrations', label: 'Semester registration', icon: <HowToRegIcon /> },
+    { page: 'healthInsurance', to: '/staff/health-insurance', label: 'Health insurance', icon: <HealthIcon /> },
     { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
     { page: 'alumni', to: '/staff/alumni', label: 'Alumni', icon: <AlumniIcon /> },
   ] },

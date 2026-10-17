@@ -75,12 +75,15 @@ class VerificationIT {
         assertThat(overview.at("/ready/0/issues")).isEmpty();
         assertThat(overview.get("institutionNactvetNo").asText()).isEqualTo("REG/" + s.tenant + "/001");
 
-        // submit by API
+        // submit by API: NACTVET needs the payment reference of the verification fee with every upload
+        submit("API", null).andExpect(jsonPath("$.code").value("PAYMENT_REFERENCE_REQUIRED"));
         JsonNode batch = s.body(submit("API").andExpect(status().isOk()));
         long batchId = batch.get("id").asLong();
         assertThat(batch.get("batchNo").asInt()).isEqualTo(1);
         assertThat(batch.get("pending").asInt()).isEqualTo(4);
-        assertThat(batch.get("externalRef").asText()).isNotBlank();   // SIM-... when simulated, NACTVET's batch reference when live
+        // outcomes come from NACTVET's feedback for the intake's application year and intake (as NOAS pulls them)
+        assertThat(batch.get("externalRef").asText()).matches("\\d{4}/(SEPTEMBER|MARCH)");
+        assertThat(batch.get("paymentReference").asText()).isEqualTo("991100223344");
         submit("API").andExpect(jsonPath("$.code").value("NOTHING_TO_SUBMIT"));
         assertThat(statusOf(single)).isEqualTo("PENDING_VERIFICATION");
 
@@ -158,7 +161,8 @@ class VerificationIT {
                 .andExpect(jsonPath("$.code").value("NOT_AN_API_SUBMISSION"));
 
         String file = s.text(s.call(get("/api/admission/nactvet-submissions/" + id + "/file"), officer, null).andExpect(status().isOk()));
-        assertThat(file).contains("Application Ref", refA, refB, "NTA4-IT-" + s.tenant, "S0101/0001");
+        assertThat(file).contains("Application Ref", refA, refB, "NTA4-IT-" + s.tenant, "S0101/0001",
+                "payment_reference_number", "impairement", "form_four_indexnumber", "next_kin_relation");
         String template = s.text(s.call(get("/api/admission/nactvet-submissions/" + id + "/file?kind=outcomes"), officer, null));
         assertThat(template).startsWith("﻿reference,index_number,outcome").contains(refA, refB);
 
@@ -263,7 +267,12 @@ class VerificationIT {
     }
 
     private org.springframework.test.web.servlet.ResultActions submit(String channel) throws Exception {
-        return s.call(post("/api/admission/windows/" + s.inst.windowId() + "/nactvet-submissions"), officer, "{\"channel\":\"" + channel + "\"}");
+        return submit(channel, "API".equals(channel) ? "991100223344" : null);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions submit(String channel, String paymentReference) throws Exception {
+        return s.call(post("/api/admission/windows/" + s.inst.windowId() + "/nactvet-submissions"), officer, "{\"channel\":\"" + channel
+                + "\"" + (paymentReference == null ? "" : ",\"paymentReference\":\"" + paymentReference + "\"") + "}");
     }
 
     private org.springframework.test.web.servlet.ResultActions accept(Applicant a, String code) throws Exception {

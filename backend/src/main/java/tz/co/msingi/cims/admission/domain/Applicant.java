@@ -74,6 +74,9 @@ public class Applicant extends BaseEntity {
     private String nectaIndexNumber;
     private Short nectaExamYear;
 
+    /** NECTA's PREM number for the candidate (from the CSEE results). */
+    private String premNumber;
+
     @Column(nullable = false)
     private boolean namesFromNecta;
 

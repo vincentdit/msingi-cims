@@ -26,10 +26,10 @@ import StudentIptCard from './StudentIptCard';
 import { useInstitution } from '../../components/InstitutionContext';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
 import StudentTransferCard from './StudentTransferCard';
-import EmailCard from '../../components/EmailCard';
 import PrivacyCard from '../../components/PrivacyCard';
 import AlumniCard from '../../components/AlumniCard';
 import NinCard from '../../components/NinCard';
+import HealthCoverCard from '../../components/HealthCoverCard';
 
 const student = { realm: 'student' as const };
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
@@ -471,13 +471,14 @@ export function StudentProfilePage() {
             ['', `${t('student.year', { n: p.yearOfStudy })} · ${p.academicYear} · ${p.intake}`],
             [t('student.status'), <Chip key="s" size="small" color={statusColour(p.status)} label={humanise(p.status)} />],
             ...(p.nactvetVerificationNo ? [['NACTVET', p.nactvetVerificationNo] as [string, ReactNode]] : []),
+            ...(p.premNumber ? [[t('app.premNumber'), p.premNumber] as [string, ReactNode]] : []),
           ]} />
           <Typography variant="caption" color="text.secondary">{t('student.readOnlyNote')}</Typography>
         </CardContent>
       </Card>
 
       <StudentTransferCard />
-      <EmailCard realm="student" />
+      <HealthCoverCard />
       <NinCard />
       <AlumniCard />
       <PrivacyCard realm="student" />

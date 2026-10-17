@@ -43,7 +43,7 @@ class LiveGepgGatewayTest {
 
     static class Settings extends IntegrationSettingsService {
         IntegrationSettingsService.Settings s = new IntegrationSettingsService.Settings("SP19921", "1001", "LCIMS001", "140206",
-                false, null, false, false, null, null, false, null);
+                false, null, false, false, null, null, false, null, false, null, null, false);
 
         Settings() {
             super(null, null, null);

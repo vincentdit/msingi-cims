@@ -1,9 +1,9 @@
-# Live GePG, HESLB, NIDA, MUSE and TAMISEMI adapters against the gov-mocks project (development), and NACTVET student
+# Live GePG, HESLB, NIDA, MUSE, TAMISEMI and NHIF adapters against the gov-mocks project (development), and NACTVET student
 # registration and results against nactvet-mock. Start the mocks first:
 #   cd gov-mocks;    .\mvnw.cmd spring-boot:run      (port 8098, dashboard http://localhost:8098)
 #   cd nactvet-mock; .\mvnw.cmd spring-boot:run      (port 8099)
 # then run CIMS with profiles dev,gov-mocks (add nactvet-mock for admission verification too).
-# Enter a GePG SP code, sub SP code, system id and GFS code, and switch on HESLB / NIDA / MUSE / TAMISEMI, under Integrations.
+# Enter a GePG SP code, sub SP code, system id and GFS code, and switch on HESLB / NIDA / MUSE / TAMISEMI / NHIF, under Integrations.
 cims:
   gepg:
     mode: live
@@ -30,6 +30,10 @@ cims:
     mode: live
     base-url: http://localhost:8098
     api-key: mock-tamisemi-key
+  nhif:
+    mode: live
+    base-url: http://localhost:8098
+    api-key: mock-nhif-key
   nactvet:
     submission:
       mode: live

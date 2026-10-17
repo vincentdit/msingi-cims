@@ -30,8 +30,17 @@ public interface NectaClient {
         }
     }
 
+    /**
+     * @param premNumber the candidate's PREM number: the unique number NECTA gives a pupil at primary school (the PSLE
+     *                   registration) and keeps on later results; null when NECTA does not send it
+     */
     record NectaResult(ExamType exam, String indexNumber, int year, String firstName, String middleName, String surname,
-                       String sex, String centreName, String division, Integer points, List<SubjectGrade> subjects) {
+                       String sex, String centreName, String division, Integer points, List<SubjectGrade> subjects, String premNumber) {
+
+        public NectaResult(ExamType exam, String indexNumber, int year, String firstName, String middleName, String surname,
+                           String sex, String centreName, String division, Integer points, List<SubjectGrade> subjects) {
+            this(exam, indexNumber, year, firstName, middleName, surname, sex, centreName, division, points, subjects, null);
+        }
 
         public String candidateName() {
             return String.join(" ", java.util.stream.Stream.of(firstName, middleName, surname)

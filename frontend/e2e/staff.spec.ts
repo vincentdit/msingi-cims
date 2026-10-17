@@ -4,8 +4,8 @@ import { expectPageWorks, STAFF_PASSWORD, staffSignIn, watchErrors } from './hel
 const PAGES: Record<string, string[]> = {
   admin: ['/staff', '/staff/approvals', '/staff/reports', '/staff/applications', '/staff/students', '/staff/users',
     '/staff/audit', '/staff/security', '/staff/integrations', '/staff/imports', '/staff/letters', '/staff/institution', '/staff/timetable',
-    '/staff/exam-timetable'],
-  bursar: ['/staff/finance-overview', '/staff/finance', '/staff/sponsors', '/staff/waivers'],
+    '/staff/exam-timetable', '/staff/health-insurance'],
+  bursar: ['/staff/finance-overview', '/staff/finance', '/staff/sponsors', '/staff/waivers', '/staff/health-insurance'],
   exams: ['/staff/exams-office', '/staff/exam-timetable', '/staff/marks', '/staff/results', '/staff/eligibility', '/staff/regulations'],
   lecturer: ['/staff/my-teaching', '/staff/teaching', '/staff/timetable'],
 };

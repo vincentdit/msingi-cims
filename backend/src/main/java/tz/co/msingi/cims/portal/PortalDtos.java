@@ -68,7 +68,7 @@ public final class PortalDtos {
                               String disability, String nextOfKinName, String nextOfKinPhone, String nextOfKinRelation,
                               String programmeName, String programmeCode, String awardName, String academicYear, String intake,
                               int yearOfStudy, String status, String nactvetVerificationNo, String admissionLetterNo,
-                              Map<String, String> editableFields, List<ChangeRequestView> requests) {
+                              Map<String, String> editableFields, List<ChangeRequestView> requests, String premNumber) {
     }
 
     // ------------------------------------------------------------------ dashboard

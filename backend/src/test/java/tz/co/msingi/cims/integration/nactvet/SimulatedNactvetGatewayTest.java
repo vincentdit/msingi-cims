@@ -21,7 +21,7 @@ class SimulatedNactvetGatewayTest {
 
     @Test
     void outcomeDependsOnTheLastDigitOfTheIndexNumber() {
-        List<Outcome> out = gateway.fetchOutcomes("REF", List.of(c("A", "S0101/0001", null), c("B", "S0101/0007", null),
+        List<Outcome> out = gateway.fetchOutcomes("2026", "SEPTEMBER", List.of(c("A", "S0101/0001", null), c("B", "S0101/0007", null),
                 c("C", "S0101/0009", null), c("D", "S0101/0013", null)));
         assertThat(out).extracting(Outcome::result).containsExactly(Result.VERIFIED, Result.QUERIED, Result.REJECTED, Result.VERIFIED);
         assertThat(out.get(0).verificationNo()).matches("NV/\\d{4}/\\d{6}");
@@ -34,7 +34,7 @@ class SimulatedNactvetGatewayTest {
 
     @Test
     void queriedRecordIsVerifiedWhenResubmittedWithRemarks() {
-        assertThat(gateway.fetchOutcomes("REF", List.of(c("B", "S0101/0007", "Name corrected"))).get(0).result())
+        assertThat(gateway.fetchOutcomes("2026", "SEPTEMBER", List.of(c("B", "S0101/0007", "Name corrected"))).get(0).result())
                 .isEqualTo(Result.VERIFIED);
     }
 
@@ -51,6 +51,6 @@ class SimulatedNactvetGatewayTest {
 
     private static Candidate c(String ref, String index, String remarks) {
         return new Candidate(ref, index, 2025, "Asha", null, "Mussa", "F", LocalDate.of(2006, 1, 1), "Tanzanian", "255712345678",
-                "NTA4-IT", "Basic Technician Certificate in IT", 4, remarks);
+                "NTA4-IT", "Basic Technician Certificate in IT", 4, remarks, tz.co.msingi.cims.integration.nactvet.NactvetGateway.Background.NONE);
     }
 }

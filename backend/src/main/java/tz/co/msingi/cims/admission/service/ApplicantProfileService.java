@@ -129,6 +129,7 @@ public class ApplicantProfileService {
                         "No NECTA results found for " + index + " (" + req.year() + "). Check the index number and year."));
         ApplicantQualification q = fromNecta(a, req.type(), r);
         takeSchool(a, req.type(), r);
+        if (a.getPremNumber() == null && r.premNumber() != null) a.setPremNumber(r.premNumber());
         qualifications.save(q);
         audit.record("NECTA_RESULTS_ADDED", "Applicant", a.getId(), Map.of("index", index, "year", req.year()));
         requireChoicesStillOpen(a, submitted, "With this qualification");
@@ -164,6 +165,7 @@ public class ApplicantProfileService {
         q.setDivision(r.division());
         q.setPoints(r.points() == null ? null : r.points().shortValue());
         q.setCandidateName(r.candidateName());
+        q.setPremNumber(r.premNumber());
         q.setSource(ApplicantQualification.Source.NECTA);
         q.verifiedAtSource();
         r.subjects().forEach(sub -> q.addSubject(sub.code(), sub.name(), sub.grade()));

@@ -101,6 +101,8 @@ public class Student extends BaseEntity {
     private Long curriculumId;
 
     private String nactvetVerificationNo;
+    /** NECTA's PREM number, from the applicant's CSEE results. */
+    private String premNumber;
     private String admissionLetterNo;
 
     @Enumerated(EnumType.STRING)

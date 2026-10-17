@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class MockSwitches {
 
-    public static final Set<String> SYSTEMS = Set.of("GEPG", "HESLB", "NIDA", "MUSE", "TAMISEMI");
+    public static final Set<String> SYSTEMS = Set.of("GEPG", "HESLB", "NIDA", "MUSE", "TAMISEMI", "NHIF");
 
     private final Map<String, Boolean> outage = new ConcurrentHashMap<>();
 

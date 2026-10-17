@@ -211,6 +211,7 @@ public class RegistryService {
         s.setPrimarySchool(ap.getPrimarySchool());
         s.setPrimarySchoolCode(ap.getPrimarySchoolCode());
         s.setOlevelSchool(ap.getOlevelSchool());
+        s.setPremNumber(ap.getPremNumber());
         s.setAlevelSchool(ap.getAlevelSchool());
         s.setProgramme(programme);
         s.setEntryAcademicYear(w.getAcademicYear());
@@ -315,7 +316,7 @@ public class RegistryService {
                 FirstRegistrationView.of(firstRegistrations.findByStudentId(s.getId()).orElse(null)),
                 s.getCampusId() != null ? s.getCampusId() : campuses.defaultCampusFor(s.getProgramme().getId()),
                 campuses.campusName(s.getCampusId() != null ? s.getCampusId() : campuses.defaultCampusFor(s.getProgramme().getId())),
-                s.getStudentCategoryId(), campuses.categoryName(s.getStudentCategoryId()));
+                s.getStudentCategoryId(), campuses.categoryName(s.getStudentCategoryId()), s.getPremNumber());
     }
 
     /** Sets the fee category the student is billed under from now on (FR-FIN-01); invoices already issued keep their amounts. */

@@ -334,6 +334,7 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
             <Typography variant="body2">{a.applicant.phone}{a.applicant.email ? ` · ${a.applicant.email}` : ''}</Typography>
             <Typography variant="body2">{a.applicant.sex === 'F' ? 'Female' : a.applicant.sex === 'M' ? 'Male' : '—'} · Born {formatDate(a.applicant.dateOfBirth)} · {a.applicant.region ?? '—'}</Typography>
             <Typography variant="body2">Next of kin: {a.applicant.nextOfKinName ?? '—'} ({a.applicant.nextOfKinRelation ?? '—'}) {a.applicant.nextOfKinPhone ?? ''}</Typography>
+            {a.applicant.premNumber && <Typography variant="body2">{`PREM number (NECTA): ${a.applicant.premNumber}`}</Typography>}
           </Box>
           <Divider />
           <Box>

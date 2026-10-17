@@ -6,12 +6,13 @@ A development stand-in for **NACTVET admission verification** (BP-04, FR-ADM-12,
 NACTVET: submit selected applicants, fetch outcomes (some still processing), resolve queries, confirm multiple admissions,
 and see what happens when NACTVET is down or refuses the credentials.
 
-It speaks the NOAS style of NACTVET's api-out-service: every call is a JSON POST carrying `authorization` and `api_code`,
-answered with HTTP 200 and `{code, message, params}`. **The paths and field names are placeholders** until NACTVET publishes
-its admission verification API. CIMS reads them from configuration (`cims.nactvet.verification.*`), so only configuration
-changes when the real ones are known. Batches and confirmation codes are saved to `data/nactvet-mock-state.json`
-(gitignored) and read back when the mock restarts, so CIMS can still fetch outcomes of earlier batches. **Reset everything**
-on the dashboard clears it.
+Admission verification follows **NOAS's integration with NACTVET**: selected applicants are uploaded one programme at a
+time to `/nacteapi/index.php/api/upload`, and outcomes are pulled from NACTVET's verification feedback
+`/nacteapi/index.php/api-out-service/verifiedresultsall` by application year and intake. The confirmation of a multiple
+admission is not part of NOAS; its path stays a placeholder. CIMS reads all three paths from configuration
+(`cims.nactvet.verification.*`). Uploads and confirmation codes are saved to `data/nactvet-mock-state.json` (gitignored)
+and read back when the mock restarts, so CIMS can still fetch outcomes of earlier uploads. **Reset everything** on the
+dashboard clears it. (A state file from before uploads by programme is not read back: the mock starts empty.)
 
 ## Run it
 
@@ -20,8 +21,8 @@ cd C:\dev\msingi-cims\nactvet-mock
 .\mvnw.cmd spring-boot:run
 ```
 
-It listens on port 8099. Open **http://localhost:8099** for its dashboard: every batch CIMS has submitted with each
-candidate's outcome (refreshed every 3 seconds), the confirmation code for multiple admissions with a **Confirm elsewhere**
+It listens on port 8099. Open **http://localhost:8099** for its dashboard: every upload CIMS has made (programme, intake,
+payment reference) with each applicant's outcome (refreshed every 3 seconds), the confirmation code for multiple admissions with a **Confirm elsewhere**
 button, an outage switch and a reset.
 
 Then run CIMS with the `nactvet-mock` profile as well as `dev`:
@@ -36,35 +37,38 @@ cd C:\dev\msingi-cims\backend
 | `MOCK_PORT` | `8099` | Port |
 | `MOCK_NACTE_AUTHORIZATION`, `MOCK_NACTE_API_CODE` | `mock-authorization`, `MOCK` | Credentials CIMS must send (the `nactvet-mock` profile sends these) |
 | `MOCK_PROCESSING_SECONDS` | `5` | Seconds before a candidate has an outcome; index numbers ending in 5 take three times as long |
-| `MOCK_STATE_FILE` | `data/nactvet-mock-state.json` | Where batches are saved between restarts; empty keeps them in memory only |
+| `MOCK_STATE_FILE` | `data/nactvet-mock-state.json` | Where uploads are saved between restarts; empty keeps them in memory only |
 
 ## Outcomes
 
-Decided by the last digit of the candidate's CSEE index number, the same rules as CIMS's built-in simulator:
+Decided by the last digit of the applicant's form four index number, the same rules as CIMS's built-in simulator. In the
+feedback they appear as NACTVET writes them:
 
-| Last digit | Outcome |
-|---|---|
-| 7 | `QUERIED` (name does not match NECTA); verified once resubmitted with remarks |
-| 9 | `NOT_VERIFIED` (does not meet the minimum entry requirements) |
-| 3 | `VERIFIED`, also admitted by another institution: the applicant needs NACTVET's confirmation code to accept |
-| 5 | `VERIFIED`, after three times the processing time (try **Fetch outcomes** twice) |
-| any other | `VERIFIED` |
+| Last digit | Outcome | `verification_status` / `eligibility` in the feedback |
+|---|---|---|
+| 7 | Queried (name does not match NECTA); verified when uploaded again | `Returned for correction` |
+| 9 | Not verified (does not meet the minimum entry requirements) | `Not Approved` / `Not Eligible` |
+| 3 | Verified, also admitted by another institution: the applicant needs NACTVET's confirmation code to accept | `Verified and Approved` / `Eligible`, `multiple_selection` = `Multiple selection` |
+| 5 | Verified, after three times the processing time (try **Fetch outcomes** twice) | `Pending` until then |
+| any other | Verified | `Verified and Approved` / `Eligible` |
 
-Also: a candidate without names, date of birth or programme code is `QUERIED`, and so is the same index number twice in
-one batch. An application already decided in an earlier batch gets the same outcome and verification number again.
+Also: an applicant without names, date of birth or form four index number is queried, and so is the same index number
+twice in one upload. An applicant already decided in an earlier upload for the same programme gets the same outcome and
+verification number again. The institution is whoever holds the mock's credential (NACTVET knows it from the token).
 
 The mock has no SMS. The confirmation code it "sends" is written to its log, and with the `nactvet-mock` profile CIMS shows
 it on the applicant's offer page in development, as it does with the built-in simulator.
 
-## NACTVET endpoints (placeholders)
+## NACTVET admission verification endpoints (as NOAS uses them)
 
-All under `/nacteapi/index.php/api-out-service`. Body `code`: 200 OK, 401 wrong credentials, 404 not found, 422 invalid request.
+Answers are HTTP 200 with a `code`: 200 OK, 401 wrong credentials, 404 not found, 422 invalid request; HTTP 503 during a
+simulated outage.
 
-| Path | Request (besides `authorization`, `api_code`) | `params` in the answer |
+| Path | Request | Answer |
 |---|---|---|
-| `/admissionverification` | `institution_code`, `candidates`: `application_ref`, `index_number`, `exam_year`, `first_name`, `middle_name`, `surname`, `sex`, `date_of_birth`, `nationality`, `phone`, `programme_code`, `programme_name`, `award_level`, `remarks` | `batch_ref`, `received` |
-| `/admissionverificationresults` | `batch_ref` | one entry per candidate: `application_ref`, `index_number`, `programme_code`, `status` (`PROCESSING`, `VERIFIED`, `QUERIED`, `NOT_VERIFIED`), `reason`, `verification_number`, `multiple_admission` (0/1) |
-| `/admissionconfirmation` | `institution_code`, `index_number`, `confirmation_code` | `confirmed` (0/1), `reason` (`WRONG_CODE`, `ALREADY_CONFIRMED_ELSEWHERE`) |
+| `/nacteapi/index.php/api/upload` | A JSON **array** wrapping one object: `heading` (`authorization`, `intake` SEPTEMBER or MARCH, `programme_id`, `application_year`, `level`, `payment_reference_number`) and `students`, each `{particulars}`: `firstname`, `secondname`, `surname`, `DOB` (d-MM-yyyy), `gender`, `impairement`, `form_four_indexnumber`, `form_four_year`, `form_six_indexnumber`, `form_six_year`, `NTA4_reg`, `NTA4_grad_year`, `NTA5_reg`, `NTA5_grad_year`, `email_address`, `mobile_number`, `address`, `region`, `district`, `nationality`, `next_kin_name`, `next_kin_address`, `next_kin_email_address`, `next_kin_phone`, `next_kin_region`, `next_kin_relation` | `{code, message, params: {received, reference}}` |
+| `/nacteapi/index.php/api-out-service/verifiedresultsall` | `authorization`, `api_code`, `year`, `intake`, `page_number`, `page_size` | `{code, page_number, page_size, total_records, total_pages, params}`; each row: `user_id` (the form four index number in the mock), `student_verification_id`, `first_name`, `second_name`, `last_name`, `gender`, `date_of_birth`, `disability`, `programme_id`, `institution_id`, `verification_status`, `multiple_selection`, `academic_year`, `intake`, `eligibility`, `remarks` |
+| `/nacteapi/index.php/api-out-service/admissionconfirmation` (placeholder) | `authorization`, `api_code`, `institution_code`, `index_number`, `confirmation_code` | `params`: `confirmed` (0/1), `reason` (`WRONG_CODE`, `ALREADY_CONFIRMED_ELSEWHERE`) |
 
 ## Student registration and results (placeholders)
 
@@ -88,8 +92,8 @@ Index numbers in these paths use `-` for `/` (`S0101-0003`).
 
 | Call | Does |
 |---|---|
-| `GET /mock/status` | Outage on or off, number of batches, processing time |
-| `GET /mock/batches` | Every batch received, with its outcomes so far (and confirmation codes) |
+| `GET /mock/status` | Outage on or off, number of uploads, processing time |
+| `GET /mock/batches` | Every upload received (programme, intake, payment reference), with its outcomes so far (and confirmation codes) |
 | `GET /mock/confirmation-codes/{index}` | The confirmation code for a multiple admission |
 | `POST /mock/confirm-elsewhere/{index}` | The other institution confirms first, so this institution's confirmation is refused |
 | `POST /mock/outage?on=true` | Every NACTVET call answers HTTP 503 until `on=false` (CIMS shows "NACTVET could not be reached") |
@@ -103,6 +107,7 @@ Invoke-RestMethod -Method Post "http://localhost:8099/mock/outage?on=true"
 ## Tests
 
 `SubmissionTest`: student registration and results outcomes and credentials.
-`NactvetMockTest`: outcomes by index number and processing time, resubmission and repeated decisions, incomplete and
-duplicate candidates, confirmation codes and confirmation elsewhere, credentials, unknown batches and outages.
-`StatePersistenceTest`: batches, verification numbers and confirmation codes survive a restart; reset clears the file.
+`NactvetMockTest`: outcomes by index number and processing time in the feedback, paging and year/intake, uploading again
+and repeated decisions, incomplete and duplicate applicants, confirmation codes and confirmation elsewhere, credentials,
+incomplete headings and outages.
+`StatePersistenceTest`: uploads, verification numbers and confirmation codes survive a restart; reset clears the file.

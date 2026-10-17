@@ -75,6 +75,7 @@ class ApplicantJourneyIT {
         assertThat(profile.get("sex").asText()).isEqualTo(candidate.get("sex").asText());
         assertThat(profile.get("nectaIndexNumber").asText()).isEqualTo("S0101/0002");
         assertThat(profile.get("namesFromNecta").asBoolean()).isTrue();
+        assertThat(profile.get("premNumber").asText()).matches("\\d{11}").isEqualTo(candidate.get("premNumber").asText());   // from NECTA
         JsonNode quals = body(call(get("/api/applicant/qualifications"), token, null));
         assertThat(quals.size()).isEqualTo(1);
         assertThat(quals.get(0).get("registration").asBoolean()).isTrue();
@@ -113,6 +114,10 @@ class ApplicantJourneyIT {
         call(put("/api/applicant/applications/" + appId + "/choices"), token,
                 "{\"windowProgrammeIds\":[" + inst.windowProgrammeId() + "]}")
                 .andExpect(jsonPath("$.code").value("FEE_NOT_PAID"));
+        // what is still to do comes as codes the portal words in the applicant's language, and as plain English
+        JsonNode started = body(call(get("/api/applicant/applications"), token, null)).get(0);
+        assertThat(started.get("todo").findValuesAsText("code")).containsExactly("FEE", "CHOICE");
+        assertThat(started.get("blockers").get(0).asText()).isEqualTo("Pay the application fee");
 
         JsonNode fee = body(call(post("/api/applicant/applications/" + appId + "/fee"), token, null));
         assertThat(fee.get("controlNo").asText()).startsWith("99").hasSize(12);

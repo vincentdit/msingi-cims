@@ -175,6 +175,7 @@ public class IntegrationLogQuery {
             case NIDA -> tz.co.msingi.cims.integration.nida.NidaClient.class;
             case MUSE -> tz.co.msingi.cims.integration.muse.MuseClient.class;
             case TAMISEMI -> tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class;
+            case NHIF -> tz.co.msingi.cims.integration.nhif.NhifClient.class;
         };
         if (port == null) return gepg.isSimulated() ? "SIMULATED" : "LIVE";
         try {

@@ -27,6 +27,8 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway.Candidate;
 import tz.co.msingi.cims.integration.nactvet.NactvetGateway.Outcome;
+import tz.co.msingi.cims.integration.nactvet.NactvetTemplate;
+import tz.co.msingi.cims.integration.nactvet.NactvetUnavailableException;
 import tz.co.msingi.cims.notification.Messaging;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
@@ -106,17 +108,27 @@ public class VerificationService {
 
     // ------------------------------------------------------------------ commands
 
-    /** Submits every selected applicant whose record passes pre-validation (BP-04 steps 1–2). */
+    /**
+     * Submits every selected applicant whose record passes pre-validation (BP-04 steps 1–2). By API, the applicants are
+     * uploaded to NACTVET one programme at a time under the payment reference of the verification fee, as NOAS does; a
+     * programme NACTVET refuses stays selected (listed in {@code notSent}) while the others go ahead.
+     */
     @Transactional
-    public SubmissionView submit(Long windowId, NactvetSubmission.Channel channel) {
+    public SubmissionView submit(Long windowId, NactvetSubmission.Channel channel, String paymentReference) {
         AdmissionWindow window = requireWindow(windowId);
         Tenant tenant = currentTenant();
         if (blank(tenant.getNactvetRegNo())) {
             throw new BusinessRuleException("INSTITUTION_NOT_REGISTERED",
                     "The institution's NACTVET registration number is not set. Ask the system administrator to set it.");
         }
+        String payment = blank(paymentReference) ? null : paymentReference.trim();
+        if (channel == NactvetSubmission.Channel.API && payment == null) {
+            throw new BusinessRuleException("PAYMENT_REFERENCE_REQUIRED",
+                    "Enter the payment reference (control number) of the NACTVET verification fee. NACTVET needs it with every upload.");
+        }
         List<Application> selected = applications.findByWindowIdAndStatusInOrderByReferenceNoAsc(windowId, Set.of(Status.SELECTED));
-        Map<Long, ApplicantQualification> csee = csee(selected);
+        Map<Long, List<ApplicantQualification>> quals = qualificationsOf(selected);
+        Map<Long, ApplicantQualification> csee = csee(quals);
         Map<Long, String> index = new HashMap<>();
         csee.forEach((k, q) -> index.put(k, q.getIndexNumber()));
         List<Application> valid = selected.stream().filter(a -> issues(a, index, tenant).isEmpty()).toList();
@@ -128,19 +140,45 @@ public class VerificationService {
 
         NactvetSubmission sub = new NactvetSubmission();
         sub.setWindow(window);
-        sub.setBatchNo((short) (submissions.maxBatchNo(windowId) + 1));
         sub.setChannel(channel);
+        List<Application> sent = valid;
+        List<String> notSent = new ArrayList<>();
+        if (channel == NactvetSubmission.Channel.API) {
+            String year = applicationYear(window);
+            String intake = nactvetIntake(window);
+            Map<String, List<Application>> byProgramme = new LinkedHashMap<>();
+            valid.forEach(a -> byProgramme.computeIfAbsent(a.getSelectedWindowProgramme().getProgramme().getNactvetCode().trim(),
+                    k -> new ArrayList<>()).add(a));
+            sent = new ArrayList<>();
+            List<String> answers = new ArrayList<>();
+            NactvetUnavailableException firstFailure = null;
+            for (Map.Entry<String, List<Application>> e : byProgramme.entrySet()) {
+                var programme = e.getValue().get(0).getSelectedWindowProgramme().getProgramme();
+                NactvetGateway.Heading heading = new NactvetGateway.Heading(intake, e.getKey(), year,
+                        String.valueOf(programme.getAwardLevel()), payment);
+                List<Candidate> group = e.getValue().stream().map(a -> candidate(a, csee.get(a.getApplicant().getId()),
+                        index.get(a.getApplicant().getId()), a.getVerificationRemarks(), quals.get(a.getApplicant().getId()))).toList();
+                try {
+                    answers.add(e.getKey() + ": " + nactvet.upload(heading, group));
+                    sent.addAll(e.getValue());
+                } catch (NactvetUnavailableException ex) {
+                    if (firstFailure == null) firstFailure = ex;
+                    notSent.add(programme.getName() + " (" + e.getValue().size() + "): " + ex.getMessage());
+                }
+            }
+            if (sent.isEmpty()) throw firstFailure;
+            sub.setExternalRef(year + "/" + intake);
+            sub.setPaymentReference(payment);
+            String response = String.join("\n", answers);
+            sub.setNactvetResponse(response.length() > 2000 ? response.substring(0, 2000) : response);
+        }
+        sub.setBatchNo((short) (submissions.maxBatchNo(windowId) + 1));
         sub.setSubmittedAt(OffsetDateTime.now());
         sub.setSubmittedBy(CurrentUser.requireId());
         sub.setSubmittedByName(CurrentUser.name());
-        List<Candidate> candidates = valid.stream().map(a -> candidate(a, csee.get(a.getApplicant().getId()),
-                index.get(a.getApplicant().getId()), a.getVerificationRemarks())).toList();
-        if (channel == NactvetSubmission.Channel.API) {
-            sub.setExternalRef(nactvet.submit(tenant.getNactvetRegNo(), candidates));
-        }
         submissions.save(sub);
 
-        for (Application a : valid) {
+        for (Application a : sent) {
             NactvetSubmissionItem item = new NactvetSubmissionItem();
             item.setSubmission(sub);
             item.setApplication(a);
@@ -152,9 +190,16 @@ public class VerificationService {
             a.setStatus(Status.PENDING_VERIFICATION);
         }
         items.flush();
-        audit.record("NACTVET_SUBMITTED", "NactvetSubmission", sub.getId(), Map.of("batchNo", sub.getBatchNo(),
-                "channel", channel.name(), "applicants", valid.size(), "skipped", selected.size() - valid.size()));
-        return submissionView(sub);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("batchNo", sub.getBatchNo());
+        details.put("channel", channel.name());
+        details.put("applicants", sent.size());
+        details.put("skipped", selected.size() - sent.size());
+        if (payment != null) details.put("paymentReference", payment);
+        if (!notSent.isEmpty()) details.put("notSent", notSent);
+        audit.record("NACTVET_SUBMITTED", "NactvetSubmission", sub.getId(), details);
+        SubmissionView v = submissionView(sub);
+        return notSent.isEmpty() ? v : withNotSent(v, notSent);
     }
 
     /** Fetches outcomes of an API submission from NACTVET (BP-04 step 2). */
@@ -165,7 +210,8 @@ public class VerificationService {
             throw new BusinessRuleException("NOT_AN_API_SUBMISSION", "This batch was submitted as a file. Import NACTVET's outcome file instead.");
         }
         List<NactvetSubmissionItem> pending = requireOpen(sub);
-        return apply(sub, pending, nactvet.fetchOutcomes(sub.getExternalRef(), candidates(pending)), "API");
+        String[] feedback = feedbackKey(sub);
+        return apply(sub, pending, nactvet.fetchOutcomes(feedback[0], feedback[1], candidates(pending)), "API");
     }
 
     /**
@@ -270,23 +316,31 @@ public class VerificationService {
 
     // ------------------------------------------------------------------ files
 
-    /** The submission in NACTVET's admission verification template (downloads are audited: personal data leaves the system). */
+    /**
+     * The submission in NACTVET's applicant upload template (the heading and particulars NACTVET's upload API takes), with
+     * CIMS's application reference first so NACTVET's outcomes can be matched back. Downloads are audited: personal data
+     * leaves the system.
+     */
     @Transactional
     public String submissionFile(Long submissionId) {
         NactvetSubmission sub = requireSubmission(submissionId);
-        StringBuilder sb = new StringBuilder(Csv.line("S/N", "Institution", "Application Ref", "Index Number", "Exam Year",
-                "First Name", "Middle Name", "Surname", "Sex", "Date of Birth", "Nationality", "Phone", "Programme Code",
-                "Programme Name", "Award Level", "Remarks"));
+        List<Object> header = new ArrayList<>(List.of("S/N", "Application Ref", "Institution", "intake", "programme_id",
+                "programme_name", "application_year", "level", "payment_reference_number"));
+        header.addAll(NactvetTemplate.FIELDS);
+        StringBuilder sb = new StringBuilder(Csv.line(header.toArray()));
         String institution = currentTenant().getNactvetRegNo();
+        String year = applicationYear(sub.getWindow());
+        String intake = nactvetIntake(sub.getWindow());
         int n = 0;
         List<NactvetSubmissionItem> all = items.findBySubmissionIdOrderByIdAsc(submissionId);
         List<Candidate> cs = candidates(all);
         for (int k = 0; k < all.size(); k++) {
             NactvetSubmissionItem i = all.get(k);
             Candidate c = cs.get(k);
-            sb.append(Csv.line(++n, institution, c.applicationRef(), c.indexNumber(), c.examYear(), c.firstName(), c.middleName(),
-                    c.surname(), c.sex(), c.dateOfBirth(), c.nationality(), c.phone(), i.getProgrammeCode(), c.programmeName(),
-                    c.awardLevel(), c.remarks()));
+            List<Object> row = new ArrayList<>(List.of(++n, c.applicationRef(), nz(institution), intake, nz(i.getProgrammeCode()),
+                    nz(c.programmeName()), year, String.valueOf(c.awardLevel()), nz(sub.getPaymentReference())));
+            row.addAll(NactvetTemplate.particulars(c).values());
+            sb.append(Csv.line(row.toArray()));
         }
         audit.record("NACTVET_FILE_DOWNLOADED", "NactvetSubmission", sub.getId(), Map.of("batchNo", sub.getBatchNo()));
         return sb.toString();
@@ -375,39 +429,114 @@ public class VerificationService {
         return out;
     }
 
-    /** The CSEE sitting used for NACTVET, per applicant: the latest verified one. */
-    private Map<Long, ApplicantQualification> csee(List<Application> apps) {
+    /** Every qualification of the applicants, per applicant. */
+    private Map<Long, List<ApplicantQualification>> qualificationsOf(List<Application> apps) {
         if (apps.isEmpty()) return Map.of();
+        return qualifications.findByApplicantIdIn(apps.stream().map(a -> a.getApplicant().getId()).distinct().toList()).stream()
+                .collect(Collectors.groupingBy(q -> q.getApplicant().getId()));
+    }
+
+    /** The CSEE sitting used for NACTVET, per applicant: the latest verified one. */
+    private static Map<Long, ApplicantQualification> csee(Map<Long, List<ApplicantQualification>> quals) {
         Map<Long, ApplicantQualification> out = new HashMap<>();
-        qualifications.findByApplicantIdIn(apps.stream().map(a -> a.getApplicant().getId()).distinct().toList()).stream()
-                .filter(q -> q.getType() == ApplicantQualification.Type.CSEE && q.isVerified() && !blank(q.getIndexNumber()))
-                .sorted(Comparator.comparing((ApplicantQualification q) -> q.getExamYear() == null ? 0 : q.getExamYear()))
-                .forEach(q -> out.put(q.getApplicant().getId(), q));
+        quals.forEach((applicantId, list) -> latest(list, ApplicantQualification.Type.CSEE, null, true)
+                .ifPresent(q -> out.put(applicantId, q)));
         return out;
     }
 
     private Map<Long, String> indexNumbers(List<Application> apps) {
         Map<Long, String> out = new HashMap<>();
-        csee(apps).forEach((applicantId, q) -> out.put(applicantId, q.getIndexNumber()));
+        csee(qualificationsOf(apps)).forEach((applicantId, q) -> out.put(applicantId, q.getIndexNumber()));
         return out;
+    }
+
+    /** The latest qualification of a type (and NTA level) with an index or registration number; verified ones first. */
+    private static java.util.Optional<ApplicantQualification> latest(List<ApplicantQualification> list, ApplicantQualification.Type type,
+                                                                     Integer level, boolean verifiedOnly) {
+        Comparator<ApplicantQualification> order = Comparator
+                .comparing((ApplicantQualification q) -> q.isVerified())
+                .thenComparing(q -> q.getExamYear() == null ? 0 : (int) q.getExamYear());
+        return list.stream()
+                .filter(q -> q.getType() == type && !blank(q.getIndexNumber()) && (!verifiedOnly || q.isVerified()))
+                .filter(q -> level == null || (q.getAwardLevel() != null && q.getAwardLevel().intValue() == level))
+                .max(order);
     }
 
     // ------------------------------------------------------------------ helpers
 
-    private static Candidate candidate(Application a, ApplicantQualification q, String indexNumber, String remarks) {
+    private static Candidate candidate(Application a, ApplicantQualification q, String indexNumber, String remarks,
+                                       List<ApplicantQualification> quals) {
         Applicant ap = a.getApplicant();
         var p = a.getSelectedWindowProgramme().getProgramme();
         Integer year = q == null || q.getExamYear() == null ? null : (int) q.getExamYear();
         return new Candidate(a.getReferenceNo(), indexNumber, year, ap.getFirstName(), ap.getMiddleName(), ap.getSurname(),
                 ap.getSex(), ap.getDateOfBirth(), ap.getNationality(), ap.getPhone(), p.getNactvetCode(), p.getName(),
-                p.getAwardLevel(), remarks);
+                p.getAwardLevel(), remarks, background(ap, quals == null ? List.of() : quals));
+    }
+
+    /** The rest of NACTVET's particulars: impairment, the latest ACSEE and NTA 4/5 awards, contacts and next of kin. */
+    private static NactvetGateway.Background background(Applicant ap, List<ApplicantQualification> quals) {
+        var acsee = latest(quals, ApplicantQualification.Type.ACSEE, null, false);
+        var nta4 = latest(quals, ApplicantQualification.Type.NTA, 4, false);
+        var nta5 = latest(quals, ApplicantQualification.Type.NTA, 5, false);
+        return new NactvetGateway.Background(ap.getDisability(),
+                acsee.map(ApplicantQualification::getIndexNumber).orElse(null), acsee.map(VerificationService::year).orElse(null),
+                nta4.map(ApplicantQualification::getIndexNumber).orElse(null), nta4.map(VerificationService::year).orElse(null),
+                nta5.map(ApplicantQualification::getIndexNumber).orElse(null), nta5.map(VerificationService::year).orElse(null),
+                ap.getEmail(), ap.getPostalAddress(), ap.getRegion(), ap.getDistrict(),
+                ap.getNextOfKinName(), ap.getNextOfKinAddress(), ap.getNextOfKinEmail(), ap.getNextOfKinPhone(),
+                ap.getNextOfKinRegion(), ap.getNextOfKinRelation());
+    }
+
+    private static Integer year(ApplicantQualification q) {
+        return q.getExamYear() == null ? null : (int) q.getExamYear();
     }
 
     /** Candidates for submitted items, as they were sent (index number and remarks from the item). */
     private List<Candidate> candidates(List<NactvetSubmissionItem> list) {
-        Map<Long, ApplicantQualification> q = csee(list.stream().map(NactvetSubmissionItem::getApplication).toList());
-        return list.stream().map(i -> candidate(i.getApplication(), q.get(i.getApplication().getApplicant().getId()),
-                i.getIndexNumber(), i.getRemarks())).toList();
+        Map<Long, List<ApplicantQualification>> quals = qualificationsOf(list.stream().map(NactvetSubmissionItem::getApplication).toList());
+        Map<Long, ApplicantQualification> q = csee(quals);
+        return list.stream().map(i -> {
+            Long applicantId = i.getApplication().getApplicant().getId();
+            return candidate(i.getApplication(), q.get(applicantId), i.getIndexNumber(), i.getRemarks(), quals.get(applicantId));
+        }).toList();
+    }
+
+    /**
+     * NACTVET's intake, as NOAS names it: MARCH or SEPTEMBER, from the intake's name, otherwise its starting month
+     * (July to December is the September intake).
+     */
+    static String nactvetIntake(AdmissionWindow w) {
+        var intake = w.getIntake();
+        String name = (intake.getName() == null ? "" : intake.getName()) + " " + (intake.getCode() == null ? "" : intake.getCode());
+        name = name.toUpperCase(Locale.ROOT);
+        if (name.contains("MAR")) return "MARCH";
+        if (name.contains("SEP")) return "SEPTEMBER";
+        return intake.getStartMonth() >= 7 ? "SEPTEMBER" : "MARCH";
+    }
+
+    /** The calendar year the intake starts in: the academic year's first year, or the next one for a month before it starts. */
+    static String applicationYear(AdmissionWindow w) {
+        var start = w.getAcademicYear().getStartDate();
+        int month = w.getIntake().getStartMonth();
+        return String.valueOf(month > 0 && month < start.getMonthValue() ? start.getYear() + 1 : start.getYear());
+    }
+
+    /** The application year and intake whose NACTVET feedback holds a batch's outcomes. */
+    private static String[] feedbackKey(NactvetSubmission sub) {
+        String ref = sub.getExternalRef() == null ? "" : sub.getExternalRef();
+        int slash = ref.indexOf('/');
+        if (slash > 0 && ref.substring(0, slash).matches("\\d{4}")) {
+            return new String[]{ref.substring(0, slash), ref.substring(slash + 1)};
+        }
+        // a batch from before uploads by programme: read the window's year and intake
+        return new String[]{applicationYear(sub.getWindow()), nactvetIntake(sub.getWindow())};
+    }
+
+    private static SubmissionView withNotSent(SubmissionView v, List<String> notSent) {
+        return new SubmissionView(v.id(), v.batchNo(), v.channel(), v.status(), v.externalRef(), v.submittedAt(), v.submittedByName(),
+                v.lastOutcomeAt(), v.completedAt(), v.total(), v.pending(), v.verified(), v.queried(), v.rejected(),
+                v.paymentReference(), List.copyOf(notSent));
     }
 
     private List<NactvetSubmissionItem> requireOpen(NactvetSubmission sub) {
@@ -439,7 +568,8 @@ public class VerificationService {
         return new SubmissionView(s.getId(), s.getBatchNo(), s.getChannel().name(), s.getStatus().name(), s.getExternalRef(),
                 s.getSubmittedAt(), s.getSubmittedByName(), s.getLastOutcomeAt(), s.getCompletedAt(), total,
                 c.getOrDefault(NactvetSubmissionItem.Outcome.PENDING, 0L), c.getOrDefault(NactvetSubmissionItem.Outcome.VERIFIED, 0L),
-                c.getOrDefault(NactvetSubmissionItem.Outcome.QUERIED, 0L), c.getOrDefault(NactvetSubmissionItem.Outcome.REJECTED, 0L));
+                c.getOrDefault(NactvetSubmissionItem.Outcome.QUERIED, 0L), c.getOrDefault(NactvetSubmissionItem.Outcome.REJECTED, 0L),
+                s.getPaymentReference(), null);
     }
 
     private static ApplicantRow row(Application a, String indexNumber, OffsetDateTime now, AdmissionLetter letter) {
@@ -475,6 +605,10 @@ public class VerificationService {
 
     private static String emptyToNull(String s) {
         return s == null || s.isEmpty() ? null : s;
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     private static boolean blank(String s) {

@@ -29,3 +29,7 @@ mock:
     api-key: ${MOCK_MUSE_API_KEY:mock-muse-key}
   tamisemi:
     api-key: ${MOCK_TAMISEMI_API_KEY:mock-tamisemi-key}
+  nhif:
+    api-key: ${MOCK_NHIF_API_KEY:mock-nhif-key}
+    # Seconds before NHIF has decided a registration batch (PENDING until then)
+    processing-seconds: ${MOCK_NHIF_PROCESSING_SECONDS:5}

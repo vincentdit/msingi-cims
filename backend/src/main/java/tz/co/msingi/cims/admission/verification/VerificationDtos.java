@@ -13,7 +13,11 @@ public final class VerificationDtos {
     private VerificationDtos() {
     }
 
-    public record SubmitRequest(@NotNull NactvetSubmission.Channel channel) {
+    /**
+     * @param paymentReference API only: the payment reference (control number) of the verification fee paid to NACTVET,
+     *                         sent in the heading of every programme upload
+     */
+    public record SubmitRequest(@NotNull NactvetSubmission.Channel channel, @Size(max = 60) String paymentReference) {
     }
 
     public record ResolveQueryRequest(@NotBlank @Size(max = 300) String remarks) {
@@ -30,7 +34,8 @@ public final class VerificationDtos {
 
     public record SubmissionView(Long id, int batchNo, String channel, String status, String externalRef,
                                  OffsetDateTime submittedAt, String submittedByName, OffsetDateTime lastOutcomeAt,
-                                 OffsetDateTime completedAt, long total, long pending, long verified, long queried, long rejected) {
+                                 OffsetDateTime completedAt, long total, long pending, long verified, long queried, long rejected,
+                                 String paymentReference, List<String> notSent) {
     }
 
     public record ApplicantRow(Long applicationId, String referenceNo, String applicantName, String phone, String sex,
