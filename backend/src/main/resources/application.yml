@@ -209,6 +209,9 @@ cims:
     from: ${CIMS_EMAIL_FROM:no-reply@cims.msingi.co.tz}
     async: true
     retry-cron: ${CIMS_EMAIL_RETRY_CRON:0 */5 * * * *}
+  payments:
+    # testing period: the "Simulate payment" buttons pay fees even with live GePG or a live collector. Set CIMS_ALLOW_PAYMENT_SIMULATION=false before go-live.
+    allow-simulation: ${CIMS_ALLOW_PAYMENT_SIMULATION:true}
   privacy:
     notice-version: "2026-10"
     retention-cron: ${CIMS_RETENTION_CRON:0 0 2 1 * *}   # monthly; runs only where the institution switched it on

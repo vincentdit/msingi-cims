@@ -63,6 +63,10 @@ public class ApplicationService {
 
     public static final String PURPOSE_APPLICATION_FEE = "APPLICATION_FEE";
 
+    /** Testing period: lets the simulate-payment button pay fees whatever payment route is set up (cims.payments.allow-simulation). */
+    @org.springframework.beans.factory.annotation.Value("${cims.payments.allow-simulation:false}")
+    private boolean allowPaymentSimulation;
+
     private final ApplicationRepository applications;
     private final AdmissionWindowRepository windows;
     private final WindowProgrammeRepository windowProgrammes;
@@ -164,7 +168,7 @@ public class ApplicationService {
     /** Development only: simulates paying the current control number or payment reference. */
     @Transactional
     public FeeView simulatePayment(Long applicationId) {
-        if (!gepgProps.isSimulated()) {
+        if (!allowPaymentSimulation && !gepgProps.isSimulated()) {
             throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available with simulated GePG");
         }
         Application app = own(applicationId, profiles.currentApplicant());

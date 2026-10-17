@@ -259,6 +259,7 @@ Integration tests run against real PostgreSQL so that row-level security, trigge
 | `CIMS_GEPG_MODE` / `CIMS_GEPG_CALLBACK_SECRET` | `simulated` / `change-me` | GePG adapter (public institutions) |
 | `CIMS_EMAIL_MODE` / `CIMS_EMAIL_FROM` / `CIMS_SMTP_HOST` / `CIMS_SMTP_PORT` / `CIMS_SMTP_USERNAME` / `CIMS_SMTP_PASSWORD` | `simulated` / `no-reply@cims.msingi.co.tz` / `localhost` / `1027` | Email channel: `simulated` writes to the log and the outbox; `smtp` sends through the mail server. In development run `docker compose up -d mailpit` and use `CIMS_EMAIL_MODE=smtp` to read every email at http://localhost:8027 |
 | `CIMS_COLLECTION_MODE` / `CIMS_COLLECTION_CALLBACK_SECRET` | `simulated` / `change-me` | Private and FBO institutions: `statement` in production until a collector adapter is added (payments confirmed from statements and the signed callback) |
+| `CIMS_ALLOW_PAYMENT_SIMULATION` | `true` (testing period) | The *Simulate payment* buttons pay fees whatever GePG or collector mode is set; **set `false` before go-live** |
 | `CIMS_NECTA_MODE` | `simulated` | NECTA results: `simulated` or `live` (the NECTA results API, `POST /api/results/individual`) |
 | `NECTA_API_KEY` | — | NECTA results API key; required when `CIMS_NECTA_MODE=live`. For development it can sit in `backend/config/application-dev.yml` (not committed; copy `application-dev.yml.example`), which makes the dev profile use live NECTA |
 | `CIMS_NECTA_BASE_URL` | `https://api.necta.go.tz` | NECTA results API address |
