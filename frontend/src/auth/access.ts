@@ -32,7 +32,8 @@ export type PageKey =
   | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
-  dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
+  // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
+  dashboard: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.BURSAR, R.ACCOUNTANT, R.AUDITOR],
   approvals: [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS, R.BURSAR, R.MANAGEMENT],
   reports: [R.ADMIN, R.MANAGEMENT, R.ACADEMIC, R.ADMISSIONS, R.REGISTRAR, R.HOD, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.WARDEN, R.IPT, R.AUDITOR],
   windows: [R.ADMIN, R.ADMISSIONS, R.ACADEMIC, R.REGISTRAR, R.MANAGEMENT, R.AUDITOR],

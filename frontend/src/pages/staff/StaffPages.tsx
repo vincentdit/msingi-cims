@@ -544,11 +544,14 @@ function buildRules(f: { passes: string; subjects: string; minGrade: string; alt
 }
 
 const CONFIGURE_ROLES = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'];
+const DOCUMENT_ROLES = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC', 'REGISTRAR'];
 
 export function WindowDetailPage() {
   const { id } = useParams();
   const { user } = useSession();
   const canConfigure = !!user('staff')?.roles.some((r) => CONFIGURE_ROLES.includes(r));
+  // the documents applicants upload are personal data: only the offices that handle applications see the list (API rule)
+  const canSeeDocuments = !!user('staff')?.roles.some((r) => DOCUMENT_ROLES.includes(r));
   const qc = useQueryClient();
   const w = useQuery({ queryKey: ['staff', 'window', id], queryFn: () => api<AdmissionWindow>(`/api/admission/windows/${id}`, staff) });
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
@@ -588,7 +591,7 @@ export function WindowDetailPage() {
           </TableBody>
         </Table>
       </TableContainer></Card>
-      <WindowDocumentsCard windowId={win.id} canEdit={canConfigure} />
+      {canSeeDocuments && <WindowDocumentsCard windowId={win.id} canEdit={canConfigure} />}
       <JoiningInstructionsCard win={win} canEdit={canConfigure} />
       <WindowHistoryCard windowId={win.id} />
       {editing && <WindowFormDialog win={win} onClose={() => setEditing(false)} onSaved={(x) => { setEditing(false); qc.setQueryData(['staff', 'window', id], x); refresh(); }} />}

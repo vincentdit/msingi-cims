@@ -75,8 +75,6 @@ export default function ApplicationPage() {
       {current && (current.status === 'DRAFT' || current.status === 'PAYMENT_PENDING' || amending
         ? <Wizard app={current} onDone={amending ? () => setEditing(false) : undefined} />
         : <><Submitted app={current} onEdit={() => setEditing(true)} /><SubmittedDocuments appId={current.id} /></>)}
-      <Box sx={{ mt: 3 }}><EmailCard realm="applicant" /></Box>
-      <Box sx={{ mt: 3 }}><PrivacyCard realm="applicant" /></Box>
     </Container>
   );
 }
@@ -111,7 +109,14 @@ function Wizard({ app, onDone }: { app: Application; onDone?: () => void }) {
     { label: t('app.steps.other'), body: <OtherQualificationsStep app={app} onNext={() => setActive(4)} /> },
     { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(5)} /> },
     ...(hasDocs ? [{ label: t('app.steps.documents'), body: <DocumentsStep appId={app.id} onNext={() => setActive(6)} /> }] : []),
-    { label: t('app.steps.review'), body: <ReviewStep app={app} onDone={onDone} /> },
+    // the email address and the personal-data rights are offered once, on the last step, before submitting
+    { label: t('app.steps.review'), body: (
+      <>
+        <ReviewStep app={app} onDone={onDone} />
+        <Box sx={{ mt: 3 }}><EmailCard realm="applicant" /></Box>
+        <Box sx={{ mt: 3 }}><PrivacyCard realm="applicant" /></Box>
+      </>
+    ) },
   ];
 
   return (
