@@ -219,6 +219,8 @@ export interface Application {
   submittedAt?: string;
   choices: Choice[];
   blockers: string[];
+  /** The same steps as codes, worded in the applicant's language (blockers is the English). */
+  todo?: { code: string; items: string[] }[];
   selectedProgramme?: string;
   offer?: Offer;
   letter?: AdmissionLetterInfo;

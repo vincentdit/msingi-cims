@@ -310,7 +310,9 @@ export function ReviewStep({ app, onDone }: { app: Application; onDone?: () => v
       {app.blockers.length > 0 && (
         <Alert severity="warning">
           <strong>{t('app.todo')}:</strong>
-          <Box component="ul" sx={{ m: 0, pl: 2 }}>{app.blockers.map((b) => <li key={b}>{b}</li>)}</Box>
+          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            {app.todo ? app.todo.map((x, i) => <li key={i}>{todoText(x, t)}</li>) : app.blockers.map((b) => <li key={b}>{b}</li>)}
+          </Box>
         </Alert>
       )}
       <ErrorAlert error={submit.error} />
@@ -324,4 +326,12 @@ export function ReviewStep({ app, onDone }: { app: Application; onDone?: () => v
       )}
     </Stack>
   );
+}
+
+/** A step still to do, in the applicant's language: the missing fields by their names, documents and programmes as given. */
+function todoText(x: { code: string; items: string[] }, t: (k: string, o?: Record<string, unknown>) => string): string {
+  const key = `app.todoItem.${x.code}`;
+  if (x.code === 'PROFILE') return t(key, { items: x.items.map((f) => t(`app.todoField.${f}`, { defaultValue: f })).join(', ') });
+  if (x.code === 'CHANGE_CHOICE') return t(key, { programme: x.items[0], reason: x.items[1] });
+  return t(key, { items: x.items.join(', '), defaultValue: x.code });
 }

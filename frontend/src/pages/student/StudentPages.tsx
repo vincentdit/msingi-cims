@@ -26,7 +26,6 @@ import StudentIptCard from './StudentIptCard';
 import { useInstitution } from '../../components/InstitutionContext';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
 import StudentTransferCard from './StudentTransferCard';
-import EmailCard from '../../components/EmailCard';
 import PrivacyCard from '../../components/PrivacyCard';
 import AlumniCard from '../../components/AlumniCard';
 import NinCard from '../../components/NinCard';
@@ -477,7 +476,6 @@ export function StudentProfilePage() {
       </Card>
 
       <StudentTransferCard />
-      <EmailCard realm="student" />
       <NinCard />
       <AlumniCard />
       <PrivacyCard realm="student" />

@@ -274,18 +274,25 @@ public final class AdmissionDtos {
     public record ApplicationView(Long id, String referenceNo, String status, Long windowId, String windowName,
                                   String academicYear, String intake, OffsetDateTime windowClosesAt, BigDecimal applicationFee,
                                   short maxChoices, boolean feePaid, OffsetDateTime submittedAt, List<ChoiceView> choices,
-                                  List<String> blockers, String selectedProgramme, OfferView offer, LetterView letter,
+                                  List<String> blockers, List<Todo> todo, String selectedProgramme, OfferView offer, LetterView letter,
                                   StudentInfo student, boolean amendable, OffsetDateTime amendedAt) {
-        public static ApplicationView of(Application a, List<String> blockers, String devConfirmationCode, LetterView letter,
+        public static ApplicationView of(Application a, List<String> blockers, List<Todo> todo, String devConfirmationCode, LetterView letter,
                                          StudentInfo student, boolean amendable) {
             AdmissionWindow w = a.getWindow();
             return new ApplicationView(a.getId(), a.getReferenceNo(), a.getStatus().name(), w.getId(), w.getName(),
                     w.getAcademicYear().getCode(), w.getIntake().getName(), w.getClosesAt(), w.getApplicationFee(),
                     w.getMaxChoices(), a.isFeePaid(), a.getSubmittedAt(),
-                    a.getChoices().stream().map(ChoiceView::of).toList(), blockers,
+                    a.getChoices().stream().map(ChoiceView::of).toList(), blockers, todo,
                     a.getSelectedWindowProgramme() == null ? null : a.getSelectedWindowProgramme().getProgramme().getName(),
                     OfferView.of(a, devConfirmationCode), letter, student, amendable, a.getAmendedAt());
         }
+    }
+
+    /**
+     * A step still missing before submission: WINDOW_CLOSED, PROFILE (items = the missing fields), NECTA, FEE, CHOICE, DOCUMENTS (items =
+     * the documents), CHANGE_CHOICE (items = programme, reason). The portal words it in the applicant's language.
+     */
+    public record Todo(String code, List<String> items) {
     }
 
     /** Once Registry has handed the applicant over: the registration number and student status (BP-05). */
