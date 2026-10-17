@@ -164,7 +164,7 @@ class ImportIT {
         assertThat(db(() -> jdbc.queryForObject("select body from messages where template_code = 'EXTERNAL_SELECTION'", String.class))).contains("TAMISEMI");
 
         // NACTVET verification takes them like any selected applicant
-        long batch = s.body(s.call(post("/api/admission/windows/" + inst.windowId() + "/nactvet-submissions"), officer, "{\"channel\":\"API\"}")
+        long batch = s.body(s.call(post("/api/admission/windows/" + inst.windowId() + "/nactvet-submissions"), officer, "{\"channel\":\"API\",\"paymentReference\":\"991100223344\"}")
                 .andExpect(status().isOk())).get("id").asLong();
         s.call(post("/api/admission/nactvet-submissions/" + batch + "/fetch-outcomes"), officer, null).andExpect(status().isOk());
         assertThat(db(() -> jdbc.queryForObject("select status from applications", String.class))).isEqualTo("OFFERED");

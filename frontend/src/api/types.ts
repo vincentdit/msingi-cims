@@ -460,7 +460,11 @@ export interface NactvetSubmission {
   batchNo: number;
   channel: 'API' | 'FILE';
   status: 'SUBMITTED' | 'COMPLETED';
+  /** API batch: NACTVET application year and intake of the feedback, e.g. 2026/SEPTEMBER */
   externalRef?: string;
+  paymentReference?: string;
+  /** Only right after submitting: programmes NACTVET refused, still selected */
+  notSent?: string[];
   submittedAt: string;
   submittedByName: string;
   lastOutcomeAt?: string;

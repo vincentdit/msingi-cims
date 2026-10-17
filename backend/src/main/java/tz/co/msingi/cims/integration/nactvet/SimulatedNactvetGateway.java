@@ -38,14 +38,14 @@ public class SimulatedNactvetGateway implements NactvetGateway {
     private final SmsGateway sms; // NACTVET's own SMS: not the institution's, so not in its message log
 
     @Override
-    public String submit(String institutionCode, List<Candidate> candidates) {
-        String ref = "SIM-" + institutionCode + "-" + System.currentTimeMillis();
-        log.info("[NACTVET simulated] submission {} with {} candidate(s)", ref, candidates.size());
-        return ref;
+    public String upload(Heading heading, List<Candidate> candidates) {
+        log.info("[NACTVET simulated] upload of {} applicant(s) for programme {} ({} {}, level {}, payment {})", candidates.size(),
+                heading.programmeId(), heading.intake(), heading.applicationYear(), heading.level(), heading.paymentReference());
+        return "{\"code\":200,\"message\":\"Simulated: received " + candidates.size() + " applicant(s)\"}";
     }
 
     @Override
-    public List<Outcome> fetchOutcomes(String externalRef, Collection<Candidate> submitted) {
+    public List<Outcome> fetchOutcomes(String applicationYear, String intake, Collection<Candidate> submitted) {
         List<Outcome> out = new ArrayList<>();
         for (Candidate c : submitted) {
             int digit = lastDigit(c.indexNumber());
@@ -66,7 +66,7 @@ public class SimulatedNactvetGateway implements NactvetGateway {
                 }
             }
         }
-        log.info("[NACTVET simulated] {} outcome(s) for {}", out.size(), externalRef);
+        log.info("[NACTVET simulated] {} outcome(s) for {} {}", out.size(), applicationYear, intake);
         return out;
     }
 
