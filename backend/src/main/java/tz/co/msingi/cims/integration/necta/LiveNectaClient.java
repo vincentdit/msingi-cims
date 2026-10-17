@@ -94,7 +94,10 @@ public class LiveNectaClient implements NectaClient {
                 name(p.path("last_name")), sex(text(p.path("sex"))), upper(p.path("center_name")), division, points, subjects, prem(root)));
     }
 
-    /** The PREM number, wherever NECTA puts it: in the particulars, or beside them, under the names NECTA's services use. */
+    /**
+     * The PREM number: NECTA sends it as {@code particulars.prem_number} (11 digits, e.g. 20140255164); the other spellings are
+     * read too in case another NECTA service names it differently.
+     */
     static String prem(JsonNode root) {
         for (JsonNode where : new JsonNode[]{root.path("particulars"), root}) {
             for (String k : new String[]{"prem_number", "prem_no", "premNumber", "prem", "PREM", "prem_num"}) {

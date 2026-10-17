@@ -80,8 +80,8 @@ public class SimulatedNectaClient implements NectaClient {
                 prem(idx, exam == ExamType.CSEE ? year : year - 2));
     }
 
-    /** A made-up PREM number: the year the candidate sat the primary school leaving examination and eight digits, always the same for one candidate. */
+    /** A made-up PREM number in NECTA's shape (11 digits, e.g. 20140255164): a year and seven digits, always the same for one candidate. */
     static String prem(String idx, int cseeYear) {
-        return String.format("%d%08d", cseeYear - 4, Math.floorMod(idx.toUpperCase().hashCode(), 100_000_000));
+        return String.format("%d%07d", cseeYear - 10, Math.floorMod(idx.toUpperCase().hashCode(), 10_000_000));
     }
 }

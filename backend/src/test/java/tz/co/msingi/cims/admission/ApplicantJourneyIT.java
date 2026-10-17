@@ -75,7 +75,7 @@ class ApplicantJourneyIT {
         assertThat(profile.get("sex").asText()).isEqualTo(candidate.get("sex").asText());
         assertThat(profile.get("nectaIndexNumber").asText()).isEqualTo("S0101/0002");
         assertThat(profile.get("namesFromNecta").asBoolean()).isTrue();
-        assertThat(profile.get("premNumber").asText()).matches("\\d{12}").isEqualTo(candidate.get("premNumber").asText());   // from NECTA
+        assertThat(profile.get("premNumber").asText()).matches("\\d{11}").isEqualTo(candidate.get("premNumber").asText());   // from NECTA
         JsonNode quals = body(call(get("/api/applicant/qualifications"), token, null));
         assertThat(quals.size()).isEqualTo(1);
         assertThat(quals.get(0).get("registration").asBoolean()).isTrue();

@@ -19,7 +19,7 @@ class LiveNectaClientTest {
 
     static final String FOUND = """
             {"status":{"code":1,"message":"Success"},
-             "particulars":{"first_name":"NEEMA","middle_name":"JOHN","last_name":"MWAKYUSA","sex":"F","center_name":"Azania Secondary School","prem_number":"20190312 3456"},
+             "particulars":{"first_name":"NEEMA","middle_name":"JOHN","last_name":"MWAKYUSA","sex":"F","center_name":"Azania Secondary School","prem_number":"20150123456","center_number":"S0101","exam_id":1},
              "results":{"division":"I","points":9},
              "subjects":[{"subject_code":"041","subject_name":"Basic Mathematics","grade":"B"},
                          {"subject_code":"022","subject_name":"English Language","grade":"a"},
@@ -78,10 +78,10 @@ class LiveNectaClientTest {
 
     @Test
     void thePremNumberIsTakenWhereverNectaPutsIt() {
-        assertThat(client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow().premNumber()).isEqualTo("201903123456");
-        response.set(FOUND.replace("\"prem_number\":\"20190312 3456\"", "\"x\":1").replace("{\"status\"", "{\"premNumber\":\"20190312\",\"status\""));
+        assertThat(client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow().premNumber()).isEqualTo("20150123456");
+        response.set(FOUND.replace("\"prem_number\":\"20150123456\"", "\"x\":1").replace("{\"status\"", "{\"premNumber\":\"20190312\",\"status\""));
         assertThat(client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow().premNumber()).isEqualTo("20190312");
-        response.set(FOUND.replace("\"prem_number\":\"20190312 3456\"", "\"x\":1"));
+        response.set(FOUND.replace("\"prem_number\":\"20150123456\"", "\"x\":1"));
         assertThat(client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow().premNumber()).isNull();
     }
 
