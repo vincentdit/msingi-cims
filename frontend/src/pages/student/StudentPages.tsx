@@ -471,6 +471,7 @@ export function StudentProfilePage() {
             ['', `${t('student.year', { n: p.yearOfStudy })} · ${p.academicYear} · ${p.intake}`],
             [t('student.status'), <Chip key="s" size="small" color={statusColour(p.status)} label={humanise(p.status)} />],
             ...(p.nactvetVerificationNo ? [['NACTVET', p.nactvetVerificationNo] as [string, ReactNode]] : []),
+            ...(p.premNumber ? [[t('app.premNumber'), p.premNumber] as [string, ReactNode]] : []),
           ]} />
           <Typography variant="caption" color="text.secondary">{t('student.readOnlyNote')}</Typography>
         </CardContent>

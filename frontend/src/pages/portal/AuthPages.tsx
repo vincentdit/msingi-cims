@@ -37,6 +37,7 @@ function DevCode({ code }: { code?: string }) {
 interface NectaCandidate {
   indexNumber: string; examYear: number; firstName: string; middleName?: string; surname: string; fullName: string; sex?: 'M' | 'F';
   centreName?: string; division?: string; points?: number; subjects: { code: string; name: string; grade: string }[]; alreadyRegistered: boolean;
+  premNumber?: string;
 }
 
 const YEARS = Array.from({ length: new Date().getFullYear() - 1987 }, (_, i) => new Date().getFullYear() - i);
@@ -98,6 +99,7 @@ export function RegisterPage() {
               <Typography variant="body2" color="text.secondary">
                 {[candidate.indexNumber + ' · ' + candidate.examYear, candidate.sex && t(`auth.sex${candidate.sex}`), candidate.centreName].filter(Boolean).join(' · ')}
               </Typography>
+              {candidate.premNumber && <Typography variant="body2" color="text.secondary">{t('app.premNumber')}: <strong>{candidate.premNumber}</strong></Typography>}
               {(candidate.division || candidate.points != null) && (
                 <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
                   {[candidate.division && t('auth.division', { division: candidate.division }), candidate.points != null && t('auth.points', { points: candidate.points })].filter(Boolean).join(' · ')}

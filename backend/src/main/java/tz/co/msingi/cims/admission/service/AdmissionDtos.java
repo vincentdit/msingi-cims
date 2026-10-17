@@ -57,7 +57,7 @@ public final class AdmissionDtos {
     /** What NECTA holds for an index number, shown to the applicant to confirm before the account is created. */
     public record NectaCandidateView(String indexNumber, int examYear, String firstName, String middleName, String surname, String fullName,
                                      String sex, String centreName, String division, Integer points, List<SubjectView> subjects,
-                                     boolean alreadyRegistered) {
+                                     boolean alreadyRegistered, String premNumber) {
     }
 
     public record RegisterResponse(Long userId, String maskedPhone, String message, String devOtp, String fullName) {
@@ -116,7 +116,7 @@ public final class AdmissionDtos {
                               String nectaIndexNumber, Short nectaExamYear, boolean namesFromNecta, String ward, String street,
                               String nextOfKinEmail, String nextOfKinAddress, String nextOfKinRegion, String nextOfKinDistrict,
                               String nextOfKinWard, String nextOfKinStreet, String primarySchool, String primarySchoolCode,
-                              String olevelSchool, boolean olevelFromNecta, String alevelSchool, boolean alevelFromNecta) {
+                              String olevelSchool, boolean olevelFromNecta, String alevelSchool, boolean alevelFromNecta, String premNumber) {
         public static ProfileView of(Applicant a) {
             return new ProfileView(a.getId(), a.getFirstName(), a.getMiddleName(), a.getSurname(), a.fullName(), a.getSex(),
                     a.getDateOfBirth(), a.getNationality(), a.getPhone(), a.getEmail(), a.getRegion(), a.getDistrict(),
@@ -124,7 +124,7 @@ public final class AdmissionDtos {
                     a.getNextOfKinRelation(), a.missingProfileFields(), a.getNectaIndexNumber(), a.getNectaExamYear(), a.isNamesFromNecta(),
                     a.getWard(), a.getStreet(), a.getNextOfKinEmail(), a.getNextOfKinAddress(), a.getNextOfKinRegion(),
                     a.getNextOfKinDistrict(), a.getNextOfKinWard(), a.getNextOfKinStreet(), a.getPrimarySchool(), a.getPrimarySchoolCode(),
-                    a.getOlevelSchool(), a.isOlevelFromNecta(), a.getAlevelSchool(), a.isAlevelFromNecta());
+                    a.getOlevelSchool(), a.isOlevelFromNecta(), a.getAlevelSchool(), a.isAlevelFromNecta(), a.getPremNumber());
         }
     }
 
@@ -168,7 +168,7 @@ public final class AdmissionDtos {
                                     String centreName, String division, Short points, String source, boolean verified,
                                     List<SubjectView> subjects, String candidateName, boolean registration, String awardName,
                                     String institution, java.math.BigDecimal gpa, String classAward, String otherLevel,
-                                    String checkStatus, String checkNote, String checkedByName, OffsetDateTime checkedAt) {
+                                    String checkStatus, String checkNote, String checkedByName, OffsetDateTime checkedAt, String premNumber) {
         public static QualificationView of(ApplicantQualification q) {
             Applicant a = q.getApplicant();
             boolean registration = q.getType() == ApplicantQualification.Type.CSEE && a != null && q.getIndexNumber().equals(a.getNectaIndexNumber())
@@ -178,7 +178,7 @@ public final class AdmissionDtos {
                     q.getSubjects().stream().map(s -> new SubjectView(s.getSubjectCode(), s.getSubjectName(), s.getGrade())).toList(),
                     q.getCandidateName(), registration, q.getAwardName(), q.getInstitution(), q.getGpa(), q.getClassAward(),
                     q.getOtherLevel() == null ? null : q.getOtherLevel().name(), q.getCheckStatus().name(), q.getCheckNote(),
-                    q.getCheckedByName(), q.getVerifiedAt());
+                    q.getCheckedByName(), q.getVerifiedAt(), q.getPremNumber());
         }
     }
 

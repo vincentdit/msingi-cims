@@ -16,7 +16,7 @@ import java.util.Random;
  * Handy test values (CSEE):  S0101/0001 → strong results (Division I);
  *                            S0101/0002 → weak results (fewer than four passes);
  *                            S0101/0000 → no such candidate.
- * Names, sex and school are made up from the index number.
+ * Names, sex, school and PREM number are made up from the index number.
  */
 @Slf4j
 @Component
@@ -76,6 +76,12 @@ public class SimulatedNectaClient implements NectaClient {
         boolean female = r.nextBoolean();
         String[] first = female ? FEMALE : MALE;
         return new NectaResult(exam, idx, year, first[r.nextInt(first.length)], MALE[r.nextInt(MALE.length)],
-                SURNAMES[r.nextInt(SURNAMES.length)], female ? "F" : "M", SCHOOLS[r.nextInt(SCHOOLS.length)], division, points, subjects);
+                SURNAMES[r.nextInt(SURNAMES.length)], female ? "F" : "M", SCHOOLS[r.nextInt(SCHOOLS.length)], division, points, subjects,
+                prem(idx, exam == ExamType.CSEE ? year : year - 2));
+    }
+
+    /** A made-up PREM number: the year the candidate sat the primary school leaving examination and eight digits, always the same for one candidate. */
+    static String prem(String idx, int cseeYear) {
+        return String.format("%d%08d", cseeYear - 4, Math.floorMod(idx.toUpperCase().hashCode(), 100_000_000));
     }
 }

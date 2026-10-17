@@ -120,7 +120,7 @@ public class StudentPortalService {
                 s.getNationality(), s.getPhone(), s.getEmail(), s.getRegion(), s.getDistrict(), s.getPostalAddress(), s.getDisability(),
                 s.getNextOfKinName(), s.getNextOfKinPhone(), s.getNextOfKinRelation(), s.getProgramme().getName(), s.getProgramme().getCode(),
                 s.getProgramme().getAwardName(), s.getEntryAcademicYear().getCode(), s.getIntake().getName(), s.getYearOfStudy(),
-                s.getStatus().name(), s.getNactvetVerificationNo(), s.getAdmissionLetterNo(), StudentFields.labels(), changes.forStudent(s.getId()));
+                s.getStatus().name(), s.getNactvetVerificationNo(), s.getAdmissionLetterNo(), StudentFields.labels(), changes.forStudent(s.getId()), s.getPremNumber());
     }
 
     @Transactional

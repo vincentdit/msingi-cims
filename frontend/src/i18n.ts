@@ -58,7 +58,7 @@ const en = {
     namesFromNecta: 'Your name is as NECTA has it on your Form Four results and cannot be changed here.',
   },
   app: {
-    title: 'My application', steps: { results: 'Results', details: 'Personal details', fee: 'Application fee', other: 'Other qualifications', programmes: 'Programmes', documents: 'Documents', review: 'Review & submit' },
+    title: 'My application', steps: { results: 'Results', details: 'Personal details', fee: 'Application fee', other: 'Other qualifications', programmes: 'Programmes', documents: 'Documents', review: 'Applicant profile' },
     resultsIntro: 'Your Form Four results were fetched from NECTA when you registered. Other sittings, Form Six results and other awards are added after the application fee.',
     examType: 'Examination', indexNumber: 'Index number', year: 'Year', fetch: 'Fetch results',
     priorAward: 'I hold an NTA or NVA award', awardNumber: 'AVN / certificate number', level: 'Level', add: 'Add',
@@ -70,7 +70,8 @@ const en = {
     programmesIntro: 'Choose up to {{n}} programmes in order of preference. Only programmes you qualify for can be selected.',
     eligible: 'You qualify', notEligible: 'Not eligible', why: 'Why?', choice: 'Choice {{n}}',
     entryLevel: 'With your {{basis}} you can apply for {{label}} programmes.', otherLevels: '{{n}} programme(s) at other levels are not open to you.',
-    saveChoices: 'Save choices', reviewIntro: 'Check your application before submitting. After submitting you can still change it until the application window closes.',
+    saveChoices: 'Save choices', reviewIntro: 'This is your applicant profile. Check every part and use Edit to change it, then submit. After submitting you can still change your application until the application window closes.',
+    premNumber: 'PREM number',
     submit: 'Submit application', submitted: 'Application submitted', reference: 'Reference number',
     submittedText: 'We have received your application. You will be notified by SMS when selection results are out.',
     todo: 'Still to do',
@@ -297,6 +298,11 @@ const en = {
     logDRAFT: 'Draft', logSUBMITTED: 'With supervisor', logAPPROVED: 'Approved', logRETURNED: 'Returned',
     approved: '{{n}} of {{total}} weeks approved', mark: 'IPT mark', marks: 'Marks: {{n}} of 3 recorded', declinedTry: 'Your request for {{org}} was declined. Please choose another organisation.', cancel: 'Cancel',
   },
+  profileStep: {
+    edit: 'Edit', personal: 'Personal details', results: 'Form Four results (NECTA)', other: 'Other qualifications', choices: 'Programme choices',
+    noOther: 'No other qualifications added.', phone: 'Mobile number', email: 'Email', address: 'Address', schools: 'Schools',
+    nextOfKin: 'Next of kin', notGiven: 'Not given',
+  },
   profile: {
     sex: 'Sex', dateOfBirth: 'Date of birth', nationality: 'Nationality', disability: 'Disability / physical impairment', none: 'None',
     residence: 'WHERE YOU LIVE', region: 'Region', district: 'District', ward: 'Ward', street: 'Village / street', postalAddress: 'Postal address',
@@ -462,7 +468,7 @@ const sw: typeof en = {
     namesFromNecta: 'Jina lako ni kama lilivyo kwenye matokeo ya kidato cha nne ya NECTA na haliwezi kubadilishwa hapa.',
   },
   app: {
-    title: 'Maombi yangu', steps: { results: 'Matokeo', details: 'Taarifa binafsi', fee: 'Ada ya maombi', other: 'Sifa nyingine', programmes: 'Programu', documents: 'Nyaraka', review: 'Hakiki na wasilisha' },
+    title: 'Maombi yangu', steps: { results: 'Matokeo', details: 'Taarifa binafsi', fee: 'Ada ya maombi', other: 'Sifa nyingine', programmes: 'Programu', documents: 'Nyaraka', review: 'Wasifu wa mwombaji' },
     resultsIntro: 'Matokeo yako ya kidato cha nne yalichukuliwa kutoka NECTA ulipojisajili. Mitihani mingine, matokeo ya kidato cha sita na tuzo nyingine huongezwa baada ya ada ya maombi.',
     examType: 'Mtihani', indexNumber: 'Namba ya mtihani', year: 'Mwaka', fetch: 'Pata matokeo',
     priorAward: 'Nina tuzo ya NTA au NVA', awardNumber: 'AVN / namba ya cheti', level: 'Ngazi', add: 'Ongeza',
@@ -474,7 +480,8 @@ const sw: typeof en = {
     programmesIntro: 'Chagua hadi programu {{n}} kwa mpangilio wa upendeleo. Ni programu unazostahili tu zinazoweza kuchaguliwa.',
     eligible: 'Unastahili', notEligible: 'Hustahili', why: 'Kwa nini?', choice: 'Chaguo {{n}}',
     entryLevel: 'Kwa {{basis}} yako unaweza kuomba programu za {{label}}.', otherLevels: 'Programu {{n}} za ngazi nyingine haziko wazi kwako.',
-    saveChoices: 'Hifadhi machaguo', reviewIntro: 'Hakiki maombi yako kabla ya kuwasilisha. Baada ya kuwasilisha bado unaweza kuyabadilisha hadi dirisha la maombi lifungwe.',
+    saveChoices: 'Hifadhi machaguo', reviewIntro: 'Huu ni wasifu wako wa mwombaji. Hakiki kila sehemu na tumia Hariri kuibadilisha, kisha wasilisha. Baada ya kuwasilisha bado unaweza kubadilisha maombi yako hadi dirisha la maombi lifungwe.',
+    premNumber: 'Namba ya PREM',
     submit: 'Wasilisha maombi', submitted: 'Maombi yamewasilishwa', reference: 'Namba ya kumbukumbu',
     submittedText: 'Tumepokea maombi yako. Utajulishwa kwa SMS matokeo ya uchaguzi yatakapotoka.',
     todo: 'Bado kukamilisha',
@@ -700,6 +707,11 @@ const sw: typeof en = {
     challenges: 'Changamoto', hours: 'Saa', saveDraft: 'Hifadhi rasimu', submitWeek: 'Wasilisha kwa msimamizi', newWeek: 'Ongeza wiki {{n}}', edit: 'Hariri',
     logDRAFT: 'Rasimu', logSUBMITTED: 'Iko kwa msimamizi', logAPPROVED: 'Imekubaliwa', logRETURNED: 'Imerudishwa',
     approved: 'Wiki {{n}} kati ya {{total}} zimekubaliwa', mark: 'Alama ya IPT', marks: 'Alama: {{n}} kati ya 3 zimewekwa', declinedTry: 'Ombi lako la {{org}} limekataliwa. Tafadhali chagua taasisi nyingine.', cancel: 'Ghairi',
+  },
+  profileStep: {
+    edit: 'Hariri', personal: 'Taarifa binafsi', results: 'Matokeo ya kidato cha nne (NECTA)', other: 'Sifa nyingine', choices: 'Machaguo ya programu',
+    noOther: 'Hakuna sifa nyingine zilizoongezwa.', phone: 'Namba ya simu', email: 'Barua pepe', address: 'Anwani', schools: 'Shule',
+    nextOfKin: 'Ndugu wa karibu', notGiven: 'Haijatolewa',
   },
   profile: {
     sex: 'Jinsia', dateOfBirth: 'Tarehe ya kuzaliwa', nationality: 'Uraia', disability: 'Ulemavu / changamoto ya kimwili', none: 'Hakuna',

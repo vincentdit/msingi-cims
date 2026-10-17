@@ -164,6 +164,8 @@ export interface Profile {
   olevelFromNecta?: boolean;
   alevelSchool?: string;
   alevelFromNecta?: boolean;
+  /** NECTA's PREM number for the candidate (from the CSEE results) */
+  premNumber?: string;
 }
 
 export interface Qualification {
@@ -191,6 +193,8 @@ export interface Qualification {
   checkNote?: string;
   checkedByName?: string;
   checkedAt?: string;
+  /** NECTA's PREM number, as sent with these results */
+  premNumber?: string;
 }
 
 export interface Choice {
@@ -593,6 +597,7 @@ export interface StudentDetail {
   nextOfKinRelation?: string;
   awardName: string;
   applicationRef?: string;
+  premNumber?: string;
   nactvetVerificationNo?: string;
   admissionLetterNo?: string;
   admittedAt: string;
@@ -789,7 +794,7 @@ export interface StudentProfile {
   phone: string; email?: string; region?: string; district?: string; postalAddress?: string; disability?: string;
   nextOfKinName?: string; nextOfKinPhone?: string; nextOfKinRelation?: string;
   programmeName: string; programmeCode: string; awardName: string; academicYear: string; intake: string; yearOfStudy: number; status: string;
-  nactvetVerificationNo?: string; admissionLetterNo?: string;
+  nactvetVerificationNo?: string; admissionLetterNo?: string; premNumber?: string;
   editableFields: Record<string, string>; requests: ChangeRequest[];
 }
 

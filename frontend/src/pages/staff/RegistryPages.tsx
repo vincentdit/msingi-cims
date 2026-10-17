@@ -440,6 +440,7 @@ export function StudentDetailPage() {
           <Section title="Admission">
             <Field label="Application" value={d.applicationRef} />
             <Field label="NACTVET verification" value={d.nactvetVerificationNo} />
+            <Field label="PREM number (NECTA)" value={d.premNumber} />
             <Field label="Admission letter" value={d.admissionLetterNo} />
             <Field label="Handed over" value={`${formatDateTime(d.admittedAt)} by ${d.admittedByName}`} />
           </Section>
