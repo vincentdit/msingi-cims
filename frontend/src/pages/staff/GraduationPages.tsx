@@ -9,11 +9,12 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
 import type { Graduand, GraduandGenerateResult, GraduationDetail, GraduationStatus, GraduationSummary } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -120,7 +121,7 @@ export function GraduationPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/graduations" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Graduation</Button>
+      <Button component={StaffLink} to="/staff/graduations" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Graduation</Button>
       <ErrorAlert error={q.error ?? act.error ?? print.error} />
       {q.isLoading && <Loading />}
       {g && (

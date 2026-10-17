@@ -6,11 +6,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { Semester, SemesterRegistration, SemesterRegistrationSummary } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -61,7 +61,7 @@ export default function SemesterRegistrationsPage() {
         } />
       <ErrorAlert error={semesters.error ?? summary.error ?? list.error ?? approveAll.error} />
       {semesters.data && !semesters.data.length && (
-        <Alert severity="info">No semesters yet. Set them up in the <RouterLink to="/staff/calendar">academic calendar</RouterLink>.</Alert>
+        <Alert severity="info">No semesters yet. Set them up in the <StaffLink to="/staff/calendar">academic calendar</StaffLink>.</Alert>
       )}
       {s && (
         <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -188,7 +188,7 @@ function RegistrationDialog({ reg, canDecide, onClose, onDone }: { reg: Semester
           {reg.decidedAt && ` · ${STATUS_LABEL[reg.status].toLowerCase()} ${formatDateTime(reg.decidedAt)} by ${reg.decidedByName}`}
         </Typography>
         {reg.decisionNote && <Alert severity="warning" sx={{ mt: 1 }}><strong>Note to student:</strong> {reg.decisionNote}</Alert>}
-        <Button component={RouterLink} to={`/staff/students/${reg.studentId}`} size="small" sx={{ mt: 1, px: 0 }}>Open student record</Button>
+        <Button component={StaffLink} to={`/staff/students/${reg.studentId}`} size="small" sx={{ mt: 1, px: 0 }}>Open student record</Button>
         {rejecting && (
           <TextField fullWidth multiline minRows={2} sx={{ mt: 2 }} label="What should the student correct?" value={note} onChange={(e) => setNote(e.target.value)}
             helperText="Sent to the student by SMS and shown in the portal." autoFocus />

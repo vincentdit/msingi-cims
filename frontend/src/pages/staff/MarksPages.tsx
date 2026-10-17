@@ -12,12 +12,13 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, upload } from '../../api/client';
 import type { AssessmentComponent, MarksRow, Offering, OfferingStatus, OfferingSummary, ResitMarks, Semester, StaffOption, UploadResult } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { ApprovalStagesDialog, ItemWindowDialog } from './ExamRouteDialogs';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const ALLOCATORS = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC'];
@@ -298,11 +299,11 @@ export function OfferingPage() {
 
   return (
     <Container maxWidth="xl" disableGutters>
-      <Button component={RouterLink} to="/staff/marks" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Marks</Button>
+      <Button component={StaffLink} to="/staff/marks" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Marks</Button>
       <PageTitle title={`${o.code} · ${o.title}`}
         subtitle={<>{o.semesterName} {o.academicYear} · {num(o.credits)} credits{o.departmentName && <> · {o.departmentName}</>} · {o.lecturers.map((l) => l.fullName).join(', ') || 'No lecturer allocated'}</>}
         action={<Stack direction="row" spacing={1}>
-          <Button component={RouterLink} to={`/staff/teaching/${o.id}`}>Attendance</Button>
+          <Button component={StaffLink} to={`/staff/teaching/${o.id}`}>Attendance</Button>
           {o.can.assign && <Button startIcon={<GroupIcon />} onClick={() => setAssigning(true)}>Lecturers</Button>}
         </Stack>} />
       <Card sx={{ mb: 2 }}>

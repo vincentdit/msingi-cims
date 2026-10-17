@@ -5,12 +5,13 @@ import Grid from '@mui/material/Grid2';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { OverviewSection } from './OverviewSection';
-import { Navigate, Link as RouterLink } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { api, formatDate, formatTzs } from '../../api/client';
 import type { DashboardData } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { BarList, ColumnChart, SplitBar } from '../../components/charts';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
@@ -38,7 +39,7 @@ export default function DashboardPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={first ? `Welcome, ${first}` : 'Dashboard'} subtitle="Today at a glance. Figures update every minute; full detail is under Reports."
-        action={<Button component={RouterLink} to="/staff/reports" endIcon={<ArrowForwardIcon />}>Reports</Button>} />
+        action={<Button component={StaffLink} to="/staff/reports" endIcon={<ArrowForwardIcon />}>Reports</Button>} />
       {overview && (
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
           <Tab value="overview" label="Institution overview" />
@@ -48,7 +49,7 @@ export default function DashboardPage() {
       {overview && tab === 'overview' ? <OverviewSection /> : (
         <>
           {waiting > 0 && (
-            <Alert severity="warning" sx={{ mb: 3 }} action={<Button color="inherit" component={RouterLink} to="/staff/approvals" endIcon={<ArrowForwardIcon />}>Approvals</Button>}>
+            <Alert severity="warning" sx={{ mb: 3 }} action={<Button color="inherit" component={StaffLink} to="/staff/approvals" endIcon={<ArrowForwardIcon />}>Approvals</Button>}>
               {waiting === 1 ? '1 decision waits for you.' : `${waiting} decisions wait for you.`}
             </Alert>
           )}
@@ -72,7 +73,7 @@ function Section({ title, subtitle, link, children }: { title: string; subtitle?
       <Stack direction="row" alignItems="baseline" spacing={1.5} sx={{ mb: 1.5 }}>
         <Typography variant="h5" component="h2">{title}</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>{subtitle}</Typography>
-        <Button size="small" component={RouterLink} to={link}>Reports</Button>
+        <Button size="small" component={StaffLink} to={link}>Reports</Button>
       </Stack>
       {children}
     </Box>
@@ -142,7 +143,7 @@ function RegistrySection({ r }: { r: NonNullable<DashboardData['registry']> }) {
         <Kpi label="Registered" value={r.registered.toLocaleString()} />
         <Kpi label="Still to report" value={r.awaitingRegistration.toLocaleString()} tone={r.awaitingRegistration ? 'warning.main' : undefined} />
         <Kpi label="Detail updates waiting" value={r.pendingChangeRequests.toLocaleString()}
-          hint={r.pendingChangeRequests ? <RouterLink to="/staff/students">Review on Students</RouterLink> : 'None waiting'} />
+          hint={r.pendingChangeRequests ? <StaffLink to="/staff/students">Review on Students</StaffLink> : 'None waiting'} />
       </Grid>
       <Grid container spacing={1.5}>
         <Panel title="Current students by programme">
@@ -163,7 +164,7 @@ function FinanceSection({ f }: { f: NonNullable<DashboardData['finance']> }) {
     <Section title="Finance" subtitle={f.academicYear ? `Annual fees ${f.academicYear}` : undefined} link="/staff/reports?area=Finance">
       {(f.daysNotReconciled > 0 || f.openExceptions > 0) && (
         <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 1.5 }}
-          action={<Button color="inherit" size="small" component={RouterLink} to="/staff/finance">Open Fees</Button>}>
+          action={<Button color="inherit" size="small" component={StaffLink} to="/staff/finance">Open Fees</Button>}>
           {f.daysNotReconciled > 0 && `${f.daysNotReconciled} day(s) with payments in the last 30 days are not reconciled and closed. `}
           {f.openExceptions > 0 && `${f.openExceptions} reconciliation exception(s) open.`}
         </Alert>

@@ -8,12 +8,13 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { EligibilityLine, EligibilityOverview, EligibilityRules, ExemptionView, GenerateEligibilityResult, OfferingEligibilityView } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { tr } from '../../locale/ui';
 import { OFFERING_STAGE, useRoles, useSemesterChoice } from './MarksPages';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const pct = (n?: number | null) => (n == null ? '—' : `${Number(n).toLocaleString('en-GB', { maximumFractionDigits: 1 })}%`);
@@ -26,7 +27,7 @@ function RulesLine({ rules }: { rules: EligibilityRules }) {
   return (
     <Typography variant="body2" color="text.secondary">
       To sit an examination a student needs {list}, or an approved exemption.
-      {' '}<Link component={RouterLink} to="/staff/regulations">Change the rules</Link>
+      {' '}<Link component={StaffLink} to="/staff/regulations">Change the rules</Link>
     </Typography>
   );
 }
@@ -209,13 +210,13 @@ export function OfferingEligibilityPage() {
   const rows = (e?.students ?? []).filter((s) => !only || !s.eligible);
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/eligibility" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Examination eligibility</Button>
+      <Button component={StaffLink} to="/staff/eligibility" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Examination eligibility</Button>
       <ErrorAlert error={v.error} />
       {v.isLoading && <Loading />}
       {e && (
         <>
           <PageTitle title={`${e.code} · ${e.title}`} subtitle={`${e.semesterName}${e.departmentName ? ` · ${e.departmentName}` : ''} · results ${OFFERING_STAGE[e.status].toLowerCase()}`}
-            action={<Button component={RouterLink} to={`/staff/teaching/${e.offeringId}`}>Attendance</Button>} />
+            action={<Button component={StaffLink} to={`/staff/teaching/${e.offeringId}`}>Attendance</Button>} />
           <Card sx={{ mb: 2 }}><CardContent><RulesLine rules={e.rules} />
             <Typography variant="body2" sx={{ mt: 1 }}>
               {e.generatedAt ? <>List generated {formatDateTime(e.generatedAt)} by {e.generatedByName}.</> : 'The Examinations Officer has not generated this list yet.'}

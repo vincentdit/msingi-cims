@@ -10,7 +10,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import {
   CALENDAR_EVENT_KINDS, type AcademicCalendar, type AcademicYear, type CalendarEvent, type CourseModule, type Curriculum,
@@ -18,6 +18,7 @@ import {
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const CALENDAR_EDITORS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'];
@@ -283,7 +284,7 @@ function CurriculumList() {
               <Typography variant="h6">{versions[0].programmeCode} · {versions[0].programmeName}</Typography>
             </CardContent>
             {versions.map((c) => (
-              <CardActionArea key={c.id} component={RouterLink} to={`/staff/curricula/${c.id}`} sx={{ px: 2, py: 1.25, borderTop: 1, borderColor: 'divider' }}>
+              <CardActionArea key={c.id} component={StaffLink} to={`/staff/curricula/${c.id}`} sx={{ px: 2, py: 1.25, borderTop: 1, borderColor: 'divider' }}>
                 <Stack direction="row" spacing={2} alignItems="center">
                   <Typography sx={{ fontWeight: 600, minWidth: 40 }}>v{c.curriculumVersion}</Typography>
                   <Chip size="small" color={c.status === 'DRAFT' ? 'warning' : statusColour(c.status)} label={humanise(c.status)} />
@@ -477,7 +478,7 @@ export function CurriculumEditorPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/curricula" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Curricula</Button>
+      <Button component={StaffLink} to="/staff/curricula" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Curricula</Button>
       <PageTitle title={`${c.programmeCode} curriculum v${c.curriculumVersion}`}
         subtitle={<>{c.programmeName} · from the {c.effectiveYear} intake · {c.programmeSemesters} semesters
           {c.studentsOnIt > 0 && <> · {c.studentsOnIt} student{c.studentsOnIt === 1 ? '' : 's'} on this version</>}</>}

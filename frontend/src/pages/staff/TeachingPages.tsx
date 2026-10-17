@@ -11,7 +11,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError, formatDate } from '../../api/client';
 import type {
   AttendanceStatus, AttendanceView, ClassSessionView, OfferingAttendance, RegisterLine, SessionKind, SessionRequest, WorkloadView,
@@ -21,6 +21,7 @@ import { OFFERING_STAGE, useRoles, useSemesterChoice } from './MarksPages';
 import { ClassListButton, StartCheckInDialog } from './MyTeachingPages';
 import PhoneIcon from '@mui/icons-material/PhoneAndroid';
 import QrIcon from '@mui/icons-material/QrCode2';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 const WIDE = ['INSTITUTION_ADMIN', 'EXAMINATIONS_OFFICER', 'HEAD_OF_DEPARTMENT', 'DEPUTY_PRINCIPAL_ACADEMIC', 'MANAGEMENT_VIEWER'];
@@ -292,7 +293,7 @@ export function AttendancePage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <Button component={RouterLink} to="/staff/teaching" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Teaching & attendance</Button>
+      <Button component={StaffLink} to="/staff/teaching" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>Teaching & attendance</Button>
       <ErrorAlert error={v.error} />
       {v.isLoading && <Loading />}
       {a && (
@@ -301,7 +302,7 @@ export function AttendancePage() {
             subtitle={`${a.semesterName}${a.departmentName ? ` · ${a.departmentName}` : ''} · ${a.lecturers.length ? a.lecturers.join(', ') : 'no lecturer allocated'}`}
             action={(
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
-                {can(EXAMS) && <Button component={RouterLink} to={`/staff/eligibility/${a.offeringId}`} startIcon={<EligibilityIcon />}>Eligibility</Button>}
+                {can(EXAMS) && <Button component={StaffLink} to={`/staff/eligibility/${a.offeringId}`} startIcon={<EligibilityIcon />}>Eligibility</Button>}
                 <ClassListButton offeringId={a.offeringId} code={a.code} />
                 {a.canRecord && !openCheckIn && <Button startIcon={<QrIcon />} onClick={() => setCheckIn(true)} sx={{ whiteSpace: 'nowrap' }}>Self check-in</Button>}
                 {a.canRecord && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setSession({})} sx={{ whiteSpace: 'nowrap' }}>Record session</Button>}
@@ -311,7 +312,7 @@ export function AttendancePage() {
           {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice(null)}>{notice}</Alert>}
           {openCheckIn && (
             <Alert severity="info" icon={<QrIcon />} sx={{ mb: 2 }}
-              action={<Button color="inherit" size="small" component={RouterLink} to={`/staff/teaching/check-in/${openCheckIn.id}`}>Show the code</Button>}>
+              action={<Button color="inherit" size="small" component={StaffLink} to={`/staff/teaching/check-in/${openCheckIn.id}`}>Show the code</Button>}>
               Self check-in is open for the session of {formatDate(openCheckIn.sessionDate)} at {openCheckIn.startTime.slice(0, 5)}.
             </Alert>
           )}

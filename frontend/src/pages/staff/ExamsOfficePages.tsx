@@ -10,10 +10,10 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { tr } from '../../locale/ui';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle, LinkRow } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 
@@ -65,7 +65,7 @@ export function ExamsOfficePage() {
                     <Stack key={i} direction="row" spacing={1.5} alignItems="center" sx={{ py: 1 }}>
                       {SEV_ICON[s.severity]}
                       <Typography variant="body2" sx={{ flex: 1 }}>{s.text}</Typography>
-                      {s.link && <Button size="small" component={RouterLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
+                      {s.link && <Button size="small" component={StaffLink} to={s.link} endIcon={<ArrowForwardIcon />}>Open</Button>}
                     </Stack>
                   ))}
                 </Stack>
@@ -75,10 +75,10 @@ export function ExamsOfficePage() {
               <Card sx={{ mb: 2.5 }}>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Remarks and appeals</Typography>
-                    <Button size="small" component={RouterLink} to="/staff/appeals">Open</Button></Stack>
+                    <Button size="small" component={StaffLink} to="/staff/appeals">Open</Button></Stack>
                   <Figures items={[['Need an examiner', b.appeals.requested], ['Awaiting payment', b.appeals.awaitingPayment], ['With an examiner', b.appeals.withExaminer],
                     ['To forward', b.appeals.toForward], ['With the administrator', b.appeals.withAdministrator], ['Decided', b.appeals.closed]]} />
-                  {b.amendmentsPending > 0 && <Typography variant="body2" sx={{ mt: 1 }}>{b.amendmentsPending} result amendment(s) wait for the administrator. <RouterLink to="/staff/amendments">Amendments</RouterLink></Typography>}
+                  {b.amendmentsPending > 0 && <Typography variant="body2" sx={{ mt: 1 }}>{b.amendmentsPending} result amendment(s) wait for the administrator. <StaffLink to="/staff/amendments">Amendments</StaffLink></Typography>}
                 </CardContent>
               </Card>
             )}
@@ -131,7 +131,7 @@ export function ExamsOfficePage() {
               <Card sx={{ mb: 2.5 }}>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Examination eligibility</Typography>
-                    <Button size="small" component={RouterLink} to="/staff/eligibility">Open</Button></Stack>
+                    <Button size="small" component={StaffLink} to="/staff/eligibility">Open</Button></Stack>
                   <Figures items={[['Modules with a list', `${b.eligibility.modulesGenerated} of ${b.eligibility.modules}`], ['Students', b.eligibility.students],
                     ['Not eligible (module entries)', b.eligibility.ineligible], ['Exemptions to decide', b.eligibility.pendingExemptions]]} />
                 </CardContent>
@@ -141,7 +141,7 @@ export function ExamsOfficePage() {
               <Card>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}><Typography variant="h6">Result sheets</Typography>
-                    <Button size="small" component={RouterLink} to="/staff/results">Open</Button></Stack>
+                    <Button size="small" component={StaffLink} to="/staff/results">Open</Button></Stack>
                   <Pipeline total={b.sheets.classes} steps={[['Not computed', Math.max(0, b.sheets.classes - b.sheets.computed - b.sheets.recommended - b.sheets.confirmed - b.sheets.published)],
                     ['Computed', b.sheets.computed], ['Recommended', b.sheets.recommended], ['Confirmed', b.sheets.confirmed], ['Published', b.sheets.published]]} unit="classes" />
                   {b.sheets.sheets.length > 0 && (
@@ -278,7 +278,7 @@ export function AppealsPage() {
                         {a.canMark && <Button size="small" variant="contained" onClick={() => setDialog({ a, action: 'mark' })}>Record marks</Button>}
                         {a.canForward && <Button size="small" variant="contained" onClick={() => setDialog({ a, action: 'forward' })}>Forward outcome</Button>}
                         {a.canReject && <Button size="small" color="error" onClick={() => setDialog({ a, action: 'reject' })}>Decline</Button>}
-                        {a.amendmentId && a.status === 'AMENDMENT_PENDING' && <Button size="small" component={RouterLink} to="/staff/amendments">Amendment</Button>}
+                        {a.amendmentId && a.status === 'AMENDMENT_PENDING' && <Button size="small" component={StaffLink} to="/staff/amendments">Amendment</Button>}
                       </Stack>
                     </TableCell>
                   </TableRow>

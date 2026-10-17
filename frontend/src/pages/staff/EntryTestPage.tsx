@@ -10,10 +10,11 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Fragment, useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { AdmissionWindow, EntryRules } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
 
@@ -75,7 +76,7 @@ export default function EntryTestPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Test entry rules" subtitle={`${win.name}: type a sample applicant's results to see which programmes they could apply for, and why. Nothing is saved.`}
-        action={<Button startIcon={<ArrowBackIcon />} component={RouterLink} to={`/staff/windows/${id}`}>Back to the window</Button>} />
+        action={<Button startIcon={<ArrowBackIcon />} component={StaffLink} to={`/staff/windows/${id}`}>Back to the window</Button>} />
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 5 }}>
           <Card>

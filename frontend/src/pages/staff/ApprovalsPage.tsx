@@ -3,10 +3,10 @@ import CheckIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassIcon from '@mui/icons-material/HourglassEmpty';
 import { Box, Button, Card, Chip, Container, Divider, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { Link as RouterLink } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import type { ApprovalInbox, ApprovalItem } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 
 const ORDER = ['Academic Committee', 'Governing Board', 'Head of Department', 'Department Board', 'Administrator'];
 const age = (iso?: string) => {
@@ -74,7 +74,7 @@ function Line({ i }: { i: ApprovalItem }) {
         )}
       </Box>
       <Stack alignItems={{ sm: 'flex-end' }} spacing={0.5} sx={{ flexShrink: 0 }}>
-        <Button component={RouterLink} to={i.link} variant={i.canAct ? 'contained' : 'outlined'} size="small" endIcon={<ArrowForwardIcon />}>
+        <Button component={StaffLink} to={i.link} variant={i.canAct ? 'contained' : 'outlined'} size="small" endIcon={<ArrowForwardIcon />}>
           {i.canAct ? 'Review' : 'View'}
         </Button>
         {i.submittedAt && <Typography variant="caption" color="text.secondary">{formatDateTime(i.submittedAt)}</Typography>}
