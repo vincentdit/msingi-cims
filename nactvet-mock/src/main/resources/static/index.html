@@ -54,18 +54,19 @@
 
   <div class="card"><h2>How the mock answers</h2>
     <div style="padding: 4px 16px 14px">
-      By the last digit of the CSEE index number:
+      By the last digit of the form four index number:
       <ul class="rules">
-        <li><b>7</b>: queried (name does not match NECTA); verified once resubmitted with remarks</li>
+        <li><b>7</b>: queried (name does not match NECTA); verified when uploaded again</li>
         <li><b>9</b>: not verified (minimum entry requirements)</li>
         <li><b>3</b>: verified, also admitted elsewhere; the applicant needs the confirmation code shown in the batch</li>
         <li><b>5</b>: verified, but takes three times as long</li>
         <li>any other digit: verified</li>
       </ul>
       <details><summary>Endpoints</summary>
-        <p>NACTVET (JSON POST with <code>authorization</code> and <code>api_code</code>):
-        <code>/nacteapi/index.php/api-out-service/admissionverification</code>,
-        <code>…/admissionverificationresults</code>, <code>…/admissionconfirmation</code>; student registration
+        <p>NACTVET admission verification, as NOAS uses it: upload <code>/nacteapi/index.php/api/upload</code> (an array wrapping
+        <code>{heading, students}</code>, the credential in <code>heading.authorization</code>) and feedback
+        <code>/nacteapi/index.php/api-out-service/verifiedresultsall</code> (<code>authorization</code>, <code>api_code</code>,
+        <code>year</code>, <code>intake</code>, paged); confirmation <code>…/admissionconfirmation</code> (placeholder). Student registration
         <code>…/studentregistration</code> and <code>…/studentregistrationstatus</code> (a student without a verification number is queried);
         results <code>…/resultsubmission</code> and <code>…/resultsubmissionstatus</code> (a row without a verification number or a grade is queried).</p>
         <p>Developer: <code>GET /mock/batches</code>, <code>GET /mock/confirmation-codes/{index}</code>,
@@ -95,7 +96,7 @@
       document.getElementById('meta').textContent = `Outcomes after ${status.processing_seconds}s · ${status.batches} batch(es)`;
       document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
       document.getElementById('batches').innerHTML = batches.length ? batches.map(card).join('')
-        : '<div class="card"><div class="empty">No batches yet. Submit selected applicants from CIMS (NACTVET verification &amp; offers → Submit to NACTVET → Send through the NACTVET API).</div></div>';
+        : '<div class="card"><div class="empty">No uploads yet. Submit selected applicants from CIMS (NACTVET verification &amp; offers → Submit to NACTVET → Send through the NACTVET API).</div></div>';
     } catch (e) {
       document.getElementById('updated').textContent = 'Could not reach the mock';
     }
@@ -103,13 +104,13 @@
 
   function card(b) {
     const rows = b.outcomes.map(o => `<tr>
-      <td>${esc(o.application_ref)}</td><td>${esc(o.index_number)}</td><td>${esc(o.programme_code)}</td>
+      <td>${esc(o.name)}</td><td>${esc(o.index_number)}</td>
       <td class="s ${esc(o.status)}">${label[o.status] || esc(o.status)}</td>
       <td>${esc(o.verification_number)}</td>
       <td>${o.confirmation_code ? `<code>${esc(o.confirmation_code)}</code> <button data-elsewhere="${esc(o.index_number)}" title="Another institution confirms first">Confirm elsewhere</button>` : ''}</td>
       <td class="wrap">${esc(o.reason)}</td></tr>`).join('');
-    return `<div class="card"><h2><span>${esc(b.batch_ref)}</span><span class="muted">${esc(b.institution_code)} · received ${new Date(b.received_at).toLocaleString()}</span></h2>
-      <div class="scroll"><table><thead><tr><th>Application</th><th>Index</th><th>Programme</th><th>Status</th><th>Verification no.</th><th>Confirmation code</th><th>Reason</th></tr></thead>
+    return `<div class="card"><h2><span>${esc(b.batch_ref)} · programme ${esc(b.programme_id)}</span><span class="muted">${esc(b.intake)} ${esc(b.application_year)} · payment ${esc(b.payment_reference)} · received ${new Date(b.received_at).toLocaleString()}</span></h2>
+      <div class="scroll"><table><thead><tr><th>Applicant</th><th>Index</th><th>Status</th><th>Verification no.</th><th>Confirmation code</th><th>Reason</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
   }
 

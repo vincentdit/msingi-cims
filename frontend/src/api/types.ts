@@ -219,6 +219,8 @@ export interface Application {
   submittedAt?: string;
   choices: Choice[];
   blockers: string[];
+  /** The same steps as codes, worded in the applicant's language (blockers is the English). */
+  todo?: { code: string; items: string[] }[];
   selectedProgramme?: string;
   offer?: Offer;
   letter?: AdmissionLetterInfo;
@@ -458,7 +460,11 @@ export interface NactvetSubmission {
   batchNo: number;
   channel: 'API' | 'FILE';
   status: 'SUBMITTED' | 'COMPLETED';
+  /** API batch: NACTVET application year and intake of the feedback, e.g. 2026/SEPTEMBER */
   externalRef?: string;
+  paymentReference?: string;
+  /** Only right after submitting: programmes NACTVET refused, still selected */
+  notSent?: string[];
   submittedAt: string;
   submittedByName: string;
   lastOutcomeAt?: string;

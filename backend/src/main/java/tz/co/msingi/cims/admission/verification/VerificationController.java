@@ -48,7 +48,7 @@ public class VerificationController {
     @PostMapping("/windows/{windowId}/nactvet-submissions")
     @PreAuthorize(OFFICE)
     public SubmissionView submit(@PathVariable Long windowId, @Valid @RequestBody SubmitRequest req) {
-        return service.submit(windowId, req.channel());
+        return service.submit(windowId, req.channel(), req.paymentReference());
     }
 
     @Operation(summary = "Fetch outcomes of an API submission from NACTVET")

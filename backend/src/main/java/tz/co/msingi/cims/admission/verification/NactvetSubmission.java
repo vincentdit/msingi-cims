@@ -41,7 +41,14 @@ public class NactvetSubmission extends BaseEntity {
     @Column(nullable = false)
     private Status status = Status.SUBMITTED;
 
+    /** API batch: NACTVET application year and intake whose feedback holds the outcomes, e.g. {@code 2026/SEPTEMBER}. */
     private String externalRef;
+
+    /** API batch: payment reference (control number) of the verification fee paid to NACTVET. */
+    private String paymentReference;
+
+    /** API batch: NACTVET's answer to each programme upload. */
+    private String nactvetResponse;
 
     @Column(nullable = false)
     private OffsetDateTime submittedAt;

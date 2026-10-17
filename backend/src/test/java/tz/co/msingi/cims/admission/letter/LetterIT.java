@@ -176,7 +176,7 @@ class LetterIT {
         Applicant a = s.apply(index);
         s.selectAndApprove(officer, chair);
         long batch = s.body(s.call(post("/api/admission/windows/" + s.inst.windowId() + "/nactvet-submissions"), officer,
-                "{\"channel\":\"API\"}")).get("id").asLong();
+                "{\"channel\":\"API\",\"paymentReference\":\"991100223344\"}")).get("id").asLong();
         s.call(post("/api/admission/nactvet-submissions/" + batch + "/fetch-outcomes"), officer, null).andExpect(status().isOk());
         s.call(post("/api/applicant/applications/" + a.applicationId() + "/offer/accept"), a.token(), "{}")
                 .andExpect(jsonPath("$.status").value("ACCEPTED"));

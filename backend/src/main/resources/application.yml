@@ -121,11 +121,13 @@ cims:
     # Admission verification: simulated (in CIMS) or live (HTTP; run the nactvet-mock project to try it without NACTVET)
     mode: ${CIMS_NACTVET_MODE:simulated}
     verification:
-      # NOAS-style endpoints. Placeholders until NACTVET publishes its admission verification API; nactvet-mock answers them.
+      # NACTVET's applicant upload and verification feedback, as NOAS uses them. The confirmation of a multiple admission is
+      # not part of NOAS: its path stays a placeholder until NACTVET publishes it. nactvet-mock answers all three.
       base-url: ${CIMS_NACTVET_VERIFICATION_URL:${cims.nactvet.awards.base-url}}
-      submit-path: ${CIMS_NACTVET_SUBMIT_PATH:/nacteapi/index.php/api-out-service/admissionverification}
-      results-path: ${CIMS_NACTVET_RESULTS_PATH:/nacteapi/index.php/api-out-service/admissionverificationresults}
+      upload-path: ${CIMS_NACTVET_UPLOAD_PATH:/nacteapi/index.php/api/upload}
+      feedback-path: ${CIMS_NACTVET_FEEDBACK_PATH:/nacteapi/index.php/api-out-service/verifiedresultsall}
       confirm-path: ${CIMS_NACTVET_CONFIRM_PATH:/nacteapi/index.php/api-out-service/admissionconfirmation}
+      feedback-page-size: ${CIMS_NACTVET_FEEDBACK_PAGE_SIZE:500}
       authorization: ${CIMS_NACTVET_VERIFICATION_AUTHORIZATION:${cims.nactvet.awards.authorization}}
       api-code: ${CIMS_NACTVET_VERIFICATION_API_CODE:${cims.nactvet.awards.api-code}}
       # Development against nactvet-mock only: show the confirmation code the mock "sent by SMS" on screen
