@@ -127,6 +127,10 @@ class MfaAndSecurityIT {
         s.call(put("/api/security-settings"), admin, settings).andExpect(status().isOk()).andExpect(jsonPath("$.staffIdleMinutes").value(20));
         s.call(get("/api/public/institution"), null, null).andExpect(jsonPath("$.idleMinutes.staff").value(20))
                 .andExpect(jsonPath("$.idleMinutes.student").value(45));
+        // the privacy notice applicants read at sign-up says how long the institution keeps applications
+        s.call(get("/api/public/privacy-notice"), null, null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicantRetentionMonths").value(24)).andExpect(jsonPath("$.version").value("2026-10"))
+                .andExpect(jsonPath("$.institution").isNotEmpty());
 
         // the bursar must set it up before doing anything else; a lecturer need not
         JsonNode b = login("bursar");

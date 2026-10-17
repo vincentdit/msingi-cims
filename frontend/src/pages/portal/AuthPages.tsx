@@ -2,6 +2,7 @@ import { Alert, Box, Button, Card, CardContent, Checkbox, Container, FormControl
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrivacyNoticeLink } from '../../components/PrivacyNoticeDialog';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { TokenResponse } from '../../api/types';
@@ -136,7 +137,8 @@ export function RegisterPage() {
             <TextField label={t('auth.phone')} value={f.phone} onChange={set('phone')} required placeholder="0712 345 678" inputMode="tel" autoComplete="tel" autoFocus />
             <TextField label={t('auth.email')} value={f.email} onChange={set('email')} type="email" autoComplete="email" />
             <NewPasswordFields password={f.password} confirm={confirm} onPassword={(v) => setF({ ...f, password: v })} onConfirm={setConfirm} />
-            <FormControlLabel control={<Checkbox checked={f.acceptPrivacyNotice} onChange={set('acceptPrivacyNotice')} />} label={<Typography variant="body2">{t('auth.privacy')}</Typography>} />
+            <FormControlLabel control={<Checkbox checked={f.acceptPrivacyNotice} onChange={set('acceptPrivacyNotice')} />}
+              label={<Typography variant="body2">{t('auth.privacyBefore')}<PrivacyNoticeLink onAgree={() => setF((x) => ({ ...x, acceptPrivacyNotice: true }))}>{t('auth.privacyLink')}</PrivacyNoticeLink>{t('auth.privacyAfter')}</Typography>} />
             <ErrorAlert error={m.error} />
             <Button type="submit" variant="contained" size="large"
               disabled={m.isPending || !f.acceptPrivacyNotice || !passwordOk(f.password) || confirm !== f.password}>{t('auth.create')}</Button>

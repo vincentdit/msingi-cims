@@ -32,6 +32,13 @@ public class PublicController {
     private final tz.co.msingi.cims.finance.collection.PaymentChannelService payments;
     private final tz.co.msingi.cims.platform.privacy.SecuritySettingsService security;
 
+    @org.springframework.beans.factory.annotation.Value("${cims.privacy.notice-version:2026-10}")
+    private String privacyNoticeVersion;
+
+    /** What the privacy notice shown at sign-up needs from the institution: its name and contacts, and how long applications are kept. */
+    public record PrivacyNoticeView(String version, String institution, String contactEmail, String contactPhone, int applicantRetentionMonths) {
+    }
+
     public record InstitutionView(String code, String name, String shortName, String nactvetRegNo, String contactEmail,
                                   String contactPhone, Map<String, Object> branding, PhotoView campusPhoto,
                                   tz.co.msingi.cims.finance.collection.PaymentChannelService.PublicPayment payment,
@@ -44,6 +51,13 @@ public class PublicController {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
         return new InstitutionView(t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactEmail(),
                 t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), payments.forPayers(), security.idle());
+    }
+
+    @Operation(summary = "The facts the applicants' privacy notice shows: version, institution, contacts and retention of applications")
+    @GetMapping("/privacy-notice")
+    public PrivacyNoticeView privacyNotice() {
+        Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
+        return new PrivacyNoticeView(privacyNoticeVersion, t.getName(), t.getContactEmail(), t.getContactPhone(), security.get().retentionApplicantMonths());
     }
 
     @Operation(summary = "Admission windows open now, with programmes and entry requirements")
