@@ -29,6 +29,7 @@ import StudentTransferCard from './StudentTransferCard';
 import PrivacyCard from '../../components/PrivacyCard';
 import AlumniCard from '../../components/AlumniCard';
 import NinCard from '../../components/NinCard';
+import HealthCoverCard from '../../components/HealthCoverCard';
 
 const student = { realm: 'student' as const };
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
@@ -476,6 +477,7 @@ export function StudentProfilePage() {
       </Card>
 
       <StudentTransferCard />
+      <HealthCoverCard />
       <NinCard />
       <AlumniCard />
       <PrivacyCard realm="student" />

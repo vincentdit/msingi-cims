@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static tz.co.msingi.govmocks.gepg.GepgXml.el;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "mock.gepg.delay-ms=50")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.gepg.delay-ms=50", "mock.nhif.processing-seconds=0"})
 class GovMocksTest {
 
     /** CIMS's side of the test keys: signs as CIMS, checks GePG's signatures. */
@@ -119,6 +119,38 @@ class GovMocksTest {
         String a3 = http().post().uri("/api/bill/sigqrequest").contentType(MediaType.APPLICATION_XML)
                 .body("<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><Gepg>&e;</Gepg>").retrieve().body(String.class);
         assertThat(code(a3, "gepgBillSubReqAck")).isEqualTo(7242);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void nhifCardsAndStudentRegistration() {
+        assertThat(nhifCard("1023-4561")).containsEntry("status", "ACTIVE").containsEntry("card_no", "10234561");
+        assertThat(nhifCard("10234560")).containsEntry("status", "NOT_FOUND");
+        assertThat(nhifCard("10234569")).containsEntry("status", "INACTIVE");
+        assertThat(nhifCard("10234568")).containsEntry("full_name", "NEEMA JOHN KIMARO");
+        Map<String, Object> reg = http().post().uri("/nhif/api/v1/student-registrations").header("X-Api-Key", "mock-nhif-key").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("institution_code", "REG/DEMO/001", "academic_year", "2027/2028", "students", List.of(
+                        Map.of("registration_no", "DEMO/27/0001", "first_name", "Asha", "surname", "Mwinyi", "date_of_birth", "2006-03-04"),
+                        Map.of("registration_no", "DEMO/27/0007", "first_name", "Juma", "surname", "Ali", "date_of_birth", "2006-03-04"),
+                        Map.of("registration_no", "DEMO/27/0002", "first_name", "Neema", "surname", "Said"))))
+                .retrieve().body(Map.class);
+        assertThat((List<?>) reg.get("rejected")).hasSize(1);
+        Map<String, Object> st = http().get().uri("/nhif/api/v1/student-registrations/status?institution_code=REG/DEMO/001&batch_ref=" + reg.get("batch_ref"))
+                .header("X-Api-Key", "mock-nhif-key").retrieve().body(Map.class);
+        assertThat(st).containsEntry("state", "COMPLETED");
+        List<Map<String, Object>> items = (List<Map<String, Object>>) st.get("items");
+        assertThat(items).extracting(i -> i.get("status")).containsExactly("REGISTERED", "REJECTED");
+        assertThat(items.get(0).get("valid_to")).isEqualTo("2028-06-30");
+        // the issued card is now a known member, with the student's name
+        assertThat(nhifCard((String) items.get(0).get("card_no"))).containsEntry("status", "ACTIVE").containsEntry("full_name", "ASHA MWINYI");
+        assertThatThrownBy(() -> http().post().uri("/nhif/api/v1/cards/verify").header("X-Api-Key", "wrong").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("card_no", "1")).retrieve().body(Map.class)).isInstanceOf(HttpClientErrorException.Unauthorized.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> nhifCard(String no) {
+        return http().post().uri("/nhif/api/v1/cards/verify").header("X-Api-Key", "mock-nhif-key").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("card_no", no)).retrieve().body(Map.class);
     }
 
     @Test

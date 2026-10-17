@@ -1070,6 +1070,8 @@ export interface StudentSemesterRegistration {
   clearance?: Clearance;
   registration?: SemesterRegistration;
   history: SemesterRegistration[];
+  /** The institution requires health insurance (NHIF) and the student is not covered yet */
+  healthCoverMissing?: boolean;
 }
 
 export interface SemesterRegistrationSummary {

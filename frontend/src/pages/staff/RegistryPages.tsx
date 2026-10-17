@@ -25,6 +25,7 @@ import { useRoles } from './MarksPages';
 import { ChangeRequestsButton } from './ChangeRequests';
 import { IdCardBatchDialog, StudentIdCard, StudentStatusCard } from './StatusAndCards';
 import NinCard from '../../components/NinCard';
+import HealthCoverCard from '../../components/HealthCoverCard';
 import { StudentTransferCard } from './TransferPages';
 import { StaffLink } from '../../components/StaffLink';
 
@@ -320,6 +321,7 @@ export function StudentDetailPage() {
   const canSeeFees = useRoles()(['INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'AUDITOR', 'REGISTRAR']);
   const canSeeNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'ADMISSIONS_OFFICER']);
   const canEditNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR']);
+  const canSeeHealth = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'DEPUTY_PRINCIPAL_ACADEMIC', 'AUDITOR']);
   const st = useQuery({ queryKey: ['staff', 'student', id], queryFn: () => api<StudentDetail>(`/api/registry/students/${id}`, staff) });
   const [docs, setDocs] = useState<{ item: string; verified: boolean }[]>([]);
   const [remarks, setRemarks] = useState('');
@@ -426,6 +428,7 @@ export function StudentDetailPage() {
         <Grid size={{ xs: 12, md: 5 }}>
           <StudentIdCard studentId={s.id} regNo={s.registrationNo} />
           {canSeeNin && <NinCard studentId={s.id} canEdit={canEditNin} />}
+          {canSeeHealth && <HealthCoverCard studentId={s.id} canEdit={canEditNin} />}
           {canSeeFees && <StudentFeesCard studentId={s.id} />}
           <StudentExamCard studentId={s.id} regNo={s.registrationNo} />
           <Section title="Programme">

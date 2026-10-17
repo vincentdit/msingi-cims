@@ -50,6 +50,8 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
             return wrap(bean, tz.co.msingi.cims.integration.muse.MuseClient.class, ExternalSystem.MUSE);
         if (tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class.isAssignableFrom(type))
             return wrap(bean, tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class, ExternalSystem.TAMISEMI);
+        if (tz.co.msingi.cims.integration.nhif.NhifClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.nhif.NhifClient.class, ExternalSystem.NHIF);
         if (SmsGateway.class.isAssignableFrom(type)) return wrap(bean, SmsGateway.class, ExternalSystem.SMS);
         return bean;
     }
@@ -96,6 +98,9 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (result instanceof tz.co.msingi.cims.integration.nida.NidaClient.Result r) return "NIN " + r.status();
         if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r) return "Posted as " + r.museRef();
         if (result instanceof tz.co.msingi.cims.integration.heslb.HeslbClient.SubmissionResult r) return r.accepted() + " of " + r.received() + " accepted";
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Card r) return "Card " + r.status();
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Submission r) return "Batch " + r.batchRef() + " · " + r.received() + " received";
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Status r) return r.state() + " · " + r.items().size() + " decided";
         if (result instanceof tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.Status r) return r.state() + " · " + r.items().size() + " decided";
         if (result instanceof String s && s.length() <= 60) return "Reference " + s;
         return null;
@@ -108,8 +113,9 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
                 case NACTVET_AWARDS -> args.length >= 2 ? args[0] + " " + args[1] : null;
                 case NACTVET_CATALOGUE -> "institutions and programmes";
                 case NACTVET -> switch (op) {
-                    case "submit" -> args.length >= 2 && args[1] instanceof Collection<?> c ? c.size() + " candidates" : null;
-                    case "fetchOutcomes" -> args.length >= 1 ? "batch " + args[0] : null;
+                    case "upload" -> args.length >= 2 && args[0] instanceof tz.co.msingi.cims.integration.nactvet.NactvetGateway.Heading h
+                            && args[1] instanceof Collection<?> c ? c.size() + " applicants · programme " + h.programmeId() : null;
+                    case "fetchOutcomes" -> args.length >= 2 ? "feedback " + args[0] + " " + args[1] : null;
                     case "confirmAdmission" -> args.length >= 2 ? String.valueOf(args[1]) : null;
                     default -> null;
                 };
@@ -121,6 +127,12 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
                         ? nin.replaceAll("\\D", "").substring(nin.replaceAll("\\D", "").length() - 4) : "") : null;
                 case MUSE -> args.length >= 1 && args[0] instanceof tz.co.msingi.cims.integration.muse.MuseClient.Journal j ? "journal " + j.batchRef() : null;
                 case TAMISEMI -> args.length >= 2 ? args[0] + " " + args[1] : null;
+                case NHIF -> switch (op) {
+                    case "verifyCard" -> args.length >= 1 && args[0] instanceof String c ? "card …" + (c.length() > 4 ? c.substring(c.length() - 4) : c) : null;
+                    case "registerStudents" -> args.length >= 3 && args[2] instanceof Collection<?> c ? args[1] + " · " + c.size() + " students" : null;
+                    case "registrationStatus" -> args.length >= 2 ? "batch " + args[1] : null;
+                    default -> null;
+                };
                 case SMS -> args.length >= 1 ? mask(String.valueOf(args[0])) + (args.length >= 4 && args[3] != null ? " · " + args[3] : "") : null;
             };
         } catch (RuntimeException e) {

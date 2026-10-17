@@ -181,6 +181,15 @@ cims:
     base-url: ${CIMS_TAMISEMI_URL:https://selform.tamisemi.go.tz}
     api-key: ${CIMS_TAMISEMI_API_KEY:}
     selections-path: /tamisemi/api/v1/selections
+  # NHIF (students' health insurance): simulated (in CIMS) or live (JSON over HTTPS with an API key). The paths are placeholders
+  # until NHIF issues the institution its interface document; gov-mocks answers them.
+  nhif:
+    mode: ${CIMS_NHIF_MODE:simulated}
+    base-url: ${CIMS_NHIF_URL:https://verification.nhif.or.tz}
+    api-key: ${CIMS_NHIF_API_KEY:}
+    card-path: /nhif/api/v1/cards/verify
+    registrations-path: /nhif/api/v1/student-registrations
+    status-path: /nhif/api/v1/student-registrations/status
   documents:
     # Link printed in the QR code of admission letters; {host} is the institution's primary domain
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}

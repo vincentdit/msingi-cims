@@ -39,14 +39,14 @@
 </head>
 <body>
 <header>
-  <h1>Government systems mock <small>· GePG, HESLB, NIDA, MUSE, TAMISEMI · development only</small></h1>
+  <h1>Government systems mock <small>· GePG, HESLB, NIDA, MUSE, TAMISEMI, NHIF · development only</small></h1>
   <span id="outages"></span>
 </header>
 <nav id="tabs"></nav>
 <main id="main"></main>
 <div id="toast"></div>
 <script>
-const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI'];
+const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI', 'NHIF'];
 let tab = location.hash.slice(1) || 'GePG';
 const $ = (s) => document.querySelector(s);
 const esc = (v) => v == null ? '' : String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -160,14 +160,36 @@ async function addSel() {
   if ($('#tIdx').value) q.set('indexNumber', $('#tIdx').value);
   await call('POST', '/mock/tamisemi/selections?' + q); load();
 }
+async function nhif() {
+  const s = await call('GET', '/mock/nhif');
+  return `<div class="card"><h2>Add a member card</h2><div class="body bar">
+    <input id="nCard" placeholder="Card number" size="14"> <input id="nName" placeholder="Holder's full name" size="22">
+    <select id="nStatus"><option>ACTIVE</option><option>INACTIVE</option></select>
+    <button onclick="call('POST','/mock/nhif/cards?cardNo='+encodeURIComponent($('#nCard').value)+'&fullName='+encodeURIComponent($('#nName').value)+'&status='+$('#nStatus').value).then(()=>{toast('Card added');load()})">Add</button>
+    <button onclick="if(confirm('Forget all cards and batches?')) call('POST','/mock/nhif/reset').then(load)">Reset</button>
+  </div><div class="body muted">Other card numbers by the last digit: 0 not found · 9 inactive · 8 active but someone else's · otherwise active.
+    Registration: no date of birth is rejected on receipt; registration numbers ending in 7 are refused; decisions after ${s.processingSeconds}s.</div></div>
+  <div class="card"><h2>Registration batches</h2>${table([
+    ['Batch', b => esc(b.batchRef)], ['Institution', b => esc(b.institutionCode)], ['Year', b => esc(b.academicYear)], ['Received', b => b.received],
+    ['Rejected on receipt', b => b.rejected.length], ['Registered', b => b.items.filter(i => i.status === 'REGISTERED').length],
+    ['Refused', b => b.items.filter(i => i.status === 'REJECTED').length], ['At', b => esc(b.receivedAt)]
+  ], s.batches, 'None yet. Send students whose NHIF contribution is paid from CIMS (Health insurance → Send to NHIF).')}</div>
+  <div class="card"><h2>Known cards</h2>${table([
+    ['Card', c => esc(c.cardNo)], ['Holder', c => esc(c.fullName)], ['Status', c => `<span class="${c.status === 'ACTIVE' ? 'ok' : 'bad'}">${esc(c.status)}</span>`],
+    ['Scheme', c => esc(c.scheme)], ['Valid to', c => esc(c.validTo)], ['From', c => esc(c.source)]
+  ], s.cards, 'None yet.')}</div>
+  <div class="card"><h2>Card checks</h2>${table([
+    ['Card', c => esc(c.card)], ['Result', c => `<span class="${c.status === 'ACTIVE' ? 'ok' : 'bad'}">${esc(c.status)}</span>`], ['At', c => esc(c.at)]
+  ], s.checks, 'No checks yet.')}</div>`;
+}
 async function load() {
   try {
     outages();
-    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi })[tab]();
+    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi, NHIF: nhif })[tab]();
     $('#main').innerHTML = html;
   } catch (e) { console.error(e); }
 }
-renderTabs(); load(); setInterval(() => { if (tab === 'GePG' || tab === 'NIDA') load(); }, 4000);
+renderTabs(); load(); setInterval(() => { if (tab === 'GePG' || tab === 'NIDA' || tab === 'NHIF') load(); }, 4000);
 </script>
 </body>
 </html>

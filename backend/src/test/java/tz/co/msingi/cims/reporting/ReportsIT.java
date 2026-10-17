@@ -74,7 +74,7 @@ class ReportsIT {
     @Test
     void theCatalogueFollowsRolesAndKeepsNamedListsFromManagementViewers() throws Exception {
         List<String> all = codes(admin);
-        assertThat(all).contains("ADM-01", "ADM-08", "REG-02", "FIN-04", "GOV-01", "GOV-02", "TCH-01", "EXM-04", "GRD-01", "GRD-02", "HST-01", "HST-02", "IPT-01", "IPT-02").hasSize(35);
+        assertThat(all).contains("ADM-01", "ADM-08", "REG-02", "FIN-04", "GOV-01", "GOV-02", "TCH-01", "EXM-04", "GRD-01", "GRD-02", "HST-01", "HST-02", "IPT-01", "IPT-02", "REG-08", "REG-09").hasSize(37);
         assertThat(codes(viewer)).contains("ADM-01", "REG-01", "FIN-01", "FIN-06").doesNotContain("ADM-07", "ADM-08", "REG-02", "FIN-04", "FIN-05", "GOV-01");
         assertThat(codes(accountant)).allMatch(c -> c.startsWith("FIN-") || c.startsWith("HST-"));
         assertThat(codes(registrar)).allMatch(c -> c.startsWith("ADM-") || c.startsWith("REG-") || c.startsWith("GRD-") || c.startsWith("HST-") || c.startsWith("IPT-"));

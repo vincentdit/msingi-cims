@@ -51,9 +51,21 @@ public final class SemesterRegistrationDtos {
      * What the student sees: the semester, whether they can register now (state), the modules of their curriculum for it,
      * the fee clearance and their registration if they have one.
      */
+    /** @param healthCoverMissing the institution requires health insurance (NHIF) and the student is not covered for the semester's year */
     public record StudentRegistration(SemesterInfo semester, String state, String message, short yearOfStudy, String curriculum,
                                       List<ModuleOption> core, List<ModuleOption> electives, int minElectives, int maxElectives,
-                                      Clearance clearance, RegistrationView registration, List<RegistrationView> history) {
+                                      Clearance clearance, RegistrationView registration, List<RegistrationView> history, boolean healthCoverMissing) {
+
+        public StudentRegistration(SemesterInfo semester, String state, String message, short yearOfStudy, String curriculum,
+                                   List<ModuleOption> core, List<ModuleOption> electives, int minElectives, int maxElectives,
+                                   Clearance clearance, RegistrationView registration, List<RegistrationView> history) {
+            this(semester, state, message, yearOfStudy, curriculum, core, electives, minElectives, maxElectives, clearance, registration, history, false);
+        }
+
+        StudentRegistration withHealthCoverMissing(boolean missing) {
+            return new StudentRegistration(semester, state, message, yearOfStudy, curriculum, core, electives, minElectives, maxElectives, clearance,
+                    registration, history, missing);
+        }
     }
 
     public record SemesterSummary(Long semesterId, String semesterName, String window, long currentStudents, long notRegistered,

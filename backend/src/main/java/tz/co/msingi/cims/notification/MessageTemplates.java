@@ -41,7 +41,8 @@ public final class MessageTemplates {
                 Map.entry("outcome", "your grade is now B"), Map.entry("kind", "Waiver"), Map.entry("status", "Fixed"),
                 Map.entry("sponsor", "Higher Education Students' Loans Board"),
                 Map.entry("channels", "M-Pesa 555123, CRDB Bank 0150123456700"), Map.entry("instalment", "2"),
-                Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"));
+                Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"),
+                Map.entry("cardNo", "SN104526781"), Map.entry("validTo", "30 June 2028"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -169,6 +170,14 @@ public final class MessageTemplates {
                 List.of("semester", "reason", "institution"), Set.of("reason"),
                 "Your registration for {semester} needs correcting: {reason}. Update it on the student portal.",
                 "Usajili wako wa {semester} unahitaji marekebisho: {reason}. Urekebishe kwenye tovuti ya mwanafunzi.", s);
+        add("NHIF_CARD_ISSUED", "NHIF card issued", "NHIF registers a student sent by the institution under the student package", "Registry",
+                List.of("cardNo", "validTo", "institution"), Set.of("cardNo"),
+                "{institution}: NHIF has registered you for health insurance. Your NHIF card number is {cardNo}, valid until {validTo}.",
+                "{institution}: NHIF imekusajili kwa bima ya afya. Namba ya kadi yako ya NHIF ni {cardNo}, inatumika hadi {validTo}.", s);
+        add("NHIF_REGISTRATION_REJECTED", "NHIF registration not accepted", "NHIF does not register a student sent by the institution", "Registry",
+                List.of("reason", "institution"), Set.of(),
+                "{institution}: NHIF did not register you for health insurance: {reason}. See Health insurance on the student portal or contact Registry.",
+                "{institution}: NHIF haikukusajili kwa bima ya afya: {reason}. Angalia Bima ya afya kwenye tovuti ya mwanafunzi au wasiliana na Usajili.", s);
         add("RESULTS_PUBLISHED", "Results published", "The Examinations Officer publishes confirmed semester results", "Examinations",
                 List.of("semester", "gpa", "decision", "institution"), Set.of(),
                 "Your results for {semester} are out: GPA {gpa}, {decision}. See your grades on the student portal.",
