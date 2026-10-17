@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
@@ -19,13 +20,14 @@ import { setLanguage } from '../../i18n';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type {
-  AdmissionWindow, ApplicantRow, ApplicationDetail, ApplicationSummary, Department, EntryRules, Page, Programme, TokenResponse, WindowStats,
+  AdmissionWindow, ApplicantRow, ApplicationDetail, ApplicationSummary, Department, Page, Programme, TokenResponse, WindowProgramme, WindowStats,
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
 import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
 import JoiningInstructionsCard from './JoiningInstructionsCard';
+import ProgrammeOfferDialog from './ProgrammeOfferDialog';
 import { ApplicationDocumentsSection, WindowDocumentsCard } from './ApplicationDocuments';
 import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './QualificationChecks';
 import { CampusPicker, CampusesTab, DepartmentsTab, NamedListTab, useCampuses, useProgrammeCampuses } from './StructurePages';
@@ -533,17 +535,6 @@ export function WindowsPage() {
   );
 }
 
-function buildRules(f: { passes: string; subjects: string; minGrade: string; altFamily: string; altLevel: string; summary: string }): EntryRules {
-  const subjects = f.subjects.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const pathways: EntryRules['pathways'] = [];
-  const conditions = [];
-  if (Number(f.passes) > 0) conditions.push({ type: 'CSEE_MIN_PASSES' as const, count: Number(f.passes), minGrade: f.minGrade });
-  if (subjects.length) conditions.push({ type: 'CSEE_SUBJECT' as const, count: subjects.length, minGrade: f.minGrade, subjects });
-  if (conditions.length) pathways.push({ label: 'Form Four (CSEE)', conditions });
-  if (f.altFamily) pathways.push({ label: `${f.altFamily} Level ${f.altLevel} holders`, conditions: [{ type: 'PRIOR_AWARD', family: f.altFamily, minLevel: Number(f.altLevel) }] });
-  return { summary: f.summary, pathways };
-}
-
 const CONFIGURE_ROLES = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC'];
 const DOCUMENT_ROLES = ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER', 'DEPUTY_PRINCIPAL_ACADEMIC', 'REGISTRAR'];
 
@@ -558,16 +549,13 @@ export function WindowDetailPage() {
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const refresh = () => qc.invalidateQueries({ queryKey: ['staff'] });
   const [editing, setEditing] = useState(false);
-  const empty = { programmeId: '', capacity: '50', passes: '4', subjects: 'BASIC MATHEMATICS', minGrade: 'D', altFamily: '', altLevel: '3', summary: 'Four passes in CSEE including Basic Mathematics' };
-  const [form, setForm] = useState<typeof empty | null>(null);
-  const add = useMutation({
-    mutationFn: (f: typeof empty) => api(`/api/admission/windows/${id}/programmes`, { method: 'POST', realm: 'staff', body: { programmeId: Number(f.programmeId), capacity: Number(f.capacity), entryRules: buildRules(f) } }),
-    onSuccess: () => { setForm(null); refresh(); },
-  });
+  // null: closed; 'new': offering another programme; otherwise the programme being edited
+  const [offer, setOffer] = useState<WindowProgramme | 'new' | null>(null);
   if (w.isLoading) return <Loading />;
   const win = w.data;
   if (!win) return <ErrorAlert error={w.error} />;
   // the steps that work on applications are ready once the window has opened (applications can exist)
+  const canEdit = canConfigure && win.status !== 'CLOSED';
   const notOpenYet = win.state === 'DRAFT' || win.state === 'SCHEDULED' ? 'Ready once the window opens for applications.' : undefined;
   return (
     <Container maxWidth="lg" disableGutters>
@@ -579,15 +567,16 @@ export function WindowDetailPage() {
           <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/selection`} disabledReason={notOpenYet}>Selection</Button>
           <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/verification`} disabledReason={notOpenYet}>NACTVET &amp; offers</Button>
           <Button variant="outlined" component={StaffLink} to={`/staff/windows/${id}/handover`} disabledReason={notOpenYet}>Registration hand-over</Button>
-          {canConfigure && win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm(empty)}>Add programme</Button>}
+          {canConfigure && win.status !== 'CLOSED' && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOffer('new')}>Add programme</Button>}
         </Stack>} />
       <WindowLifecycle win={win} onEdit={() => setEditing(true)} />
       <Card><TableContainer>
         <Table size="small">
-          <TableHead><TableRow><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell align="right">Places</TableCell><TableCell>Minimum entry requirements</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell align="right">Places</TableCell><TableCell>Minimum entry requirements</TableCell>{canEdit && <TableCell />}</TableRow></TableHead>
           <TableBody>
             {win.programmes?.map((p) => (
-              <TableRow key={p.id}><TableCell>{p.programmeName}</TableCell><TableCell>{p.awardName}</TableCell><TableCell align="right">{p.capacity}</TableCell><TableCell>{p.requirementSummary}</TableCell></TableRow>
+              <TableRow key={p.id}><TableCell>{p.programmeName}</TableCell><TableCell>{p.awardName}</TableCell><TableCell align="right">{p.capacity}</TableCell><TableCell>{p.requirementSummary}</TableCell>
+                {canEdit && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}><Button size="small" startIcon={<EditIcon />} onClick={() => setOffer(p)}>Edit</Button></TableCell>}</TableRow>
             ))}
           </TableBody>
         </Table>
@@ -596,36 +585,8 @@ export function WindowDetailPage() {
       <JoiningInstructionsCard win={win} canEdit={canConfigure} />
       <WindowHistoryCard windowId={win.id} />
       {editing && <WindowFormDialog win={win} onClose={() => setEditing(false)} onSaved={(x) => { setEditing(false); qc.setQueryData(['staff', 'window', id], x); refresh(); }} />}
-      <Dialog open={!!form} onClose={() => setForm(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Offer a programme</DialogTitle>
-        {form && (
-          <DialogContent>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField select label="Programme" value={form.programmeId} onChange={(e) => setForm({ ...form, programmeId: e.target.value })}>
-                {programmes.data?.filter((p) => !win.programmes?.some((wp) => wp.programmeId === p.id)).map((p) => <MenuItem key={p.id} value={String(p.id)}>{p.name}</MenuItem>)}
-              </TextField>
-              <TextField label="Places (capacity)" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
-              <Typography variant="subtitle2">NACTVET minimum entry requirements</Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField label="CSEE passes (0 = none)" value={form.passes} onChange={(e) => setForm({ ...form, passes: e.target.value })} />
-                <TextField select label="Minimum grade" value={form.minGrade} onChange={(e) => setForm({ ...form, minGrade: e.target.value })}>
-                  {['A', 'B', 'C', 'D'].map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-                </TextField>
-              </Stack>
-              <TextField label="Required subjects (comma separated)" value={form.subjects} onChange={(e) => setForm({ ...form, subjects: e.target.value })} helperText="e.g. BASIC MATHEMATICS, PHYSICS" />
-              <Stack direction="row" spacing={2}>
-                <TextField select label="Alternative: prior award" value={form.altFamily} onChange={(e) => setForm({ ...form, altFamily: e.target.value })}>
-                  <MenuItem value="">None</MenuItem><MenuItem value="NVA">NVA</MenuItem><MenuItem value="NTA">NTA</MenuItem>
-                </TextField>
-                <TextField label="Minimum level" value={form.altLevel} onChange={(e) => setForm({ ...form, altLevel: e.target.value })} disabled={!form.altFamily} />
-              </Stack>
-              <TextField label="Summary shown to applicants" value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} multiline />
-              <ErrorAlert error={add.error} />
-            </Stack>
-          </DialogContent>
-        )}
-        <DialogActions><Button onClick={() => setForm(null)}>Cancel</Button><Button variant="contained" onClick={() => form && add.mutate(form)} disabled={add.isPending}>Add</Button></DialogActions>
-      </Dialog>
+      {offer && <ProgrammeOfferDialog win={win} offer={offer === 'new' ? null : offer} programmes={programmes.data ?? []}
+        onClose={() => setOffer(null)} onSaved={() => { setOffer(null); refresh(); }} />}
     </Container>
   );
 }

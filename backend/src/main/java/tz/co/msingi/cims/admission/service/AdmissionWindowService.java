@@ -157,9 +157,12 @@ public class AdmissionWindowService {
                 .orElseThrow(() -> new NotFoundException("Window programme", windowProgrammeId));
         checkCapacity(wp.getProgramme(), req.capacity());
         validateRules(req.entryRules());
+        String before = wp.getEntryRules() == null ? "" : wp.getEntryRules().summary();
+        int placesBefore = wp.getCapacity();
         wp.setCapacity(req.capacity());
         wp.setEntryRules(req.entryRules());
-        audit.record("UPDATE_PROGRAMME", "AdmissionWindow", windowId, Map.of("programme", wp.getProgramme().getCode(), "capacity", req.capacity()));
+        audit.record("UPDATE_PROGRAMME", "AdmissionWindow", windowId, Map.of("programme", wp.getProgramme().getCode(),
+                "capacity", req.capacity(), "capacityBefore", placesBefore, "requirements", req.entryRules().summary(), "requirementsBefore", before == null ? "" : before));
         return WindowProgrammeView.of(wp);
     }
 
@@ -335,6 +338,9 @@ public class AdmissionWindowService {
     }
 
     private static void validateRules(EntryRules rules) {
+        if (rules.summary() == null || rules.summary().isBlank()) {
+            throw new BusinessRuleException("INVALID_RULE", "Write the summary of the entry requirements shown to applicants");
+        }
         for (EntryRules.Pathway p : rules.pathways()) {
             for (EntryRules.Condition c : p.conditions()) {
                 if (c.type() == null) {

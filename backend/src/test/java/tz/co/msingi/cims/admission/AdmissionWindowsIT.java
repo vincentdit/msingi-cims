@@ -187,4 +187,26 @@ class AdmissionWindowsIT {
         s.call(post("/api/admission/windows/" + inst.windowId() + "/reopen"), admissions, "{\"closesAt\":\"" + now.plusDays(7) + "\",\"reason\":\"Late applicants\"}")
                 .andExpect(jsonPath("$.code").value("SELECTION_STARTED"));
     }
+
+    @Test
+    void entryRequirementsAndPlacesCanBeChangedUntilTheWindowCloses() throws Exception {
+        OffsetDateTime now = OffsetDateTime.now();
+        long id = newWindow("Requirements window", now.plusDays(1), now.plusDays(20));
+        long wp = s.body(s.call(get("/api/admission/windows/" + id), admissions, null)).get("programmes").get(0).get("id").asLong();
+        String rules = "{\"programmeId\":" + inst.programmeId() + ",\"capacity\":60,\"entryRules\":{\"summary\":\"Four CSEE passes including Physics, or NVA Level 3\","
+                + "\"pathways\":[{\"label\":\"CSEE\",\"conditions\":[{\"type\":\"CSEE_MIN_PASSES\",\"count\":4,\"minGrade\":\"D\"},"
+                + "{\"type\":\"CSEE_SUBJECT\",\"count\":1,\"minGrade\":\"D\",\"subjects\":[\"PHYSICS\"]}]},"
+                + "{\"label\":\"NVA holders\",\"conditions\":[{\"type\":\"PRIOR_AWARD\",\"family\":\"NVA\",\"minLevel\":3}]}]}}";
+        s.call(put("/api/admission/windows/" + id + "/programmes/" + wp), admissions, rules).andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(60))
+                .andExpect(jsonPath("$.requirementSummary").value("Four CSEE passes including Physics, or NVA Level 3"))
+                .andExpect(jsonPath("$.entryRules.pathways.length()").value(2));
+        // the summary applicants read cannot be left empty, and subject conditions need subjects
+        s.call(put("/api/admission/windows/" + id + "/programmes/" + wp), admissions, rules.replace("Four CSEE passes including Physics, or NVA Level 3", " "))
+                .andExpect(jsonPath("$.code").value("INVALID_RULE"));
+        s.call(put("/api/admission/windows/" + id + "/programmes/" + wp), admissions, rules.replace("[\"PHYSICS\"]", "[]"))
+                .andExpect(jsonPath("$.code").value("INVALID_RULE"));
+        // only the admissions office changes them
+        s.call(put("/api/admission/windows/" + id + "/programmes/" + wp), viewer, rules).andExpect(status().isForbidden());
+    }
 }
