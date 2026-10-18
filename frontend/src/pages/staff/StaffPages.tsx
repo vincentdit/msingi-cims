@@ -33,6 +33,7 @@ import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './Qualificati
 import { CampusPicker, CampusesTab, DepartmentsTab, NamedListTab, useCampuses, useProgrammeCampuses } from './StructurePages';
 import { WindowFormDialog, WindowHistoryCard, WindowLifecycle, WindowStateChip, useWindowRoles } from './WindowAdmin';
 import { StaffLink } from '../../components/StaffLink';
+import { PasswordField } from '../../components/PasswordFields';
 
 const staff = { realm: 'staff' as const };
 
@@ -82,7 +83,7 @@ export function StaffLoginPage() {
             <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
               <Stack spacing={2} sx={{ mt: 3 }}>
                 <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
-                <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+                <PasswordField label="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
                 <ErrorAlert error={m.error} />
                 <Button type="submit" variant="contained" size="large" disabled={m.isPending}>Sign in</Button>
                 <Button component={StaffLink} to="/">Back to admission portal</Button>

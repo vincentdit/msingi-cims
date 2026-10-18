@@ -35,7 +35,7 @@ test('the back-office switches to Kiswahili at once and back', async ({ page }) 
 
 test('the staff sign-in page offers Kiswahili', async ({ page }) => {
   await page.goto('/staff/login');
-  await page.getByRole('button', { name: 'SW' }).click();
+  await page.getByRole('button', { name: 'SW', exact: true }).click();
   await expect(page.getByLabel('Jina la mtumiaji')).toBeVisible();
 });
 

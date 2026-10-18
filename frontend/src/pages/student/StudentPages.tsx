@@ -30,6 +30,7 @@ import PrivacyCard from '../../components/PrivacyCard';
 import AlumniCard from '../../components/AlumniCard';
 import NinCard from '../../components/NinCard';
 import HealthCoverCard from '../../components/HealthCoverCard';
+import { PasswordField } from '../../components/PasswordFields';
 
 const student = { realm: 'student' as const };
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
@@ -64,7 +65,7 @@ export function StudentLoginPage() {
               <Stack spacing={2}>
                 <Typography variant="body2" color="text.secondary">{t('student.signInHint')}</Typography>
                 <TextField label={t('student.login')} value={login} onChange={(e) => setLogin(e.target.value)} required autoComplete="username" />
-                <TextField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="current-password" />
+                <PasswordField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                 <ErrorAlert error={m.error} />
                 <Button type="submit" variant="contained" size="large" disabled={m.isPending}>{t('auth.signIn')}</Button>
                 <Link component={RouterLink} to="/forgot-password" sx={{ alignSelf: 'center' }}>{t('auth.forgot')}</Link>

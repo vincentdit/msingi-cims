@@ -2,7 +2,7 @@ import CheckIcon from '@mui/icons-material/CheckCircle';
 import CircleIcon from '@mui/icons-material/RadioButtonUnchecked';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { Box, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Box, IconButton, InputAdornment, Stack, TextField, Typography, type TextFieldProps } from '@mui/material';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,23 @@ export const PASSWORD_RULES = [
 export const passwordOk = (v: string) => PASSWORD_RULES.every((r) => r.test(v));
 
 const METER = ['#D14343', '#E07A2E', '#E0A82E', '#8DB33A', '#2E8B57'];
+
+/** A password box with an eye button to show or hide what is typed (sign-in, current password). */
+export function PasswordField(props: Omit<TextFieldProps, 'type'>) {
+  const { t } = useTranslation();
+  const [show, setShow] = useState(false);
+  return (
+    <TextField {...props} type={show ? 'text' : 'password'}
+      slotProps={{ ...props.slotProps, input: { endAdornment: (
+        <InputAdornment position="end">
+          <IconButton size="small" onClick={() => setShow(!show)} onMouseDown={(e) => e.preventDefault()}
+            aria-label={show ? t('auth.hidePassword') : t('auth.showPassword')} aria-pressed={show} edge="end">
+            {show ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+          </IconButton>
+        </InputAdornment>
+      ) } }} />
+  );
+}
 
 function Secret({ label, value, onChange, error, helperText, autoFocus }: {
   label: string; value: string; onChange: (v: string) => void; error?: boolean; helperText?: React.ReactNode; autoFocus?: boolean;

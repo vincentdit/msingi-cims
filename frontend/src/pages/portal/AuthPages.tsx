@@ -8,7 +8,7 @@ import { api } from '../../api/client';
 import type { TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
-import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
+import { NewPasswordFields, PasswordField, passwordOk } from '../../components/PasswordFields';
 
 interface OtpSent {
   maskedPhone: string;
@@ -208,7 +208,7 @@ export function LoginPage() {
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Stack spacing={2}>
           <TextField label={t('auth.login')} value={login} onChange={(e) => setLogin(e.target.value)} required autoComplete="username" />
-          <TextField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="current-password" />
+          <PasswordField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           <ErrorAlert error={m.error} />
           <Button type="submit" variant="contained" size="large" disabled={m.isPending}>{t('auth.signIn')}</Button>
           <Stack direction="row" justifyContent="space-between">

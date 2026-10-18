@@ -5,10 +5,10 @@ test('the admission portal home works in English and Kiswahili', async ({ page }
   const errors = watchErrors(page);
   await page.goto('/');
   await expectPageWorks(page);
-  await expect(page.getByRole('button', { name: 'SW' })).toBeVisible();
-  await page.getByRole('button', { name: 'SW' }).click();
+  await expect(page.getByRole('button', { name: 'SW', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'SW', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'sw');
-  await page.getByRole('button', { name: 'EN' }).click();
+  await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   expect(errors).toEqual([]);
 });
