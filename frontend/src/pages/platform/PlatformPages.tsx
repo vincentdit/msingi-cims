@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
@@ -30,7 +30,9 @@ export function OverviewPage() {
       {failing.length > 0 && (
         <Alert severity={failing.some((h) => h.status === 'DOWN') ? 'error' : 'warning'} sx={{ mb: 2.5 }}
           action={<Button color="inherit" component={RouterLink} to="/platform/integrations">Details</Button>}>
-          {failing.map((h) => `${h.label}: ${h.status === 'DOWN' ? 'failing' : `${h.failures} of ${h.calls} calls failed`}`).join(' · ')} (last 24 hours)
+          {failing.map((h, i) => (
+            <Fragment key={h.system}>{i > 0 && ' · '}{h.label}: {h.status === 'DOWN' ? 'failing' : `${h.failures} of ${h.calls} calls failed`}</Fragment>
+          ))} (last 24 hours)
         </Alert>
       )}
       <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
@@ -88,7 +90,7 @@ function AttentionRow({ r }: { r: InstitutionRow }) {
       sx={{ py: 1, borderTop: 1, borderColor: 'divider', color: 'inherit', textDecoration: 'none', '&:hover': { bgcolor: 'action.hover' } }}>
       <Box sx={{ minWidth: 0 }}>
         <Typography fontWeight={600}>{r.name} <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 400, color: 'text.secondary' }}>· {r.code}</Box></Typography>
-        <Typography variant="body2" color="text.secondary">{reasons.join(' · ')}</Typography>
+        <Typography variant="body2" color="text.secondary">{reasons.map((x, i) => <Fragment key={i}>{i > 0 && ' · '}{x}</Fragment>)}</Typography>
       </Box>
       <StatusChip status={r.status} />
     </Stack>

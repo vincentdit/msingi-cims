@@ -367,6 +367,16 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Sees:** only their sponsor (they land on its page): the sponsored students with each share, what was invoiced, paid and outstanding, the sponsor's invoices and control numbers, and the Excel statement. They can get a GePG control number for an invoice, but cannot change sponsorships or record payments.
 - **Next:** none planned.
 
+## Helpdesk across the roles
+
+- **Applicants and people without an account:** **Help** on the admission portal (and *Stuck? Ask the institution for help* under the sign-in forms): answers to common questions, then a request. Without an account a request is made with a name and mobile number and followed with its number and the code sent by SMS.
+- **Students:** the **?** button in the student portal: the same answers and requests, in the students' categories (fees, registration, results, hostel…).
+- **Every member of staff:** **Help › Ask for help**, for example to the ICT office.
+- **Offices that answer** (Admissions, Registrar, Bursar, Accountant, Examinations, Hostel Warden, IPT, Clearance, Sponsor Officer, Deputy Principal (Academic), and the Institution Administrator for sign-in and ICT): **Help › Helpdesk** shows the requests of their categories; they reply, add notes only staff see, take or assign requests, move them to another office, mark them waiting or resolved, keep the answers of their categories, and see performance.
+- **Institution Administrator:** sees every request, keeps the categories (office, who may choose them, targets) and general answers, and raises tickets to Msingi or sends a request on to Msingi (**Msingi support** tab). Overdue requests are escalated to the administrators.
+- **Auditor and Principal / Management:** read every request and the performance, change nothing.
+- **Platform Administrator (Msingi):** **Support** in the platform console: tickets from every institution, with priority-based targets, notes the institution does not see, assignment and escalation.
+
 ## Suggested order for the next slices
 
 Every role is now Done. Next: a review across roles (permissions matrix, mobile layouts, Swahili wording), then the integrations waiting on NACTVET (results template and API, NVA award template).

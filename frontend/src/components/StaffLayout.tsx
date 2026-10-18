@@ -1,3 +1,5 @@
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import HelpIcon from '@mui/icons-material/HelpOutline';
 import AssignmentIcon from '@mui/icons-material/AssignmentInd';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CampaignIcon from '@mui/icons-material/Campaign';
@@ -117,6 +119,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'notices', to: '/staff/notices', label: 'Notices', icon: <CampaignIcon /> },
     { page: 'messages', to: '/staff/messages', label: 'Messages', icon: <SmsIcon /> },
   ] },
+  { title: 'Help', items: [
+    { page: 'helpdesk', to: '/staff/helpdesk', label: 'Helpdesk', icon: <SupportAgentIcon /> },
+    { page: 'help', to: '/staff/help', label: 'Ask for help', icon: <HelpIcon /> },
+  ] },
   { title: 'Administration', items: [
     { page: 'users', to: '/staff/users', label: 'Users & roles', icon: <UsersIcon /> },
     { page: 'audit', to: '/staff/audit', label: 'Audit trail', icon: <AuditIcon /> },
@@ -169,6 +175,10 @@ export default function StaffLayout() {
   // how many decisions wait for this person, shown on the Approvals menu item
   const waiting = useQuery({ queryKey: ['staff', 'approvals', 'count'], enabled: can(roles, 'approvals') && !me?.mustChangePassword,
     refetchInterval: 60_000, queryFn: () => api<{ actionable: number }>('/api/approvals/count', { realm: 'staff' }) }).data?.actionable ?? 0;
+  // requests waiting in the person's offices (not yet assigned, or assigned to them), on the Helpdesk menu item
+  const helpdesk = useQuery({ queryKey: ['helpdesk', 'counts'], enabled: can(roles, 'helpdesk') && !me?.mustChangePassword,
+    refetchInterval: 60_000, queryFn: () => api<{ mine: number; unassigned: number }>('/api/helpdesk/counts', { realm: 'staff' }) }).data;
+  const helpdeskWaiting = (helpdesk?.mine ?? 0) + (helpdesk?.unassigned ?? 0);
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
   const idleOut = useCallback(() => { signOut('staff'); navigate('/staff/login?idle=1'); }, [signOut, navigate]);
   const onPassword = location.pathname.startsWith('/staff/password');
@@ -204,6 +214,7 @@ export default function StaffLayout() {
                   <ListItemIcon>{n.icon}</ListItemIcon>
                   <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 15 }} />
                   {n.page === 'approvals' && waiting > 0 && <Badge badgeContent={waiting} color="warning" sx={{ mr: 1.5 }} aria-label={`${waiting} waiting`} />}
+                  {n.page === 'helpdesk' && helpdeskWaiting > 0 && <Badge badgeContent={helpdeskWaiting} color="warning" sx={{ mr: 1.5 }} aria-label={`${helpdeskWaiting} waiting`} />}
                 </ListItemButton>
               ))}
             </Box>

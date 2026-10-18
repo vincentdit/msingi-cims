@@ -1,4 +1,5 @@
-import { AppBar, Avatar, Box, Button, Container, Stack, ToggleButton, ToggleButtonGroup, Toolbar, Typography } from '@mui/material';
+import HelpIcon from '@mui/icons-material/HelpOutline';
+import { AppBar, Avatar, Box, Button, Container, IconButton, Stack, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/session';
@@ -44,6 +45,10 @@ export default function PortalLayout() {
             <ToggleButton value="en" sx={{ px: 1, py: 0.25 }}>EN</ToggleButton>
             <ToggleButton value="sw" sx={{ px: 1, py: 0.25 }}>SW</ToggleButton>
           </ToggleButtonGroup>
+          <Tooltip title={t('nav.help')}>
+            <IconButton component={RouterLink} to="/help" aria-label={t('nav.help')} sx={{ display: { xs: 'inline-flex', sm: 'none' } }}><HelpIcon /></IconButton>
+          </Tooltip>
+          <Button component={RouterLink} to="/help" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>{t('nav.help')}</Button>
           {applicant ? (
             <>
               <Button component={RouterLink} to="/application" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>{t('nav.myApplication')}</Button>

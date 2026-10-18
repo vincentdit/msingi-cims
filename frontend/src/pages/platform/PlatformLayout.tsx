@@ -7,13 +7,16 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import PeopleIcon from '@mui/icons-material/SupervisorAccount';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import {
-  AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
+  AppBar, Badge, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
 import { useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { MSINGI_ACCENT } from '../../components/InstitutionContext';
-import { usePlatformSession } from './shared';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../api/client';
+import { platform, usePlatformSession } from './shared';
 
 const WIDTH = 248;
 const BG = '#0B2B2A';
@@ -22,6 +25,7 @@ const NAV = [
   { to: '/platform', label: 'Overview', icon: <DashboardIcon />, end: true },
   { to: '/platform/institutions', label: 'Institutions', icon: <ApartmentIcon /> },
   { to: '/platform/nactvet', label: 'NACTVET catalogue', icon: <AccountBalanceIcon /> },
+  { to: '/platform/support', label: 'Support', icon: <SupportAgentIcon /> },
   { to: '/platform/integrations', label: 'Integration health', icon: <MonitorHeartIcon /> },
   { to: '/platform/users', label: 'Platform users', icon: <PeopleIcon /> },
   { to: '/platform/audit', label: 'Audit trail', icon: <HistoryIcon /> },
@@ -33,6 +37,10 @@ export default function PlatformLayout() {
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [open, setOpen] = useState(false);
   const { me, signOut } = usePlatformSession();
+  // support tickets waiting for Msingi (not yet assigned, or assigned to this person)
+  const counts = useQuery({ queryKey: ['platform', 'support', 'counts'], enabled: !!me && !me.mustChangePassword, refetchInterval: 60_000,
+    queryFn: () => api<{ mine: number; unassigned: number }>('/api/platform/support/counts', platform) }).data;
+  const waiting = (counts?.mine ?? 0) + (counts?.unassigned ?? 0);
   const navigate = useNavigate();
   const location = useLocation();
   const onPassword = location.pathname.startsWith('/platform/password');
@@ -61,6 +69,7 @@ export default function PlatformLayout() {
             }}>
             <ListItemIcon>{n.icon}</ListItemIcon>
             <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 15 }} />
+            {n.to === '/platform/support' && waiting > 0 && <Badge badgeContent={waiting} color="warning" sx={{ mr: 1.5 }} aria-label={`${waiting} waiting`} />}
           </ListItemButton>
         ))}
       </List>

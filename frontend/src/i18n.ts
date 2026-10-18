@@ -4,7 +4,7 @@ import { initReactI18next } from 'react-i18next';
 
 // English and Kiswahili (BR-40). Keys are grouped by screen.
 const en = {
-  nav: { apply: 'Apply', signIn: 'Sign in', signOut: 'Sign out', myApplication: 'My application', staff: 'Staff' },
+  nav: { apply: 'Apply', signIn: 'Sign in', signOut: 'Sign out', myApplication: 'My application', staff: 'Staff', help: 'Help' },
   home: {
     heroTitle: 'Apply online for {{year}}',
     heroText: 'Certificate and diploma programmes accredited by NACTVET. Apply from your phone in about 20 minutes.',
@@ -42,6 +42,7 @@ const en = {
     pwRule_length: 'At least 10 characters', pwRule_upper: 'One uppercase letter (A-Z)', pwRule_lower: 'One lowercase letter (a-z)',
     pwRule_digit: 'One digit (0-9)', pwRule_special: 'One special character (!@#$…)', showPassword: 'Show password', hidePassword: 'Hide password',
     privacy: 'I have read the privacy notice and agree that my data is used to process my application.',
+    needHelp: 'Stuck? Ask the institution for help',
     privacyBefore: 'I have read the ', privacyLink: 'privacy notice', privacyAfter: ' and agree that my data is used to process my application.',
     create: 'Create account', haveAccount: 'Already have an account? Sign in',
     verifyTitle: 'Verify your phone', verifyText: 'Enter the code we sent by SMS to {{phone}}.',
@@ -142,7 +143,7 @@ const en = {
   student: {
     portal: 'Student portal', signInTitle: 'Student sign-in', signInHint: 'Use your registration number (or mobile number) and the password you created when you applied.',
     login: 'Registration number or mobile number', notStudentYet: 'Still an applicant?', toAdmission: 'Go to the admission portal',
-    navHome: 'Home', navRegister: 'Register', navTimetable: 'Timetable', navResults: 'Results', navFees: 'Fees', navNotices: 'Notices', navProfile: 'Profile',
+    navHelp: 'Help', navHome: 'Home', navRegister: 'Register', navTimetable: 'Timetable', navResults: 'Results', navFees: 'Fees', navNotices: 'Notices', navProfile: 'Profile',
     hello: 'Hello, {{name}}', year: 'Year {{n}}', regNo: 'Registration number',
     statusADMITTED: 'Admitted — report for registration', statusACTIVE: 'Registered', statusOther: 'Status: {{status}}',
     reportHint: 'Bring your original documents to Registry to complete your first registration.',
@@ -428,7 +429,7 @@ const en = {
 };
 
 const sw: typeof en = {
-  nav: { apply: 'Omba', signIn: 'Ingia', signOut: 'Toka', myApplication: 'Maombi yangu', staff: 'Watumishi' },
+  nav: { apply: 'Omba', signIn: 'Ingia', signOut: 'Toka', myApplication: 'Maombi yangu', staff: 'Watumishi', help: 'Msaada' },
   home: {
     heroTitle: 'Omba mtandaoni kwa {{year}}',
     heroText: 'Programu za astashahada na stashahada zilizoidhinishwa na NACTVET. Omba kwa simu yako kwa takriban dakika 20.',
@@ -466,6 +467,7 @@ const sw: typeof en = {
     pwRule_length: 'Angalau herufi 10', pwRule_upper: 'Herufi kubwa moja (A-Z)', pwRule_lower: 'Herufi ndogo moja (a-z)',
     pwRule_digit: 'Tarakimu moja (0-9)', pwRule_special: 'Alama maalum moja (!@#$…)', showPassword: 'Onyesha nenosiri', hidePassword: 'Ficha nenosiri',
     privacy: 'Nimesoma taarifa ya faragha na nakubali taarifa zangu zitumike kushughulikia maombi yangu.',
+    needHelp: 'Umekwama? Omba msaada kutoka chuoni',
     privacyBefore: 'Nimesoma ', privacyLink: 'taarifa ya faragha', privacyAfter: ' na nakubali taarifa zangu zitumike kushughulikia maombi yangu.',
     create: 'Fungua akaunti', haveAccount: 'Una akaunti tayari? Ingia',
     verifyTitle: 'Thibitisha simu yako', verifyText: 'Weka namba tuliyotuma kwa SMS kwenda {{phone}}.',
@@ -566,7 +568,7 @@ const sw: typeof en = {
   student: {
     portal: 'Tovuti ya mwanafunzi', signInTitle: 'Kuingia kwa mwanafunzi', signInHint: 'Tumia namba yako ya usajili (au namba ya simu) na nenosiri ulilotengeneza ulipoomba.',
     login: 'Namba ya usajili au namba ya simu', notStudentYet: 'Bado ni mwombaji?', toAdmission: 'Nenda kwenye tovuti ya udahili',
-    navHome: 'Mwanzo', navRegister: 'Sajili', navTimetable: 'Ratiba', navResults: 'Matokeo', navFees: 'Ada', navNotices: 'Matangazo', navProfile: 'Wasifu',
+    navHelp: 'Msaada', navHome: 'Mwanzo', navRegister: 'Sajili', navTimetable: 'Ratiba', navResults: 'Matokeo', navFees: 'Ada', navNotices: 'Matangazo', navProfile: 'Wasifu',
     hello: 'Habari, {{name}}', year: 'Mwaka wa {{n}}', regNo: 'Namba ya usajili',
     statusADMITTED: 'Umedahiliwa — ripoti kwa usajili', statusACTIVE: 'Umesajiliwa', statusOther: 'Hali: {{status}}',
     reportHint: 'Leta vyeti vyako halisi Ofisi ya Usajili ili kukamilisha usajili wako wa kwanza.',

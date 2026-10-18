@@ -17,6 +17,7 @@ interface OtpSent {
 }
 
 function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
       <Card sx={{ borderRadius: 3 }}>
@@ -26,6 +27,9 @@ function AuthCard({ title, subtitle, children }: { title: string; subtitle?: Rea
           <Box sx={{ mt: 3 }}>{children}</Box>
         </CardContent>
       </Card>
+      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 2 }}>
+        <Link component={RouterLink} to="/help">{t('auth.needHelp')}</Link>
+      </Typography>
     </Container>
   );
 }

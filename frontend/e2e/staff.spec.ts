@@ -4,10 +4,11 @@ import { expectPageWorks, STAFF_PASSWORD, staffSignIn, watchErrors } from './hel
 const PAGES: Record<string, string[]> = {
   admin: ['/staff', '/staff/approvals', '/staff/reports', '/staff/applications', '/staff/students', '/staff/users',
     '/staff/audit', '/staff/security', '/staff/integrations', '/staff/imports', '/staff/letters', '/staff/institution', '/staff/timetable',
-    '/staff/exam-timetable', '/staff/health-insurance'],
-  bursar: ['/staff/finance-overview', '/staff/finance', '/staff/sponsors', '/staff/waivers', '/staff/health-insurance'],
+    '/staff/exam-timetable', '/staff/health-insurance', '/staff/helpdesk', '/staff/helpdesk?tab=performance', '/staff/helpdesk?tab=answers',
+    '/staff/helpdesk?tab=categories', '/staff/helpdesk?tab=msingi', '/staff/help'],
+  bursar: ['/staff/finance-overview', '/staff/finance', '/staff/sponsors', '/staff/waivers', '/staff/health-insurance', '/staff/helpdesk'],
   exams: ['/staff/exams-office', '/staff/exam-timetable', '/staff/marks', '/staff/results', '/staff/eligibility', '/staff/regulations'],
-  lecturer: ['/staff/my-teaching', '/staff/teaching', '/staff/timetable'],
+  lecturer: ['/staff/my-teaching', '/staff/teaching', '/staff/timetable', '/staff/help'],
 };
 
 for (const [user, pages] of Object.entries(PAGES)) {

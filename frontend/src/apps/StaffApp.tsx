@@ -1,4 +1,5 @@
 /** The staff part of CIMS, loaded only when someone opens it (keeps the admission portal small on phones). */
+import { HelpdeskPage, HelpdeskTicketPage, StaffHelpPage } from '../pages/staff/HelpdeskPages';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from '../auth/session';
 import StaffLayout from '../components/StaffLayout';
@@ -64,6 +65,9 @@ export default function StaffApp() {
         <Route path="transfers" element={<TransfersPage />} />
         <Route path="semester-registrations" element={<SemesterRegistrationsPage />} />
         <Route path="health-insurance" element={<HealthInsurancePage />} />
+        <Route path="helpdesk" element={<HelpdeskPage />} />
+        <Route path="helpdesk/:id" element={<HelpdeskTicketPage />} />
+        <Route path="help" element={<StaffHelpPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="marks" element={<MarksPage />} />
         <Route path="marks/:id" element={<OfferingPage />} />

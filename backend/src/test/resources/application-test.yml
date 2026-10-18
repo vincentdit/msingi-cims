@@ -36,6 +36,10 @@ cims:
     retry-cron: "-"
   reports:
     schedule-cron: "-"
+  helpdesk:
+    sla-cron: "-"               # tests call the job directly
+    public-requests-per-hour: 1000
+    public-lookups-per-minute: 1000
   finance:
     reminder-cron: "-"
   privacy:
