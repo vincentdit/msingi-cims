@@ -66,6 +66,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final TransactionTemplate tx;
     private final PaymentChannelRepository paymentChannels;
     private final CampusService campusService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -76,6 +77,7 @@ public class DemoDataSeeder implements ApplicationRunner {
             TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedPaymentChannels()));
         }
         TenantContext.runAs(tenant.toInfo(), () -> tx.executeWithoutResult(s -> seedCampuses()));
+        tx.executeWithoutResult(s -> seedMsingiBilling(tenant.getId()));
         log.info("Demo institution ready - staff: admin / Admin@2026, admissions / Admissions@2026, registry / Registry@2026, bursar / Bursar@2026, accountant / Accountant@2026, hod / Hod@2026, academic / Academic@2026, lecturer / Lecturer@2026, exams / Exams@2026, library / Library@2026, warden / Warden@2026, ipt / Ipt@2026, principal / Principal@2026, auditor / Auditor@2026, assessor / Assessor@2026, coordinator / Coordinator@2026 (header X-Tenant: DEMO)");
     }
 
@@ -100,6 +102,27 @@ public class DemoDataSeeder implements ApplicationRunner {
             }
         }
         return t;
+    }
+
+    /**
+     * Msingi billing for the demo college: Msingi's invoice details (made-up accounts) and a contract that started four months ago,
+     * so "Run billing now" in the platform console prepares the licence year and the usage quarters that have ended.
+     */
+    private void seedMsingiBilling(Long tenantId) {
+        Integer contracts = jdbc.queryForObject("select count(*) from billing_contracts where tenant_id = ?", Integer.class, tenantId);
+        if (contracts != null && contracts > 0) return;
+        jdbc.update("""
+                update platform_billing_settings set tin = coalesce(tin, '100-200-300'), address = coalesce(address, 'Plot 12, Area D, Dodoma'),
+                  phone = coalesce(phone, '+255 754 000 111'), email = coalesce(email, 'billing@msingi.co.tz'), website = coalesce(website, 'msingi.co.tz'),
+                  channels = case when channels = '[]'::jsonb then cast(? as jsonb) else channels end where id = 1""",
+                "[{\"provider\":\"CRDB\",\"accountName\":\"Msingi Technologies Ltd\",\"accountNumber\":\"0150999888700\",\"branch\":\"Dodoma\"},"
+                        + "{\"provider\":\"MPESA\",\"accountName\":\"MSINGI TECHNOLOGIES\",\"accountNumber\":\"888777\"}]");
+        java.time.LocalDate start = java.time.LocalDate.now(java.time.ZoneId.of("Africa/Dar_es_Salaam")).minusMonths(4).withDayOfMonth(1);
+        jdbc.update("""
+                insert into billing_contracts (tenant_id, reference, start_date, setup_fee, annual_fee, student_fee, application_fee, application_percent,
+                  usage_cycle, billing_contact_name, billing_email, created_by_name)
+                values (?, 'MSG/CIMS/2026/001', ?, 2500000, 6000000, 10000, 1000, 0, 'QUARTERLY', 'The Bursar', 'bursar@demo.ac.tz', 'Demo data')""",
+                tenantId, java.sql.Date.valueOf(start));
     }
 
     /** The demo college is private, so it is paid into its own accounts: two mobile money business numbers and two banks (made-up numbers). */

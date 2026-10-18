@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProgrammeTable } from './CataloguePages';
+import { BillingCard } from './BillingPages';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import {
@@ -386,6 +387,7 @@ export function InstitutionDetailPage() {
 
         <Grid size={{ xs: 12, md: 5 }}>
           <NactvetCard d={d} onDone={done} />
+          <BillingCard tenantId={d.id} name={d.name} />
           <Card sx={{ mb: 2.5 }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>

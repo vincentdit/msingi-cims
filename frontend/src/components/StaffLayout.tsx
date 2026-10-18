@@ -1,3 +1,4 @@
+import SubscriptionIcon from '@mui/icons-material/ReceiptLongOutlined';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import HelpIcon from '@mui/icons-material/HelpOutline';
 import AssignmentIcon from '@mui/icons-material/AssignmentInd';
@@ -131,6 +132,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'integrations', to: '/staff/integrations', label: 'Integrations', icon: <IntegrationIcon /> },
     { page: 'security', to: '/staff/security', label: 'Security & privacy', icon: <SecurityIcon /> },
     { page: 'institution', to: '/staff/institution', label: 'Institution', icon: <InstitutionIcon /> },
+    { page: 'subscription', to: '/staff/msingi-subscription', label: 'Msingi subscription', icon: <SubscriptionIcon /> },
   ] },
 ];
 

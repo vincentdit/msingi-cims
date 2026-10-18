@@ -113,7 +113,7 @@ public class ReceiptService {
     }
 
     /** "Tanzanian shillings one hundred twenty thousand only". */
-    static final class AmountInWords {
+    public static final class AmountInWords {
         private static final String[] ONES = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
                 "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"};
         private static final String[] TENS = {"", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
@@ -121,7 +121,7 @@ public class ReceiptService {
         private AmountInWords() {
         }
 
-        static String tzs(BigDecimal amount) {
+        public static String tzs(BigDecimal amount) {
             long shillings = amount.setScale(0, RoundingMode.DOWN).longValueExact();
             int cents = amount.subtract(BigDecimal.valueOf(shillings)).movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValue();
             String w = "Tanzanian shillings " + words(shillings);

@@ -213,6 +213,9 @@ cims:
     sla-cron: ${CIMS_HELPDESK_SLA_CRON:0 */10 * * * *}    # escalate tickets that missed a target, close resolved ones after 7 days; "-" disables
     public-requests-per-hour: 5          # requests from the public help page, per address
     public-lookups-per-minute: 20        # following a request with its number and code, per address
+  billing:                               # Msingi billing: what Msingi charges institutions for CIMS
+    cron: ${CIMS_BILLING_CRON:0 15 6 * * *}   # daily: prepare invoices that fell due, send reminders; "-" disables
+    callback-secret: ${CIMS_BILLING_CALLBACK_SECRET:change-me}   # HMAC secret shared with Msingi's payment collector
   payments:
     # testing period: the "Simulate payment" buttons pay fees even with live GePG or a live collector. Set CIMS_ALLOW_PAYMENT_SIMULATION=false before go-live.
     allow-simulation: ${CIMS_ALLOW_PAYMENT_SIMULATION:true}

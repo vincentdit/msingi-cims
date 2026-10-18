@@ -7,6 +7,7 @@ import { InstitutionDetailPage, InstitutionsPage, OnboardPage } from '../pages/p
 import { IntegrationsPage, OverviewPage, PlatformAuditPage, PlatformUsersPage } from '../pages/platform/PlatformPages';
 import { CataloguePage } from '../pages/platform/CataloguePages';
 import { SupportPage, SupportTicketPage } from '../pages/platform/SupportPages';
+import { BillingInvoicePage, BillingPage } from '../pages/platform/BillingPages';
 
 export default function PlatformApp() {
   return (
@@ -19,6 +20,8 @@ export default function PlatformApp() {
         <Route path="institutions/:id" element={<InstitutionDetailPage />} />
         <Route path="nactvet" element={<CataloguePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="billing" element={<BillingPage />} />
+        <Route path="billing/invoices/:id" element={<BillingInvoicePage />} />
         <Route path="support" element={<SupportPage />} />
         <Route path="support/:id" element={<SupportTicketPage />} />
         <Route path="users" element={<PlatformUsersPage />} />

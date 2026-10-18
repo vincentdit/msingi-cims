@@ -50,6 +50,7 @@ public class SecurityConfig {
             "/api/student-auth/**",
             "/api/integrations/gepg/**",
             "/api/integrations/collections/**",
+            "/api/integrations/msingi-billing/**",
             "/api/integrations/sms/**",
             "/actuator/health/**",
             "/v3/api-docs/**",
