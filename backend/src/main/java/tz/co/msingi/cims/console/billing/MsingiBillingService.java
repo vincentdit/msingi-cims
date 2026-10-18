@@ -81,10 +81,10 @@ public class MsingiBillingService {
     @Transactional(readOnly = true)
     public Settings settings() {
         return jdbc.queryForObject("""
-                select company_name, tin, vrn, address, phone, email, website, channels::text, invoice_note, updated_by_name, updated_at
+                select company_name, tin, vrn, address, phone, email, website, channels::text, invoice_note, updated_by_name, updated_at, logo is not null
                 from platform_billing_settings where id = 1""", (rs, i) -> new Settings(rs.getString(1), rs.getString(2), rs.getString(3),
                 rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), channels(rs.getString(8)), rs.getString(9), rs.getString(10),
-                rs.getObject(11, OffsetDateTime.class)));
+                rs.getObject(11, OffsetDateTime.class), rs.getBoolean(12)));
     }
 
     @Transactional
@@ -103,6 +103,48 @@ public class MsingiBillingService {
                 name, trim(s.tin()), trim(s.vrn()), trim(s.address()), trim(s.phone()), trim(s.email()), trim(s.website()), write(chans),
                 trim(s.invoiceNote()), CurrentUser.platformName());
         platformAudit.record("BILLING_SETTINGS_CHANGED", null, "BillingSettings", 1L, Map.of("channels", chans.size()));
+        return settings();
+    }
+
+    /** Msingi's logo on its documents: the one uploaded under Invoice details, or the built-in one. */
+    public record Logo(byte[] bytes, String contentType) {
+    }
+
+    private static final byte[] BUILT_IN_LOGO;
+
+    static {
+        try (var in = MsingiBillingService.class.getResourceAsStream("/branding/msingi-logo.png")) {
+            BUILT_IN_LOGO = in == null ? new byte[0] : in.readAllBytes();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Logo logo() {
+        return jdbc.query("select logo, logo_type from platform_billing_settings where id = 1 and logo is not null",
+                (rs, i) -> new Logo(rs.getBytes(1), rs.getString(2))).stream().findFirst().orElse(new Logo(BUILT_IN_LOGO, "image/png"));
+    }
+
+    /** Replaces Msingi's logo (PNG or JPEG up to 1 MB, at least 120 pixels wide); null bytes go back to the built-in logo. */
+    @Transactional
+    public Settings saveLogo(byte[] bytes) {
+        if (bytes == null) {
+            jdbc.update("update platform_billing_settings set logo = null, logo_type = null, updated_by_name = ?, updated_at = now() where id = 1", CurrentUser.platformName());
+        } else {
+            if (bytes.length > 1024 * 1024) throw new BusinessRuleException("LOGO_TOO_LARGE", "Use a logo of at most 1 MB.");
+            String type = bytes.length > 8 && (bytes[0] & 0xFF) == 0x89 && bytes[1] == 'P' ? "image/png"
+                    : bytes.length > 3 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8 ? "image/jpeg" : null;
+            if (type == null) throw new BusinessRuleException("LOGO_TYPE", "The logo must be a PNG or JPEG image.");
+            try {
+                var img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+                if (img == null || img.getWidth() < 120) throw new BusinessRuleException("LOGO_TOO_SMALL", "Use a logo at least 120 pixels wide so it prints sharply.");
+            } catch (java.io.IOException e) {
+                throw new BusinessRuleException("LOGO_TYPE", "The logo could not be read.");
+            }
+            jdbc.update("update platform_billing_settings set logo = ?, logo_type = ?, updated_by_name = ?, updated_at = now() where id = 1", bytes, type, CurrentUser.platformName());
+        }
+        platformAudit.record("BILLING_LOGO_CHANGED", null, "BillingSettings", 1L, Map.of("custom", bytes != null));
         return settings();
     }
 
@@ -416,7 +458,7 @@ public class MsingiBillingService {
         platformAudit.recordAs(CurrentUser.platformId().orElse(null), by, "BILLING_INVOICE_ISSUED", tenantId, "BillingInvoice", id,
                 Map.of("invoiceNo", no, "total", total.toPlainString()));
         InvoiceView v = view(id, true);
-        BillingDocuments.Pdf pdf = documents.invoice(v, settings(), tenant(tenantId), c);
+        BillingDocuments.Pdf pdf = documents.invoice(logo(), v, settings(), tenant(tenantId), c);
         toInstitution(tenantId, c, "Invoice " + no + " from Msingi Technologies",
                 "Dear " + addressee(tenantId, c) + ",\n\nPlease find attached invoice " + no + " for TZS " + tzs(v.invoice().total())
                         + (v.invoice().balance().compareTo(v.invoice().total()) < 0 ? " (TZS " + tzs(v.invoice().balance()) + " still to pay after your credit)" : "")
@@ -523,7 +565,7 @@ public class MsingiBillingService {
         toInstitution(tenantId, c, "Payment received — receipt " + no, "Dear " + addressee(tenantId, c) + ",\n\nMsingi Technologies has received TZS "
                 + tzs(amount) + " (" + DAY.format(at.atZoneSameInstant(TZ).toLocalDate()) + ")" + (p.invoices() == null || p.invoices().isBlank() ? "" : " for " + p.invoices())
                 + ". Thank you.\nYour receipt is attached." + (p.unallocated().signum() > 0 ? " TZS " + tzs(p.unallocated()) + " is held as credit for your next invoice." : ""),
-                documents.receipt(p, settings(), tenant(tenantId)));
+                documents.receipt(logo(), p, settings(), tenant(tenantId)));
         return id;
     }
 
@@ -728,7 +770,7 @@ public class MsingiBillingService {
         BigDecimal balance = inv.stream().filter(r -> Set.of("ISSUED", "PARTLY_PAID").contains(r.status())).map(InvoiceRow::balance).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal overdue = inv.stream().filter(r -> r.daysOverdue() != null && r.daysOverdue() > 0).map(InvoiceRow::balance).reduce(BigDecimal.ZERO, BigDecimal::add);
         Settings s = settings();
-        Settings payTo = new Settings(s.companyName(), s.tin(), s.vrn(), s.address(), s.phone(), s.email(), s.website(), s.channels(), s.invoiceNote(), null, null);
+        Settings payTo = new Settings(s.companyName(), s.tin(), s.vrn(), s.address(), s.phone(), s.email(), s.website(), s.channels(), s.invoiceNote(), null, null, s.customLogo());
         Contract mine = c == null ? null : new Contract(c.id(), c.tenantId(), c.reference(), c.status(), c.startDate(), c.endDate(), c.currency(), c.setupFee(),
                 c.annualFee(), c.studentFee(), c.applicationFee(), c.applicationPercent(), c.usageCycle(), c.vatPercent(), c.paymentTermsDays(), false, false,
                 c.suspendAfterDays(), c.billingContactName(), c.billingEmail(), c.billingPhone(), null, c.setupBilled(), c.licenceBilledUntil(), c.usageBilledUntil(), null, null);
@@ -745,19 +787,19 @@ public class MsingiBillingService {
     @Transactional(readOnly = true)
     public BillingDocuments.Pdf invoicePdf(Long id, boolean msingi) {
         InvoiceView v = msingi ? view(id, true) : ownInvoice(id);
-        return documents.invoice(v, settings(), tenant(v.invoice().tenantId()), active(v.invoice().tenantId()));
+        return documents.invoice(logo(), v, settings(), tenant(v.invoice().tenantId()), active(v.invoice().tenantId()));
     }
 
     @Transactional(readOnly = true)
     public BillingDocuments.Pdf receiptPdf(Long paymentId, boolean msingi) {
         PaymentRow p = payment(paymentId);
         if (!msingi && !p.tenantId().equals(TenantContext.requireTenantId())) throw new NotFoundException("Payment", paymentId);
-        return documents.receipt(p, settings(), tenant(p.tenantId()));
+        return documents.receipt(logo(), p, settings(), tenant(p.tenantId()));
     }
 
     @Transactional(readOnly = true)
     public BillingDocuments.Pdf statementPdf(Long tenantId) {
-        return documents.statement(statement(tenantId), settings());
+        return documents.statement(logo(), statement(tenantId), settings());
     }
 
     @Transactional
@@ -788,7 +830,7 @@ public class MsingiBillingService {
                     ? " was due on " + DAY.format(r.dueDate()) + " and is " + r.daysOverdue() + " days overdue." : " is due on " + DAY.format(r.dueDate()) + ".");
         } + "\nWhen paying, quote the payment reference " + r.paymentReference() + "." + payLines()
                 + "\n\nIf you have already paid, please send us the payment details so we can match it.";
-        String to = toInstitution(r.tenantId(), c, subject, body, documents.invoice(v, settings(), tenant(r.tenantId()), c));
+        String to = toInstitution(r.tenantId(), c, subject, body, documents.invoice(logo(), v, settings(), tenant(r.tenantId()), c));
         jdbc.update("insert into billing_reminders (tenant_id, invoice_id, level, kind, sent_to) values (?, ?, ?, ?, ?)", r.tenantId(), invoiceId, level, kind, to);
         jdbc.update("update billing_invoices set last_reminded_at = now(), reminder_level = greatest(reminder_level, ?) where id = ?", level, invoiceId);
     }

@@ -43,7 +43,7 @@ public class BillingDocuments {
     private static final HtmlTemplate STATEMENT = HtmlTemplate.classpath("templates/msingi-statement.html");
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.UK);
 
-    public Pdf invoice(InvoiceView v, Settings s, Tenant t, Contract c) {
+    public Pdf invoice(MsingiBillingService.Logo logo, InvoiceView v, Settings s, Tenant t, Contract c) {
         InvoiceRow r = v.invoice();
         Map<String, String> val = company(s);
         boolean draft = "DRAFT".equals(r.status());
@@ -65,6 +65,7 @@ public class BillingDocuments {
         val.put("balance", tzs(r.balance()));
         val.put("words", ReceiptService.AmountInWords.tzs(r.total()));
         Map<String, String> mk = new HashMap<>();
+        mk.put("logo", logoImg(logo, s));
         StringBuilder rows = new StringBuilder();
         for (Line l : v.lines()) {
             rows.append("<tr><td>").append(escape(l.description())).append("</td><td class=\"r\">").append(escape(qty(l.quantity())))
@@ -82,7 +83,7 @@ public class BillingDocuments {
         return new Pdf(name, PdfRenderer.render(INVOICE.render(val, mk), "invoice " + val.get("invoiceNo")));
     }
 
-    public Pdf receipt(PaymentRow p, Settings s, Tenant t) {
+    public Pdf receipt(MsingiBillingService.Logo logo, PaymentRow p, Settings s, Tenant t) {
         Map<String, String> val = company(s);
         val.put("receiptNo", p.receiptNo());
         val.put("paidAt", WHEN.format(p.paidAt().atZoneSameInstant(TZ)));
@@ -94,12 +95,13 @@ public class BillingDocuments {
         val.put("words", ReceiptService.AmountInWords.tzs(p.amount()));
         val.put("invoices", p.invoices() == null || p.invoices().isBlank() ? "Held as credit" : p.invoices());
         Map<String, String> mk = new HashMap<>();
+        mk.put("logo", logoImg(logo, s));
         mk.put("credit", p.unallocated().signum() > 0 ? "<p>TZS " + escape(tzs(p.unallocated())) + " is held as credit for the next invoice.</p>" : "");
         mk.put("stamp", "REVERSED".equals(p.status()) ? "<div class=\"stamp\">REVERSED</div>" : "");
         return new Pdf("receipt-" + p.receiptNo() + ".pdf", PdfRenderer.render(RECEIPT.render(val, mk), "receipt " + p.receiptNo()));
     }
 
-    public Pdf statement(Statement st, Settings s) {
+    public Pdf statement(MsingiBillingService.Logo logo, Statement st, Settings s) {
         Map<String, String> val = company(s);
         val.put("institution", st.institutionName());
         val.put("date", DAY.format(LocalDate.now(TZ)));
@@ -113,6 +115,7 @@ public class BillingDocuments {
         val.put("a3", tzs(a.days61to90()));
         val.put("a4", tzs(a.over90()));
         Map<String, String> mk = new HashMap<>();
+        mk.put("logo", logoImg(logo, s));
         StringBuilder rows = new StringBuilder();
         for (Entry e : st.entries()) {
             rows.append("<tr><td>").append(escape(DAY.format(e.date()))).append("</td><td>").append(escape(e.reference())).append("</td><td>")
@@ -125,6 +128,12 @@ public class BillingDocuments {
         mk.put("credit", st.credit().signum() > 0 ? "<p>Credit held for your next invoice: <strong>TZS " + escape(tzs(st.credit())) + "</strong></p>" : "");
         mk.put("payTo", payTo(s));
         return new Pdf("statement-" + st.institutionCode() + ".pdf", PdfRenderer.render(STATEMENT.render(val, mk), "statement " + st.institutionCode()));
+    }
+
+    private static String logoImg(MsingiBillingService.Logo logo, Settings s) {
+        if (logo == null || logo.bytes().length == 0) return "<div class=\"logo\">" + escape(s.companyName().substring(0, 1)) + "</div>";
+        return "<img alt=\"" + escape(s.companyName()) + "\" style=\"width: 58pt; height: auto;\" src=\"data:" + logo.contentType() + ";base64,"
+                + java.util.Base64.getEncoder().encodeToString(logo.bytes()) + "\" />";
     }
 
     private static Map<String, String> company(Settings s) {

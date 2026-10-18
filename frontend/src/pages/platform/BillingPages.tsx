@@ -14,7 +14,7 @@ import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, download, formatDateTime } from '../../api/client';
+import { api, download, formatDateTime, privateImageUrl, uploadForm } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import {
   CYCLE_LABEL, KIND_LABEL, LINE_KIND, METHOD_LABEL, PROVIDERS, day, period, tzs,
@@ -598,6 +598,7 @@ function SettingsTab() {
       <CardContent>
         <Typography variant="h6">Msingi's details on invoices</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Printed on every invoice, receipt and statement, and in the payment instructions sent to institutions.</Typography>
+        <LogoPicker custom={!!f.customLogo} onChanged={(s2) => { qc.setQueryData(['platform', 'billing', 'settings'], s2); setF({ ...f, customLogo: s2.customLogo }); }} />
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}><TextField label="Company name" required value={f.companyName} onChange={set('companyName')} fullWidth /></Grid>
           <Grid size={{ xs: 6, md: 3 }}><TextField label="TIN" value={f.tin ?? ''} onChange={set('tin')} fullWidth /></Grid>
@@ -632,6 +633,41 @@ function SettingsTab() {
         {save.isSuccess && <Alert severity="success" sx={{ mt: 1.5 }}>Saved.</Alert>}
       </CardContent>
     </Card>
+  );
+}
+
+/** Msingi's logo on its documents: the built-in one, or one uploaded here (PNG or JPEG). */
+function LogoPicker({ custom, onChanged }: { custom: boolean; onChanged: (s: BillingSettings) => void }) {
+  const [url, setUrl] = useState<string>();
+  const [n, setN] = useState(0);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    let live = true;
+    privateImageUrl('/api/platform/billing/settings/logo', 'platform').then((u) => live && setUrl(u)).catch(() => undefined);
+    return () => { live = false; };
+  }, [n]);
+  const pick = (file?: File) => {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    uploadForm<BillingSettings>('/api/platform/billing/settings/logo', 'platform', form, 'PUT').then((s) => { setError(null); onChanged(s); setN(n + 1); }).catch(setError);
+  };
+  const reset = () => api<BillingSettings>('/api/platform/billing/settings/logo', { ...platform, method: 'DELETE' }).then((s) => { onChanged(s); setN(n + 1); }).catch(setError);
+  return (
+    <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
+      <Box sx={{ width: 84, height: 84, border: 1, borderColor: 'divider', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff' }}>
+        {url && <Box component="img" src={url} alt={tr('Logo')} sx={{ maxWidth: 76, maxHeight: 76 }} />}
+      </Box>
+      <Box>
+        <Typography variant="subtitle2">Logo</Typography>
+        <Typography variant="body2" color="text.secondary">{custom ? tr('Your uploaded logo.') : tr('The Msingi Technologies logo built into CIMS.')}</Typography>
+        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+          <Button size="small" component="label">Upload a logo<input hidden type="file" accept="image/png,image/jpeg" onChange={(e) => pick(e.target.files?.[0])} /></Button>
+          {custom && <Button size="small" color="inherit" onClick={reset}>Use the built-in logo</Button>}
+        </Stack>
+        <ErrorAlert error={error} />
+      </Box>
+    </Stack>
   );
 }
 

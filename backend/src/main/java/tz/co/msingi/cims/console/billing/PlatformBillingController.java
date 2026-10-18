@@ -47,6 +47,23 @@ public class PlatformBillingController {
         return service.saveSettings(s);
     }
 
+    @GetMapping("/settings/logo")
+    public ResponseEntity<byte[]> logo() {
+        MsingiBillingService.Logo l = service.logo();
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType(l.contentType()))
+                .header("Cache-Control", "no-cache").body(l.bytes());
+    }
+
+    @PutMapping(value = "/settings/logo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Settings uploadLogo(@RequestPart("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return service.saveLogo(file.getBytes());
+    }
+
+    @DeleteMapping("/settings/logo")
+    public Settings removeLogo() {
+        return service.saveLogo(null);
+    }
+
     @GetMapping("/contracts/{tenantId}")
     public List<Contract> contracts(@PathVariable Long tenantId) {
         return service.contracts(tenantId);

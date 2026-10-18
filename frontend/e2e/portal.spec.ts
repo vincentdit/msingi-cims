@@ -34,6 +34,21 @@ test('the help page answers questions and takes a request without an account', a
   expect(errors).toEqual([]);
 });
 
+test('a programme page shows the fee and requirements, and its short link opens it in Kiswahili', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Details and fees' }).first().click();
+  await expect(page).toHaveURL(/\/programmes\//);
+  await expectPageWorks(page);
+  await expect(page.getByRole('heading', { name: 'Entry requirements' })).toBeVisible();
+  const code = new URL(page.url()).pathname.split('/').pop();
+  await page.goto(`/p/${code}?lang=sw&src=e2e`);
+  await expect(page).toHaveURL(new RegExp(`/programmes/${code}\\?lang=sw`));
+  await expect(page.getByRole('heading', { name: 'Sifa za kujiunga' })).toBeVisible();
+  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  expect(errors).toEqual([]);
+});
+
 test('the document verification page opens', async ({ page }) => {
   await page.goto('/verify');
   await expectPageWorks(page);

@@ -30,9 +30,13 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -281,4 +285,42 @@ class MsingiBillingIT {
         p(post("/api/platform/billing/contracts/" + tenantId + "/end"), "{\"endDate\":\"" + today + "\"}").andExpect(jsonPath("$.status").value("ENDED"));
         assertThat(body(p(get("/api/platform/billing/overview"), null)).get("institutions").findValuesAsText("code")).contains(tenant);
     }
+
+    @Test
+    void msingiLogoOnDocumentsBuiltInOrUploaded() throws Exception {
+        // the built-in Msingi logo is there from the start
+        assertThat(body(p(get("/api/platform/billing/settings"), null)).get("customLogo").asBoolean()).isFalse();
+        byte[] builtIn = p(get("/api/platform/billing/settings/logo"), null).andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png")).andReturn().getResponse().getContentAsByteArray();
+        assertThat(builtIn.length).isGreaterThan(1000);
+        try {
+            // too small, or not an image, is refused; a proper PNG replaces it
+            p(logo(InstitutionPhotoIT.png(60, 40)), null).andExpect(jsonPath("$.code").value("LOGO_TOO_SMALL"));
+            p(logo("not an image".getBytes()), null).andExpect(jsonPath("$.code").value("LOGO_TYPE"));
+            byte[] mine = InstitutionPhotoIT.png(400, 200);
+            p(logo(mine), null).andExpect(status().isOk());
+            assertThat(body(p(get("/api/platform/billing/settings"), null)).get("customLogo").asBoolean()).isTrue();
+            p(get("/api/platform/billing/settings/logo"), null).andExpect(content().bytes(mine));
+            // institutions cannot change it
+            s.call(logo(mine), admin, null).andExpect(r -> assertThat(r.getResponse().getStatus()).isIn(401, 403));
+            // documents still render with it
+            p(put("/api/platform/billing/contracts/" + tenantId), "{\"startDate\":\"" + today + "\",\"annualFee\":1200000,\"usageCycle\":\"MONTHLY\",\"autoIssue\":true}")
+                    .andExpect(status().isOk());
+            p(post("/api/platform/billing/run"), null).andExpect(status().isOk());
+            long lic = body(p(get("/api/platform/billing/invoices?status=open&tenantId=" + tenantId), null)).at("/rows/0/id").asLong();
+            byte[] pdf = s.call(get("/api/msingi-billing/invoices/" + lic + "/pdf"), admin, null).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
+        } finally {
+            p(delete("/api/platform/billing/settings/logo"), null).andExpect(status().is2xxSuccessful());
+        }
+        assertThat(body(p(get("/api/platform/billing/settings"), null)).get("customLogo").asBoolean()).isFalse();
+    }
+
+    static org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder logo(byte[] bytes) {
+        var b = multipart("/api/platform/billing/settings/logo");
+        b.file(new org.springframework.mock.web.MockMultipartFile("file", "logo.png", "image/png", bytes));
+        b.with(r -> { r.setMethod("PUT"); return r; });
+        return b;
+    }
 }
+

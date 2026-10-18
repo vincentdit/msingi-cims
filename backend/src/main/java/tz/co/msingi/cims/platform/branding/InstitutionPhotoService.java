@@ -55,6 +55,11 @@ public class InstitutionPhotoService {
         if (type == null) {
             throw new BusinessRuleException("PHOTO_TYPE", "Upload a JPEG, PNG or WebP photo.");
         }
+        // the logo is printed on posters and documents, which take JPEG and PNG (PNG keeps a transparent background)
+        if (kind == Kind.LOGO && type.equals("image/webp")) {
+            throw new BusinessRuleException("PHOTO_TYPE", "Upload the logo as PNG (best, with a transparent background) or JPEG.");
+        }
+        int minWidth = kind == Kind.LOGO ? 200 : MIN_WIDTH;
         Integer width = null, height = null;
         if (!type.equals("image/webp")) {
             BufferedImage img = read(bytes);
@@ -63,9 +68,9 @@ public class InstitutionPhotoService {
             }
             width = img.getWidth();
             height = img.getHeight();
-            if (width < MIN_WIDTH) {
+            if (width < minWidth) {
                 throw new BusinessRuleException("PHOTO_TOO_SMALL",
-                        "The photo is " + width + " pixels wide; use one at least " + MIN_WIDTH + " pixels wide so it stays sharp.");
+                        "The image is " + width + " pixels wide; use one at least " + minWidth + " pixels wide so it stays sharp.");
             }
         }
         InstitutionPhoto p = photos.findByKind(kind).orElseGet(InstitutionPhoto::new);

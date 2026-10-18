@@ -35,4 +35,8 @@ public class WindowProgramme extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private EntryRules entryRules;
+
+    /** Selling points shown on the programme page and the advert poster ("Hostel bure"…), one per line. */
+    @Column(length = 500)
+    private String highlights;
 }

@@ -141,7 +141,10 @@ export default function HomePage() {
                         <CheckCircleIcon fontSize="small" color="secondary" sx={{ mt: '2px' }} />
                         <Typography variant="body2"><strong>{t('home.requirements')}:</strong> {p.requirementSummary}</Typography>
                       </Stack>
-                      <Typography variant="caption" color="text.secondary">{t('home.places', { n: p.capacity })}</Typography>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">{t('home.places', { n: p.capacity })}</Typography>
+                        <Button size="small" component={RouterLink} to={`/programmes/${encodeURIComponent(p.programmeCode)}`}>{t('programme.details')}</Button>
+                      </Stack>
                     </CardContent>
                   </Card>
                 ))}

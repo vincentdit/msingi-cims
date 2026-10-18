@@ -3,7 +3,7 @@
 export interface Channel { provider: string; accountName?: string; accountNumber: string; branch?: string }
 export interface BillingSettings {
   companyName: string; tin?: string; vrn?: string; address?: string; phone?: string; email?: string; website?: string; channels: Channel[];
-  invoiceNote?: string; updatedByName?: string; updatedAt?: string;
+  invoiceNote?: string; updatedByName?: string; updatedAt?: string; customLogo?: boolean;
 }
 export interface Contract {
   id: number; tenantId: number; reference?: string; status: 'ACTIVE' | 'ENDED'; startDate: string; endDate?: string; currency: string;

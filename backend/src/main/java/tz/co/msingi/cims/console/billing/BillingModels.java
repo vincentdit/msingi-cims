@@ -16,7 +16,8 @@ public final class BillingModels {
     }
 
     public record Settings(String companyName, String tin, String vrn, String address, String phone, String email, String website,
-                           List<Channel> channels, String invoiceNote, String updatedByName, OffsetDateTime updatedAt) {
+                           List<Channel> channels, String invoiceNote, String updatedByName, OffsetDateTime updatedAt,
+                           boolean customLogo) {
     }
 
     public record ContractInput(String reference, LocalDate startDate, LocalDate endDate, BigDecimal setupFee, BigDecimal annualFee,

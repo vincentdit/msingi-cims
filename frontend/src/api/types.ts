@@ -27,6 +27,8 @@ export interface Institution {
   branding: { primaryColor?: string; accentColor?: string; tagline?: string; logoUrl?: string };
   /** The institution's own campus photo, when the administrator has uploaded one. */
   campusPhoto?: InstitutionPhoto;
+  /** The institution's logo (used on the portal header, programme pages and advert posters). */
+  logo?: InstitutionPhoto;
   /** How fees are paid: GEPG (public institutions) or COLLECTION (private and faith-based: the college's own accounts). */
   payment?: { mode: 'GEPG' | 'COLLECTION'; channels: PaymentChannel[] };
   /** Minutes without activity before each kind of user is signed out. */
@@ -84,6 +86,8 @@ export interface WindowProgramme {
   capacity: number;
   requirementSummary?: string;
   entryRules?: EntryRules;
+  /** Selling points for the programme page and advert poster, one per line. */
+  highlights?: string | null;
 }
 
 export interface AdmissionWindow {
@@ -2214,4 +2218,34 @@ export interface MyTimetable {
 export interface StudentTimetable {
   semesterId?: number | null; semesterName?: string | null; classPublished: boolean; classPublishedAt?: string | null; examPublished: boolean;
   examPublishedAt?: string | null; slots: SlotView[]; exams: SittingView[]; unscheduled: string[];
+}
+
+/** A programme on offer to the public (open now or opening soon): fees, requirements in English and Kiswahili, selling points. */
+export interface ProgrammeAdvert {
+  windowId: number;
+  windowName: string;
+  academicYear: string;
+  intake: string;
+  opensAt: string;
+  closesAt: string;
+  open: boolean;
+  applicationFee: number;
+  windowProgrammeId: number;
+  code: string;
+  name: string;
+  awardName: string;
+  awardFamily: 'NVA' | 'NTA';
+  awardLevel: number;
+  durationSemesters: number;
+  department: string;
+  capacity: number;
+  requirementSummary?: string;
+  requirementsEn: string;
+  requirementsSw: string;
+  routesEn: string[];
+  routesSw: string[];
+  highlights: string[];
+  fee?: { total: number; instalments: number; firstInstalment: number } | null;
+  /** The short public link, e.g. /p/DPH. */
+  path: string;
 }
