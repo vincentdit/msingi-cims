@@ -14,21 +14,25 @@ export const useGepg = () => (useInstitution().payment?.mode ?? 'GEPG') === 'GEP
 export function usePayWords() {
   const { t } = useTranslation();
   const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
+  const words = (g: boolean) => ({ gepg: g, number: g ? t('pay.controlNo') : t('pay.reference'), getNumber: g ? t('pay.getControlNo') : t('pay.getReference') });
   return {
-    gepg,
-    number: gepg ? t('pay.controlNo') : t('pay.reference'),
-    getNumber: gepg ? t('pay.getControlNo') : t('pay.getReference'),
+    ...words(gepg),
+    /** The words for one invoice: government payments such as NHIF always go through GePG, even in a private college. */
+    forInvoice: (purpose?: string) => words(gepg || alwaysGepg(purpose)),
   };
 }
+
+/** Payments to government bodies that always go through GePG, whoever owns the institution. */
+export const alwaysGepg = (purpose?: string) => purpose === 'NHIF_CONTRIBUTION';
 
 /**
  * How to pay with a control number or payment reference. Public institutions: GePG through any bank or mobile money. Private and
  * faith-based institutions: step-by-step instructions for each mobile money business number and bank account the college lists.
  */
-export function HowToPay({ reference, amount }: { reference: string; amount?: number }) {
+export function HowToPay({ reference, amount, gepg }: { reference: string; amount?: number; gepg?: boolean }) {
   const { t } = useTranslation();
   const inst = useInstitution();
-  const mode = inst.payment?.mode ?? 'GEPG';
+  const mode = gepg ? 'GEPG' : inst.payment?.mode ?? 'GEPG';
   if (mode === 'GEPG') {
     return <Typography variant="body2" color="text.secondary">{t('pay.gepgHow')} {t('fees.payWith')}</Typography>;
   }

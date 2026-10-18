@@ -108,7 +108,7 @@ public class BillingService {
             throw new BusinessRuleException("INVOICE_PAID", "This invoice is already paid");
         }
         List<ControlNumber> existing = controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId);
-        ControlNumber.Issuer issuer = issuerNow();
+        ControlNumber.Issuer issuer = issuerFor(inv);
         for (ControlNumber cn : existing) {
             if (cn.isUsable() && cn.getIssuer() == issuer) {
                 return cn;
@@ -127,7 +127,7 @@ public class BillingService {
         cn.setInvoice(inv);
         cn.setBillId(TenantContext.requireTenantId() + "-" + inv.getId() + "-" + (existing.size() + 1));
         cn.setExpiresAt(OffsetDateTime.now().plus(gepgProps.controlNumberValidity()));
-        if (!paymentChannels.usesGepg()) {
+        if (issuer == ControlNumber.Issuer.COLLECTION) {
             return controlNumbers.save(issueReference(inv, cn));
         }
         GepgGateway.ControlNumberResponse resp;
@@ -236,9 +236,15 @@ public class BillingService {
         return cn;
     }
 
-    /** Who issues new numbers for this institution: GePG for public institutions, CIMS for private and faith-based ones. */
-    private ControlNumber.Issuer issuerNow() {
-        return paymentChannels.usesGepg() ? ControlNumber.Issuer.GEPG : ControlNumber.Issuer.COLLECTION;
+    /** Payments to government bodies that always go through GePG, whoever owns the institution (NHIF contributions). */
+    public static final java.util.Set<String> ALWAYS_GEPG = java.util.Set.of("NHIF_CONTRIBUTION");
+
+    /**
+     * Who issues the number an invoice is paid with: GePG for public institutions, CIMS (a payment reference into the college's
+     * own accounts) for private and faith-based ones, and GePG in every institution for government payments such as NHIF.
+     */
+    public ControlNumber.Issuer issuerFor(Invoice inv) {
+        return paymentChannels.usesGepg() || ALWAYS_GEPG.contains(inv.getPurpose()) ? ControlNumber.Issuer.GEPG : ControlNumber.Issuer.COLLECTION;
     }
 
     public record PaymentNotification(String billId, String controlNo, String gepgReceiptNo, String pspReceiptNo,
@@ -368,7 +374,7 @@ public class BillingService {
     /** Latest control number for the invoice (active or paid), or null if none was issued. */
     @Transactional(readOnly = true)
     public ControlNumber currentControlNumber(Long invoiceId) {
-        ControlNumber.Issuer issuer = issuerNow();
+        ControlNumber.Issuer issuer = issuerFor(get(invoiceId));
         return controlNumbers.findByInvoiceIdOrderByIdDesc(invoiceId).stream()
                 .filter(cn -> (cn.getStatus() == ControlNumber.Status.ACTIVE && cn.getIssuer() == issuer) || cn.getStatus() == ControlNumber.Status.PAID)
                 .findFirst().orElse(null);

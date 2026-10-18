@@ -92,7 +92,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
       <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>Connections</Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {Object.entries(q.data!.modes).filter(([k]) => gepg || k !== 'GEPG').map(([k, v]) => (
+          {Object.entries(q.data!.modes).filter(([k]) => gepg || s.nhifEnabled || k !== 'GEPG').map(([k, v]) => (
             <Chip key={k} size="small" color={v === 'LIVE' ? 'success' : 'default'} variant={v === 'LIVE' ? 'filled' : 'outlined'}
               label={`${SYSTEMS[k] ?? k}: ${v === 'LIVE' ? 'live' : 'simulated'}`} />
           ))}
@@ -101,8 +101,9 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           Msingi switches each connection to live once the body has given access. You are known to NACTVET and HESLB as <b>{q.data!.institutionCode}</b> unless you enter another code.
         </Typography>
       </CardContent></Card>
-      {gepg && <Card><CardContent>
-        <Typography variant="subtitle2" gutterBottom>GePG</Typography>
+      {(gepg || s.nhifEnabled) && <Card><CardContent>
+        <Typography variant="subtitle2" gutterBottom>{gepg ? 'GePG' : 'GePG (NHIF contributions)'}</Typography>
+        {!gepg && <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Fees are paid into your own accounts, but NHIF contributions are government payments and always go through GePG with a control number.</Typography>}
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSpCode', 'SP code', 'e.g. SP19921')}</Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSubSpCode', 'Sub SP code', 'Collection account')}</Grid>
@@ -125,7 +126,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           <Grid size={{ xs: 12, sm: 4 }}>{text('nhifCode', 'Code at NHIF (optional)')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="NHIF student contribution (TZS)" type="number" fullWidth disabled={!canEdit} value={s.nhifContribution ?? ''}
-              helperText="Per year; 0 when the institution pays NHIF itself" inputProps={{ min: 0, step: 100 }}
+              helperText={gepg ? 'Per year; 0 when the institution pays NHIF itself' : 'Per year, paid through GePG with a control number; 0 when the institution pays NHIF itself'} inputProps={{ min: 0, step: 100 }}
               onChange={(e) => setS({ ...s, nhifContribution: e.target.value === '' ? null : Number(e.target.value) })} />
           </Grid>
           <Grid size={{ xs: 12 }}>{flag('nhifRequired', 'Students need health insurance before semester registration')}</Grid>

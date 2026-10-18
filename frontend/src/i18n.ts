@@ -371,7 +371,7 @@ const en = {
     noCardConfirm: 'Register me with NHIF through the institution. A bill of TZS {{amount}} will be made.', noCardFree: 'Register me with NHIF through the institution.',
     yes: 'Yes, register me', cancel: 'Cancel', change: 'Give a card number', retry: 'Send me to NHIF again',
     card: 'Card {{card}}', holder: 'Name at NHIF: {{name}}', scheme: 'Scheme: {{scheme}}', validTo: 'Valid until {{date}}', checked: 'Checked with NHIF {{when}}',
-    pay: 'Pay TZS {{amount}} with payment number {{controlNo}}.', payNoNumber: 'Pay TZS {{amount}} (invoice {{invoice}}). The payment number is on its way.',
+    pay: 'Pay TZS {{amount}} to NHIF through GePG with control number {{controlNo}}, by bank or mobile money.', payNoNumber: 'Pay TZS {{amount}} (invoice {{invoice}}). The GePG control number is on its way.',
     status: {
       ACTIVE: 'Covered', EXPIRED: 'Expired', INVALID: 'Card not accepted', AWAITING_PAYMENT: 'Waiting for payment', READY: 'Paid: waiting to be sent to NHIF',
       SUBMITTED: 'With NHIF', REJECTED: 'Not registered by NHIF', NONE: 'No cover recorded',
@@ -798,7 +798,7 @@ const sw: typeof en = {
     noCardConfirm: 'Nisajili NHIF kupitia chuo. Bili ya TZS {{amount}} itatolewa.', noCardFree: 'Nisajili NHIF kupitia chuo.',
     yes: 'Ndiyo, nisajili', cancel: 'Ghairi', change: 'Weka namba ya kadi', retry: 'Nitume NHIF tena',
     card: 'Kadi {{card}}', holder: 'Jina NHIF: {{name}}', scheme: 'Mpango: {{scheme}}', validTo: 'Inatumika hadi {{date}}', checked: 'Imehakikiwa na NHIF {{when}}',
-    pay: 'Lipa TZS {{amount}} kwa namba ya malipo {{controlNo}}.', payNoNumber: 'Lipa TZS {{amount}} (ankara {{invoice}}). Namba ya malipo inakuja.',
+    pay: 'Lipa TZS {{amount}} kwa NHIF kupitia GePG kwa namba ya malipo {{controlNo}}, kwa benki au simu.', payNoNumber: 'Lipa TZS {{amount}} (ankara {{invoice}}). Namba ya malipo ya GePG inakuja.',
     status: {
       ACTIVE: 'Una bima', EXPIRED: 'Muda umeisha', INVALID: 'Kadi haikukubaliwa', AWAITING_PAYMENT: 'Inasubiri malipo', READY: 'Imelipwa: inasubiri kutumwa NHIF',
       SUBMITTED: 'Iko NHIF', REJECTED: 'NHIF haikusajili', NONE: 'Hakuna bima iliyorekodiwa',

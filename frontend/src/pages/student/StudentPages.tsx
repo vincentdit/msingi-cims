@@ -253,11 +253,11 @@ export function StudentFees() {
             {inv.balance > 0 && !['CANCELLED', 'CREDITED'].includes(inv.status) && (
               inv.controlNo ? (
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
-                  <Typography variant="caption" color="text.secondary">{words.number}</Typography>
+                  <Typography variant="caption" color="text.secondary">{words.forInvoice(inv.purpose).number}</Typography>
                   <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
-                  <HowToPay reference={inv.controlNo} amount={inv.balance} />
+                  <HowToPay reference={inv.controlNo} amount={inv.balance} gepg={words.forInvoice(inv.purpose).gepg} />
                 </Box>
-              ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.getNumber}</Button>
+              ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.forInvoice(inv.purpose).getNumber}</Button>
             )}
             {SHOW_DEV_TOOLS && inv.balance > 0 && (
               <Button size="small" color="warning" variant="outlined" sx={{ mt: 1.5 }} disabled={simulate.isPending} onClick={() => simulate.mutate(inv.id)}>{t('student.simulatePay')}</Button>
