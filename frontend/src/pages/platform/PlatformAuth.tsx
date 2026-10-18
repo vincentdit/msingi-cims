@@ -5,7 +5,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ErrorAlert, PageTitle } from '../../components/common';
 import { MSINGI_ACCENT, MSINGI_PRIMARY } from '../../components/InstitutionContext';
-import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
+import { NewPasswordFields, PasswordField, passwordOk } from '../../components/PasswordFields';
 import { platform, usePlatformSession, type PlatformToken } from './shared';
 
 /** Sign-in for Msingi Technologies staff. Institution staff sign in at their institution's address instead. */
@@ -32,7 +32,7 @@ export function PlatformLoginPage() {
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2}>
               <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required fullWidth />
-              <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required fullWidth />
+              <PasswordField label="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required fullWidth />
               <ErrorAlert error={m.error} />
               <Button type="submit" variant="contained" size="large" disabled={!username || !password || m.isPending}>Sign in</Button>
             </Stack>
@@ -71,7 +71,7 @@ export function PlatformPasswordPage() {
         <CardContent>
           <Stack spacing={2}>
             {done && <Alert severity="success">Your password has been changed.</Alert>}
-            <TextField label={forced ? 'Temporary password' : 'Current password'} type="password" value={current} onChange={(e) => setCurrent(e.target.value)}
+            <PasswordField label={forced ? 'Temporary password' : 'Current password'} value={current} onChange={(e) => setCurrent(e.target.value)}
               autoComplete="current-password" required fullWidth />
             <NewPasswordFields password={next} confirm={confirm} onPassword={setNext} onConfirm={setConfirm} label="New password" />
             <ErrorAlert error={m.error} />

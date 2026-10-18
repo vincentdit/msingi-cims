@@ -76,7 +76,7 @@ export default async function globalSetup() {
   const academic = await staff('academic', 'Academic@2026');
   const round = await call('POST', `/api/admission/windows/${window.id}/selection-rounds`, admissions);
   await call('POST', `/api/admission/selection-rounds/${round.round.id}/approve`, academic, { committeeMinuteRef: 'AC/E2E/1' });
-  const batch = await call('POST', `/api/admission/windows/${window.id}/nactvet-submissions`, admissions, { channel: 'API' });
+  const batch = await call('POST', `/api/admission/windows/${window.id}/nactvet-submissions`, admissions, { channel: 'API', paymentReference: '991100223344' });
   await call('POST', `/api/admission/nactvet-submissions/${batch.id}/fetch-outcomes`, admissions);
   await call('POST', `/api/applicant/applications/${app.id}/offer/accept`, applicant, {});
 

@@ -13,6 +13,6 @@ public final class ProfileOptions {
             "Deaf-blind", "Autism", "Intellectual impairment", "Multiple impairments", "Other");
 
     public static final List<String> RELATIONSHIPS = List.of(
-            "Father", "Mother", "Parent", "Guardian", "Spouse", "Brother", "Sister", "Uncle", "Aunt", "Grandfather", "Grandmother",
+            "Father", "Mother", "Guardian", "Spouse", "Brother", "Sister", "Uncle", "Aunt", "Grandfather", "Grandmother",
             "Son", "Daughter", "Relative", "Other");
 }

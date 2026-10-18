@@ -35,7 +35,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 6MB
-      max-request-size: 7MB
+      max-request-size: 16MB    # helpdesk messages carry up to 3 files of 5 MB
   threads:
     virtual:
       enabled: true
@@ -121,11 +121,13 @@ cims:
     # Admission verification: simulated (in CIMS) or live (HTTP; run the nactvet-mock project to try it without NACTVET)
     mode: ${CIMS_NACTVET_MODE:simulated}
     verification:
-      # NOAS-style endpoints. Placeholders until NACTVET publishes its admission verification API; nactvet-mock answers them.
+      # NACTVET's applicant upload and verification feedback, as NOAS uses them. The confirmation of a multiple admission is
+      # not part of NOAS: its path stays a placeholder until NACTVET publishes it. nactvet-mock answers all three.
       base-url: ${CIMS_NACTVET_VERIFICATION_URL:${cims.nactvet.awards.base-url}}
-      submit-path: ${CIMS_NACTVET_SUBMIT_PATH:/nacteapi/index.php/api-out-service/admissionverification}
-      results-path: ${CIMS_NACTVET_RESULTS_PATH:/nacteapi/index.php/api-out-service/admissionverificationresults}
+      upload-path: ${CIMS_NACTVET_UPLOAD_PATH:/nacteapi/index.php/api/upload}
+      feedback-path: ${CIMS_NACTVET_FEEDBACK_PATH:/nacteapi/index.php/api-out-service/verifiedresultsall}
       confirm-path: ${CIMS_NACTVET_CONFIRM_PATH:/nacteapi/index.php/api-out-service/admissionconfirmation}
+      feedback-page-size: ${CIMS_NACTVET_FEEDBACK_PAGE_SIZE:500}
       authorization: ${CIMS_NACTVET_VERIFICATION_AUTHORIZATION:${cims.nactvet.awards.authorization}}
       api-code: ${CIMS_NACTVET_VERIFICATION_API_CODE:${cims.nactvet.awards.api-code}}
       # Development against nactvet-mock only: show the confirmation code the mock "sent by SMS" on screen
@@ -179,6 +181,15 @@ cims:
     base-url: ${CIMS_TAMISEMI_URL:https://selform.tamisemi.go.tz}
     api-key: ${CIMS_TAMISEMI_API_KEY:}
     selections-path: /tamisemi/api/v1/selections
+  # NHIF (students' health insurance): simulated (in CIMS) or live (JSON over HTTPS with an API key). The paths are placeholders
+  # until NHIF issues the institution its interface document; gov-mocks answers them.
+  nhif:
+    mode: ${CIMS_NHIF_MODE:simulated}
+    base-url: ${CIMS_NHIF_URL:https://verification.nhif.or.tz}
+    api-key: ${CIMS_NHIF_API_KEY:}
+    card-path: /nhif/api/v1/cards/verify
+    registrations-path: /nhif/api/v1/student-registrations
+    status-path: /nhif/api/v1/student-registrations/status
   documents:
     # Link printed in the QR code of admission letters; {host} is the institution's primary domain
     verification-url: ${CIMS_VERIFICATION_URL:https://{host}/verify/{code}}
@@ -198,6 +209,13 @@ cims:
     from: ${CIMS_EMAIL_FROM:no-reply@cims.msingi.co.tz}
     async: true
     retry-cron: ${CIMS_EMAIL_RETRY_CRON:0 */5 * * * *}
+  helpdesk:
+    sla-cron: ${CIMS_HELPDESK_SLA_CRON:0 */10 * * * *}    # escalate tickets that missed a target, close resolved ones after 7 days; "-" disables
+    public-requests-per-hour: 5          # requests from the public help page, per address
+    public-lookups-per-minute: 20        # following a request with its number and code, per address
+  payments:
+    # testing period: the "Simulate payment" buttons pay fees even with live GePG or a live collector. Set CIMS_ALLOW_PAYMENT_SIMULATION=false before go-live.
+    allow-simulation: ${CIMS_ALLOW_PAYMENT_SIMULATION:true}
   privacy:
     notice-version: "2026-10"
     retention-cron: ${CIMS_RETENTION_CRON:0 0 2 1 * *}   # monthly; runs only where the institution switched it on

@@ -57,7 +57,7 @@ export default function SemesterRegistrationPage() {
   const showForm = canEdit && (reg?.status !== 'SUBMITTED' || editing);
   const history = d.history.filter((h) => h.id !== reg?.id);
   const electivesOk = picked.length >= d.minElectives && picked.length <= d.maxElectives;
-  const cleared = !d.clearance || d.clearance.cleared;
+  const cleared = (!d.clearance || d.clearance.cleared) && !d.healthCoverMissing;
   const choose = d.minElectives === d.maxElectives ? t('semReg.chooseExactly', { count: d.minElectives })
     : t('semReg.chooseRange', { min: d.minElectives, max: d.maxElectives });
 
@@ -91,6 +91,11 @@ export default function SemesterRegistrationPage() {
       {d.state !== 'OPEN' && d.state !== 'LATE' && (
         <Alert severity={d.state === 'NOT_OPEN' ? 'info' : 'warning'}>
           {t(`semReg.state${d.state}`, { semester: sem?.name ?? '', date: sem ? formatDate(sem.registrationOpens) : '', defaultValue: d.message })}
+        </Alert>
+      )}
+      {d.healthCoverMissing && canEdit && (
+        <Alert severity="warning" action={<Button color="inherit" size="small" component={RouterLink} to="/student/profile">{t('health.title')}</Button>}>
+          {t('semReg.healthCover')}
         </Alert>
       )}
       {d.state === 'LATE' && canEdit && <Alert severity="warning">{t('semReg.lateNote')}

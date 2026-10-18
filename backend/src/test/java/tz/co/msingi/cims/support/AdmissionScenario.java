@@ -93,7 +93,7 @@ public class AdmissionScenario {
     public void admit(String officerToken, String chairToken, Applicant... applicants) throws Exception {
         selectAndApprove(officerToken, chairToken);
         long batch = body(call(post("/api/admission/windows/" + inst.windowId() + "/nactvet-submissions"), officerToken,
-                "{\"channel\":\"API\"}").andExpect(status().isOk())).get("id").asLong();
+                "{\"channel\":\"API\",\"paymentReference\":\"991100223344\"}").andExpect(status().isOk())).get("id").asLong();
         call(post("/api/admission/nactvet-submissions/" + batch + "/fetch-outcomes"), officerToken, null).andExpect(status().isOk());
         for (Applicant a : applicants) {
             call(post("/api/applicant/applications/" + a.applicationId() + "/offer/accept"), a.token(), "{}")

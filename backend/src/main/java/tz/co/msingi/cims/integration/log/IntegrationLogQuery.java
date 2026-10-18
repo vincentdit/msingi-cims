@@ -25,11 +25,21 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class IntegrationLogQuery {
 
-    public static final Map<ExternalSystem, String> LABELS = Map.of(
-            ExternalSystem.NECTA, "NECTA results", ExternalSystem.NACTVET, "NACTVET admission verification",
-            ExternalSystem.NACTVET_AWARDS, "NACTVET award verification", ExternalSystem.NACTVET_CATALOGUE, "NACTVET institution catalogue",
-            ExternalSystem.GEPG, "GePG payments", ExternalSystem.COLLECTION, "Mobile money and bank collection",
-            ExternalSystem.SMS, "SMS gateway");
+    /** The name of every outside system as people read it; each one has a name (a missing one showed as a blank row). */
+    public static final Map<ExternalSystem, String> LABELS = Map.ofEntries(
+            Map.entry(ExternalSystem.NECTA, "NECTA results"),
+            Map.entry(ExternalSystem.NACTVET, "NACTVET admission verification"),
+            Map.entry(ExternalSystem.NACTVET_AWARDS, "NACTVET award verification"),
+            Map.entry(ExternalSystem.NACTVET_CATALOGUE, "NACTVET institution catalogue"),
+            Map.entry(ExternalSystem.NACTVET_SUBMISSION, "NACTVET registration and results"),
+            Map.entry(ExternalSystem.GEPG, "GePG payments"),
+            Map.entry(ExternalSystem.COLLECTION, "Mobile money and bank collection"),
+            Map.entry(ExternalSystem.SMS, "SMS gateway"),
+            Map.entry(ExternalSystem.HESLB, "HESLB student loans"),
+            Map.entry(ExternalSystem.NIDA, "NIDA national ID check"),
+            Map.entry(ExternalSystem.MUSE, "MUSE government accounting"),
+            Map.entry(ExternalSystem.TAMISEMI, "TAMISEMI selections"),
+            Map.entry(ExternalSystem.NHIF, "NHIF health insurance"));
 
     private final JdbcTemplate jdbc;
     private final ApplicationContext context;
@@ -175,6 +185,7 @@ public class IntegrationLogQuery {
             case NIDA -> tz.co.msingi.cims.integration.nida.NidaClient.class;
             case MUSE -> tz.co.msingi.cims.integration.muse.MuseClient.class;
             case TAMISEMI -> tz.co.msingi.cims.integration.tamisemi.TamisemiClient.class;
+            case NHIF -> tz.co.msingi.cims.integration.nhif.NhifClient.class;
         };
         if (port == null) return gepg.isSimulated() ? "SIMULATED" : "LIVE";
         try {

@@ -57,7 +57,7 @@ public class ApplicantAccountService {
                 .map(a -> a.getUser().getStatus() != UserAccount.Status.PENDING_VERIFICATION).orElse(false);
         return new NectaCandidateView(idx.indexNumber(), idx.year(), r.firstName(), r.middleName(), r.surname(), r.candidateName(),
                 r.sex(), r.centreName(), r.division(), r.points(),
-                r.subjects().stream().map(x -> new SubjectView(x.code(), x.name(), x.grade())).toList(), registered);
+                r.subjects().stream().map(x -> new SubjectView(x.code(), x.name(), x.grade())).toList(), registered, r.premNumber());
     }
 
     /**
@@ -108,6 +108,7 @@ public class ApplicantAccountService {
         a.setNectaIndexNumber(idx.indexNumber());
         a.setNectaExamYear((short) idx.year());
         a.setNamesFromNecta(true);
+        if (r.premNumber() != null) a.setPremNumber(r.premNumber());
         a.setPrivacyConsentAt(OffsetDateTime.now());
         a.setPrivacyNoticeVersion(privacyNoticeVersion);
         a = applicants.save(a);

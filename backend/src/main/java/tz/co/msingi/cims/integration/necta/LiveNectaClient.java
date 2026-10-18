@@ -20,7 +20,7 @@ import java.util.Optional;
  * The NECTA results API, as used by the National Online Admission System (NOAS): a JSON POST to
  * {@code /api/results/individual} with the index number in dash form ({@code S0101-0001}), the exam year,
  * the numeric exam id (1 = CSEE, 2 = ACSEE) and the authorised API key. NECTA answers with
- * {@code status.code} (positive when found), {@code particulars} (names, sex, centre), {@code results}
+ * {@code status.code} (positive when found), {@code particulars} (names, sex, centre and the PREM number), {@code results}
  * (division, points) and {@code subjects} (code, name, grade).
  *
  * Active when {@code cims.necta.mode=live}. The API key is never kept in the code: set {@code NECTA_API_KEY}.
@@ -91,7 +91,21 @@ public class LiveNectaClient implements NectaClient {
             subjects.add(new SubjectGrade(text(s.path("subject_code")), upper(s.path("subject_name")), grade.toUpperCase()));
         }
         return Optional.of(new NectaResult(exam, index, year, name(p.path("first_name")), name(p.path("middle_name")),
-                name(p.path("last_name")), sex(text(p.path("sex"))), upper(p.path("center_name")), division, points, subjects));
+                name(p.path("last_name")), sex(text(p.path("sex"))), upper(p.path("center_name")), division, points, subjects, prem(root)));
+    }
+
+    /**
+     * The PREM number: NECTA sends it as {@code particulars.prem_number} (11 digits, e.g. 20140255164); the other spellings are
+     * read too in case another NECTA service names it differently.
+     */
+    static String prem(JsonNode root) {
+        for (JsonNode where : new JsonNode[]{root.path("particulars"), root}) {
+            for (String k : new String[]{"prem_number", "prem_no", "premNumber", "prem", "PREM", "prem_num"}) {
+                String v = text(where.path(k));
+                if (v != null) return v.toUpperCase().replaceAll("\\s+", "");
+            }
+        }
+        return null;
     }
 
     private static String text(JsonNode n) {

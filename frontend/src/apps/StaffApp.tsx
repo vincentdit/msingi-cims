@@ -1,4 +1,5 @@
 /** The staff part of CIMS, loaded only when someone opens it (keeps the admission portal small on phones). */
+import { HelpdeskPage, HelpdeskTicketPage, StaffHelpPage } from '../pages/staff/HelpdeskPages';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from '../auth/session';
 import StaffLayout from '../components/StaffLayout';
@@ -34,6 +35,7 @@ import DashboardPage from '../pages/staff/DashboardPage';
 import ReportsPage from '../pages/staff/ReportsPage';
 import { CalendarPage, CurriculaPage, CurriculumEditorPage } from '../pages/staff/AcademicPages';
 import SemesterRegistrationsPage from '../pages/staff/SemesterRegistrationsPage';
+import HealthInsurancePage from '../pages/staff/HealthInsurancePage';
 import SelectionPage from '../pages/staff/SelectionPage';
 import VerificationPage from '../pages/staff/VerificationPage';
 import { HandoverPage, StudentDetailPage, StudentsPage } from '../pages/staff/RegistryPages';
@@ -62,6 +64,10 @@ export default function StaffApp() {
         <Route path="status-changes" element={<StatusChangesPage />} />
         <Route path="transfers" element={<TransfersPage />} />
         <Route path="semester-registrations" element={<SemesterRegistrationsPage />} />
+        <Route path="health-insurance" element={<HealthInsurancePage />} />
+        <Route path="helpdesk" element={<HelpdeskPage />} />
+        <Route path="helpdesk/:id" element={<HelpdeskTicketPage />} />
+        <Route path="help" element={<StaffHelpPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="marks" element={<MarksPage />} />
         <Route path="marks/:id" element={<OfferingPage />} />

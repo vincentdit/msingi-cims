@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, Container, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Container, Stack, Typography } from '@mui/material';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,7 @@ import { api } from '../../api/client';
 import type { TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, PageTitle } from '../../components/common';
-import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
+import { NewPasswordFields, PasswordField, passwordOk } from '../../components/PasswordFields';
 import { homeFor } from '../../components/StaffLayout';
 import EmailCard from '../../components/EmailCard';
 import MfaCard from '../../components/MfaCard';
@@ -42,7 +42,7 @@ export default function ChangePasswordPage() {
           <Stack spacing={2}>
             {!forced && <Typography variant="h6">Password</Typography>}
             {done && <Alert severity="success">Your password has been changed.</Alert>}
-            <TextField label={forced ? 'Temporary password' : 'Current password'} type="password" value={current} onChange={(e) => setCurrent(e.target.value)}
+            <PasswordField label={forced ? 'Temporary password' : 'Current password'} value={current} onChange={(e) => setCurrent(e.target.value)}
               autoComplete="current-password" required fullWidth />
             <NewPasswordFields password={next} confirm={confirm} onPassword={setNext} onConfirm={setConfirm} label="New password" />
             <ErrorAlert error={m.error} />

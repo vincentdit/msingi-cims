@@ -55,13 +55,16 @@ export default function VerificationPage() {
 
   const [submitOpen, setSubmitOpen] = useState(false);
   const [channel, setChannel] = useState<'API' | 'FILE'>('API');
+  const [paymentRef, setPaymentRef] = useState('');
   const submit = useMutation({
-    mutationFn: () => api<NactvetSubmission>(`/api/admission/windows/${id}/nactvet-submissions`, { method: 'POST', ...staff, body: { channel } }),
+    mutationFn: () => api<NactvetSubmission>(`/api/admission/windows/${id}/nactvet-submissions`, { method: 'POST', ...staff,
+      body: { channel, paymentReference: channel === 'API' ? paymentRef.trim() : undefined } }),
     onSuccess: (s) => {
       setSubmitOpen(false);
       setNotice(`Batch ${s.batchNo} submitted with ${s.total} applicant(s)` + (s.channel === 'FILE'
         ? '. Download the file and upload it to NACTVET, then import their outcome file here.'
-        : `. NACTVET reference ${s.externalRef}. Fetch outcomes when NACTVET has processed it.`));
+        : `. Uploaded to NACTVET for the ${intakeLabel(s.externalRef)} intake. Fetch outcomes when NACTVET has processed it.`)
+        + (s.notSent?.length ? ` Not sent, still selected: ${s.notSent.join('; ')}` : ''));
       setTab('submissions');
       refresh();
     },
@@ -196,7 +199,8 @@ export default function VerificationPage() {
                   <TableRow key={s.id}>
                     <TableCell>
                       <strong>#{s.batchNo}</strong> · {s.channel === 'API' ? 'API' : 'File'}
-                      {s.externalRef && <Typography variant="caption" display="block" color="text.secondary">{s.externalRef}</Typography>}
+                      {s.externalRef && <Typography variant="caption" display="block" color="text.secondary">{isIntakeRef(s.externalRef) ? `${intakeLabel(s.externalRef)} intake` : s.externalRef}</Typography>}
+                      {s.paymentReference && <Typography variant="caption" display="block" color="text.secondary">{`Payment ref. ${s.paymentReference}`}</Typography>}
                     </TableCell>
                     <TableCell>{formatDateTime(s.submittedAt)}<Typography variant="caption" display="block" color="text.secondary">{s.submittedByName}</Typography></TableCell>
                     <TableCell>
@@ -280,14 +284,19 @@ export default function VerificationPage() {
             {blockedCount > 0 && <> {blockedCount} with issues will be held back.</>}
           </Typography>
           <RadioGroup value={channel} onChange={(e) => setChannel(e.target.value as 'API' | 'FILE')}>
-            <FormControlLabel value="API" control={<Radio />} label={<Box><Typography>Send through the NACTVET API</Typography><Typography variant="body2" color="text.secondary">Outcomes are fetched from NACTVET from the Submissions tab.</Typography></Box>} sx={{ mb: 1, alignItems: 'flex-start' }} />
+            <FormControlLabel value="API" control={<Radio />} label={<Box><Typography>Send through the NACTVET API</Typography><Typography variant="body2" color="text.secondary">Uploaded one programme at a time. Outcomes are fetched from NACTVET from the Submissions tab.</Typography></Box>} sx={{ mb: 1, alignItems: 'flex-start' }} />
+            {channel === 'API' && (
+              <TextField label="Payment reference of the NACTVET verification fee" required size="small" sx={{ ml: 4, mb: 2, width: 'calc(100% - 32px)' }} value={paymentRef}
+                onChange={(e) => setPaymentRef(e.target.value)} inputProps={{ maxLength: 60 }}
+                helperText="The control number you paid NACTVET's verification fee with. NACTVET needs it with every upload." />
+            )}
             <FormControlLabel value="FILE" control={<Radio />} label={<Box><Typography>Prepare a file to upload to NACTVET</Typography><Typography variant="body2" color="text.secondary">Download the file in NACTVET's template, upload it on the NACTVET portal, then import their outcome file.</Typography></Box>} sx={{ alignItems: 'flex-start' }} />
           </RadioGroup>
           <ErrorAlert error={submit.error} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSubmitOpen(false)}>Cancel</Button>
-          <Button variant="contained" startIcon={<SendIcon />} disabled={submit.isPending} onClick={() => submit.mutate()}>Submit {readyCount}</Button>
+          <Button variant="contained" startIcon={<SendIcon />} disabled={submit.isPending || (channel === 'API' && !paymentRef.trim())} onClick={() => submit.mutate()}>Submit {readyCount}</Button>
         </DialogActions>
       </Dialog>
 
@@ -349,7 +358,7 @@ export default function VerificationPage() {
         <DialogContent>
           <Typography sx={{ mb: 1 }}><strong>{resolving?.applicantName}</strong> · {resolving?.referenceNo}</Typography>
           <Alert severity="warning" sx={{ mb: 2 }}>{resolving?.reason}</Alert>
-          <TextField label="What was corrected (sent to NACTVET with the resubmission)" fullWidth multiline minRows={2} value={remarks}
+          <TextField label="What was corrected (recorded with the resubmission; correct the record itself before resubmitting)" fullWidth multiline minRows={2} value={remarks}
             onChange={(e) => setRemarks(e.target.value)} inputProps={{ maxLength: 300 }} helperText={`${remarks.length}/300`} autoFocus />
           <ErrorAlert error={resolve.error} />
         </DialogContent>
@@ -435,4 +444,18 @@ function ApplicantTable({ rows, columns, action, actionInColumn }: {
       </TableBody>
     </Table>
   );
+}
+
+const INTAKE_REF = /^(\d{4})\/([A-Z]+)$/;
+
+/** Whether a batch's reference is the NACTVET application year and intake of its feedback (API batches since uploads by programme). */
+function isIntakeRef(ref?: string): boolean {
+  return INTAKE_REF.test(ref ?? '');
+}
+
+/** "2026/SEPTEMBER" (the NACTVET feedback a batch's outcomes come from) as "September 2026". */
+function intakeLabel(ref?: string): string {
+  const m = INTAKE_REF.exec(ref ?? '');
+  if (!m) return ref ?? '';
+  return `${m[2].charAt(0)}${m[2].slice(1).toLowerCase()} ${m[1]}`;
 }

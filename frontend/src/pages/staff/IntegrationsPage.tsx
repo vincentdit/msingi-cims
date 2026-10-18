@@ -17,6 +17,7 @@ interface Settings {
   gepgSpCode?: string | null; gepgSubSpCode?: string | null; gepgSystemId?: string | null; gepgGfsCode?: string | null;
   heslbEnabled: boolean; heslbCode?: string | null; nidaEnabled: boolean; museEnabled: boolean; museVoteCode?: string | null; museCashAccount?: string | null;
   tamisemiEnabled: boolean; tamisemiCode?: string | null;
+  nhifEnabled: boolean; nhifCode?: string | null; nhifContribution?: number | null; nhifRequired: boolean;
 }
 interface SettingsView { settings: Settings; modes: Record<string, string>; institutionCode: string; updatedByName?: string }
 interface Problem { key: string; message: string }
@@ -36,7 +37,7 @@ interface RegItem { studentId: number; registrationNo: string; name: string; pro
 
 const has = (roles: string[], ...r: string[]) => roles.some((x) => r.includes(x));
 const SYSTEMS: Record<string, string> = {
-  GEPG: 'GePG', NACTVET: 'NACTVET verification', NACTVET_SUBMISSION: 'NACTVET registration & results', HESLB: 'HESLB', NIDA: 'NIDA', MUSE: 'MUSE', TAMISEMI: 'TAMISEMI',
+  GEPG: 'GePG', NACTVET: 'NACTVET verification', NACTVET_SUBMISSION: 'NACTVET registration & results', HESLB: 'HESLB', NIDA: 'NIDA', MUSE: 'MUSE', TAMISEMI: 'TAMISEMI', NHIF: 'NHIF',
 };
 
 /** The institution's government integrations (FR-INT-03/05/06/07/08, FR-REG-07): settings and the exchanges staff start. */
@@ -53,7 +54,7 @@ export default function IntegrationsPage() {
   const [tab, setTab] = useState(tabs[0].key);
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Integrations" subtitle="Your codes at GePG, HESLB, MUSE and TAMISEMI, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI." />
+      <PageTitle title="Integrations" subtitle="Your codes at GePG, HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI." />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         {tabs.map((t) => <Tab key={t.key} value={t.key} label={t.label} />)}
       </Tabs>
@@ -117,6 +118,14 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           <Grid size={{ xs: 12, sm: 4 }}>{text('museVoteCode', 'Vote code')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{text('museCashAccount', 'Bank account in MUSE')}</Grid>
           <Grid size={{ xs: 12 }}>{flag('nidaEnabled', 'Check National Identification Numbers with NIDA')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{flag('nhifEnabled', 'NHIF health insurance')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{text('nhifCode', 'Code at NHIF (optional)')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField label="NHIF student contribution (TZS)" type="number" fullWidth disabled={!canEdit} value={s.nhifContribution ?? ''}
+              helperText="Per year; 0 when the institution pays NHIF itself" inputProps={{ min: 0, step: 100 }}
+              onChange={(e) => setS({ ...s, nhifContribution: e.target.value === '' ? null : Number(e.target.value) })} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>{flag('nhifRequired', 'Students need health insurance before semester registration')}</Grid>
         </Grid>
         <ErrorAlert error={save.error} />
         {save.isSuccess && <Alert severity="success" sx={{ mt: 1 }}>Saved.</Alert>}

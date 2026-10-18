@@ -58,7 +58,7 @@ public final class RegistryDtos {
                                 String disability, String nextOfKinName, String nextOfKinPhone, String nextOfKinRelation,
                                 String awardName, String applicationRef, String nactvetVerificationNo, String admissionLetterNo,
                                 OffsetDateTime admittedAt, String admittedByName, FirstRegistrationView firstRegistration,
-                                Long campusId, String campus, Long studentCategoryId, String studentCategory) {
+                                Long campusId, String campus, Long studentCategoryId, String studentCategory, String premNumber) {
     }
 
     public record CategoryRequest(Long studentCategoryId) {

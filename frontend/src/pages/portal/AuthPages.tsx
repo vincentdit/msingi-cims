@@ -2,12 +2,13 @@ import { Alert, Box, Button, Card, CardContent, Checkbox, Container, FormControl
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrivacyNoticeLink } from '../../components/PrivacyNoticeDialog';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
-import { NewPasswordFields, passwordOk } from '../../components/PasswordFields';
+import { NewPasswordFields, PasswordField, passwordOk } from '../../components/PasswordFields';
 
 interface OtpSent {
   maskedPhone: string;
@@ -16,6 +17,7 @@ interface OtpSent {
 }
 
 function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
       <Card sx={{ borderRadius: 3 }}>
@@ -25,6 +27,9 @@ function AuthCard({ title, subtitle, children }: { title: string; subtitle?: Rea
           <Box sx={{ mt: 3 }}>{children}</Box>
         </CardContent>
       </Card>
+      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 2 }}>
+        <Link component={RouterLink} to="/help">{t('auth.needHelp')}</Link>
+      </Typography>
     </Container>
   );
 }
@@ -37,6 +42,7 @@ function DevCode({ code }: { code?: string }) {
 interface NectaCandidate {
   indexNumber: string; examYear: number; firstName: string; middleName?: string; surname: string; fullName: string; sex?: 'M' | 'F';
   centreName?: string; division?: string; points?: number; subjects: { code: string; name: string; grade: string }[]; alreadyRegistered: boolean;
+  premNumber?: string;
 }
 
 const YEARS = Array.from({ length: new Date().getFullYear() - 1987 }, (_, i) => new Date().getFullYear() - i);
@@ -98,6 +104,7 @@ export function RegisterPage() {
               <Typography variant="body2" color="text.secondary">
                 {[candidate.indexNumber + ' · ' + candidate.examYear, candidate.sex && t(`auth.sex${candidate.sex}`), candidate.centreName].filter(Boolean).join(' · ')}
               </Typography>
+              {candidate.premNumber && <Typography variant="body2" color="text.secondary">{t('app.premNumber')}: <strong>{candidate.premNumber}</strong></Typography>}
               {(candidate.division || candidate.points != null) && (
                 <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
                   {[candidate.division && t('auth.division', { division: candidate.division }), candidate.points != null && t('auth.points', { points: candidate.points })].filter(Boolean).join(' · ')}
@@ -134,7 +141,8 @@ export function RegisterPage() {
             <TextField label={t('auth.phone')} value={f.phone} onChange={set('phone')} required placeholder="0712 345 678" inputMode="tel" autoComplete="tel" autoFocus />
             <TextField label={t('auth.email')} value={f.email} onChange={set('email')} type="email" autoComplete="email" />
             <NewPasswordFields password={f.password} confirm={confirm} onPassword={(v) => setF({ ...f, password: v })} onConfirm={setConfirm} />
-            <FormControlLabel control={<Checkbox checked={f.acceptPrivacyNotice} onChange={set('acceptPrivacyNotice')} />} label={<Typography variant="body2">{t('auth.privacy')}</Typography>} />
+            <FormControlLabel control={<Checkbox checked={f.acceptPrivacyNotice} onChange={set('acceptPrivacyNotice')} />}
+              label={<Typography variant="body2">{t('auth.privacyBefore')}<PrivacyNoticeLink onAgree={() => setF((x) => ({ ...x, acceptPrivacyNotice: true }))}>{t('auth.privacyLink')}</PrivacyNoticeLink>{t('auth.privacyAfter')}</Typography>} />
             <ErrorAlert error={m.error} />
             <Button type="submit" variant="contained" size="large"
               disabled={m.isPending || !f.acceptPrivacyNotice || !passwordOk(f.password) || confirm !== f.password}>{t('auth.create')}</Button>
@@ -200,7 +208,7 @@ export function LoginPage() {
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Stack spacing={2}>
           <TextField label={t('auth.login')} value={login} onChange={(e) => setLogin(e.target.value)} required autoComplete="username" />
-          <TextField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="current-password" />
+          <PasswordField label={t('auth.password')} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           <ErrorAlert error={m.error} />
           <Button type="submit" variant="contained" size="large" disabled={m.isPending}>{t('auth.signIn')}</Button>
           <Stack direction="row" justifyContent="space-between">

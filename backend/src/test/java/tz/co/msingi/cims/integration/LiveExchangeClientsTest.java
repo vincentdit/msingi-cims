@@ -28,7 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** The live HESLB, NIDA, MUSE, TAMISEMI and NACTVET submission clients against a stand-in server answering canned JSON. */
+/** The live HESLB, NIDA, MUSE, TAMISEMI, NHIF and NACTVET submission clients against a stand-in server answering canned JSON. */
 class LiveExchangeClientsTest {
 
     HttpServer server;
@@ -113,5 +113,35 @@ class LiveExchangeClientsTest {
         answers.put("/res", "{\"code\":401,\"message\":\"Invalid authorization\"}");
         assertThatThrownBy(() -> c.submitResults("INST", new NactvetSubmissionClient.Results("P", "2027/2028", "Semester 1", 1, "MAIN", List.of())))
                 .isInstanceOf(NactvetUnavailableException.class).hasMessageContaining("401");
+    }
+
+    @Test
+    void nhif() {
+        tz.co.msingi.cims.integration.nhif.LiveNhifClient c = new tz.co.msingi.cims.integration.nhif.LiveNhifClient(base, "k5", "/card", "/reg", "/status");
+        answers.put("/card", "{\"card_no\":\"10234561\",\"status\":\"Active\",\"full_name\":\"ASHA JUMA MWINYI\",\"scheme\":\"Dependant\",\"valid_to\":\"2028-06-30\"}");
+        var card = c.verifyCard("10234561");
+        assertThat(card.status()).isEqualTo("ACTIVE");
+        assertThat(card.validTo()).isEqualTo(LocalDate.of(2028, 6, 30));
+        assertThat(received.get(0)).startsWith("POST /card").contains("key=k5").contains("\"card_no\":\"10234561\"");
+        answers.put("/card", "{\"card_no\":\"1\",\"status\":\"NOT FOUND\"}");
+        assertThat(c.verifyCard("1").status()).isEqualTo("NOT_FOUND");
+
+        answers.put("/reg", "{\"batch_ref\":\"NHIF-1\",\"received\":2,\"rejected\":[{\"registration_no\":\"R2\",\"reason\":\"Date of birth is required\"}]}");
+        var sub = c.registerStudents("INST", "2027/2028", List.of(new tz.co.msingi.cims.integration.nhif.NhifClient.Student("R1", "Asha", null, "Mwinyi", "F",
+                LocalDate.of(2006, 3, 4), "20060304111110000112", "0712", null, "ODIT", 1)));
+        assertThat(sub.batchRef()).isEqualTo("NHIF-1");
+        assertThat(sub.rejected()).extracting(tz.co.msingi.cims.integration.nhif.NhifClient.Rejected::reason).containsExactly("Date of birth is required");
+        assertThat(received.get(2)).contains("\"package\":\"STUDENT\"").contains("\"date_of_birth\":\"2006-03-04\"");
+        answers.put("/status", "{\"state\":\"completed\",\"items\":[{\"registration_no\":\"R1\",\"status\":\"registered\",\"card_no\":\"SN1\",\"valid_to\":\"2028-06-30\"}]}");
+        var st = c.registrationStatus("INST", "NHIF-1");
+        assertThat(st.state()).isEqualTo("COMPLETED");
+        assertThat(st.items().get(0).status()).isEqualTo("REGISTERED");
+        assertThat(received.get(3)).startsWith("GET /status?").contains("batch_ref=NHIF-1");
+        statuses.put("/status", 503);
+        assertThatThrownBy(() -> c.registrationStatus("INST", "NHIF-1")).isInstanceOf(ExternalSystemUnavailableException.class);
+        assertThat(tz.co.msingi.cims.integration.nhif.NhifClient.normalise(" 1023-4561 ")).isEqualTo("10234561");
+        assertThat(tz.co.msingi.cims.integration.nhif.NhifClient.normalise("12")).isNull();
+        assertThat(tz.co.msingi.cims.health.HealthCoverServiceTestAccess.sameSurname("ASHA JUMA MWINYI", "Mwinyi")).isTrue();
+        assertThat(tz.co.msingi.cims.health.HealthCoverServiceTestAccess.sameSurname("NEEMA JOHN KIMARO", "Mwinyi")).isFalse();
     }
 }

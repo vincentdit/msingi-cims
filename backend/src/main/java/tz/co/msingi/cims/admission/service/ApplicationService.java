@@ -63,6 +63,10 @@ public class ApplicationService {
 
     public static final String PURPOSE_APPLICATION_FEE = "APPLICATION_FEE";
 
+    /** Testing period: lets the simulate-payment button pay fees whatever payment route is set up (cims.payments.allow-simulation). */
+    @org.springframework.beans.factory.annotation.Value("${cims.payments.allow-simulation:false}")
+    private boolean allowPaymentSimulation;
+
     private final ApplicationRepository applications;
     private final AdmissionWindowRepository windows;
     private final WindowProgrammeRepository windowProgrammes;
@@ -164,7 +168,7 @@ public class ApplicationService {
     /** Development only: simulates paying the current control number or payment reference. */
     @Transactional
     public FeeView simulatePayment(Long applicationId) {
-        if (!gepgProps.isSimulated()) {
+        if (!allowPaymentSimulation && !gepgProps.isSimulated()) {
             throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available with simulated GePG");
         }
         Application app = own(applicationId, profiles.currentApplicant());
@@ -317,29 +321,50 @@ public class ApplicationService {
         return qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream().map(ApplicantQualification::toEngine).toList();
     }
 
-    /** Steps still missing before submission — shown to the applicant as a checklist. */
+    /** Steps still missing before submission, in plain English (the submit refusal; the portal shows {@link #todo} in the applicant's language). */
     List<String> blockers(Application app, Applicant a) {
-        List<String> b = new ArrayList<>();
+        return todo(app, a).stream().map(ApplicationService::english).toList();
+    }
+
+    /** Steps still missing before submission — shown to the applicant as a checklist; a code and its details, worded by the portal. */
+    List<AdmissionDtos.Todo> todo(Application app, Applicant a) {
+        List<AdmissionDtos.Todo> b = new ArrayList<>();
         if (!app.isEditable()) {
             return b;
         }
-        if (!app.getWindow().isOpen(OffsetDateTime.now())) b.add("The admission window is closed");
-        if (!a.missingProfileFields().isEmpty()) b.add("Complete your personal details (" + String.join(", ", a.missingProfileFields()) + ")");
+        if (!app.getWindow().isOpen(OffsetDateTime.now())) b.add(new AdmissionDtos.Todo("WINDOW_CLOSED", List.of()));
+        if (!a.missingProfileFields().isEmpty()) b.add(new AdmissionDtos.Todo("PROFILE", a.missingProfileFields()));
         if (qualifications.findByApplicantIdOrderByIdAsc(a.getId()).stream().noneMatch(ApplicantQualification::isVerified)) {
-            b.add("Add your NECTA results");
+            b.add(new AdmissionDtos.Todo("NECTA", List.of()));
         }
-        if (!app.isFeePaid()) b.add("Pay the application fee");
-        if (app.getChoices().isEmpty()) b.add("Choose at least one programme");
+        if (!app.isFeePaid()) b.add(new AdmissionDtos.Todo("FEE", List.of()));
+        if (app.getChoices().isEmpty()) b.add(new AdmissionDtos.Todo("CHOICE", List.of()));
         List<String> docs = documents.missingRequired(app);
-        if (!docs.isEmpty()) b.add("Upload " + String.join(", ", docs));
+        if (!docs.isEmpty()) b.add(new AdmissionDtos.Todo("DOCUMENTS", docs));
         // qualifications added since choosing may have changed the entry level (as in NOAS)
         List<EligibilityEngine.Qualification> quals = engineQualifications(a);
         for (ApplicationChoice c : app.getChoices()) {
             var p = c.getWindowProgramme().getProgramme();
             EligibilityResult r = engine.evaluate(p.getAwardFamily().name(), p.entryLevel(), c.getWindowProgramme().getEntryRules(), quals);
-            if (!r.eligible()) b.add("Change your choice of " + p.getName() + ": " + r.summary());
+            if (!r.eligible()) b.add(new AdmissionDtos.Todo("CHANGE_CHOICE", List.of(p.getName(), r.summary())));
         }
         return b;
+    }
+
+    private static final java.util.Map<String, String> FIELD_WORDS = java.util.Map.of("sex", "sex", "dateOfBirth", "date of birth",
+            "nationality", "nationality", "region", "region", "nextOfKinName", "next of kin's name", "nextOfKinPhone", "next of kin's phone");
+
+    static String english(AdmissionDtos.Todo t) {
+        return switch (t.code()) {
+            case "WINDOW_CLOSED" -> "The admission window is closed";
+            case "PROFILE" -> "Complete your personal details: " + String.join(", ", t.items().stream().map(f -> FIELD_WORDS.getOrDefault(f, f)).toList());
+            case "NECTA" -> "Add your NECTA results";
+            case "FEE" -> "Pay the application fee";
+            case "CHOICE" -> "Choose at least one programme";
+            case "DOCUMENTS" -> "Upload " + String.join(", ", t.items());
+            case "CHANGE_CHOICE" -> "Change your choice of " + t.items().get(0) + ": " + t.items().get(1);
+            default -> t.code();
+        };
     }
 
     private ApplicationView view(Application app, Applicant a) {
@@ -348,7 +373,8 @@ public class ApplicationService {
                 .map(l -> new LetterView(l.getLetterNo(), l.getEdition(), l.getVerificationCode(), l.getIssuedAt())).orElse(null);
         StudentInfo student = students.findByApplicationId(app.getId())
                 .map(st -> new StudentInfo(st.getRegistrationNo(), st.getStatus().name())).orElse(null);
-        return ApplicationView.of(app, blockers(app, a), devCode, letter, student, editGuard.amendable(app));
+        List<AdmissionDtos.Todo> todo = todo(app, a);
+        return ApplicationView.of(app, todo.stream().map(ApplicationService::english).toList(), todo, devCode, letter, student, editGuard.amendable(app));
     }
 
     private FeeView feeView(Application app) {

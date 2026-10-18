@@ -3,14 +3,15 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LockIcon from '@mui/icons-material/LockOutlined';
+import EditIcon from '@mui/icons-material/EditOutlined';
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Collapse, Divider,
   IconButton, MenuItem, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, formatDateTime, formatTzs } from '../../api/client';
+import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import type { Application, EligibilityResult, Fee, Profile, ProgrammeEligibility, Qualification } from '../../api/types';
 import { AreaPicker } from '../../components/AreaPicker';
 import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
@@ -40,6 +41,7 @@ export function ResultsStep({ onNext }: { onNext: () => void }) {
               <Box>
                 <Typography sx={{ fontWeight: 700 }}>{q.type} · {q.indexNumber}{q.examYear ? ` · ${q.examYear}` : ''}</Typography>
                 {q.centreName && <Typography variant="body2" color="text.secondary">{q.centreName}{q.division ? ` · Division ${q.division}` : ''}{q.points ? ` (${q.points} points)` : ''}</Typography>}
+                {q.premNumber && <Typography variant="body2" color="text.secondary">{t('app.premNumber')}: <strong>{q.premNumber}</strong></Typography>}
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Chip size="small" color={q.verified ? 'success' : 'warning'} label={q.verified ? t('app.verified') : t('app.pending')} />
@@ -291,26 +293,114 @@ function ProgrammeOption({ e, checked, disabled, onToggle }: { e: ProgrammeEligi
 }
 
 // ---------------------------------------------------------------- Review
-export function ReviewStep({ app, onDone }: { app: Application; onDone?: () => void }) {
+/** Where the profile's Edit buttons lead: the wizard step of each part (documents only when the window asks for them). */
+export interface ProfileSteps { results: number; details: number; fee: number; other: number; programmes: number; documents?: number }
+
+/**
+ * The applicant profile, on the last step: everything the application holds (personal details, Form Four results with the
+ * PREM number, other qualifications, programme choices, fee and documents), each part with an Edit button that opens its
+ * step; then what is still to do and Submit.
+ */
+export function ReviewStep({ app, onDone, goTo, stepsOf }: { app: Application; onDone?: () => void; goTo?: (step: number) => void; stepsOf?: ProfileSteps }) {
   const { t } = useTranslation();
   const invalidate = useInvalidate();
+  const profile = useQuery({ queryKey: ['applicant', 'profile'], queryFn: () => api<Profile>('/api/applicant/profile', { realm: 'applicant' }) });
+  const quals = useQuery({ queryKey: ['applicant', 'qualifications'], queryFn: () => api<Qualification[]>('/api/applicant/qualifications', { realm: 'applicant' }) });
+  const docs = useQuery({ queryKey: ['applicant', 'documents', app.id], enabled: stepsOf?.documents != null,
+    queryFn: () => api<{ typeId: number; name: string; required: boolean; fileName?: string; status?: string }[]>(`/api/applicant/applications/${app.id}/documents`, { realm: 'applicant' }) });
   const submit = useMutation({ mutationFn: () => api(`/api/applicant/applications/${app.id}/submit`, { method: 'POST', realm: 'applicant' }), onSuccess: invalidate });
+  const p = profile.data;
+  const all = quals.data ?? [];
+  const registration = all.filter((q) => q.registration || ((q.type === 'CSEE' || q.type === 'ACSEE') && !all.some((x) => x.registration)));
+  const others = all.filter((q) => !registration.includes(q));
+  const join = (...xs: (string | undefined | null)[]) => xs.filter((x) => x && String(x).trim()).join(', ');
+  const edit = (step?: number) => goTo && step != null
+    ? <Button size="small" startIcon={<EditIcon fontSize="small" />} onClick={() => goTo(step)}>{t('profileStep.edit')}</Button> : null;
   return (
     <Stack spacing={2.5}>
       <Typography color="text.secondary">{t('app.reviewIntro')}</Typography>
-      <Card>
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary">{app.windowName}</Typography>
-          {app.choices.map((c) => (
-            <Typography key={c.id} sx={{ mt: 0.5 }}><strong>{t('app.choice', { n: c.order })}:</strong> {c.programmeName}</Typography>
+
+      <ProfileSection title={t('profileStep.personal')} action={edit(stepsOf?.details)}>
+        {!p ? <Loading /> : (
+          <>
+            <Typography variant="h6">{p.fullName}</Typography>
+            <Rows rows={[
+              [t('app.indexNumber'), p.nectaIndexNumber ? `${p.nectaIndexNumber}${p.nectaExamYear ? ' · ' + p.nectaExamYear : ''}` : undefined],
+              [t('app.premNumber'), p.premNumber],
+              [t('profile.sex'), p.sex ? t(`auth.sex${p.sex}`) : undefined],
+              [t('profile.dateOfBirth'), p.dateOfBirth ? formatDate(p.dateOfBirth) : undefined],
+              [t('profile.nationality'), p.nationality],
+              [t('profileStep.phone'), p.phone],
+              [t('profileStep.email'), p.email],
+              [t('profileStep.address'), join(p.street, p.ward, p.district, p.region, p.postalAddress)],
+              [t('profile.disability'), p.disability || t('profile.none')],
+              [t('profileStep.schools'), join(p.primarySchool, p.olevelSchool, p.alevelSchool)],
+              [t('profileStep.nextOfKin'), join(p.nextOfKinName, p.nextOfKinRelation, p.nextOfKinPhone, p.nextOfKinEmail)],
+            ]} empty={t('profileStep.notGiven')} />
+            {p.missingFields.length > 0 && <Alert severity="warning" sx={{ mt: 1 }}>{t('app.todoItem.PROFILE', { items: p.missingFields.map((f) => t(`app.todoField.${f}`, { defaultValue: f })).join(', ') })}</Alert>}
+          </>
+        )}
+      </ProfileSection>
+
+      {/* the Form Four results come from NECTA and cannot be changed */}
+      <ProfileSection title={t('profileStep.results')}>
+        {registration.length === 0 ? <Typography color="text.secondary">{t('app.todoItem.NECTA')}</Typography> : registration.map((q) => (
+          <Box key={q.id} sx={{ mb: 1 }}>
+            <Typography sx={{ fontWeight: 700 }}>{q.type} · {q.indexNumber}{q.examYear ? ` · ${q.examYear}` : ''}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {join(q.centreName, q.division ? `Division ${q.division}` : null, q.points ? `${q.points} points` : null)}
+              {q.premNumber ? ` · ${t('app.premNumber')}: ${q.premNumber}` : ''}
+            </Typography>
+            {q.subjects.length > 0 && <Typography variant="caption" color="text.secondary">{q.subjects.map((x) => `${x.name} ${x.grade}`).join(', ')}</Typography>}
+          </Box>
+        ))}
+      </ProfileSection>
+
+      <ProfileSection title={t('profileStep.other')} action={edit(stepsOf?.other)}>
+        {others.length === 0 ? <Typography color="text.secondary">{t('profileStep.noOther')}</Typography> : others.map((q) => (
+          <Stack key={q.id} direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {q.type === 'OTHER' ? q.awardName : q.type === 'NTA' ? `NTA Level ${q.awardLevel} · ${q.awardName ?? ''}` : q.type === 'NVA' ? `NVA Level ${q.awardLevel}` : `${q.type} · ${q.indexNumber}`}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">{join(q.institution ?? q.centreName, q.examYear ? String(q.examYear) : null, q.gpa != null ? `GPA ${q.gpa}` : null, q.classAward)}</Typography>
+            </Box>
+            <Chip size="small" color={q.checkStatus === 'VERIFIED' ? 'success' : q.checkStatus === 'REJECTED' ? 'error' : 'warning'}
+              label={q.checkStatus === 'VERIFIED' ? t('app.verified') : q.checkStatus === 'REJECTED' ? t('other.notAccepted') : t('app.pending')} />
+          </Stack>
+        ))}
+      </ProfileSection>
+
+      <ProfileSection title={t('profileStep.choices')} action={edit(stepsOf?.programmes)}>
+        {app.choices.length === 0 ? <Typography color="text.secondary">{t('app.todoItem.CHOICE')}</Typography> : app.choices.map((c) => (
+          <Typography key={c.id} sx={{ mb: 0.5 }}><strong>{t('app.choice', { n: c.order })}:</strong> {c.programmeName}</Typography>
+        ))}
+      </ProfileSection>
+
+      <ProfileSection title={t('app.steps.fee')} action={app.feePaid ? null : edit(stepsOf?.fee)}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {app.feePaid ? <CheckCircleIcon color="success" fontSize="small" /> : <CancelIcon color="warning" fontSize="small" />}
+          <Typography>{app.feePaid ? t('app.feePaid') : t('app.todoItem.FEE')}</Typography>
+        </Stack>
+      </ProfileSection>
+
+      {stepsOf?.documents != null && (
+        <ProfileSection title={t('app.steps.documents')} action={edit(stepsOf.documents)}>
+          {(docs.data ?? []).map((d) => (
+            <Stack key={d.typeId} direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+              {d.fileName && d.status !== 'REJECTED' ? <CheckCircleIcon color="success" fontSize="small" /> : <CancelIcon color={d.required ? 'warning' : 'disabled'} fontSize="small" />}
+              <Typography variant="body2">{d.name}{d.fileName ? ` · ${d.fileName}` : ''}</Typography>
+            </Stack>
           ))}
-          <Typography sx={{ mt: 1 }}>{t('app.steps.fee')}: {app.feePaid ? '✓' : '—'}</Typography>
-        </CardContent>
-      </Card>
+        </ProfileSection>
+      )}
+
       {app.blockers.length > 0 && (
         <Alert severity="warning">
           <strong>{t('app.todo')}:</strong>
-          <Box component="ul" sx={{ m: 0, pl: 2 }}>{app.blockers.map((b) => <li key={b}>{b}</li>)}</Box>
+          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            {app.todo ? app.todo.map((x, i) => <li key={i}>{todoText(x, t)}</li>) : app.blockers.map((b) => <li key={b}>{b}</li>)}
+          </Box>
         </Alert>
       )}
       <ErrorAlert error={submit.error} />
@@ -324,4 +414,39 @@ export function ReviewStep({ app, onDone }: { app: Application; onDone?: () => v
       )}
     </Stack>
   );
+}
+
+function ProfileSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</Typography>
+          {action}
+        </Stack>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Rows({ rows, empty }: { rows: [string, string | undefined][]; empty: string }) {
+  return (
+    <Box component="dl" sx={{ m: 0, mt: 1, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '200px 1fr' }, columnGap: 2, rowGap: { xs: 0, sm: 0.75 } }}>
+      {rows.map(([k, v]) => (
+        <Box key={k} sx={{ display: 'contents' }}>
+          <Typography component="dt" variant="body2" color="text.secondary" sx={{ mt: { xs: 1, sm: 0 } }}>{k}</Typography>
+          <Typography component="dd" variant="body2" sx={{ m: 0, color: v ? 'text.primary' : 'text.disabled' }}>{v || empty}</Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/** A step still to do, in the applicant's language: the missing fields by their names, documents and programmes as given. */
+function todoText(x: { code: string; items: string[] }, t: (k: string, o?: Record<string, unknown>) => string): string {
+  const key = `app.todoItem.${x.code}`;
+  if (x.code === 'PROFILE') return t(key, { items: x.items.map((f) => t(`app.todoField.${f}`, { defaultValue: f })).join(', ') });
+  if (x.code === 'CHANGE_CHOICE') return t(key, { programme: x.items[0], reason: x.items[1] });
+  return t(key, { items: x.items.join(', '), defaultValue: x.code });
 }

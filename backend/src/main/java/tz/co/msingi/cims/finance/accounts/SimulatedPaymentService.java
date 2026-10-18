@@ -25,10 +25,14 @@ public class SimulatedPaymentService {
     private final tz.co.msingi.cims.finance.collection.CollectionProperties collection;
     private final tz.co.msingi.cims.finance.collection.PaymentChannelService channels;
 
+    /** Testing period: allows simulated payments with live GePG or a live collector too (cims.payments.allow-simulation). */
+    @org.springframework.beans.factory.annotation.Value("${cims.payments.allow-simulation:false}")
+    private boolean allowSimulation;
+
     @Transactional
     public Statement payMine(Long invoiceId, BigDecimal amount) {
         boolean viaGepg = channels.usesGepg();
-        if (viaGepg ? !gepg.isSimulated() : !collection.isSimulated()) {
+        if (!allowSimulation && (viaGepg ? !gepg.isSimulated() : !collection.isSimulated())) {
             throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available in the test system");
         }
         Invoice inv = accounts.requireMine(invoiceId);

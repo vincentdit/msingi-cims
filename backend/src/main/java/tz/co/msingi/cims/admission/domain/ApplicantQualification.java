@@ -54,6 +54,8 @@ public class ApplicantQualification extends BaseEntity {
     private String division;
     private Short points;
     private String candidateName;
+    /** NECTA's PREM number for the candidate, as sent with these results. */
+    private String premNumber;
     private String awardName;
     private String institution;
     private java.math.BigDecimal gpa;

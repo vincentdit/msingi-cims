@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProgrammeTable } from './CataloguePages';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
@@ -690,7 +690,7 @@ function LinkDialog({ name, onClose, onPick }: { name: string; onClose: () => vo
             <Stack key={r.id} direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 1, borderTop: 1, borderColor: 'divider' }}>
               <Box>
                 <Typography fontWeight={600}>{r.name}</Typography>
-                <Typography variant="body2" color="text.secondary">{[r.registrationNumber, r.region, `${r.programmes} programmes`].filter(Boolean).join(' · ')}</Typography>
+                <Typography variant="body2" color="text.secondary">{[r.registrationNumber, r.region, `${r.programmes} programmes`].filter(Boolean).map((x, i) => <Fragment key={i}>{i > 0 && ' · '}{x}</Fragment>)}</Typography>
               </Box>
               <Button size="small" onClick={() => onPick(r.id)}>Choose</Button>
             </Stack>

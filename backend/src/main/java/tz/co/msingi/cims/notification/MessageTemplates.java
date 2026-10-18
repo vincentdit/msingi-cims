@@ -24,7 +24,8 @@ public final class MessageTemplates {
 
     static {
         Map<String, String> s = Map.ofEntries(
-                Map.entry("code", "482913"), Map.entry("institution", "Msingi Demo Technical College"), Map.entry("minutes", "10"),
+                Map.entry("code", "482913"), Map.entry("ticketNo", "HD-2026-00042"), Map.entry("subject", "Control number not received"),
+                Map.entry("due", "18 Oct 2026, 16:00"), Map.entry("institution", "Msingi Demo Technical College"), Map.entry("minutes", "10"),
                 Map.entry("referenceNo", "DEMO/APP/2027/000123"), Map.entry("controlNo", "991234567890"), Map.entry("amount", "TZS 320,000"),
                 Map.entry("description", "Fees 2027/2028 — ODIT year 1"), Map.entry("receiptNo", "DEMO/RCT/2026/000045"),
                 Map.entry("programme", "Ordinary Diploma in Information Technology"), Map.entry("deadline", "20 October 2026"),
@@ -41,7 +42,8 @@ public final class MessageTemplates {
                 Map.entry("outcome", "your grade is now B"), Map.entry("kind", "Waiver"), Map.entry("status", "Fixed"),
                 Map.entry("sponsor", "Higher Education Students' Loans Board"),
                 Map.entry("channels", "M-Pesa 555123, CRDB Bank 0150123456700"), Map.entry("instalment", "2"),
-                Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"));
+                Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"),
+                Map.entry("cardNo", "SN104526781"), Map.entry("validTo", "30 June 2028"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -169,6 +171,34 @@ public final class MessageTemplates {
                 List.of("semester", "reason", "institution"), Set.of("reason"),
                 "Your registration for {semester} needs correcting: {reason}. Update it on the student portal.",
                 "Usajili wako wa {semester} unahitaji marekebisho: {reason}. Urekebishe kwenye tovuti ya mwanafunzi.", s);
+        add("NHIF_CARD_ISSUED", "NHIF card issued", "NHIF registers a student sent by the institution under the student package", "Registry",
+                List.of("cardNo", "validTo", "institution"), Set.of("cardNo"),
+                "{institution}: NHIF has registered you for health insurance. Your NHIF card number is {cardNo}, valid until {validTo}.",
+                "{institution}: NHIF imekusajili kwa bima ya afya. Namba ya kadi yako ya NHIF ni {cardNo}, inatumika hadi {validTo}.", s);
+        add("NHIF_REGISTRATION_REJECTED", "NHIF registration not accepted", "NHIF does not register a student sent by the institution", "Registry",
+                List.of("reason", "institution"), Set.of(),
+                "{institution}: NHIF did not register you for health insurance: {reason}. See Health insurance on the student portal or contact Registry.",
+                "{institution}: NHIF haikukusajili kwa bima ya afya: {reason}. Angalia Bima ya afya kwenye tovuti ya mwanafunzi au wasiliana na Usajili.", s);
+        add("HELPDESK_RECEIVED", "Help request received", "An applicant, student or staff member asks for help", "Helpdesk",
+                List.of("ticketNo", "subject", "due", "institution"), Set.of("ticketNo"),
+                "{institution}: we have received your request {ticketNo} ({subject}). We aim to reply by {due}. Follow it under Help on the portal.",
+                "{institution}: tumepokea ombi lako {ticketNo} ({subject}). Tunalenga kukujibu kabla ya {due}. Lifuatilie kwenye Msaada katika tovuti.", s);
+        add("HELPDESK_RECEIVED_GUEST", "Help request received (no account)", "Someone without an account asks for help on the public help page", "Helpdesk",
+                List.of("ticketNo", "code", "due", "institution"), Set.of("ticketNo", "code"),
+                "{institution}: we have received your request {ticketNo}. Follow it on the help page with code {code}. We aim to reply by {due}.",
+                "{institution}: tumepokea ombi lako {ticketNo}. Lifuatilie kwenye ukurasa wa msaada kwa nambari ya siri {code}. Tunalenga kukujibu kabla ya {due}.", s);
+        add("HELPDESK_REPLY", "Help request answered", "Staff reply to a help request", "Helpdesk",
+                List.of("ticketNo", "subject", "institution"), Set.of("ticketNo"),
+                "{institution}: there is a reply to your request {ticketNo} ({subject}). Read it under Help on the portal.",
+                "{institution}: kuna jibu la ombi lako {ticketNo} ({subject}). Lisome kwenye Msaada katika tovuti.", s);
+        add("HELPDESK_REPLY_GUEST", "Help request answered (no account)", "Staff reply to a request made on the public help page", "Helpdesk",
+                List.of("ticketNo", "institution"), Set.of("ticketNo"),
+                "{institution}: there is a reply to your request {ticketNo}. Open the help page and enter the request number with your code.",
+                "{institution}: kuna jibu la ombi lako {ticketNo}. Fungua ukurasa wa msaada na uweke namba ya ombi pamoja na nambari yako ya siri.", s);
+        add("HELPDESK_RESOLVED", "Help request resolved", "Staff mark a help request resolved", "Helpdesk",
+                List.of("ticketNo", "subject", "institution"), Set.of("ticketNo"),
+                "{institution}: your request {ticketNo} has been answered and marked resolved. If you still need help, reply within 7 days.",
+                "{institution}: ombi lako {ticketNo} limejibiwa na kuwekwa kuwa limetatuliwa. Kama bado unahitaji msaada, jibu ndani ya siku 7.", s);
         add("RESULTS_PUBLISHED", "Results published", "The Examinations Officer publishes confirmed semester results", "Examinations",
                 List.of("semester", "gpa", "decision", "institution"), Set.of(),
                 "Your results for {semester} are out: GPA {gpa}, {decision}. See your grades on the student portal.",

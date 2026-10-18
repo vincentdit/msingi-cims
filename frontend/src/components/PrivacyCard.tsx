@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, download, formatDate, type Realm } from '../api/client';
 import { ErrorAlert } from './common';
+import { PrivacyNoticeLink } from './PrivacyNoticeDialog';
 
 export interface PrivacyRequest {
   id: number; requestNo: string; userId: number; subjectName: string; userType: string; kind: 'ACCESS' | 'CORRECTION' | 'ERASURE' | 'OBJECTION';
@@ -34,7 +35,10 @@ export default function PrivacyCard({ realm }: { realm: Exclude<Realm, 'platform
     <Card sx={{ borderRadius: realm === 'staff' ? undefined : 3, textAlign: 'left' }}>
       <CardContent>
         <Typography variant="h6" sx={{ mb: 0.5 }}>{t('privacy.title')}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{t('privacy.intro')}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {t('privacy.intro')}
+          {realm === 'applicant' && <>{' '}<PrivacyNoticeLink>{t('privacy.readNotice')}</PrivacyNoticeLink></>}
+        </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => dl.mutate()} disabled={dl.isPending}>{t('privacy.download')}</Button>
           <Button onClick={() => setOpen(true)}>{t('privacy.ask')}</Button>

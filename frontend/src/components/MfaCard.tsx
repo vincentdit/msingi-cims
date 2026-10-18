@@ -8,6 +8,7 @@ import { api } from '../api/client';
 import type { TokenResponse } from '../api/types';
 import { useSession } from '../auth/session';
 import { ErrorAlert } from './common';
+import { PasswordField } from './PasswordFields';
 
 interface MfaStatus { enabled: boolean; enabledAt?: string; required: boolean; policy: string; recoveryCodesLeft: number }
 interface Setup { secret: string; otpauthUri: string; qrPng: string }
@@ -88,7 +89,7 @@ export default function MfaCard() {
         <DialogTitle>{ask === 'codes' ? 'New recovery codes' : 'Turn off two-step sign-in'}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 1.5 }}>{ask === 'codes' ? 'Your old recovery codes stop working.' : 'Your account will be protected by your password only.'} Confirm with your password.</Typography>
-          <TextField fullWidth type="password" label="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          <PasswordField fullWidth label="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           <ErrorAlert error={withPassword.error} />
         </DialogContent>
         <DialogActions>

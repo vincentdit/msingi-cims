@@ -27,9 +27,9 @@ const EXAMS_READERS = [R.ADMIN, R.ACADEMIC, R.HOD, R.EXAMS, R.MANAGEMENT];
 const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 
 export type PageKey =
-  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'graduations'
+  | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'healthInsurance' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations';
+  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
@@ -43,6 +43,7 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   statusChanges: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   transfers: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   semesterRegistrations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
+  healthInsurance: [R.ADMIN, R.REGISTRAR, R.BURSAR, R.ACCOUNTANT, R.ACADEMIC, R.MANAGEMENT, R.AUDITOR],
   graduations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
   calendar: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.ADMISSIONS, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   curricula: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
@@ -75,6 +76,10 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   imports: [R.ADMIN, R.REGISTRAR, R.EXAMS, R.BURSAR, R.ACCOUNTANT, R.ADMISSIONS],
   alumni: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
   integrations: [R.ADMIN, R.BURSAR, R.ACCOUNTANT, R.REGISTRAR, R.ADMISSIONS, R.EXAMS],
+  // the offices that answer helpdesk requests (each sees its own categories), and those who oversee them
+  helpdesk: [R.ADMIN, R.ADMISSIONS, R.REGISTRAR, R.BURSAR, R.ACCOUNTANT, R.EXAMS, R.WARDEN, R.IPT, R.CLEARANCE, R.SPONSOR, R.ACADEMIC, R.AUDITOR, R.MANAGEMENT],
+  // every member of staff can ask for help
+  help: Object.values(R),
 };
 
 export const can = (roles: readonly string[] | undefined, page: PageKey) => !!roles?.some((r) => PAGE_ROLES[page].includes(r));
@@ -82,10 +87,10 @@ export const can = (roles: readonly string[] | undefined, page: PageKey) => !!ro
 /** The page a path belongs to (the first segment after /staff). */
 const PATH_PAGE: Record<string, PageKey> = {
   '': 'dashboard', approvals: 'approvals', reports: 'reports', windows: 'windows', applications: 'applications', programmes: 'programmes', students: 'students', 'status-changes': 'statusChanges', transfers: 'transfers',
-  'semester-registrations': 'semesterRegistrations', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
+  'semester-registrations': 'semesterRegistrations', 'health-insurance': 'healthInsurance', graduations: 'graduations', calendar: 'calendar', curricula: 'curricula',
   'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', timetable: 'timetable', 'exam-timetable': 'examTimetable', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
-  institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations',
+  institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations', helpdesk: 'helpdesk', help: 'help',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {

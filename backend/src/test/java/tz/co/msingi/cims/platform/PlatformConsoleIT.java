@@ -191,7 +191,7 @@ class PlatformConsoleIT {
         assertThat(audit.findValuesAsText("action")).contains("INSTITUTION_ONBOARDED", "INSTITUTION_SUSPENDED", "INSTITUTION_REACTIVATED",
                 "INSTITUTION_ADMIN_PASSWORD_RESET", "DOMAIN_ADDED", "DOMAIN_REMOVED", "SMS_BUNDLE_CREDITED", "INSTITUTION_UPDATED");
         assertThat(audit.at("/content/0/actorName").asText()).isEqualTo("Platform ops" + suffix);
-        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(12));
+        call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(13));
     }
 
     @Test
@@ -212,6 +212,8 @@ class PlatformConsoleIT {
         assertThat(mine.at("/content/0/outcome").asText()).isEqualTo("SUCCESS");
         assertThat(mine.toString()).contains("S0101/0002").doesNotContain("S0101/0003");
         JsonNode health = sb.body(sb.call(get("/api/audit/integrations/health"), sb.staffToken("auditor"), null));
+        // every outside system has a name (none shows as a blank row)
+        for (JsonNode h : health) assertThat(h.path("label").asText()).as(h.get("system").asText()).isNotBlank();
         JsonNode necta = null;
         for (JsonNode h : health) if (h.get("system").asText().equals("NECTA")) necta = h;
         assertThat(necta.get("calls").asLong()).isEqualTo(1);

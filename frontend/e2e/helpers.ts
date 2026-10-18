@@ -26,7 +26,7 @@ export async function staffSignIn(page: Page, user: keyof typeof STAFF_PASSWORD 
   await page.evaluate((l) => localStorage.setItem('cims.lang', l), language);
   await page.reload();
   await page.getByLabel(language === 'sw' ? 'Jina la mtumiaji' : 'Username').fill(user);
-  await page.getByLabel(language === 'sw' ? 'Nenosiri' : 'Password').fill(STAFF_PASSWORD[user]);
+  await page.locator('input[type=password]').fill(STAFF_PASSWORD[user]);
   await page.getByRole('button', { name: language === 'sw' ? 'Ingia' : 'Sign in' }).click();
   await expect(page.getByRole('navigation', { name: language === 'sw' ? 'Menyu kuu' : 'Main menu' })).toBeVisible();
 }

@@ -109,10 +109,12 @@ function Wizard({ app, onDone }: { app: Application; onDone?: () => void }) {
     { label: t('app.steps.other'), body: <OtherQualificationsStep app={app} onNext={() => setActive(4)} /> },
     { label: t('app.steps.programmes'), body: <ProgrammesStep app={app} onNext={() => setActive(5)} /> },
     ...(hasDocs ? [{ label: t('app.steps.documents'), body: <DocumentsStep appId={app.id} onNext={() => setActive(6)} /> }] : []),
-    // the email address and the personal-data rights are offered once, on the last step, before submitting
+    // the last step is the applicant profile, with Edit buttons for each part; the email address and the personal-data rights
+    // are offered once, there, before submitting
     { label: t('app.steps.review'), body: (
       <>
-        <ReviewStep app={app} onDone={onDone} />
+        <ReviewStep app={app} onDone={onDone} goTo={setActive}
+          stepsOf={{ results: 0, details: 1, fee: 2, other: 3, programmes: 4, documents: hasDocs ? 5 : undefined }} />
         <Box sx={{ mt: 3 }}><EmailCard realm="applicant" /></Box>
         <Box sx={{ mt: 3 }}><PrivacyCard realm="applicant" /></Box>
       </>

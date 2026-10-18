@@ -54,7 +54,15 @@ class RegistryReports extends ReportQueries implements ReportProvider {
                         ROLES, true, List.of(SEMESTER, MODULE, PROGRAMME, SEX), this::classList),
                 new Definition("REG-05", "Registry", "First registration status",
                         "Students handed over by Admissions: registered at reporting, and still to report.", ROLES, false,
-                        List.of(ACADEMIC_YEAR, INTAKE, PROGRAMME, AWARD, LEVEL, SEX), this::firstRegistration));
+                        List.of(ACADEMIC_YEAR, INTAKE, PROGRAMME, AWARD, LEVEL, SEX), this::firstRegistration),
+                new Definition("REG-08", "Registry", "Health insurance (NHIF) cover",
+                        "Current students per programme with active health cover (own NHIF card or through the institution), registration under way, "
+                                + "problems to sort out and no cover recorded, for an academic year.", ROLES, false,
+                        List.of(ACADEMIC_YEAR, PROGRAMME, AWARD, LEVEL, SEX, YEAR_OF_STUDY), this::healthCover),
+                new Definition("REG-09", "Registry", "Students without health cover",
+                        "Current students not covered for the academic year: no cover recorded, card not accepted or expired, NHIF refused the "
+                                + "registration, or contribution not paid.", ROLES, true,
+                        List.of(ACADEMIC_YEAR, PROGRAMME, AWARD, LEVEL, SEX, YEAR_OF_STUDY), this::withoutCover));
     }
 
     private Sql filters(Filter f, boolean withStatus) {
@@ -182,5 +190,58 @@ class RegistryReports extends ReportQueries implements ReportProvider {
                 Column.percent("rate", "Registered %")), r).withTotals();
         d.totals().set(6, ratio(d.totals().get(3), d.totals().get(2)));
         return d;
+    }
+
+    /** The cover year (the chosen academic year, else the current one) and the programme filters, for current students. */
+    private Sql coverFilters(Filter f) {
+        Sql q = new Sql().eq("p.id", "programme", f.programmeId()).eq("p.award_family", "award", f.awardFamily()).eq("p.award_level", "level", f.level())
+                .eq("s.sex", "sex", f.sex()).eq("s.year_of_study", "yos", f.yearOfStudy() == null ? null : f.yearOfStudy().shortValue())
+                .raw("s.status in ('ADMITTED', 'ACTIVE')").param("today", LocalDate.now(Sql.ZONE));
+        if (f.academicYearId() != null) return q.param("coverYear", f.academicYearId());
+        Long current = jdbc.getJdbcTemplate().queryForList(
+                "select id from academic_years order by (current_date between start_date and end_date) desc, start_date desc limit 1", Long.class)
+                .stream().findFirst().orElse(-1L);
+        return q.param("coverYear", current);
+    }
+
+    private static final String COVER_JOIN = " from students s join programmes p on p.id = s.programme_id"
+            + " left join health_covers c on c.student_id = s.id and c.academic_year_id = :coverYear"
+            + " left join invoices i on i.id = c.invoice_id where 1 = 1";
+
+    /** As shown: ACTIVE (valid), UNDER_WAY (contribution billed, paid or with NHIF), PROBLEM (not accepted, expired, refused) or NONE. */
+    private static final String COVER_STATE = """
+            case when c.id is null then 'NONE'
+                 when c.status = 'ACTIVE' and (c.valid_to is null or c.valid_to >= :today) then 'ACTIVE'
+                 when c.status in ('AWAITING_PAYMENT', 'READY', 'SUBMITTED') then 'UNDER_WAY'
+                 else 'PROBLEM' end""";
+
+    private Data healthCover(Filter f) {
+        Sql q = coverFilters(f);
+        List<List<Object>> r = rows("select p.code, p.name, count(*), count(*) filter (where (" + COVER_STATE + ") = 'ACTIVE'), "
+                + "count(*) filter (where (" + COVER_STATE + ") = 'ACTIVE' and c.route = 'OWN_CARD'), "
+                + "count(*) filter (where (" + COVER_STATE + ") = 'UNDER_WAY'), count(*) filter (where (" + COVER_STATE + ") = 'PROBLEM'), "
+                + "count(*) filter (where c.id is null)" + COVER_JOIN + q + " group by p.code, p.name order by p.name", q);
+        r.forEach(x -> x.add(ratio(x.get(3), x.get(2))));
+        Data d = new Data(List.of(Column.text("code", "Code"), Column.text("programme", "Programme"), Column.number("students", "Current students"),
+                Column.number("covered", "Covered"), Column.number("ownCard", "of which own card"), Column.number("underWay", "Registration under way"),
+                Column.number("problems", "Needs attention"), Column.number("none", "No cover recorded"), Column.percent("rate", "Covered %")), r).withTotals();
+        d.totals().set(8, ratio(d.totals().get(3), d.totals().get(2)));
+        return d.withNote("Covered: an NHIF card checked with NHIF and not expired, or issued after registration through the institution. "
+                + "Registration under way: NHIF contribution billed, paid, or sent to NHIF. Needs attention: card not accepted, expired, or NHIF refused the registration.");
+    }
+
+    private Data withoutCover(Filter f) {
+        Sql q = coverFilters(f).raw("(" + COVER_STATE + ") <> 'ACTIVE'").raw("coalesce(c.status, '') not in ('READY', 'SUBMITTED')");
+        List<List<Object>> r = rows("""
+                select s.registration_no, s.surname, concat_ws(' ', s.first_name, s.middle_name), s.sex, p.code, s.year_of_study, s.phone,
+                       case when c.id is null then 'No cover recorded'
+                            when c.status = 'ACTIVE' then 'Card expired'
+                            when c.status = 'INVALID' then 'Card not accepted'
+                            when c.status = 'REJECTED' then 'Refused by NHIF'
+                            when c.status = 'AWAITING_PAYMENT' then 'Contribution not paid' else c.status end, c.reason""" + COVER_JOIN + q
+                + " order by p.code, s.year_of_study, s.surname, s.first_name", q);
+        return new Data(List.of(Column.text("regNo", "Registration no."), Column.text("surname", "Surname"), Column.text("names", "Other names"),
+                Column.text("sex", "Sex"), Column.text("programme", "Programme"), Column.number("year", "Year"), Column.text("phone", "Phone"),
+                Column.text("state", "Situation"), Column.text("reason", "Reason")), r);
     }
 }

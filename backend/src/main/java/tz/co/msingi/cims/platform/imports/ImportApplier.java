@@ -185,6 +185,9 @@ class ImportApplier {
                 if (res.isPresent()) {
                     qualifications.save(tz.co.msingi.cims.admission.service.ApplicantProfileService.fromNecta(applicants.findById(applicant).orElseThrow(),
                             tz.co.msingi.cims.admission.domain.ApplicantQualification.Type.CSEE, res.get()));
+                    if (res.get().premNumber() != null) {
+                        jdbc.update("update applicants set prem_number = coalesce(prem_number, ?) where id = ?", res.get().premNumber(), applicant);
+                    }
                 } else {
                     notAtNecta.add(r.get("indexNumber") + "/" + examYear);
                 }

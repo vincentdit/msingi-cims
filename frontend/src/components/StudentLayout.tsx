@@ -1,3 +1,4 @@
+import HelpIcon from '@mui/icons-material/HelpOutline';
 import NotificationsIcon from '@mui/icons-material/NotificationsOutlined';
 import ResultsIcon from '@mui/icons-material/GradingOutlined';
 import TimetableIcon from '@mui/icons-material/CalendarViewWeekOutlined';
@@ -40,7 +41,7 @@ export default function StudentLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dash = useQuery({ queryKey: ['student', 'dashboard'], queryFn: () => api<StudentDashboard>('/api/student/dashboard', { realm: 'student' }) });
-  const current = pathname.startsWith('/student/notices') ? false
+  const current = pathname.startsWith('/student/notices') || pathname.startsWith('/student/help') ? false
     : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
   const label = (key: string) => t(`student.${key}`);
@@ -62,6 +63,11 @@ export default function StudentLayout() {
             <IconButton aria-label={t('student.navNotices')} onClick={() => navigate('/student/notices')}
               color={pathname.startsWith('/student/notices') ? 'primary' : 'default'}>
               <Badge color="error" badgeContent={unread}><NotificationsIcon /></Badge>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t('student.navHelp')}>
+            <IconButton aria-label={t('student.navHelp')} onClick={() => navigate('/student/help')} color={pathname.startsWith('/student/help') ? 'primary' : 'default'}>
+              <HelpIcon />
             </IconButton>
           </Tooltip>
           <ToggleButtonGroup size="small" exclusive value={i18n.language} onChange={(_, v) => v && setLanguage(v)} aria-label="language">
