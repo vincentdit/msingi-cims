@@ -58,7 +58,7 @@ export default function PaymentMethodsTab({ canManage }: { canManage: boolean })
   return (
     <>
       <Alert severity="success" icon={false} sx={{ mb: 2 }}>
-        <strong>{d.ownership === 'FBO' ? 'Faith-based' : 'Private'} institution — no GePG.</strong> Every invoice gets a 12-digit CIMS <strong>payment reference</strong>.
+        <strong>{d.ownership === 'FBO' ? 'Faith-based institution: fees are paid into your own accounts.' : 'Private institution: fees are paid into your own accounts.'}</strong> Every invoice gets a 12-digit CIMS <strong>payment reference</strong>.
         Payers quote it when they pay into one of the accounts below; the portals and the SMS show them how. Mobile money payments are confirmed by the
         collector as they happen; bank payments when the Accountant imports the day’s statement under <em>Reconciliation</em>, or records a remittance.
       </Alert>

@@ -15,6 +15,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 import { api, download, formatDateTime, uploadForm, type Realm } from '../../api/client';
 import { ErrorAlert, Loading } from '../common';
 import { tr } from '../../locale/ui';
+import { useGepg } from '../HowToPay';
 import { CloseRequest, Conversation, FilePicker, ReplyBox, TicketStatusChip, messageForm } from './parts';
 import type { AnswerHit, Article, Category, Suggestion, TicketRow, TicketView } from './types';
 
@@ -73,6 +74,7 @@ export default function HelpCentre({ mode, intro }: { mode: HelpMode; intro?: st
 // ------------------------------------------------------------------ answers (knowledge base)
 
 function Answers({ base, auth }: { base: string; auth: { realm?: Realm } }) {
+  const gepg = useGepg();
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   useEffect(() => { const h = setTimeout(() => setQuery(q), 300); return () => clearTimeout(h); }, [q]);
@@ -86,7 +88,7 @@ function Answers({ base, auth }: { base: string; auth: { realm?: Realm } }) {
     <Card>
       <CardContent>
         <Typography variant="h6" sx={{ mb: 1 }}>Answers to common questions</Typography>
-        <TextField fullWidth size="small" placeholder="Search the answers, e.g. control number" value={q} onChange={(e) => setQ(e.target.value)}
+        <TextField fullWidth size="small" placeholder={gepg ? 'Search the answers, e.g. control number' : 'Search the answers, e.g. payment reference'} value={q} onChange={(e) => setQ(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} inputProps={{ 'aria-label': tr('Search the answers') }} sx={{ mb: 1.5 }} />
         {list.data?.length === 0 && <Typography color="text.secondary">No answer matches. Ask us below.</Typography>}
         {list.data?.map((a) => (
@@ -153,6 +155,7 @@ function MyRequests({ realm, onOpen, onAsk }: { realm: Realm; onOpen: (id: numbe
 function AskForm({ mode, base, realm, onDone, onCancel }: {
   mode: HelpMode; base: string; realm: Realm; onDone: (r: TicketView | GuestCreated) => void; onCancel?: () => void;
 }) {
+  const gepg = useGepg();
   const qc = useQueryClient();
   const categories = useQuery({ queryKey: ['help', base, 'categories'], queryFn: () => api<Category[]>(`${base}/categories`, mode === 'public' ? {} : { realm }) });
   const [f, setF] = useState({ name: '', phone: '', email: '', categoryId: '', subject: '', body: '' });
@@ -234,7 +237,7 @@ function AskForm({ mode, base, realm, onDone, onCancel }: {
             helperText={chosen ? <>{guessed === f.categoryId && <><AutoAwesomeIcon sx={{ fontSize: 14, verticalAlign: '-2px', mr: 0.5 }} />{'We think it is about this; change it if not.'}{' · '}</>}{chosen.description}{chosen.description ? ' · ' : ''}{`We aim to reply within ${chosen.responseHours} hours`}</> : undefined}>
             {categories.data?.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
           </TextField>
-          <TextField label="Subject" required value={f.subject} onChange={set('subject')} inputProps={{ maxLength: 200 }} placeholder="e.g. My control number has not arrived" />
+          <TextField label="Subject" required value={f.subject} onChange={set('subject')} inputProps={{ maxLength: 200 }} placeholder={gepg ? 'e.g. My control number has not arrived' : 'e.g. My payment does not show'} />
           <TextField label="Describe the problem" required multiline minRows={4} value={f.body} onChange={set('body')} inputProps={{ maxLength: 5000 }}
             helperText="Say what you tried and what you see. Do not write your password." />
           {hints && hints.answers.length > 0 && (

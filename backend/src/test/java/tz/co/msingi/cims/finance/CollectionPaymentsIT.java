@@ -100,6 +100,12 @@ class CollectionPaymentsIT {
         assertThat(pub.at("/payment/channels/0/label").asText()).isEqualTo("M-Pesa");
         assertThat(pub.at("/payment/channels/0/ussd").asText()).isEqualTo("*150*00#");
 
+        // No GePG wording for a private institution: its SMS templates offer the payment reference, not the control number.
+        data.staff(inst.tenant(), "admin", tz.co.msingi.cims.platform.security.Role.INSTITUTION_ADMIN);
+        JsonNode templates = s.body(s.call(get("/api/messaging/templates"), s.staffToken("admin"), null).andExpect(status().isOk()));
+        assertThat(templates.findValuesAsText("code")).contains("PAYMENT_REFERENCE").doesNotContain("CONTROL_NUMBER");
+        assertThat(templates.toString()).doesNotContain("GePG");
+
         // The invoice gets a CIMS reference that names the institution, not a GePG control number.
         ControlNumber cn = bill(inst, "150000");
         assertThat(cn.getIssuer()).isEqualTo(ControlNumber.Issuer.COLLECTION);

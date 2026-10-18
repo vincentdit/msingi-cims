@@ -39,6 +39,7 @@ public class MessagingAdminService {
 
     private final MessagingSettingsRepository settingsRepo;
     private final MessageTemplateRepository templates;
+    private final tz.co.msingi.cims.platform.tenancy.TenantRepository tenantRepo;
     private final MessageRepository messages;
     private final SmsTopupRepository topups;
     private final AuditService audit;
@@ -103,7 +104,12 @@ public class MessagingAdminService {
 
     @Transactional(readOnly = true)
     public List<TemplateView> templates() {
-        return MessageTemplates.ALL.values().stream().map(d -> view(d, templates.findByCode(d.code()).orElse(null))).toList();
+        // a public institution issues GePG control numbers, a private or faith-based one its own payment references: only its kind is listed
+        boolean gepg = tenantRepo.findById(tz.co.msingi.cims.platform.tenancy.TenantContext.requireTenantId())
+                .map(tz.co.msingi.cims.platform.tenancy.Tenant::usesGepg).orElse(true);
+        String hidden = gepg ? "PAYMENT_REFERENCE" : "CONTROL_NUMBER";
+        return MessageTemplates.ALL.values().stream().filter(d -> !d.code().equals(hidden))
+                .map(d -> view(d, templates.findByCode(d.code()).orElse(null))).toList();
     }
 
     @Transactional

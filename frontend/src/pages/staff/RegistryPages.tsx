@@ -28,6 +28,7 @@ import NinCard from '../../components/NinCard';
 import HealthCoverCard from '../../components/HealthCoverCard';
 import { StudentTransferCard } from './TransferPages';
 import { StaffLink } from '../../components/StaffLink';
+import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
@@ -465,6 +466,7 @@ export function StudentDetailPage() {
 
 /** Fees on the student record: balance, registration clearance and invoices with control numbers (BP-06). */
 function StudentFeesCard({ studentId }: { studentId: number }) {
+  const gepg = useGepg();
   const statement = useQuery({ queryKey: ['staff', 'student', String(studentId), 'statement'], queryFn: () => api<Statement>(`/api/finance/students/${studentId}/statement`, staff) });
   const clearance = useQuery({ queryKey: ['staff', 'student', String(studentId), 'clearance'], queryFn: () => api<Clearance>(`/api/finance/students/${studentId}/clearance?gate=REGISTRATION`, staff) });
   const st = statement.data;
@@ -495,7 +497,7 @@ function StudentFeesCard({ studentId }: { studentId: number }) {
                   <Chip size="small" color={statusColour(i.status)} label={humanise(i.status)} />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">{i.invoiceNo} · {formatTzs(i.paid)} of {formatTzs(i.total)}</Typography>
-                {i.controlNo && i.balance > 0 && <Typography variant="body2">Control number <strong style={{ fontFamily: 'monospace' }}>{i.controlNo}</strong></Typography>}
+                {i.controlNo && i.balance > 0 && <Typography variant="body2">{gepg ? 'Control number' : 'Payment reference'} <strong style={{ fontFamily: 'monospace' }}>{i.controlNo}</strong></Typography>}
               </Box>
             ))}
             {!st.invoices.length && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>No invoices yet.</Typography>}

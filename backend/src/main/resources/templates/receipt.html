@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Electronic receipt for a GePG payment (FR-FIN-04).
+  Electronic receipt for a fee payment (FR-FIN-04): GePG for public institutions, the college's own accounts for private and faith-based ones.
   Double braces insert an escaped value; triple braces insert markup built by ReceiptRenderer from escaped values.
   Must stay well-formed XHTML (parsed as XML). CSS 2.1 only.
 -->
@@ -12,7 +12,7 @@
   @page {
     size: A5;
     margin: 12mm 12mm 14mm 12mm;
-    @bottom-center { content: "Electronic receipt issued by CIMS. Payment confirmed by GePG receipt {{gepgReceiptNo}}."; font-family: Helvetica, Arial, sans-serif; font-size: 6.5pt; color: #6b7280; }
+    @bottom-center { content: "{{footerNote}}"; font-family: Helvetica, Arial, sans-serif; font-size: 6.5pt; color: #6b7280; }
   }
   body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1f2937; line-height: 1.35; }
   .head { width: 100%; border-collapse: collapse; border-bottom: 2pt solid {{primaryColor}}; }
@@ -53,9 +53,9 @@
   <tr><th>Received from</th><td>{{payerName}}</td></tr>
   {{{registrationRow}}}
   <tr><th>For invoice</th><td>{{invoiceNo}} · {{invoiceDescription}}</td></tr>
-  <tr><th>Control number</th><td>{{controlNo}}</td></tr>
+  <tr><th>{{numberLabel}}</th><td>{{controlNo}}</td></tr>
   <tr><th>Paid through</th><td>{{paidThrough}}</td></tr>
-  <tr><th>GePG receipt</th><td>{{gepgReceiptNo}}</td></tr>
+  <tr><th>{{receiptLabel}}</th><td>{{gepgReceiptNo}}</td></tr>
 </table>
 
 <div class="amount">

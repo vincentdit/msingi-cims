@@ -85,6 +85,10 @@ public class ReceiptService {
         v.put("paidThrough", Stream.of(p.getPspName(), p.getChannel(), p.getPspReceiptNo() == null ? null : "ref " + p.getPspReceiptNo())
                 .filter(s -> s != null && !s.isBlank()).collect(Collectors.joining(" · ")));
         v.put("gepgReceiptNo", nz(p.getGepgReceiptNo()));
+        boolean gepg = t.usesGepg();
+        v.put("numberLabel", gepg ? "Control number" : "Payment reference");
+        v.put("receiptLabel", gepg ? "GePG receipt" : "Payment receipt");
+        v.put("footerNote", "Electronic receipt issued by CIMS. Payment confirmed by " + (gepg ? "GePG receipt " : "receipt ") + nz(p.getGepgReceiptNo()) + ".");
         v.put("amount", "TZS " + AccountService.tzs(p.getAmount()));
         v.put("amountInWords", AmountInWords.tzs(p.getAmount()));
         v.put("invoiceBalance", "TZS " + AccountService.tzs(inv.balance()));

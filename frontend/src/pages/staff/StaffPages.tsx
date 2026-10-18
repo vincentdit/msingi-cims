@@ -310,6 +310,7 @@ export function ApplicationsPage() {
 }
 
 function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => void }) {
+  const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
   const d = useQuery({ queryKey: ['staff', 'application', id], enabled: id != null, queryFn: () => api<ApplicationDetail>(`/api/admission/applications/${id}`, staff) });
   const a = d.data;
   const [printing, setPrinting] = useState(false);
@@ -361,7 +362,7 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
           <Divider />
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Fee</Typography>
-            <Typography variant="body2">{a.fee.invoiceNo ?? 'No invoice'} · {formatTzs(a.fee.amount)} · {a.fee.feePaid ? 'Paid' : 'Not paid'}{a.fee.controlNo ? ` · Control no. ${a.fee.controlNo}` : ''}</Typography>
+            <Typography variant="body2">{a.fee.invoiceNo ?? 'No invoice'} · {formatTzs(a.fee.amount)} · {a.fee.feePaid ? 'Paid' : 'Not paid'}{a.fee.controlNo ? ` · ${gepg ? 'Control no.' : 'Payment reference'} ${a.fee.controlNo}` : ''}</Typography>
           </Box>
           <Divider />
           <Box>

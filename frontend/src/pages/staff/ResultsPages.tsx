@@ -293,7 +293,7 @@ function ResitSessionDialog({ semesterId, session, onClose, onDone }: { semester
           <Grid size={6}><TextField fullWidth label="Examination period" placeholder="e.g. 10–14 July 2028" value={f.examPeriod} onChange={(e) => setF({ ...f, examPeriod: e.target.value })} /></Grid>
         </Grid>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Students with a published Supplementary decision can register for their failed modules; with Special exam, for the modules they missed. A GePG invoice is raised for any fee,
+          Students with a published Supplementary decision can register for their failed modules; with Special exam, for the modules they missed. An invoice is raised for any fee,
           and lecturers enter marks only for students who have paid. Supplementary grades are capped by the examination regulations.
         </Typography>
         <ErrorAlert error={m.error} />

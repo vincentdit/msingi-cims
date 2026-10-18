@@ -194,6 +194,11 @@ public class DemoDataSeeder implements ApplicationRunner {
             backfillNactvetCodes();
             windows.findAll().stream().filter(x -> x.getJoiningInstructions() == null)
                     .forEach(x -> x.setJoiningInstructions(demoJoiningInstructions()));
+            // the demo college is private: no GePG in the wording seeded by earlier versions
+            jdbc.update("update admission_windows set instructions = replace(instructions, ?, ?) where instructions like '%GePG%'",
+                    "Have your Form Four (CSEE) index number ready. Application fee TZS 10,000 is paid through a GePG control number.", "Have your Form Four (CSEE) index number ready. Application fee TZS 10,000 is paid by mobile money or bank, quoting the payment reference you get.");
+            jdbc.update("update admission_windows set joining_instructions = cast(replace(cast(joining_instructions as text), ?, ?) as jsonb) where cast(joining_instructions as text) like '%GePG%'",
+                    "Fees are payable only through a GePG control number issued by the college after registration.", "Fees are paid only into the college\'s mobile money and bank accounts shown on your invoice, quoting your payment reference.");
             return;
         }
         AcademicYear year = new AcademicYear();
@@ -224,7 +229,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         w.setApplicationFee(new BigDecimal("10000.00"));
         w.setMaxChoices((short) 3);
         w.setStatus(AdmissionWindow.Status.PUBLISHED);
-        w.setInstructions("Have your Form Four (CSEE) index number ready. Application fee TZS 10,000 is paid through a GePG control number.");
+        w.setInstructions("Have your Form Four (CSEE) index number ready. Application fee TZS 10,000 is paid by mobile money or bank, quoting the payment reference you get.");
         addProgramme(w, it4, 120, new EntryRules("Four passes in CSEE including Basic Mathematics, or NVA Level III",
                 List.of(new Pathway("Form Four (CSEE)", List.of(
                                 new Condition(ConditionType.CSEE_MIN_PASSES, 4, "D", null, null, null),
@@ -315,7 +320,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                         "Completed medical examination form"),
                 List.of("Two sets of the college uniform (available at the college shop)", "Laboratory coat and safety boots (technical programmes)",
                         "Scientific calculator", "Bedding and personal items (if you are allocated a hostel place)"),
-                "Fees are payable only through a GePG control number issued by the college after registration.\n"
+                "Fees are paid only into the college's mobile money and bank accounts shown on your invoice, quoting your payment reference.\n"
                         + "The first instalment must be paid before registration is completed.",
                 List.of("Orientation for new students runs during the first week.",
                         "Hostel places are limited and allocated on a first-come, first-served basis."),

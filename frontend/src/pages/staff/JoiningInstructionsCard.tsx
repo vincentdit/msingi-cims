@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { api, formatDate } from '../../api/client';
 import type { AdmissionWindow, JoiningInstructions } from '../../api/types';
 import { ErrorAlert } from '../../components/common';
+import { useGepg } from '../../components/HowToPay';
 
 const toLines = (a?: string[]) => (a ?? []).join('\n');
 const fromLines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -25,6 +26,7 @@ const toForm = (j?: JoiningInstructions): Form => ({
 
 /** Joining instructions printed with every admission letter of the window (FR-ADM-13). */
 export default function JoiningInstructionsCard({ win, canEdit }: { win: AdmissionWindow; canEdit: boolean }) {
+  const gepg = useGepg();
   const qc = useQueryClient();
   const j = win.joiningInstructions;
   const [form, setForm] = useState<Form | null>(null);
@@ -86,7 +88,7 @@ export default function JoiningInstructionsCard({ win, canEdit }: { win: Admissi
               <Grid size={12}><TextField label="Reporting venue" fullWidth required value={form.reportingVenue} onChange={set('reportingVenue')} /></Grid>
               <Grid size={{ xs: 12, md: 6 }}><TextField label="Documents to bring (one per line)" fullWidth multiline minRows={4} value={form.documentsToBring} onChange={set('documentsToBring')} /></Grid>
               <Grid size={{ xs: 12, md: 6 }}><TextField label="Items to bring (one per line)" fullWidth multiline minRows={4} value={form.itemsToBring} onChange={set('itemsToBring')} /></Grid>
-              <Grid size={12}><TextField label="Fees" fullWidth multiline minRows={2} value={form.feesNote} onChange={set('feesNote')} helperText="Amounts and how to pay. Fees are always paid through a GePG control number." /></Grid>
+              <Grid size={12}><TextField label="Fees" fullWidth multiline minRows={2} value={form.feesNote} onChange={set('feesNote')} helperText={gepg ? 'Amounts and how to pay. Fees are always paid through a GePG control number.' : 'Amounts and how to pay. Fees are paid into the college’s own mobile money and bank accounts with a payment reference.'} /></Grid>
               <Grid size={12}><TextField label="Other information (one per line)" fullWidth multiline minRows={2} value={form.notes} onChange={set('notes')} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><TextField label="Signatory name" fullWidth required value={form.signatoryName} onChange={set('signatoryName')} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><TextField label="Signatory title" fullWidth required value={form.signatoryTitle} onChange={set('signatoryTitle')} /></Grid>

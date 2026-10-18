@@ -53,9 +53,9 @@ public final class MessageTemplates {
                 List.of("referenceNo", "institution"), Set.of("referenceNo"),
                 "Your application {referenceNo} has been received. We will notify you of the outcome by SMS.",
                 "Maombi yako {referenceNo} yamepokelewa. Tutakujulisha matokeo kwa SMS.", s);
-        add("APPLICATION_FEE_REMINDER", "Application fee reminder", "An applicant has not paid the application fee two days after getting a control number, or the window closes within three days", "Admission",
+        add("APPLICATION_FEE_REMINDER", "Application fee reminder", "An applicant has not paid the application fee two days after getting a payment number, or the window closes within three days", "Admission",
                 List.of("window", "amount", "controlNo", "deadline", "institution"), Set.of(),
-                "Your application to {institution} ({window}) is not complete: pay {amount} with control number {controlNo} before {deadline}.",
+                "Your application to {institution} ({window}) is not complete: pay {amount} with payment number {controlNo} before {deadline}.",
                 "Maombi yako {institution} ({window}) hayajakamilika: lipa {amount} kwa namba ya malipo {controlNo} kabla ya {deadline}.", s);
         add("ADMISSION_WINDOW_CLOSED", "Admission window closed early", "The Admissions Office closes a window before its closing date", "Admission",
                 List.of("window", "reason", "institution"), Set.of("window"),
@@ -135,7 +135,7 @@ public final class MessageTemplates {
                 List.of("controlNo", "amount", "description", "channels", "institution"), Set.of("controlNo"),
                 "Payment reference {controlNo} for {amount} ({description}). Pay {institution} via {channels} and quote this reference.",
                 "Namba ya kumbukumbu ya malipo {controlNo} kwa {amount} ({description}). Lipa {institution} kupitia {channels} ukitaja namba hii.", s);
-        add("PAYMENT_RECEIVED", "Payment received", "A GePG payment is received", "Fees",
+        add("PAYMENT_RECEIVED", "Payment received", "A payment is received", "Fees",
                 List.of("amount", "receiptNo", "institution"), Set.of(),
                 "Payment of {amount} received. Receipt {receiptNo}.",
                 "Malipo ya {amount} yamepokelewa. Stakabadhi {receiptNo}.", s);
@@ -261,7 +261,7 @@ public final class MessageTemplates {
                 "Hongera! Bodi ya Uongozi imeidhinisha tuzo yako ya {award}. Utahitimu katika {graduation} tarehe {date}.", s);
         add("HOSTEL_ALLOCATED", "Hostel bed allocated", "A hostel bed is allocated to a student", "Hostel",
                 List.of("place", "amount", "deadline", "controlNo", "institution"), Set.of(),
-                "You have been allocated {place}. Pay {amount} with control number {controlNo} by {deadline}, or the bed will be released.",
+                "You have been allocated {place}. Pay {amount} with payment number {controlNo} by {deadline}, or the bed will be released.",
                 "Umepangiwa {place}. Lipa {amount} kwa namba ya malipo {controlNo} kabla ya {deadline}, la sivyo nafasi itatolewa kwa mwingine.", s);
         add("HOSTEL_BED_CHANGED", "Hostel bed changed", "The hostel office moves a student to another bed", "Hostel",
                 List.of("place", "institution"), Set.of(),

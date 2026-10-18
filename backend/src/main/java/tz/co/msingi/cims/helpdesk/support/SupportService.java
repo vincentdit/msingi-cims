@@ -470,7 +470,7 @@ public class SupportService {
             case "WAITING" -> "Waiting for the institution";
             case "ACCOUNT_ACCESS" -> "Account or access";
             case "PROBLEM" -> "Something is not working";
-            case "INTEGRATION" -> "Integration (NECTA, NACTVET, GePG, SMS…)";
+            case "INTEGRATION" -> "Integration (NECTA, NACTVET, payments, SMS…)";
             case "DATA_CHANGE" -> "Data correction";
             case "TRAINING" -> "Training or how-to";
             case "NEW_FEATURE" -> "New feature";

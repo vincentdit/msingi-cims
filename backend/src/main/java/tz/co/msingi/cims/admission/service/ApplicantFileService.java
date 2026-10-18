@@ -203,6 +203,7 @@ public class ApplicantFileService {
         v.put("feePaid", d.fee().feePaid() ? "Yes" : "No");
         v.put("invoiceNo", nz(d.fee().invoiceNo()));
         v.put("controlNo", nz(d.fee().controlNo()));
+        v.put("numberLabel", t.usesGepg() ? "Control number" : "Payment reference");
         return v;
     }
 

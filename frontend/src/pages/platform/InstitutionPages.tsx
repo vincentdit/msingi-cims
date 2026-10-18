@@ -298,7 +298,7 @@ export function InstitutionDetailPage() {
       {d.status === 'SUSPENDED' && (
         <Alert severity="error" sx={{ mb: 2.5 }}>
           <strong>Suspended</strong> {d.statusChangedAt && <>on {formatDateTime(d.statusChangedAt)} by {d.statusChangedBy}</>}: {d.statusReason}.
-          Its portals answer "temporarily unavailable"; its data is kept and GePG payments are still recorded.
+          Its portals answer "temporarily unavailable"; its data is kept and {d.ownership === 'PUBLIC' ? 'GePG payments are' : 'payments are'} still recorded.
         </Alert>
       )}
 
@@ -533,7 +533,7 @@ function StatusDialog({ d, action, onClose, onDone }: { d: InstitutionDetail; ac
         {suspend ? (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Every portal of the institution (applicants, students and staff) shows "service temporarily unavailable" within a few minutes, and everyone signed in is stopped.
-            Its data is kept, scheduled jobs pause and GePG payments are still recorded. The institution's audit trail records the suspension.
+            Its data is kept, scheduled jobs pause and {d.ownership === 'PUBLIC' ? 'GePG payments are' : 'payments are'} still recorded. The institution's audit trail records the suspension.
           </Alert>
         ) : <Typography sx={{ mb: 2 }}>Its portals open again within a few minutes.</Typography>}
         <TextField label={suspend ? 'Reason' : 'Note (optional)'} required={suspend} fullWidth multiline minRows={2} value={reason} onChange={(e) => setReason(e.target.value)} inputProps={{ maxLength: 300 }} />

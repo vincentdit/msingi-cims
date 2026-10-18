@@ -185,7 +185,7 @@ export function FeeStep({ app, onNext }: { app: Application; onNext: () => void 
             <HowToPay reference={f.controlNo} amount={f.amount - f.paid} />
           </CardContent>
         </Card>
-      ) : request.isSuccess ? <Alert severity="info">{t('pay.pending')}</Alert> : (
+      ) : request.isSuccess ? <Alert severity="info">{t(words.gepg ? 'pay.pending' : 'pay.pendingRef')}</Alert> : (
         <Box><Button variant="contained" size="large" onClick={() => request.mutate()} disabled={request.isPending}>{words.getNumber}</Button></Box>
       )}
       {f?.controlNo && (

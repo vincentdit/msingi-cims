@@ -208,7 +208,7 @@ public class FinanceDashboardService {
         boolean bursar = has(Role.BURSAR, Role.INSTITUTION_ADMIN);
         if (w.controlNumberFailures() > 0) next.add(new Step("error", w.controlNumberFailures() + " GePG control number request(s) failed in the last 7 days.", "/staff/finance"));
         if (w.adjustmentsForMe() > 0) next.add(new Step("warning", w.adjustmentsForMe() + " waiver or refund request(s) wait for your approval.", "/staff/waivers"));
-        if (w.reconciliationExceptions() > 0) next.add(new Step("warning", w.reconciliationExceptions() + " GePG reconciliation exception(s) are open.", "/staff/finance"));
+        if (w.reconciliationExceptions() > 0) next.add(new Step("warning", w.reconciliationExceptions() + " reconciliation exception(s) are open.", "/staff/finance"));
         if (bursar && !w.lastMonthSignedOff()) next.add(new Step("info", "Last month's reconciliation is not signed off yet.", "/staff/finance"));
         if (year != null && targets.isEmpty() && bursar) next.add(new Step("info", "Set collection targets for " + year.code() + " to follow collections against them.", null));
         if (Boolean.FALSE.equals(onTrack)) {

@@ -22,6 +22,7 @@ import { BarList, ColumnChart } from '../../components/charts';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
 import { StaffLink } from '../../components/StaffLink';
+import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
 const BURSAR = ['INSTITUTION_ADMIN', 'BURSAR'];
@@ -62,6 +63,7 @@ function Kpi({ label, value, hint, tone }: { label: string; value: ReactNode; hi
 
 /** Finance overview: collections against targets, by programme, debtors, cash month by month, and the work waiting in the bursary. */
 export function FinanceOverviewPage() {
+  const gepg = useGepg();
   const can = useRoles();
   const [yearId, setYearId] = useState<number | ''>('');
   const [targets, setTargets] = useState(false);
@@ -148,12 +150,12 @@ export function FinanceOverviewPage() {
               <Card>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 1 }}>Work in the bursary</Typography>
-                  <WorkRow label="GePG reconciliation exceptions" value={d.work.reconciliationExceptions} link="/staff/finance" warn />
+                  <WorkRow label={gepg ? 'GePG reconciliation exceptions' : 'Reconciliation exceptions'} value={d.work.reconciliationExceptions} link="/staff/finance" warn />
                   <WorkRow label="Waivers and refunds waiting" value={d.work.adjustmentsOpen} hint={d.work.adjustmentsOpen ? formatTzs(d.work.adjustmentsOpenAmount) : undefined} link="/staff/waivers" />
                   <WorkRow label="Refunds to pay out" value={d.work.refundsToPay} link="/staff/waivers" />
                   <WorkRow label="Sponsor invoices unpaid" value={d.work.sponsorInvoicesOpen} hint={d.work.sponsorInvoicesOpen ? formatTzs(d.work.sponsorOutstanding) : undefined} link="/staff/sponsors" />
                   <WorkRow label="Sponsors' shares not invoiced" value={d.work.sponsorNotInvoiced > 0 ? formatTzs(d.work.sponsorNotInvoiced) : 0} link="/staff/sponsors" />
-                  <WorkRow label="Control numbers failed (7 days)" value={d.work.controlNumberFailures} link="/staff/finance" warn />
+                  {gepg && <WorkRow label="Control numbers failed (7 days)" value={d.work.controlNumberFailures} link="/staff/finance" warn />}
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
                     Reconciliation last signed off: {d.work.lastSignedOffMonth ? new Date(d.work.lastSignedOffMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'never'}
                   </Typography>
@@ -166,7 +168,7 @@ export function FinanceOverviewPage() {
                   <Typography variant="h6" sx={{ mb: 1 }}>Money received, last 12 months</Typography>
                   <ColumnChart ariaLabel="Money received per month over the last 12 months" format={(v) => `TZS ${short(v)}`}
                     points={d.monthly.map((m) => ({ key: m.key, label: m.label, value: Number(m.amount), tooltip: `${formatTzs(m.amount)} · ${m.count} payment(s)` }))} />
-                  <Typography variant="caption" color="text.secondary">GePG payments and bank remittances; sponsors' shares moved onto students and waivers are not money received.</Typography>
+                  <Typography variant="caption" color="text.secondary">{gepg ? "GePG payments and bank remittances; sponsors' shares moved onto students and waivers are not money received." : "Mobile money and bank payments; sponsors' shares moved onto students and waivers are not money received."}</Typography>
                 </CardContent>
               </Card>
               <Card sx={{ mb: 2.5 }}>
@@ -399,6 +401,7 @@ function SponsorDialog({ sponsor, onClose }: { sponsor: SponsorRow | null; onClo
 }
 
 export function SponsorDetailPage() {
+  const gepg = useGepg();
   const { id } = useParams();
   const can = useRoles();
   const qc = useQueryClient();
@@ -492,7 +495,7 @@ export function SponsorDetailPage() {
               <Table size="small">
                 <TableHead><TableRow>
                   <TableCell>Invoice</TableCell><TableCell align="right">Total</TableCell><TableCell align="right">Paid</TableCell><TableCell align="right">Balance</TableCell>
-                  <TableCell>Control number</TableCell><TableCell />
+                  <TableCell>{gepg ? 'Control number' : 'Payment reference'}</TableCell><TableCell />
                 </TableRow></TableHead>
                 <TableBody>
                   {d.invoices.map((i) => (
@@ -505,7 +508,7 @@ export function SponsorDetailPage() {
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{formatTzs(i.paid)}</TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{i.status === 'PAID' ? <Chip size="small" color="success" label="Paid" /> : formatTzs(i.balance)}</TableCell>
                       <TableCell sx={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>
-                        {i.controlNo ?? (i.status !== 'PAID' && <Button size="small" onClick={() => control.mutate(i.id)} disabled={control.isPending}>Get control number</Button>)}
+                        {i.controlNo ?? (i.status !== 'PAID' && <Button size="small" onClick={() => control.mutate(i.id)} disabled={control.isPending}>{gepg ? 'Get control number' : 'Get payment reference'}</Button>)}
                       </TableCell>
                       <TableCell align="right">{d.canManage && i.status !== 'PAID' && <Button size="small" onClick={() => setRemitting(i)}>Record bank payment</Button>}</TableCell>
                     </TableRow>
@@ -514,7 +517,7 @@ export function SponsorDetailPage() {
                 </TableBody>
               </Table>
             </TableContainer>
-            <CardContent><Typography variant="caption" color="text.secondary">As the sponsor pays (by GePG control number or bank transfer), each student's share moves onto that student's invoice. Until then, the share invoiced to the sponsor counts towards the student's clearance.</Typography></CardContent>
+            <CardContent><Typography variant="caption" color="text.secondary">{gepg ? 'As the sponsor pays (by GePG control number or bank transfer), each' : 'As the sponsor pays (by payment reference or bank transfer), each'} student's share moves onto that student's invoice. Until then, the share invoiced to the sponsor counts towards the student's clearance.</Typography></CardContent>
           </Card>
           {adding && d.academicYearId && <SponsorshipDialog sponsorId={d.sponsor.id} yearId={d.academicYearId} onClose={() => setAdding(false)} onDone={refresh} />}
           {importing && d.academicYearId && <ImportDialog sponsorId={d.sponsor.id} yearId={d.academicYearId} onClose={() => setImporting(false)} onDone={refresh} />}

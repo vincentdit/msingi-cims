@@ -10,6 +10,7 @@ import type { AdmissionWindow } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { StaffLink } from '../../components/StaffLink';
+import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
 
@@ -42,6 +43,7 @@ const SYSTEMS: Record<string, string> = {
 
 /** The institution's government integrations (FR-INT-03/05/06/07/08, FR-REG-07): settings and the exchanges staff start. */
 export default function IntegrationsPage() {
+  const gepg = useGepg();
   const { user } = useSession();
   const roles = user('staff')?.roles ?? [];
   const tabs = [
@@ -54,7 +56,7 @@ export default function IntegrationsPage() {
   const [tab, setTab] = useState(tabs[0].key);
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Integrations" subtitle="Your codes at GePG, HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI." />
+      <PageTitle title="Integrations" subtitle={gepg ? 'Your codes at GePG, HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI.' : 'Your codes at HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI.'} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         {tabs.map((t) => <Tab key={t.key} value={t.key} label={t.label} />)}
       </Tabs>
@@ -68,6 +70,7 @@ export default function IntegrationsPage() {
 }
 
 function SettingsTab({ canEdit }: { canEdit: boolean }) {
+  const gepg = useGepg();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['integration-settings'], queryFn: () => api<SettingsView>('/api/integration-settings', staff) });
   const [s, setS] = useState<Settings | null>(null);
@@ -89,7 +92,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
       <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>Connections</Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {Object.entries(q.data!.modes).map(([k, v]) => (
+          {Object.entries(q.data!.modes).filter(([k]) => gepg || k !== 'GEPG').map(([k, v]) => (
             <Chip key={k} size="small" color={v === 'LIVE' ? 'success' : 'default'} variant={v === 'LIVE' ? 'filled' : 'outlined'}
               label={`${SYSTEMS[k] ?? k}: ${v === 'LIVE' ? 'live' : 'simulated'}`} />
           ))}
@@ -98,7 +101,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           Msingi switches each connection to live once the body has given access. You are known to NACTVET and HESLB as <b>{q.data!.institutionCode}</b> unless you enter another code.
         </Typography>
       </CardContent></Card>
-      <Card><CardContent>
+      {gepg && <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>GePG</Typography>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSpCode', 'SP code', 'e.g. SP19921')}</Grid>
@@ -106,7 +109,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSystemId', 'System id', 'Registered with GePG')}</Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgGfsCode', 'Default GFS code', 'For fee items without one')}</Grid>
         </Grid>
-      </CardContent></Card>
+      </CardContent></Card>}
       <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>Optional exchanges</Typography>
         <Grid container spacing={2} alignItems="center">

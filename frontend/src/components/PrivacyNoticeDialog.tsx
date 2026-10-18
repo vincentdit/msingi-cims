@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
+import { useInstitution } from './InstitutionContext';
 import { Loading } from './common';
 
 interface Facts { version: string; institution: string; contactEmail?: string; contactPhone?: string; applicantRetentionMonths: number }
@@ -21,7 +22,8 @@ export function PrivacyNoticeDialog({ open, onClose, onAgree }: { open: boolean;
     queryFn: () => api<Facts>('/api/public/privacy-notice') });
   const f = q.data;
   const contact = f ? [f.contactEmail, f.contactPhone].filter(Boolean).join(' · ') || f.institution : '';
-  const values = f ? { institution: f.institution, contact, months: f.applicantRetentionMonths } : {};
+  const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
+  const values = f ? { institution: f.institution, contact, months: f.applicantRetentionMonths, payments: t(gepg ? 'privacyNotice.paymentsGepg' : 'privacyNotice.paymentsOwn') } : {};
   return (
     <Dialog open={open} onClose={onClose} fullScreen={phone} maxWidth="md" fullWidth scroll="paper" aria-labelledby="privacy-notice-title">
       <DialogTitle id="privacy-notice-title">

@@ -238,7 +238,7 @@ function ActionDialog({ kind, a, onClose, onDone }: { kind: 'in' | 'out' | 'canc
             required={kind === 'cancel'} slotProps={{ htmlInput: { maxLength: kind === 'cancel' ? 300 : 500 } }} />
           {kind === 'out' && <>
             <TextField label="Damages (if any)" value={damages} onChange={(e) => setDamages(e.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
-            <TextField label="Damage charge (TZS)" type="number" value={charge} onChange={(e) => setCharge(e.target.value)} helperText="Invoiced to the student with a control number" />
+            <TextField label="Damage charge (TZS)" type="number" value={charge} onChange={(e) => setCharge(e.target.value)} helperText="Invoiced to the student with a payment number" />
             <FormControlLabel control={<Checkbox checked={refundUnused} onChange={(e) => setRefundUnused(e.target.checked)} />}
               label="Refund the unused part of the hostel fee (the rest of the occupancy period)" />
             {refundUnused && <Alert severity="info">CIMS works out the amount from the window's occupancy dates and raises a refund request; the bursary approves it and pays it out.</Alert>}

@@ -45,7 +45,7 @@ class FinanceReports extends ReportQueries implements ReportProvider {
                         List.of(ACADEMIC_YEAR), this::debtors),
                 new Definition("FIN-06", "Finance", "Debtor ageing summary", "Balances owed by how long they are overdue.", ROLES, false,
                         List.of(ACADEMIC_YEAR), f -> amounts(finance.debtors(f.academicYearId()).byBucket(), "Ageing")),
-                new Definition("FIN-07", "Finance", "Reconciliation exceptions", "GePG reconciliation exceptions in the period and how each was resolved.",
+                new Definition("FIN-07", "Finance", "Reconciliation exceptions", "Reconciliation exceptions in the period (GePG file or collector and bank statements) and how each was resolved.",
                         ROLES, false, List.of(PERIOD), this::exceptions));
     }
 
@@ -112,7 +112,7 @@ class FinanceReports extends ReportQueries implements ReportProvider {
             if (x.get(7) != null) x.set(7, AdmissionReports.label(String.valueOf(x.get(7))));
         });
         return new Data(List.of(Column.date("day", "Day"), Column.text("kind", "Exception"), Column.text("status", "Status"),
-                Column.text("receipt", "GePG receipt"), Column.text("bill", "Bill / control no."), Column.money("gepg", "GePG amount"),
+                Column.text("receipt", "Receipt"), Column.text("bill", "Bill / payment no."), Column.money("gepg", "Amount collected"),
                 Column.money("cims", "CIMS amount"), Column.text("resolution", "Resolution"), Column.text("note", "Explanation"),
                 Column.text("by", "Resolved by"), Column.dateTime("at", "Resolved")), r);
     }

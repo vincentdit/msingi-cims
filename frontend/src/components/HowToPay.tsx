@@ -7,6 +7,9 @@ import { formatTzs } from '../api/client';
 import type { PaymentChannel } from '../api/types';
 import { useInstitution } from './InstitutionContext';
 
+/** True for a public institution (GePG control numbers); false for a private or faith-based one (its own accounts, CIMS payment references). */
+export const useGepg = () => (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
+
 /** The words for the number an invoice is paid with: a GePG control number, or the college's own payment reference. */
 export function usePayWords() {
   const { t } = useTranslation();

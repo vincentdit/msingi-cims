@@ -310,6 +310,7 @@ function LinesTable({ s }: { s: FeeStructure }) {
 // ============================================================ fee items
 
 function ItemsTab() {
+  const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
   const qc = useQueryClient();
   const { canEdit } = useRoles();
   const items = useQuery({ queryKey: ['staff', 'fee-items'], queryFn: () => api<FeeItem[]>('/api/finance/fee-items', staff) });
@@ -331,13 +332,13 @@ function ItemsTab() {
           onClick={() => setForm({ code: '', name: '', category: 'OTHER', gfsCode: '', allocationPriority: '100', active: true })}>New fee item</Button>}
       </Stack>
       <Card><TableContainer><Table size="small">
-        <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Name</TableCell><TableCell>Category</TableCell><TableCell>GFS code</TableCell><TableCell align="center">Priority</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
+        <TableHead><TableRow><TableCell>Code</TableCell><TableCell>Name</TableCell><TableCell>Category</TableCell>{gepg && <TableCell>GFS code</TableCell>}<TableCell align="center">Priority</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
         <TableBody>
           {items.data?.map((i) => (
             <TableRow key={i.id} hover sx={{ cursor: canEdit ? 'pointer' : 'default' }}
               onClick={() => canEdit && setForm({ id: i.id, code: i.code, name: i.name, category: i.category, gfsCode: i.gfsCode ?? '', allocationPriority: String(i.allocationPriority), active: i.active })}>
               <TableCell sx={{ fontFamily: 'monospace' }}>{i.code}</TableCell><TableCell>{i.name}</TableCell><TableCell>{humanise(i.category)}</TableCell>
-              <TableCell>{i.gfsCode ?? '—'}</TableCell><TableCell align="center">{i.allocationPriority}</TableCell>
+              {gepg && <TableCell>{i.gfsCode ?? '—'}</TableCell>}<TableCell align="center">{i.allocationPriority}</TableCell>
               <TableCell>{i.active ? <Chip size="small" color="success" label="Active" /> : <Chip size="small" label="Inactive" />}</TableCell>
             </TableRow>
           ))}
@@ -354,7 +355,7 @@ function ItemsTab() {
               <Grid size={{ xs: 12, sm: 7 }}><TextField label="Name" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><TextField select label="Category" fullWidth value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                 {CATEGORIES.map((c) => <MenuItem key={c} value={c}>{humanise(c)}</MenuItem>)}</TextField></Grid>
-              <Grid size={{ xs: 6, sm: 3 }}><TextField label="GFS code" fullWidth value={form.gfsCode} onChange={(e) => setForm({ ...form, gfsCode: e.target.value })} /></Grid>
+              {gepg && <Grid size={{ xs: 6, sm: 3 }}><TextField label="GFS code" fullWidth value={form.gfsCode} onChange={(e) => setForm({ ...form, gfsCode: e.target.value })} /></Grid>}
               <Grid size={{ xs: 6, sm: 3 }}><TextField label="Priority" fullWidth value={form.allocationPriority} onChange={(e) => setForm({ ...form, allocationPriority: e.target.value.replace(/\D/g, '') })} /></Grid>
               <Grid size={12}><FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />} label="Active (available for new fee structures)" /></Grid>
             </Grid>
