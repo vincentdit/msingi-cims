@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProgrammeTable } from './CataloguePages';
-import { BillingCard } from './BillingPages';
+import { BillingCard, ONBOARD_BILLING, OnboardBillingCard, applyOnboardBilling } from './BillingPages';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import {
@@ -109,6 +109,8 @@ export function OnboardPage() {
   const nactvetId = params.get('nactvet');
   const [f, setF] = useState(EMPTY);
   const [issued, setIssued] = useState<IssuedAdmin | null>(null);
+  const [billing, setBilling] = useState(ONBOARD_BILLING);
+  const [billed, setBilled] = useState<{ text: string; invoiceId?: number; error?: string } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const source = useQuery({ queryKey: ['platform', 'nactvet', 'institution', nactvetId], enabled: !!nactvetId,
     queryFn: () => api<CatalogueDetail>(`/api/platform/nactvet/institutions/${nactvetId}`, platform) });
@@ -136,7 +138,16 @@ export function OnboardPage() {
         admin: { username: f.adminUsername.trim(), fullName: f.adminName, email: f.adminEmail || null, phone: f.adminPhone || null },
       },
     }),
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['platform'] }); setIssued(r); },
+    onSuccess: async (r) => {
+      // the contract with Msingi and the first invoice; the institution exists even if this part fails, and it can be done on its page
+      try {
+        setBilled(await applyOnboardBilling(r.institution.id, { ...billing, billingEmail: billing.billingEmail || f.contactEmail }));
+      } catch (e) {
+        setBilled({ text: '', error: e instanceof Error ? e.message : String(e) });
+      }
+      qc.invalidateQueries({ queryKey: ['platform'] });
+      setIssued(r);
+    },
   });
   const ready = /^[A-Za-z][A-Za-z0-9]{1,19}$/.test(f.code.trim()) && f.name.trim() && domains.length > 0 && f.adminUsername.trim().length >= 3 && f.adminName.trim();
 
@@ -223,6 +234,7 @@ export function OnboardPage() {
               </Stack>
             </CardContent>
           </Card>
+          <OnboardBillingCard value={billing} onChange={setBilling} />
           <ErrorAlert error={m.error} />
           <Button variant="contained" size="large" fullWidth disabled={!ready || m.isPending} onClick={() => m.mutate()}>Onboard institution</Button>
         </Grid>
@@ -244,8 +256,12 @@ export function OnboardPage() {
       )}
       {issued && (
         <IssuedPasswordDialog open title={`${issued.institution.name} is on CIMS`} username={issued.username} password={issued.temporaryPassword}
-          note={issued.signInUrl && <Typography variant="body2">They sign in at <strong>{issued.signInUrl}</strong>.</Typography>}
-          onClose={() => navigate(`/platform/institutions/${issued.institution.id}`, { replace: true })} />
+          note={<>
+            {issued.signInUrl && <Typography variant="body2">They sign in at <strong>{issued.signInUrl}</strong>.</Typography>}
+            {billed?.text && <Alert severity="success" sx={{ mt: 1.5 }}>{billed.text}</Alert>}
+            {billed?.error && <Alert severity="warning" sx={{ mt: 1.5 }}>{`Billing was not set up: ${billed.error} Set it up on the institution's page, on the Billing card.`}</Alert>}
+          </>}
+          onClose={() => navigate(billed?.invoiceId ? `/platform/billing/invoices/${billed.invoiceId}` : `/platform/institutions/${issued.institution.id}`, { replace: true })} />
       )}
     </>
   );
@@ -386,8 +402,8 @@ export function InstitutionDetailPage() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
-          <NactvetCard d={d} onDone={done} />
           <BillingCard tenantId={d.id} name={d.name} />
+          <NactvetCard d={d} onDone={done} />
           <Card sx={{ mb: 2.5 }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>

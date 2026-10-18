@@ -786,3 +786,85 @@ function ContractDialog({ tenantId, name, contract, onClose, onDone }: {
   );
 }
 
+
+// ------------------------------------------------------------------ billing set up while onboarding
+
+export interface OnboardBillingValue {
+  enabled: boolean; reference: string; startDate: string; setupFee: string; annualFee: string; studentFee: string; applicationFee: string;
+  applicationPercent: string; usageCycle: Cycle; vatPercent: string; paymentTermsDays: string; billingContactName: string; billingEmail: string;
+  firstInvoice: boolean; issueNow: boolean;
+}
+
+export const ONBOARD_BILLING: OnboardBillingValue = {
+  enabled: true, reference: '', startDate: today(), setupFee: '0', annualFee: '0', studentFee: '0', applicationFee: '0', applicationPercent: '0',
+  usageCycle: 'QUARTERLY', vatPercent: '18', paymentTermsDays: '30', billingContactName: '', billingEmail: '', firstInvoice: true, issueNow: false,
+};
+
+/** What the institution will pay Msingi, entered while onboarding it (the contract, and the first invoice for the set-up fee and licence). */
+export function OnboardBillingCard({ value: f, onChange }: { value: OnboardBillingValue; onChange: (v: OnboardBillingValue) => void }) {
+  const set = (k: keyof OnboardBillingValue) => (e: { target: { value: string } }) => onChange({ ...f, [k]: e.target.value });
+  const money = (k: keyof OnboardBillingValue, label: string, helper?: string) => (
+    <TextField label={label} type="number" size="small" value={f[k] as string} onChange={set(k)} fullWidth helperText={helper}
+      InputProps={{ startAdornment: <InputAdornment position="start">TZS</InputAdornment> }} inputProps={{ min: 0 }} />
+  );
+  const charges = Number(f.setupFee) > 0 || Number(f.annualFee) > 0;
+  return (
+    <Card sx={{ mb: 2.5 }}>
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">What it pays Msingi</Typography>
+          <Switch checked={f.enabled} onChange={(e) => onChange({ ...f, enabled: e.target.checked })} inputProps={{ 'aria-label': tr('Bill this institution') }} />
+        </Stack>
+        {!f.enabled ? (
+          <Typography variant="body2" color="text.secondary">No contract now. Set it up later on the institution's page, on the Billing card.</Typography>
+        ) : (
+          <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+            <Grid size={{ xs: 6 }}><TextField label="Contract number" size="small" value={f.reference} onChange={set('reference')} fullWidth /></Grid>
+            <Grid size={{ xs: 6 }}><TextField label="Starts" type="date" size="small" value={f.startDate} onChange={set('startDate')} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid size={{ xs: 6 }}>{money('setupFee', 'Set-up fee (once)')}</Grid>
+            <Grid size={{ xs: 6 }}>{money('annualFee', 'Annual licence')}</Grid>
+            <Grid size={{ xs: 6 }}>{money('studentFee', 'Per active student, per year')}</Grid>
+            <Grid size={{ xs: 6 }}>{money('applicationFee', 'Per application with the fee paid')}</Grid>
+            <Grid size={{ xs: 6 }}>
+              <TextField label="Share of application fees" type="number" size="small" value={f.applicationPercent} onChange={set('applicationPercent')} fullWidth
+                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} inputProps={{ min: 0, max: 100, step: 0.5 }} />
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <TextField select label="Usage invoiced" size="small" value={f.usageCycle} onChange={set('usageCycle')} fullWidth>
+                {Object.entries(CYCLE_LABEL).map(([k, l]) => <MenuItem key={k} value={k}>{l}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 6 }}><TextField label="VAT" type="number" size="small" value={f.vatPercent} onChange={set('vatPercent')} fullWidth InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} /></Grid>
+            <Grid size={{ xs: 6 }}><TextField label="Pay within" type="number" size="small" value={f.paymentTermsDays} onChange={set('paymentTermsDays')} fullWidth InputProps={{ endAdornment: <InputAdornment position="end">{tr('days')}</InputAdornment> }} /></Grid>
+            <Grid size={{ xs: 6 }}><TextField label="Invoices to (name)" size="small" value={f.billingContactName} onChange={set('billingContactName')} fullWidth placeholder="e.g. The Bursar" /></Grid>
+            <Grid size={{ xs: 6 }}><TextField label="Invoices to (email)" type="email" size="small" value={f.billingEmail} onChange={set('billingEmail')} fullWidth helperText="Otherwise the contact email" /></Grid>
+            <Grid size={12}>
+              <FormControlLabel control={<Switch checked={f.firstInvoice && charges} disabled={!charges} onChange={(e) => onChange({ ...f, firstInvoice: e.target.checked })} />}
+                label="Prepare the first invoice now (set-up fee and the first licence year)" />
+              {f.firstInvoice && charges && (
+                <FormControlLabel control={<Switch checked={f.issueNow} onChange={(e) => onChange({ ...f, issueNow: e.target.checked })} />}
+                  label="Issue it and email it to the institution straight away" />
+              )}
+            </Grid>
+          </Grid>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** After onboarding: records the contract, then prepares (and issues) the first invoice. Returns what was done, in words. */
+export async function applyOnboardBilling(tenantId: number, f: OnboardBillingValue): Promise<{ text: string; invoiceId?: number }> {
+  if (!f.enabled) return { text: '' };
+  await api<Contract>(`/api/platform/billing/contracts/${tenantId}`, { ...platform, method: 'PUT', body: {
+    reference: f.reference || null, startDate: f.startDate, setupFee: Number(f.setupFee), annualFee: Number(f.annualFee), studentFee: Number(f.studentFee),
+    applicationFee: Number(f.applicationFee), applicationPercent: Number(f.applicationPercent), usageCycle: f.usageCycle, vatPercent: Number(f.vatPercent),
+    paymentTermsDays: Number(f.paymentTermsDays), billingContactName: f.billingContactName || null, billingEmail: f.billingEmail || null } });
+  if (!f.firstInvoice || !(Number(f.setupFee) > 0 || Number(f.annualFee) > 0)) return { text: tr('The contract is recorded. CIMS prepares its invoices as they fall due.') };
+  let v = await api<InvoiceView>('/api/platform/billing/invoices', { ...platform, method: 'POST', body: { tenantId, kind: 'LICENCE' } });
+  if (f.issueNow) {
+    v = await api<InvoiceView>(`/api/platform/billing/invoices/${v.invoice.id}/issue`, { ...platform, method: 'POST' });
+    return { text: tr(`Invoice ${v.invoice.invoiceNo} for TZS ${tzs(v.invoice.total)} was issued and emailed to the institution.`), invoiceId: v.invoice.id };
+  }
+  return { text: tr(`A draft invoice for TZS ${tzs(v.invoice.total)} is ready to check and issue.`), invoiceId: v.invoice.id };
+}
