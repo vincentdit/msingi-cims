@@ -85,6 +85,10 @@ public class ReceiptService {
         v.put("paidThrough", Stream.of(p.getPspName(), p.getChannel(), p.getPspReceiptNo() == null ? null : "ref " + p.getPspReceiptNo())
                 .filter(s -> s != null && !s.isBlank()).collect(Collectors.joining(" · ")));
         v.put("gepgReceiptNo", nz(p.getGepgReceiptNo()));
+        boolean gepg = p.getSource() == Payment.Source.GEPG;   // NHIF goes through GePG even in a private college
+        v.put("numberLabel", gepg ? "Control number" : "Payment reference");
+        v.put("receiptLabel", gepg ? "GePG receipt" : "Payment receipt");
+        v.put("footerNote", "Electronic receipt issued by CIMS. Payment confirmed by " + (gepg ? "GePG receipt " : "receipt ") + nz(p.getGepgReceiptNo()) + ".");
         v.put("amount", "TZS " + AccountService.tzs(p.getAmount()));
         v.put("amountInWords", AmountInWords.tzs(p.getAmount()));
         v.put("invoiceBalance", "TZS " + AccountService.tzs(inv.balance()));
@@ -113,7 +117,7 @@ public class ReceiptService {
     }
 
     /** "Tanzanian shillings one hundred twenty thousand only". */
-    static final class AmountInWords {
+    public static final class AmountInWords {
         private static final String[] ONES = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
                 "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"};
         private static final String[] TENS = {"", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
@@ -121,7 +125,7 @@ public class ReceiptService {
         private AmountInWords() {
         }
 
-        static String tzs(BigDecimal amount) {
+        public static String tzs(BigDecimal amount) {
             long shillings = amount.setScale(0, RoundingMode.DOWN).longValueExact();
             int cents = amount.subtract(BigDecimal.valueOf(shillings)).movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValue();
             String w = "Tanzanian shillings " + words(shillings);

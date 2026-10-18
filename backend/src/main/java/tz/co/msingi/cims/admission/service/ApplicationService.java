@@ -169,11 +169,11 @@ public class ApplicationService {
     @Transactional
     public FeeView simulatePayment(Long applicationId) {
         if (!allowPaymentSimulation && !gepgProps.isSimulated()) {
-            throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available with simulated GePG");
+            throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available with simulated payments");
         }
         Application app = own(applicationId, profiles.currentApplicant());
         if (app.getFeeInvoiceId() == null) {
-            throw new BusinessRuleException("NO_INVOICE", "Request a control number first");
+            throw new BusinessRuleException("NO_INVOICE", "Get the payment number first");
         }
         ControlNumber cn = billing.ensureControlNumber(app.getFeeInvoiceId());
         Invoice inv = billing.get(app.getFeeInvoiceId());

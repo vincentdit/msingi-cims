@@ -15,7 +15,10 @@ const PATH = '/api/admin/institution/photos/campus';
 const staff = { realm: 'staff' as const };
 const mb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-/** The administrator's page for how the institution appears on its portal: the campus photo on the admission home page. */
+/**
+ * The administrator's page for how the institution appears on its portal, its programme pages and its advert posters: the campus
+ * photo, the logo, and how the public reaches it (phones, emails, website, WhatsApp, social media).
+ */
 export default function InstitutionPage() {
   const inst = useInstitution();
   const theme = useTheme();
@@ -41,7 +44,7 @@ export default function InstitutionPage() {
 
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Institution" subtitle="How the institution appears to applicants on the admission portal." />
+      <PageTitle title="Institution" subtitle="How the institution appears on the admission portal, the programme pages and the advert posters." />
       <Card>
         <CardContent>
           <Grid container spacing={3}>
@@ -89,6 +92,114 @@ export default function InstitutionPage() {
           </Grid>
         </CardContent>
       </Card>
+      <Grid container spacing={3} sx={{ mt: 0.5 }}>
+        <Grid size={{ xs: 12, md: 5 }}><LogoCard /></Grid>
+        <Grid size={{ xs: 12, md: 7 }}><ContactsCard /></Grid>
+      </Grid>
     </Container>
+  );
+}
+
+const LOGO = '/api/admin/institution/photos/logo';
+
+/** The institution's logo: on the programme pages and the advert posters (PNG with a clear background works best). */
+function LogoCard() {
+  const qc = useQueryClient();
+  const logo = useQuery({ queryKey: ['staff', 'logo'], queryFn: async () => (await api<InstitutionPhoto | undefined>(LOGO, staff)) ?? null });
+  const src = usePublicImage(logo.data?.url);
+  const file = useRef<HTMLInputElement>(null);
+  const changed = (p: InstitutionPhoto | null) => {
+    qc.setQueryData(['staff', 'logo'], p);
+    qc.invalidateQueries({ queryKey: ['institution'] });
+  };
+  const send = useMutation({ mutationFn: (f: File) => { const form = new FormData(); form.append('file', f); return uploadForm<InstitutionPhoto>(LOGO, 'staff', form); },
+    onSuccess: changed });
+  const remove = useMutation({ mutationFn: () => api<void>(LOGO, { ...staff, method: 'DELETE' }), onSuccess: () => changed(null) });
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Typography variant="h6">Logo</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+          Shown on the programme pages and the advert posters. A square PNG with a clear or white background works best:
+          PNG or JPEG, at least 200 pixels wide, up to 5 MB.
+        </Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Box sx={{ width: 96, height: 96, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.default', display: 'grid', placeItems: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            {logo.data && src ? <Box component="img" src={src} alt="Logo" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              : <Typography variant="caption" color="text.secondary">No logo</Typography>}
+          </Box>
+          <Stack spacing={1}>
+            <input ref={file} type="file" accept="image/png,image/jpeg" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) send.mutate(f); e.target.value = ''; }} />
+            <Button variant="contained" startIcon={<UploadIcon />} disabled={send.isPending} onClick={() => file.current?.click()}>
+              {send.isPending ? 'Uploading…' : logo.data ? 'Replace logo' : 'Upload logo'}
+            </Button>
+            {logo.data && <Button color="error" startIcon={<DeleteIcon />} disabled={remove.isPending} onClick={() => remove.mutate()}>Remove logo</Button>}
+          </Stack>
+        </Stack>
+        {logo.isSuccess && !logo.data && <Alert severity="info" sx={{ mt: 2 }}>Until a logo is uploaded, posters show the institution's initials.</Alert>}
+        <ErrorAlert error={send.error ?? remove.error} />
+      </CardContent>
+    </Card>
+  );
+}
+
+interface Profile {
+  name: string; contactEmail?: string | null; contactPhone?: string | null; admissionsEmail?: string | null; phones: string[];
+  website?: string | null; whatsapp?: string | null; facebook?: string | null; instagram?: string | null; youtube?: string | null;
+  tiktok?: string | null; x?: string | null;
+}
+const PROFILE = '/api/admin/institution/profile';
+type Field = Exclude<keyof Profile, 'name' | 'phones'>;
+
+/** How the public reaches the institution: printed on the advert posters and shown on the programme pages. */
+function ContactsCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['staff', 'institution-profile'], queryFn: () => api<Profile>(PROFILE, staff) });
+  const [f, setF] = useState<Profile | null>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { if (q.data) setF({ ...q.data, phones: [...q.data.phones, '', '', ''].slice(0, 3) }); }, [q.data]);
+  const save = useMutation({
+    mutationFn: () => api<Profile>(PROFILE, { ...staff, method: 'PUT', body: { ...f, phones: f!.phones.filter((p) => p.trim()) } }),
+    onSuccess: (p) => { qc.setQueryData(['staff', 'institution-profile'], p); qc.invalidateQueries({ queryKey: ['institution'] }); setSaved(true); },
+  });
+  if (!f) return <Card sx={{ height: '100%' }}><CardContent><Typography variant="h6">Contacts and social media</Typography><ErrorAlert error={q.error} /></CardContent></Card>;
+  const field = (k: Field, label: string, helperText?: string) => (
+    <TextField size="small" fullWidth label={label} helperText={helperText} value={f[k] ?? ''}
+      onChange={(e) => { setSaved(false); setF({ ...f, [k]: e.target.value }); }} />
+  );
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Typography variant="h6">Contacts and social media</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+          Printed on the advert posters and shown on the programme pages. For social media, the page address or just the name
+          (e.g. chuoafyankinga) is enough.
+        </Typography>
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('contactPhone', 'Main phone')}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('whatsapp', 'WhatsApp number')}</Grid>
+          {f.phones.map((p, i) => (
+            <Grid key={i} size={{ xs: 12, sm: 4 }}>
+              <TextField size="small" fullWidth label={`Other phone ${i + 1}`} value={p}
+                onChange={(e) => { setSaved(false); const phones = [...f.phones]; phones[i] = e.target.value; setF({ ...f, phones }); }} />
+            </Grid>
+          ))}
+          <Grid size={{ xs: 12, sm: 6 }}>{field('contactEmail', 'Contact email')}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('admissionsEmail', 'Admissions email', 'Printed on posters; the contact email if blank')}</Grid>
+          <Grid size={12}>{field('website', 'Website')}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('facebook', 'Facebook')}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('instagram', 'Instagram')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field('youtube', 'YouTube')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field('tiktok', 'TikTok')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field('x', 'X (Twitter)')}</Grid>
+        </Grid>
+        <ErrorAlert error={save.error} />
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }}>
+          <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Save contacts</Button>
+          {saved && <Typography variant="body2" color="success.main">Saved.</Typography>}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }

@@ -20,7 +20,7 @@ const STATUS_COLOUR: Record<TicketStatus, 'info' | 'primary' | 'warning' | 'succ
 };
 /** What a support ticket to Msingi is about. */
 export const SUPPORT_CATEGORY: Record<string, string> = {
-  ACCOUNT_ACCESS: 'Account or access', PROBLEM: 'Something is not working', INTEGRATION: 'Integration (NECTA, NACTVET, GePG, SMS…)', DATA_CHANGE: 'Data correction',
+  ACCOUNT_ACCESS: 'Account or access', PROBLEM: 'Something is not working', INTEGRATION: 'Integration (NECTA, NACTVET, payments, SMS…)', DATA_CHANGE: 'Data correction',
   TRAINING: 'Training or how-to', NEW_FEATURE: 'New feature', BILLING: 'Contract or billing', OTHER: 'Other',
 };
 

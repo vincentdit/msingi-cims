@@ -207,7 +207,7 @@ public class HealthCoverService {
         if (amount.signum() > 0) bill(p, id, yid, (String) y.get("code"), amount);
         audit.record("NHIF_INSTITUTION_CHOSEN", "Student", p.id(), Map.of("year", y.get("code"), "amount", amount));
         return studentCover(p, y, amount.signum() > 0
-                ? "Pay the NHIF contribution with the control number shown. The institution then registers you with NHIF."
+                ? "Pay the NHIF contribution with the GePG control number shown. The institution then registers you with NHIF."
                 : "The institution will register you with NHIF.");
     }
 

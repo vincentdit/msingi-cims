@@ -5,6 +5,7 @@ import { RequireAuth } from '../auth/session';
 import StaffLayout from '../components/StaffLayout';
 import InstitutionPage from '../pages/staff/InstitutionPage';
 import UsersPage from '../pages/staff/UsersPage';
+import MsingiSubscriptionPage from '../pages/staff/MsingiSubscriptionPage';
 import AuditPage from '../pages/staff/AuditPage';
 import ApprovalsPage from '../pages/staff/ApprovalsPage';
 import SecurityPage from '../pages/staff/SecurityPages';
@@ -106,6 +107,7 @@ export default function StaffApp() {
         <Route path="programmes" element={<ProgrammesPage />} />
         <Route path="institution" element={<InstitutionPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="msingi-subscription" element={<MsingiSubscriptionPage />} />
         <Route path="audit" element={<AuditPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="password" element={<ChangePasswordPage />} />

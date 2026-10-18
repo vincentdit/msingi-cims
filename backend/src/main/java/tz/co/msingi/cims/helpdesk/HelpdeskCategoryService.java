@@ -119,8 +119,12 @@ public class HelpdeskCategoryService {
     /** The first set of categories, made once per institution. */
     @Transactional
     public void ensureDefaults() {
+        boolean gepg = Boolean.TRUE.equals(jdbc.queryForObject("select ownership = 'PUBLIC' from tenants where id = cims_current_tenant()", Boolean.class));
         Integer n = jdbc.queryForObject("select count(*) from helpdesk_categories", Integer.class);
-        if (n != null && n > 0) return;
+        if (n != null && n > 0) {
+            if (!gepg) withoutGepg();
+            return;
+        }
         // two first visits at once must not both create the set
         jdbc.query("select pg_advisory_xact_lock(56001, cims_current_tenant()::int)", rs -> null);
         n = jdbc.queryForObject("select count(*) from helpdesk_categories", Integer.class);
@@ -128,7 +132,7 @@ public class HelpdeskCategoryService {
         // name, description, office, applicants, students, staff, guests, response h, resolution h
         Object[][] rows = {
                 {"Applying for admission", "The application, entry requirements, choices, documents and admission letters", "ADMISSIONS_OFFICER", true, false, false, true, 8, 72},
-                {"Payments and control numbers", "Application fee, control numbers or payment references, and payments not showing", "BURSAR", true, true, false, true, 8, 48},
+                {gepg ? PAYMENTS : PAYMENTS_OWN, gepg ? "Application fee, control numbers and payments not showing" : PAYMENTS_OWN_TEXT, "BURSAR", true, true, false, true, 8, 48},
                 {"Fees and invoices", "Fee statements, instalments, sponsors, refunds and receipts", "BURSAR", false, true, false, false, 8, 72},
                 {"Registration and student records", "Semester registration, personal details, ID cards, transfers and status changes", "REGISTRAR", false, true, false, false, 8, 72},
                 {"Results and examinations", "Results, examination eligibility, remarks, appeals and transcripts", "EXAMINATIONS_OFFICER", false, true, false, false, 8, 120},
@@ -156,8 +160,8 @@ public class HelpdeskCategoryService {
                 {"Signing in and my account", "I forgot my password",
                         "On the sign-in page choose Forgot password, enter your mobile number and the code we send, then choose a new password. "
                                 + "Students sign in with their registration number or mobile number.", true, true, true},
-                {"Payments and control numbers", "I paid but the payment does not show",
-                        "Payments usually show within minutes. Make sure you paid with the control number or payment reference shown in the portal, not another one. "
+                {gepg ? PAYMENTS : PAYMENTS_OWN, "I paid but the payment does not show",
+                        "Payments usually show within minutes. Make sure you paid with the " + (gepg ? "control number" : "payment reference") + " shown in the portal, not another one. "
                                 + "If it has not shown after one working day, ask us for help and attach the payment receipt or SMS from your bank or mobile money.", true, true, true},
         };
         for (Object[] a : answers) {
@@ -166,6 +170,20 @@ public class HelpdeskCategoryService {
                     select cims_current_tenant(), id, ?, ?, ?, ?, ?, true, 'CIMS' from helpdesk_categories where name = ?""",
                     a[1], a[2], a[3], a[4], a[5], a[0]);
         }
+    }
+
+    static final String PAYMENTS = "Payments and control numbers";
+    static final String PAYMENTS_OWN = "Payments and payment references";
+    static final String PAYMENTS_OWN_TEXT = "Application fee, payment references and payments not showing";
+
+    /** A private or faith-based institution has no GePG: the starter category and answer made by earlier versions are reworded. */
+    private void withoutGepg() {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()) return;
+        Integer old = jdbc.queryForObject("select count(*) from helpdesk_categories where name = ? and description like '%control numbers%'", Integer.class, PAYMENTS);
+        if (old == null || old == 0) return;
+        jdbc.update("update helpdesk_categories set name = ?, description = ? where name = ? and description like '%control numbers%'",
+                PAYMENTS_OWN, PAYMENTS_OWN_TEXT, PAYMENTS);
+        jdbc.update("update helpdesk_articles set body = replace(body, 'the control number or payment reference shown', 'the payment reference shown') where updated_by_name = 'CIMS'");
     }
 
     private static final String SELECT = """

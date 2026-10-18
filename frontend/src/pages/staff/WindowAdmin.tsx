@@ -10,6 +10,7 @@ import { api, formatDateTime } from '../../api/client';
 import type { AcademicYear, AdmissionWindow, WindowEvent, WindowState, WindowStats } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
+import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
 /** Who may publish, open, close and reopen admission windows. */
@@ -48,6 +49,7 @@ const inDays = (n: number, hour = 23, minute = 59) => { const d = new Date(); d.
 // ================================================================== create / edit
 
 export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWindow | null; onClose: () => void; onSaved: (w: AdmissionWindow) => void }) {
+  const gepg = useGepg();
   const years = useQuery({ queryKey: ['staff', 'years'], queryFn: () => api<AcademicYear[]>('/api/academic/years', staff) });
   const intakes = useQuery({ queryKey: ['staff', 'intakes'], queryFn: () => api<{ id: number; name: string }[]>('/api/academic/intakes', staff) });
   const open = win?.state === 'OPEN';
@@ -99,7 +101,7 @@ export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWind
           <Grid size={12}><TextField fullWidth multiline minRows={2} label="Instructions shown to applicants (optional)" value={f.instructions} onChange={set('instructions')} /></Grid>
           <Grid size={12}>
             <FormControlLabel control={<Checkbox checked={feeReminders} onChange={(e) => setFeeReminders(e.target.checked)} />}
-              label="Remind applicants by SMS who got a control number but have not paid (after two days, and again three days before closing)" />
+              label={gepg ? 'Remind applicants by SMS who got a control number but have not paid (after two days, and again three days before closing)' : 'Remind applicants by SMS who got a payment reference but have not paid (after two days, and again three days before closing)'} />
           </Grid>
         </Grid>
         <ErrorAlert error={save.error} />

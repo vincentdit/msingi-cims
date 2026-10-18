@@ -493,7 +493,7 @@ function ArticleDialog({ editing: start, onClose }: { editing: Partial<Article> 
           <DialogContent dividers>
             <Stack spacing={2}>
               <TextField label="Question" required value={editing.title ?? ''} onChange={(e) => setEditing({ ...editing, title: e.target.value })} inputProps={{ maxLength: 200 }}
-                placeholder="e.g. My control number has not arrived. What do I do?" />
+                placeholder="e.g. I paid but the payment does not show. What do I do?" />
               <TextField label="Answer" required multiline minRows={6} value={editing.body ?? ''} onChange={(e) => setEditing({ ...editing, body: e.target.value })} inputProps={{ maxLength: 10000 }} />
               <TextField select label="Category" value={editing.categoryId ? String(editing.categoryId) : ''} onChange={(e) => setEditing({ ...editing, categoryId: e.target.value ? Number(e.target.value) : undefined })}
                 helperText="The office that answers the category keeps this answer up to date">

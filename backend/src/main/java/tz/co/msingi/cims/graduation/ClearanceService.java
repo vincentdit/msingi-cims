@@ -315,7 +315,7 @@ public class ClearanceService {
             BigDecimal balance = accounts.forStudent(s.getId()).balance();
             AccountDtos.Clearance gate = accounts.evaluate(s, ClearanceGate.Gate.GRADUATION);
             boolean ok = balance.signum() <= 0 && (!gate.enabled() || gate.cleared());
-            String note = ok ? null : balance.signum() > 0 ? "TZS " + tzs(balance) + " outstanding. Pay it with a control number from the Fees page."
+            String note = ok ? null : balance.signum() > 0 ? "TZS " + tzs(balance) + " outstanding. Pay it from the Fees page."
                     : gate.reason();
             ClearanceItem.Status st = ok ? ClearanceItem.Status.CLEARED : ClearanceItem.Status.HELD;
             if (i.getStatus() != st || !Objects.equals(i.getNote(), note)) {

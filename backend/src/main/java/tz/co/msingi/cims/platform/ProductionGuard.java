@@ -46,7 +46,7 @@ public class ProductionGuard {
         }
         if (env.getProperty("cims.otp.expose-in-response", Boolean.class, false)) p.add("cims.otp.expose-in-response must be false");
         if (env.getProperty("cims.demo.seed", Boolean.class, false)) p.add("cims.demo.seed must be false");
-        for (String k : List.of("cims.gepg.callback-secret", "cims.collection.callback-secret", "cims.sms.callback-secret")) {
+        for (String k : List.of("cims.gepg.callback-secret", "cims.collection.callback-secret", "cims.sms.callback-secret", "cims.billing.callback-secret")) {
             String v = env.getProperty(k);
             if (v != null && (v.isBlank() || v.startsWith("change-me") || v.startsWith("test-"))) p.add(k + " still has its default value");
         }

@@ -425,7 +425,7 @@ public class SponsorService {
             int[] w = {22, 30, 12, 11, 14, 18, 14, 14, 14, 14, 10};
             for (int i = 0; i < w.length; i++) sh.setColumnWidth(i, w[i] * 256);
             Sheet si = wb.createSheet("Invoices");
-            header(si.createRow(0), new String[]{"Invoice", "Description", "Total", "Paid", "Balance", "Status", "Control number", "Issued"}, head);
+            header(si.createRow(0), new String[]{"Invoice", "Description", "Total", "Paid", "Balance", "Status", "Payment number", "Issued"}, head);
             ri = 1;
             for (SponsorInvoice i : d.invoices()) {
                 Row r = si.createRow(ri++);

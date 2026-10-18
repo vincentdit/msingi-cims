@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import CampaignIcon from '@mui/icons-material/Campaign';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import {
@@ -28,6 +29,7 @@ import { useInstitution } from '../../components/InstitutionContext';
 import { EligibilityDetail } from '../applicant/steps';
 import JoiningInstructionsCard from './JoiningInstructionsCard';
 import ProgrammeOfferDialog from './ProgrammeOfferDialog';
+import AdvertDialog from './AdvertDialog';
 import { ApplicationDocumentsSection, WindowDocumentsCard } from './ApplicationDocuments';
 import { CHECK_COLOUR, CHECK_LABEL, CheckButtons, describe } from './QualificationChecks';
 import { CampusPicker, CampusesTab, DepartmentsTab, NamedListTab, useCampuses, useProgrammeCampuses } from './StructurePages';
@@ -310,6 +312,7 @@ export function ApplicationsPage() {
 }
 
 function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => void }) {
+  const gepg = (useInstitution().payment?.mode ?? 'GEPG') === 'GEPG';
   const d = useQuery({ queryKey: ['staff', 'application', id], enabled: id != null, queryFn: () => api<ApplicationDetail>(`/api/admission/applications/${id}`, staff) });
   const a = d.data;
   const [printing, setPrinting] = useState(false);
@@ -361,7 +364,7 @@ function ApplicationDrawer({ id, onClose }: { id: number | null; onClose: () => 
           <Divider />
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Fee</Typography>
-            <Typography variant="body2">{a.fee.invoiceNo ?? 'No invoice'} · {formatTzs(a.fee.amount)} · {a.fee.feePaid ? 'Paid' : 'Not paid'}{a.fee.controlNo ? ` · Control no. ${a.fee.controlNo}` : ''}</Typography>
+            <Typography variant="body2">{a.fee.invoiceNo ?? 'No invoice'} · {formatTzs(a.fee.amount)} · {a.fee.feePaid ? 'Paid' : 'Not paid'}{a.fee.controlNo ? ` · ${gepg ? 'Control no.' : 'Payment reference'} ${a.fee.controlNo}` : ''}</Typography>
           </Box>
           <Divider />
           <Box>
@@ -552,12 +555,15 @@ export function WindowDetailPage() {
   const [editing, setEditing] = useState(false);
   // null: closed; 'new': offering another programme; otherwise the programme being edited
   const [offer, setOffer] = useState<WindowProgramme | 'new' | null>(null);
+  const [advert, setAdvert] = useState<WindowProgramme | null>(null);
   if (w.isLoading) return <Loading />;
   const win = w.data;
   if (!win) return <ErrorAlert error={w.error} />;
   // the steps that work on applications are ready once the window has opened (applications can exist)
   const canEdit = canConfigure && win.status !== 'CLOSED';
   const notOpenYet = win.state === 'DRAFT' || win.state === 'SCHEDULED' ? 'Ready once the window opens for applications.' : undefined;
+  // adverts and programme pages are for windows the public can see: open now, or published to open later
+  const canAdvertise = win.state === 'OPEN' || win.state === 'SCHEDULED';
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title={win.name} subtitle={`${win.academicYear} · ${win.intake} · ${formatDateTime(win.opensAt)} → ${formatDateTime(win.closesAt)} · Fee ${formatTzs(win.applicationFee)} · Offers open ${win.offerAcceptanceDays} days`}
@@ -573,11 +579,13 @@ export function WindowDetailPage() {
       <WindowLifecycle win={win} onEdit={() => setEditing(true)} />
       <Card><TableContainer>
         <Table size="small">
-          <TableHead><TableRow><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell align="right">Places</TableCell><TableCell>Minimum entry requirements</TableCell>{canEdit && <TableCell />}</TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Programme</TableCell><TableCell>Award</TableCell><TableCell align="right">Places</TableCell><TableCell>Minimum entry requirements</TableCell>{(canEdit || canAdvertise) && <TableCell />}</TableRow></TableHead>
           <TableBody>
             {win.programmes?.map((p) => (
               <TableRow key={p.id}><TableCell>{p.programmeName}</TableCell><TableCell>{p.awardName}</TableCell><TableCell align="right">{p.capacity}</TableCell><TableCell>{p.requirementSummary}</TableCell>
-                {canEdit && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}><Button size="small" startIcon={<EditIcon />} onClick={() => setOffer(p)}>Edit</Button></TableCell>}</TableRow>
+                {(canEdit || canAdvertise) && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                  {canAdvertise && <Button size="small" startIcon={<CampaignIcon />} onClick={() => setAdvert(p)}>Advert</Button>}
+                  {canEdit && <Button size="small" startIcon={<EditIcon />} onClick={() => setOffer(p)}>Edit</Button>}</TableCell>}</TableRow>
             ))}
           </TableBody>
         </Table>
@@ -588,6 +596,7 @@ export function WindowDetailPage() {
       {editing && <WindowFormDialog win={win} onClose={() => setEditing(false)} onSaved={(x) => { setEditing(false); qc.setQueryData(['staff', 'window', id], x); refresh(); }} />}
       {offer && <ProgrammeOfferDialog win={win} offer={offer === 'new' ? null : offer} programmes={programmes.data ?? []}
         onClose={() => setOffer(null)} onSaved={() => { setOffer(null); refresh(); }} />}
+      {advert && <AdvertDialog win={win} wp={win.programmes?.find((x) => x.id === advert.id) ?? advert} canEdit={canConfigure} onClose={() => setAdvert(null)} />}
     </Container>
   );
 }

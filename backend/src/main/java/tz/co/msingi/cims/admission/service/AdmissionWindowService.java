@@ -166,6 +166,23 @@ public class AdmissionWindowService {
         return WindowProgrammeView.of(wp);
     }
 
+    /** The selling points of a programme in a window (any time, even after the window closes): at most six lines of 80 characters. */
+    @Transactional
+    public WindowProgrammeView highlights(Long windowId, Long windowProgrammeId, String text) {
+        WindowProgramme wp = windowProgrammes.findById(windowProgrammeId)
+                .filter(x -> x.getWindow().getId().equals(windowId))
+                .orElseThrow(() -> new NotFoundException("Window programme", windowProgrammeId));
+        java.util.List<String> lines = text == null ? java.util.List.of()
+                : java.util.Arrays.stream(text.split("\\R")).map(String::strip).filter(l -> !l.isEmpty()).toList();
+        if (lines.size() > 6) throw new BusinessRuleException("TOO_MANY_HIGHLIGHTS", "Keep to six selling points.");
+        for (String l : lines) {
+            if (l.length() > 80) throw new BusinessRuleException("HIGHLIGHT_TOO_LONG", "Keep each selling point to 80 characters: " + l.substring(0, 40) + "…");
+        }
+        wp.setHighlights(lines.isEmpty() ? null : String.join("\n", lines));
+        audit.record("UPDATE_PROGRAMME_HIGHLIGHTS", "AdmissionWindow", windowId, Map.of("programme", wp.getProgramme().getCode(), "highlights", lines.size()));
+        return WindowProgrammeView.of(wp);
+    }
+
     /** Publishes a draft: applicants see it at once and can apply from its opening date to its closing date. */
     @Transactional
     public WindowView publish(Long id) {

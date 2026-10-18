@@ -102,6 +102,15 @@ public class AdmissionAdminController {
         return windows.updateProgramme(id, wpId, req);
     }
 
+    public record Highlights(String highlights) {
+    }
+
+    @PutMapping("/windows/{id}/programmes/{wpId}/highlights")
+    @PreAuthorize(WRITE)
+    public WindowProgrammeView highlights(@PathVariable Long id, @PathVariable Long wpId, @RequestBody Highlights h) {
+        return windows.highlights(id, wpId, h.highlights());
+    }
+
     /** Publishing, opening, closing and reopening windows: the Admissions Office, the administrator or the Deputy Principal (Academic). */
     @PostMapping("/windows/{id}/publish")
     @PreAuthorize(OPEN_CLOSE)

@@ -14,6 +14,7 @@ import type { AuditEntry, AuditFacets, AuditSummary, Page } from '../../api/type
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { CallsTable } from '../platform/PlatformPages';
 import { HealthChip, MODE_LABEL, n, type IntegrationCall, type PageOf, type SystemHealth } from '../platform/shared';
+import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
 
@@ -228,6 +229,7 @@ export default function AuditPage() {
 
 /** The institution's calls to NECTA, NACTVET, GePG and the SMS gateway (as NOAS keeps integration logs). */
 function IntegrationLog({ tabs }: { tabs: React.ReactNode }) {
+  const gepg = useGepg();
   const [system, setSystem] = useState('');
   const [outcome, setOutcome] = useState('');
   const [page, setPage] = useState(0);
@@ -239,11 +241,11 @@ function IntegrationLog({ tabs }: { tabs: React.ReactNode }) {
     queryFn: () => api<PageOf<IntegrationCall>>(`/api/audit/integrations?${qs}`, staff) });
   return (
     <Container maxWidth="xl" disableGutters>
-      <PageTitle title="Audit trail" subtitle="Calls CIMS made for this institution to NECTA, NACTVET, GePG and the SMS gateway, and GePG payment notifications received. Only references are kept, never what was sent." />
+      <PageTitle title="Audit trail" subtitle={gepg ? 'Calls CIMS made for this institution to NECTA, NACTVET, GePG and the SMS gateway, and GePG payment notifications received. Only references are kept, never what was sent.' : 'Calls CIMS made for this institution to NECTA, NACTVET and the SMS gateway, and payment notifications received from your payment collector. Only references are kept, never what was sent.'} />
       {tabs}
       <ErrorAlert error={health.error ?? calls.error} />
       <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
-        {(health.data ?? []).map((h) => (
+        {(health.data ?? []).filter((h) => gepg || h.system !== 'GEPG').map((h) => (
           <Card key={h.system} sx={{ p: 1.5, minWidth: 210, flex: '1 1 210px' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="body2" fontWeight={600}>{h.label}</Typography><HealthChip status={h.status} /></Stack>
             <Typography variant="body2" color="text.secondary">{n(h.calls)} calls · {n(h.failures)} failed · 7 days</Typography>
@@ -256,7 +258,7 @@ function IntegrationLog({ tabs }: { tabs: React.ReactNode }) {
           <TextField select size="small" label="System" value={system} onChange={(e) => { setSystem(e.target.value); setPage(0); }} sx={{ minWidth: 240 }}
             slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>
             <MenuItem value="">All systems</MenuItem>
-            {(health.data ?? []).map((h) => <MenuItem key={h.system} value={h.system}>{h.label}</MenuItem>)}
+            {(health.data ?? []).filter((h) => gepg || h.system !== 'GEPG').map((h) => <MenuItem key={h.system} value={h.system}>{h.label}</MenuItem>)}
           </TextField>
           <TextField select size="small" label="Outcome" value={outcome} onChange={(e) => { setOutcome(e.target.value); setPage(0); }} sx={{ minWidth: 150 }}
             slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}>

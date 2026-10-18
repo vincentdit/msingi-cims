@@ -280,7 +280,7 @@ function FeesCard() {
                 <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
                 <HowToPay reference={inv.controlNo} amount={inv.balance} />
               </Box>
-            ) : asked ? <Alert severity="info">{t('pay.pending')}</Alert>
+            ) : asked ? <Alert severity="info">{t(words.gepg ? 'pay.pending' : 'pay.pendingRef')}</Alert>
               : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.getNumber}</Button>}
             {SHOW_DEV_TOOLS && (
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>

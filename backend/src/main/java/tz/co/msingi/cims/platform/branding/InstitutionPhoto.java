@@ -16,7 +16,7 @@ import tz.co.msingi.cims.common.BaseEntity;
 @Table(name = "institution_photos")
 public class InstitutionPhoto extends BaseEntity {
 
-    public enum Kind { CAMPUS }
+    public enum Kind { CAMPUS, LOGO }
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

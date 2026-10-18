@@ -66,6 +66,22 @@ class CollectionPaymentsIT {
     }
 
     @Test
+    void nhifContributionsGoThroughGepgEvenInAPrivateInstitution() {
+        TestData.Institution inst = institution(Ownership.PRIVATE);
+        ControlNumber fees = bill(inst, "150000");
+        assertThat(fees.getIssuer()).isEqualTo(ControlNumber.Issuer.COLLECTION);
+        ControlNumber nhif = TenantContext.callAs(inst.info(), () -> tx.execute(s -> {
+            Invoice inv = billing.createInvoice(new BillingService.NewInvoice(Invoice.PayerType.STUDENT, 1L, "Asha Juma",
+                    "255700000002", null, "NHIF_CONTRIBUTION", null, "NHIF student health insurance, 2026/2027",
+                    List.of(new BillingService.NewInvoice.Line("NHIF", "NHIF", new BigDecimal("50400")))));
+            return billing.ensureControlNumber(inv.getId());
+        }));
+        assertThat(nhif.getIssuer()).isEqualTo(ControlNumber.Issuer.GEPG);
+        assertThat(PaymentReference.isValid(nhif.getControlNo())).isFalse();
+        assertThat(nhif.getControlNo()).isNotBlank();
+    }
+
+    @Test
     void privateInstitutionIsPaidIntoItsOwnAccounts() throws Exception {
         TestData.Institution inst = institution(Ownership.PRIVATE);
         AdmissionScenario s = new AdmissionScenario(mvc, json, inst.tenant().getCode(), inst);
@@ -99,6 +115,12 @@ class CollectionPaymentsIT {
         assertThat(pub.at("/payment/channels")).hasSize(1);
         assertThat(pub.at("/payment/channels/0/label").asText()).isEqualTo("M-Pesa");
         assertThat(pub.at("/payment/channels/0/ussd").asText()).isEqualTo("*150*00#");
+
+        // No GePG wording for a private institution: its SMS templates offer the payment reference, not the control number.
+        data.staff(inst.tenant(), "admin", tz.co.msingi.cims.platform.security.Role.INSTITUTION_ADMIN);
+        JsonNode templates = s.body(s.call(get("/api/messaging/templates"), s.staffToken("admin"), null).andExpect(status().isOk()));
+        assertThat(templates.findValuesAsText("code")).contains("PAYMENT_REFERENCE").doesNotContain("CONTROL_NUMBER");
+        assertThat(templates.toString()).doesNotContain("GePG");
 
         // The invoice gets a CIMS reference that names the institution, not a GePG control number.
         ControlNumber cn = bill(inst, "150000");

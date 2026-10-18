@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!--
+  Receipt {{receiptNo}} from Msingi Technologies to an institution (Msingi billing). Double braces insert an escaped value; triple braces
+  insert markup built by BillingDocuments from escaped values. Must stay well-formed XHTML. CSS 2.1 only.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Receipt {{receiptNo}}</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm 16mm;
+    @bottom-center { content: "{{footer}}"; font-family: Helvetica, Arial, sans-serif; font-size: 7pt; color: #6b7280; } }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1f2937; line-height: 1.4; }
+  .head { width: 100%; border-collapse: collapse; border-bottom: 2pt solid #0F766E; }
+  .head td { vertical-align: top; padding-bottom: 8pt; }
+  .logo { width: 38pt; height: 38pt; background: #0F766E; color: #ffffff; font-weight: bold; font-size: 15pt; text-align: center; line-height: 38pt; border-radius: 6pt; }
+  .company { font-size: 14pt; font-weight: bold; color: #111827; }
+  .muted { color: #6b7280; }
+  .small { font-size: 7.5pt; }
+  h1 { font-size: 16pt; letter-spacing: 1pt; margin: 14pt 0 6pt 0; color: #0F766E; }
+  h3 { font-size: 9.5pt; margin: 14pt 0 4pt 0; }
+  table.meta { width: 100%; border-collapse: collapse; }
+  table.meta td { vertical-align: top; width: 50%; }
+  table.kv { border-collapse: collapse; }
+  table.kv th { text-align: left; color: #4b5563; font-weight: normal; padding: 1.5pt 10pt 1.5pt 0; }
+  table.kv td { padding: 1.5pt 0; font-weight: bold; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 10pt; }
+  table.lines th { text-align: left; background: #f3f4f6; color: #374151; font-weight: bold; padding: 4pt 6pt; border-bottom: 0.8pt solid #d1d5db; }
+  table.lines td { padding: 4pt 6pt; border-bottom: 0.6pt solid #e5e7eb; vertical-align: top; }
+  table.lines tr.total td { font-weight: bold; font-size: 10.5pt; border-top: 1pt solid #111827; }
+  table.lines tr.strong td { font-weight: bold; }
+  .r { text-align: right; }
+  table.pay { border-collapse: collapse; }
+  table.pay td { padding: 2pt 12pt 2pt 0; }
+  .box { border: 0.8pt solid #d1d5db; background: #f9fafb; padding: 7pt 9pt; margin-top: 10pt; }
+  .note { margin-top: 10pt; white-space: pre-wrap; }
+  .stamp { margin-top: 8pt; display: inline-block; border: 1.5pt solid #b91c1c; color: #b91c1c; font-weight: bold; padding: 3pt 8pt; letter-spacing: 1pt; }
+  .stamp.paid { border-color: #15803d; color: #15803d; }
+  .words { font-style: italic; color: #374151; }
+</style>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td style="width: 66pt;">{{{logo}}}</td>
+    <td>
+      <div class="company">{{company}}</div>
+      <div class="muted small">{{companyLine}}</div>
+      <div class="muted small">{{taxLine}}</div>
+    </td>
+  </tr>
+</table>
+<h1>RECEIPT</h1>
+{{{stamp}}}
+<table class="kv">
+  <tr><th>Receipt no.</th><td>{{receiptNo}}</td></tr>
+  <tr><th>Date</th><td>{{paidAt}}</td></tr>
+  <tr><th>Received from</th><td>{{from}}</td></tr>
+  <tr><th>Paid by</th><td>{{method}}</td></tr>
+  <tr><th>For</th><td>{{invoices}}</td></tr>
+</table>
+<div class="box">
+  <div class="muted small">Amount received</div>
+  <div style="font-size: 16pt; font-weight: bold;">{{amount}}</div>
+  <div class="words">{{words}}</div>
+</div>
+{{{credit}}}
+</body>
+</html>

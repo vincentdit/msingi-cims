@@ -31,11 +31,11 @@ public class SimulatedPaymentService {
 
     @Transactional
     public Statement payMine(Long invoiceId, BigDecimal amount) {
-        boolean viaGepg = channels.usesGepg();
+        Invoice inv = accounts.requireMine(invoiceId);
+        boolean viaGepg = billing.issuerFor(inv) == ControlNumber.Issuer.GEPG;
         if (!allowSimulation && (viaGepg ? !gepg.isSimulated() : !collection.isSimulated())) {
             throw new BusinessRuleException("NOT_AVAILABLE", "Payment simulation is only available in the test system");
         }
-        Invoice inv = accounts.requireMine(invoiceId);
         ControlNumber cn = billing.ensureControlNumber(inv.getId());
         BigDecimal paid = amount == null ? inv.balance() : amount;
         String psp = viaGepg ? "Simulated Bank" : channels.forPayers().channels().stream().findFirst()

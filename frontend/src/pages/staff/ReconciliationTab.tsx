@@ -18,7 +18,7 @@ const staff = { realm: 'staff' as const };
 
 const KIND: Record<string, { label: string; help: string; colour: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
   MATCHED: { label: 'Matched', help: 'In the day’s file and in CIMS with the same amount', colour: 'success' },
-  MISSING_IN_CIMS: { label: 'Not received by CIMS', help: 'It was collected (GePG, mobile money or bank) but the payment notice never reached CIMS. Post it to credit the payer.', colour: 'error' },
+  MISSING_IN_CIMS: { label: 'Not received by CIMS', help: 'It was collected but the payment notice never reached CIMS. Post it to credit the payer.', colour: 'error' },
   MISSING_IN_GEPG: { label: 'Not in the file', help: 'CIMS recorded it but the day’s file does not report it. It settles itself if a later file has it.', colour: 'warning' },
   AMOUNT_MISMATCH: { label: 'Amount differs', help: 'The file and CIMS have different amounts for the same receipt', colour: 'error' },
   DUPLICATE: { label: 'Repeated in file', help: 'The same receipt appears more than once in the file', colour: 'warning' },

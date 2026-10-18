@@ -32,6 +32,7 @@ export default defineConfig({
   optimizeDeps: { exclude: ['cims-jsx', 'cims-jsx/jsx-runtime', 'cims-jsx/jsx-dev-runtime'] },
   server: {
     port: 5173,
-    proxy: { '/api': { target: apiUrl, changeOrigin: false } },
+    // /p/ is the short programme link people share: the backend serves its preview card (Facebook, WhatsApp)
+    proxy: { '/api': { target: apiUrl, changeOrigin: false }, '/p/': { target: apiUrl, changeOrigin: false } },
   },
 });

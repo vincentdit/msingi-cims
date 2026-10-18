@@ -41,6 +41,7 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
             "/api/public/**",
+            "/p/**",
             "/api/auth/login",
             "/api/auth/mfa/verify",
             "/api/auth/mfa/sms",
@@ -50,6 +51,7 @@ public class SecurityConfig {
             "/api/student-auth/**",
             "/api/integrations/gepg/**",
             "/api/integrations/collections/**",
+            "/api/integrations/msingi-billing/**",
             "/api/integrations/sms/**",
             "/actuator/health/**",
             "/v3/api-docs/**",

@@ -86,6 +86,7 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
   - The institution always keeps one active administrator.
   - An administrator can't disable themselves or remove their own administrator role.
   - Every change is in the audit trail.
+- **Msingi subscription** (Administration): the contract with Msingi, invoices and receipts as PDF, the statement, what is owed and overdue, credit, and the accounts to pay into with each invoice's payment reference.
 - **Next:** institution settings page (name, contacts, colours, logo, registration number pattern) and integration settings.
 
 ### 4. Principal / Management Viewer: Done
@@ -357,6 +358,11 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Audit trail:**
   - The platform's own trail cannot be changed or deleted: who, what, which institution, the details and the IP address.
   - What platform staff do inside an institution also appears in that institution's audit trail as "<name> (Msingi platform)".
+- **Billing (what institutions pay Msingi):**
+  - **Contract** on each institution's page: set-up fee, annual licence, fee per active student a year, fee per paid application, share of application fees, how often usage is invoiced, VAT, payment terms, who receives the invoices, whether invoices are issued without review and whether the institution is suspended automatically when long overdue.
+  - **Invoices:** prepared every morning (the licence at the start of each contract year, usage at the end of each cycle), or by hand. Msingi checks a draft, can change its lines (with discounts), and issues it: it gets a number, a due date and a payment reference, and goes to the institution by email as a PDF.
+  - **Payments:** recorded by Msingi (bank, mobile money, cheque, cash) or reported by Msingi's payment collector; applied to the invoice and then the oldest; any surplus is credit for the next invoice. Receipts by email. A payment recorded by mistake can be reversed.
+  - **Follow-up:** overview with what was invoiced and received in the year, what is owed and overdue, ageing and each institution; statements; reminders 3 days before and 1, 14 and 30 days after the due date; a final notice (or suspension, if the contract allows) after the contract's limit.
 - **First account:**
   - Created at start-up when none exists, from `CIMS_PLATFORM_BOOTSTRAP_USERNAME` (default `msingi`) and `CIMS_PLATFORM_BOOTSTRAP_PASSWORD`. That person must choose their own password at first sign-in.
   - **Development:** `msingi` / `Msingi@2026`.

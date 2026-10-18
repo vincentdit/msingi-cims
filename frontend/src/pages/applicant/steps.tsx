@@ -17,6 +17,7 @@ import { AreaPicker } from '../../components/AreaPicker';
 import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
 import { ErrorAlert, Loading } from '../../components/common';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
+import { chosenProgramme, forgetChoice } from '../portal/applyFor';
 
 const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
@@ -185,7 +186,7 @@ export function FeeStep({ app, onNext }: { app: Application; onNext: () => void 
             <HowToPay reference={f.controlNo} amount={f.amount - f.paid} />
           </CardContent>
         </Card>
-      ) : request.isSuccess ? <Alert severity="info">{t('pay.pending')}</Alert> : (
+      ) : request.isSuccess ? <Alert severity="info">{t(words.gepg ? 'pay.pending' : 'pay.pendingRef')}</Alert> : (
         <Box><Button variant="contained" size="large" onClick={() => request.mutate()} disabled={request.isPending}>{words.getNumber}</Button></Box>
       )}
       {f?.controlNo && (
@@ -225,6 +226,18 @@ export function ProgrammesStep({ app, onNext }: { app: Application; onNext: () =
   const elig = useQuery({ queryKey: ['applicant', 'eligibility', app.windowId], queryFn: () => api<ProgrammeEligibility[]>(`/api/applicant/eligibility?windowId=${app.windowId}`, { realm: 'applicant' }) });
   const level = useQuery({ queryKey: ['applicant', 'entry-level'], queryFn: () => api<{ label: string; basis: string }>('/api/applicant/entry-level', { realm: 'applicant' }) });
   const [chosen, setChosen] = useState<number[]>(app.choices.map((c) => c.windowProgrammeId));
+  // a programme picked on its public page comes ready as the first choice (when the applicant has none yet and qualifies)
+  const [picked, setPicked] = useState<string | null>(null);
+  useEffect(() => {
+    const want = chosenProgramme();
+    if (!want || want.windowId !== app.windowId || app.choices.length > 0 || !elig.data) return;
+    const e = elig.data.find((x) => x.windowProgrammeId === want.windowProgrammeId);
+    if (e?.eligible) {
+      setChosen((c) => (c.length === 0 ? [e.windowProgrammeId] : c));
+      setPicked(e.programmeName);
+    }
+    forgetChoice();
+  }, [elig.data]);
   const save = useMutation({
     mutationFn: () => api(`/api/applicant/applications/${app.id}/choices`, { method: 'PUT', realm: 'applicant', body: { windowProgrammeIds: chosen } }),
     onSuccess: () => { invalidate(); onNext(); },
@@ -240,6 +253,7 @@ export function ProgrammesStep({ app, onNext }: { app: Application; onNext: () =
     <Stack spacing={2.5}>
       <Typography color="text.secondary">{t('app.programmesIntro', { n: app.maxChoices })}</Typography>
       {level.data && <Alert severity="info" icon={false}>{t('app.entryLevel', { basis: level.data.basis, label: level.data.label })}</Alert>}
+      {picked && <Alert severity="success">{t('app.pickedFromPage', { name: picked })}</Alert>}
       {chosen.length > 0 && (
         <Card sx={{ borderColor: 'secondary.main' }}>
           <CardContent>

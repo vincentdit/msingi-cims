@@ -40,7 +40,7 @@ public class PublicController {
     }
 
     public record InstitutionView(String code, String name, String shortName, String nactvetRegNo, String contactEmail,
-                                  String contactPhone, Map<String, Object> branding, PhotoView campusPhoto,
+                                  String contactPhone, Map<String, Object> branding, PhotoView campusPhoto, PhotoView logo,
                                   tz.co.msingi.cims.finance.collection.PaymentChannelService.PublicPayment payment,
                                   tz.co.msingi.cims.platform.privacy.SecuritySettingsService.IdleMinutes idleMinutes) {
     }
@@ -50,7 +50,8 @@ public class PublicController {
     public InstitutionView institution() {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
         return new InstitutionView(t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactEmail(),
-                t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), payments.forPayers(), security.idle());
+                t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), photos.view(InstitutionPhoto.Kind.LOGO).orElse(null),
+                payments.forPayers(), security.idle());
     }
 
     @Operation(summary = "The facts the applicants' privacy notice shows: version, institution, contacts and retention of applications")

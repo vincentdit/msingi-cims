@@ -205,12 +205,12 @@ public final class AdmissionDtos {
 
     public record WindowProgrammeView(Long id, Long programmeId, String programmeCode, String programmeName, String awardFamily,
                                       short awardLevel, String awardName, String department, int capacity,
-                                      String requirementSummary, EntryRules entryRules) {
+                                      String requirementSummary, EntryRules entryRules, String highlights) {
         public static WindowProgrammeView of(WindowProgramme wp) {
             var p = wp.getProgramme();
             return new WindowProgrammeView(wp.getId(), p.getId(), p.getCode(), p.getName(), p.getAwardFamily().name(),
                     p.getAwardLevel(), p.getAwardName(), p.getDepartment().getName(), wp.getCapacity(),
-                    wp.getEntryRules() == null ? null : wp.getEntryRules().summary(), wp.getEntryRules());
+                    wp.getEntryRules() == null ? null : wp.getEntryRules().summary(), wp.getEntryRules(), wp.getHighlights());
         }
     }
 
