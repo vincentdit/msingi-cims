@@ -91,6 +91,22 @@ public class HelpdeskDeskController {
         return service.setPriority(id, p.priority());
     }
 
+    @GetMapping("/tickets/{id}/suggestions")
+    public tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.StaffSuggestions suggestions(@PathVariable Long id) {
+        return service.suggestions(id);
+    }
+
+    @PostMapping("/suggestions/{learnedId}/used")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void used(@PathVariable Long learnedId) {
+        service.usedSuggestion(learnedId);
+    }
+
+    @GetMapping("/gaps")
+    public List<tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.Gap> gaps(@RequestParam(defaultValue = "90") int days) {
+        return service.gaps(days);
+    }
+
     @GetMapping("/tickets/{id}/agents")
     public List<Agent> agents(@PathVariable Long id) {
         return service.agents(id);

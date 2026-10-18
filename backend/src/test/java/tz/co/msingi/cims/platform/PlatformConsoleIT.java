@@ -212,6 +212,8 @@ class PlatformConsoleIT {
         assertThat(mine.at("/content/0/outcome").asText()).isEqualTo("SUCCESS");
         assertThat(mine.toString()).contains("S0101/0002").doesNotContain("S0101/0003");
         JsonNode health = sb.body(sb.call(get("/api/audit/integrations/health"), sb.staffToken("auditor"), null));
+        // every outside system has a name (none shows as a blank row)
+        for (JsonNode h : health) assertThat(h.path("label").asText()).as(h.get("system").asText()).isNotBlank();
         JsonNode necta = null;
         for (JsonNode h : health) if (h.get("system").asText().equals("NECTA")) necta = h;
         assertThat(necta.get("calls").asLong()).isEqualTo(1);

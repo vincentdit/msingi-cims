@@ -1,4 +1,5 @@
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import DescriptionIcon from '@mui/icons-material/DescriptionOutlined';
 import ImageIcon from '@mui/icons-material/ImageOutlined';
@@ -6,7 +7,7 @@ import LockIcon from '@mui/icons-material/LockOutlined';
 import {
   Alert, Box, Button, Chip, FormControlLabel, IconButton, MenuItem, Paper, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatDateTime } from '../../api/client';
 import { tr } from '../../locale/ui';
 import type { Attachment, Message, Priority, TicketStatus } from './types';
@@ -68,8 +69,10 @@ const size = (b: number) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} 
  * The conversation of a ticket. Who wrote each message is shown by side: the requester (or the institution) on the left,
  * the answering side on the right, what happened in the middle; notes only staff see are marked.
  */
-export function Conversation({ messages, ourSide, onOpen }: {
+export function Conversation({ messages, ourSide, onOpen, actions }: {
   messages: Message[]; ourSide: 'REQUESTER' | 'STAFF' | 'INSTITUTION' | 'MSINGI'; onOpen: (a: Attachment) => void;
+  /** Buttons under a message (e.g. save a reply as an answer). */
+  actions?: (m: Message) => ReactNode;
 }) {
   return (
     <Stack spacing={1.5} aria-label="Conversation">
@@ -83,6 +86,7 @@ export function Conversation({ messages, ourSide, onOpen }: {
             </Typography>
           );
         }
+        if (side === 'ASSISTANT') return <AssistantMessage key={m.id} m={m} />;
         const mine = side === ourSide;
         return (
           <Box key={m.id} sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
@@ -105,11 +109,31 @@ export function Conversation({ messages, ourSide, onOpen }: {
                   ))}
                 </Stack>
               )}
+              {actions?.(m)}
             </Paper>
           </Box>
         );
       })}
     </Stack>
+  );
+}
+
+/** An answer the CIMS assistant gave from the published answers: its title in bold, marked as a suggestion. */
+function AssistantMessage({ m }: { m: Message }) {
+  const [title, ...rest] = m.body.split('\n\n');
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+      <Paper variant="outlined" sx={{ p: 1.5, maxWidth: { xs: '100%', md: '78%' }, borderRadius: 2, bgcolor: '#F1F8F4', borderColor: 'success.light' }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }} flexWrap="wrap" useFlexGap>
+          <AutoAwesomeIcon fontSize="small" color="success" />
+          <Typography variant="subtitle2">{m.authorName}</Typography>
+          <Chip size="small" label="Suggested answer" color="success" variant="outlined" />
+          <Typography variant="caption" color="text.secondary">{formatDateTime(m.createdAt)}</Typography>
+        </Stack>
+        <Typography variant="body2" fontWeight={600}>{title}</Typography>
+        {rest.length > 0 && <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: 0.5 }}>{rest.join('\n\n')}</Typography>}
+      </Paper>
+    </Box>
   );
 }
 
@@ -154,11 +178,20 @@ export function FilePicker({ files, onChange }: { files: File[]; onChange: (f: F
  * Writing a message. Staff can mark it a note only staff see and choose the status after sending (in progress, waiting for the
  * requester, resolved).
  */
-export function ReplyBox({ onSend, sending, staff, placeholder, statuses }: {
+export function ReplyBox({ onSend, sending, staff, placeholder, statuses, draft }: {
   onSend: (body: string, files: File[], options: { internal: boolean; statusAfter?: string }) => Promise<unknown>;
   sending?: boolean; staff?: boolean; placeholder?: string; statuses?: { value: string; label: string }[];
+  /** Text put into the box from outside (a suggested reply); a new {@code n} replaces what is there. */
+  draft?: { text: string; n: number };
 }) {
   const [body, setBody] = useState('');
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!draft) return;
+    setBody(draft.text);
+    setInternal(false);
+    box.current?.focus();
+  }, [draft]);
   const [files, setFiles] = useState<File[]>([]);
   const [internal, setInternal] = useState(false);
   const [statusAfter, setStatusAfter] = useState('');
@@ -168,7 +201,7 @@ export function ReplyBox({ onSend, sending, staff, placeholder, statuses }: {
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, ...(internal ? { backgroundColor: '#FFF8E1', borderColor: 'warning.light' } : {}) }}>
       <TextField multiline minRows={3} fullWidth value={body} onChange={(e) => setBody(e.target.value)}
         placeholder={internal ? 'A note only staff can see' : placeholder ?? 'Write your message'}
-        inputProps={{ maxLength: 5000, 'aria-label': tr(internal ? 'Note for staff' : 'Message') }} />
+        inputRef={box} inputProps={{ maxLength: 5000, 'aria-label': tr(internal ? 'Note for staff' : 'Message') }} />
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} justifyContent="space-between" sx={{ mt: 1 }}>
         <FilePicker files={files} onChange={setFiles} />
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">

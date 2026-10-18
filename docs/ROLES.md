@@ -376,6 +376,7 @@ Status: **Done** means refined and tested. **Working** means usable, with known 
 - **Institution Administrator:** sees every request, keeps the categories (office, who may choose them, targets) and general answers, and raises tickets to Msingi or sends a request on to Msingi (**Msingi support** tab). Overdue requests are escalated to the administrators.
 - **Auditor and Principal / Management:** read every request and the performance, change nothing.
 - **Platform Administrator (Msingi):** **Support** in the platform console: tickets from every institution, with priority-based targets, notes the institution does not see, assignment and escalation.
+- **The assistant** helps everyone: requesters see answers that may solve their problem while they write and sometimes get an answer at once (they say whether it solved it); the answering offices see **Suggested replies** on each request (published answers and replies that solved similar requests, put in the reply box with **Use**), can **Save as an answer** a good reply, and see **Asked often, no answer yet** for their own categories on the Answers tab and the assistant's figures on the Performance tab.
 
 ## Suggested order for the next slices
 

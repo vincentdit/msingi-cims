@@ -63,6 +63,7 @@ public class HelpdeskService {
     private final HelpdeskNotifier notifier;
     private final NumberSequenceService numbers;
     private final AuditService audit;
+    private final tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant assistant;
 
     // ================================================================= views
 
@@ -79,7 +80,8 @@ public class HelpdeskService {
 
     /** One ticket with its conversation. What a requester sees leaves out staff notes and contact details. */
     public record TicketView(TicketRow ticket, String requesterPhone, String requesterEmail, List<MessageView> messages,
-                             boolean canReply, boolean canClose, boolean canManage, String msingiTicketNo, Long msingiTicketId) {
+                             boolean canReply, boolean canClose, boolean canManage, String msingiTicketNo, Long msingiTicketId,
+                             String suggestionOutcome) {
     }
 
     public record DeskPage(List<TicketRow> rows, long total, Map<String, Long> counts) {
@@ -95,7 +97,12 @@ public class HelpdeskService {
                                 Double repliedInTimePercent, Double resolvedInTimePercent, Double satisfiedPercent) {
     }
 
-    public record Performance(int days, CategoryStats overall, List<CategoryStats> categories) {
+    /** What the assistant did in the period: questions answered before asking, answers given at once, categories guessed. */
+    public record AssistantStats(long solvedBeforeAsking, long instantAnswers, long instantAccepted, long instantRejected, long categoryGuessed,
+                                 long categoryRight, long learnedReplies) {
+    }
+
+    public record Performance(int days, CategoryStats overall, List<CategoryStats> categories, AssistantStats assistant) {
     }
 
     // ================================================================= requesters with an account
@@ -133,6 +140,7 @@ public class HelpdeskService {
         CategoryView c = allowedCategory(categoryId, type);
         List<Upload> uploads = HelpdeskFiles.read(files);
         Long id = insert(c, type, uid, (String) u.get("full_name"), (String) u.get("phone"), (String) u.get("email"), null, subject, body, uploads);
+        predict(id, type, subject, body);
         Ticket t = load(id);
         notifier.received(t.facts(c.name()), null);
         notifier.newTicket(t.facts(c.name()));
@@ -156,6 +164,14 @@ public class HelpdeskService {
     public TicketView requesterClose(Long id, Boolean satisfied) {
         Ticket t = own(id);
         close(t, satisfied, t.requesterName);
+        return requesterView(id);
+    }
+
+    /** The requester says whether the answer the assistant gave at once solved the problem. */
+    @Transactional
+    public TicketView requesterAssistantFeedback(Long id, boolean helpful) {
+        Ticket t = own(id);
+        assistantFeedback(t, helpful);
         return requesterView(id);
     }
 
@@ -187,6 +203,7 @@ public class HelpdeskService {
         String code = code();
         String ticketNo = nextNumber();
         Long id = insert(c, "GUEST", null, name.trim(), msisdn, mail, new String[]{ticketNo, code}, subject, body, uploads);
+        predict(id, "GUEST", subject, body);
         Ticket t = load(id);
         notifier.received(t.facts(c.name()), code);
         notifier.newTicket(t.facts(c.name()));
@@ -209,6 +226,13 @@ public class HelpdeskService {
     public TicketView guestClose(String ticketNo, String code, Boolean satisfied) {
         Ticket t = guest(ticketNo, code);
         close(t, satisfied, t.requesterName);
+        return requesterView(t.id);
+    }
+
+    @Transactional
+    public TicketView guestAssistantFeedback(String ticketNo, String code, boolean helpful) {
+        Ticket t = guest(ticketNo, code);
+        assistantFeedback(t, helpful);
         return requesterView(t.id);
     }
 
@@ -461,7 +485,29 @@ public class HelpdeskService {
         List<CategoryStats> per = jdbc.query(sql, m, args.toArray());
         CategoryStats overall = jdbc.queryForObject(sql.substring(0, sql.indexOf("from helpdesk_categories c")).replace("select c.id, c.name,", "select null, 'All',")
                 + " from helpdesk_tickets t where t.created_at >= now() - make_interval(days => ?) and " + visible, m, args.toArray());
-        return new Performance(d, overall, per);
+        Map<String, Object> st = jdbc.queryForMap("select (select count(*) from helpdesk_deflections where created_at >= now() - make_interval(days => ?)) solved,"
+                + " count(*) filter (where t.suggestion_outcome is not null) instant,"
+                + " count(*) filter (where t.suggestion_outcome = 'ACCEPTED') accepted,"
+                + " count(*) filter (where t.suggestion_outcome = 'REJECTED') rejected,"
+                + " count(*) filter (where t.predicted_category_id is not null) guessed,"
+                + " count(*) filter (where t.predicted_category_id = t.category_id) rightly,"
+                + " (select count(*) from helpdesk_learned_answers) learned"
+                + " from helpdesk_tickets t where t.created_at >= now() - make_interval(days => ?) and " + visible, prepend(d, args));
+        AssistantStats as = new AssistantStats(n(st, "solved"), n(st, "instant"), n(st, "accepted"), n(st, "rejected"), n(st, "guessed"),
+                n(st, "rightly"), n(st, "learned"));
+        return new Performance(d, overall, per, as);
+    }
+
+    /** The days for the deflections, then {@code args} (the days and the visibility arguments). */
+    private static Object[] prepend(int days, List<Object> args) {
+        List<Object> out = new ArrayList<>();
+        out.add(days);
+        out.addAll(args);
+        return out.toArray();
+    }
+
+    private static long n(Map<String, Object> m, String k) {
+        return ((Number) m.get(k)).longValue();
     }
 
     private static Double round(ResultSet rs, int col) throws SQLException {
@@ -525,6 +571,99 @@ public class HelpdeskService {
                 : Boolean.TRUE.equals(satisfied) ? "Closed by " + name + ": the answer helped" : "Closed by " + name + ": the answer did not help", false);
         audit.recordAs(t.requesterUserId, t.requesterUserId == null ? name + " (help page)" : CurrentUser.name(), "HELPDESK_CLOSED", "HelpdeskTicket", t.id,
                 Map.of("ticketNo", t.ticketNo, "satisfied", satisfied == null ? "" : satisfied));
+        assistant.learn(t.id, satisfied);
+    }
+
+    // ---------------------------------------------------------------- the assistant on a request
+
+    /** Records what the assistant predicts for a new request and, when one answer is a confident match, gives it at once. */
+    private void predict(Long id, String requesterType, String subject, String body) {
+        String reader = "GUEST".equals(requesterType) ? "PUBLIC" : requesterType;
+        List<Long> allowed = categories.forAudience(requesterType).stream().map(CategoryView::id).toList();
+        var sg = assistant.suggest(reader, subject, body, allowed);
+        var instant = assistant.instantAnswer(reader, subject, body);
+        var top = instant != null ? instant : sg.answers().isEmpty() ? null : sg.answers().get(0);
+        jdbc.update("update helpdesk_tickets set predicted_category_id = ?, category_confidence = ?, suggested_article_id = ?, suggestion_score = ?,"
+                        + " suggestion_outcome = ? where id = ?",
+                sg.category() == null ? null : sg.category().id(), sg.category() == null ? null : sg.category().confidence(),
+                top == null ? null : top.id(), top == null ? null : top.confidence(), instant == null ? null : "INSTANT", id);
+        if (instant != null) {
+            jdbc.update("insert into helpdesk_messages (tenant_id, ticket_id, author_type, author_user_id, author_name, body, internal, article_id)"
+                    + " values (cims_current_tenant(), ?, 'ASSISTANT', null, 'CIMS assistant', ?, false, ?)", id, instant.title() + "\n\n" + instant.body(), instant.id());
+        }
+    }
+
+    private void assistantFeedback(Ticket t, boolean helpful) {
+        Map<String, Object> r = jdbc.queryForMap("select suggestion_outcome, suggested_article_id from helpdesk_tickets where id = ?", t.id);
+        if (!"INSTANT".equals(r.get("suggestion_outcome"))) {
+            throw new BusinessRuleException("NO_SUGGESTION", "There is no suggested answer waiting for your reply on this request.");
+        }
+        Object article = r.get("suggested_article_id");
+        jdbc.update("update helpdesk_tickets set suggestion_outcome = ?, updated_at = now() where id = ?", helpful ? "ACCEPTED" : "REJECTED", t.id);
+        if (article != null) {
+            jdbc.update(helpful ? "update helpdesk_articles set helpful = helpful + 1 where id = ?"
+                    : "update helpdesk_articles set not_helpful = not_helpful + 1 where id = ?", article);
+        }
+        if (helpful) {
+            addMessage(t.id, "SYSTEM", t.requesterUserId, t.requesterName, "Solved by the suggested answer", false);
+            close(load(t.id), true, t.requesterName);
+        } else {
+            addMessage(t.id, "SYSTEM", t.requesterUserId, t.requesterName, "The suggested answer did not solve it; the office will reply", false);
+            jdbc.update("update helpdesk_tickets set updated_at = now() where id = ?", t.id);
+        }
+    }
+
+    /** Answers likely to solve what someone is writing (APPLICANT, STUDENT, STAFF or GUEST), and the category guessed among theirs. */
+    @Transactional
+    public tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.Suggestion suggestFor(String requesterType, String subject, String body) {
+        String s = subject == null ? "" : subject;
+        String b = body == null ? "" : body;
+        if (s.length() + b.length() > 6000) b = b.substring(0, Math.max(0, 6000 - s.length()));
+        List<Long> allowed = categories.forAudience(requesterType).stream().map(CategoryView::id).toList();
+        return assistant.suggest("GUEST".equals(requesterType) ? "PUBLIC" : requesterType, s, b, allowed);
+    }
+
+    /** A suggested answer solved the question before a request was raised: counted, and the answer marked helpful. */
+    @Transactional
+    public void solvedBeforeAsking(String requesterType, Long articleId) {
+        String reader = "GUEST".equals(requesterType) ? "PUBLIC" : requesterType;
+        String column = switch (reader) { case "APPLICANT" -> "for_applicants"; case "STUDENT" -> "for_students"; case "STAFF" -> "for_staff"; default -> "for_public"; };
+        Integer ok = jdbc.queryForObject("select count(*) from helpdesk_articles where id = ? and published and " + column, Integer.class, articleId);
+        if (ok == null || ok == 0) throw new NotFoundException("Article", articleId);
+        jdbc.update("update helpdesk_articles set helpful = helpful + 1 where id = ?", articleId);
+        jdbc.update("insert into helpdesk_deflections (tenant_id, article_id, audience) values (cims_current_tenant(), ?, ?)", articleId, reader);
+    }
+
+    /** Frequent questions of the last {@code days} days with no answer yet, in the categories the person keeps answers for. */
+    @Transactional(readOnly = true)
+    public List<tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.Gap> gaps(int days) {
+        Access a = access();
+        List<Long> mine = categories.all().stream().filter(c -> a.admin() || a.roles.contains(c.officeRole())).map(CategoryView::id).toList();
+        return assistant.gaps(Math.min(Math.max(days, 7), 365), mine);
+    }
+
+    /** Staff used a past reply the assistant suggested (it then ranks a little higher). */
+    @Transactional
+    public void usedSuggestion(Long learnedId) {
+        access();
+        assistant.used(learnedId);
+    }
+
+    /** Suggested replies for staff on a request, and the category it seems to belong to. */
+    @Transactional(readOnly = true)
+    public tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.StaffSuggestions suggestions(Long id) {
+        Access a = access();
+        Ticket t = load(id);
+        if (!a.canSee(t)) throw new AccessDeniedException("Not your office's ticket");
+        String text = t.subject + "\n" + String.join("\n", jdbc.queryForList(
+                "select body from helpdesk_messages where ticket_id = ? and author_type = 'REQUESTER' order by created_at, id", String.class, id));
+        List<Long> active = categories.all().stream().filter(CategoryView::active).map(CategoryView::id).toList();
+        var out = assistant.forStaff(id, text, active);
+        // the answer the requester already said did not solve it is not offered again
+        Long rejected = jdbc.queryForObject("select case when suggestion_outcome = 'REJECTED' then suggested_article_id end from helpdesk_tickets where id = ?", Long.class, id);
+        if (rejected == null) return out;
+        return new tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.StaffSuggestions(
+                out.replies().stream().filter(r -> !("ANSWER".equals(r.source()) && rejected.equals(r.sourceId()))).toList(), out.category());
     }
 
     /** Moves a ticket to another status, keeping the resolution clock stopped while it waits for the requester. */
@@ -635,7 +774,7 @@ public class HelpdeskService {
         TicketRow row = row(id);
         boolean canReply = OPEN.contains(t.status) || ("RESOLVED".equals(t.status) && t.resolvedAt != null
                 && t.resolvedAt.isAfter(OffsetDateTime.now().minusDays(REOPEN_DAYS)));
-        return new TicketView(row, null, null, messages(id, false), canReply, !"CLOSED".equals(t.status), false, null, null);
+        return new TicketView(row, null, null, messages(id, false), canReply, !"CLOSED".equals(t.status), false, null, null, outcome(id));
     }
 
     private TicketView staffView(Ticket t, Access a) {
@@ -643,7 +782,11 @@ public class HelpdeskService {
         String msingiNo = t.msingiTicketId == null ? null
                 : jdbc.queryForList("select ticket_no from support_tickets where id = ?", String.class, t.msingiTicketId).stream().findFirst().orElse(null);
         boolean act = a.canAct(t);
-        return new TicketView(row, t.requesterPhone, t.requesterEmail, messages(t.id, true), act, false, act, msingiNo, t.msingiTicketId);
+        return new TicketView(row, t.requesterPhone, t.requesterEmail, messages(t.id, true), act, false, act, msingiNo, t.msingiTicketId, outcome(t.id));
+    }
+
+    private String outcome(Long id) {
+        return jdbc.queryForObject("select suggestion_outcome from helpdesk_tickets where id = ?", String.class, id);
     }
 
     private TicketRow row(Long id) {

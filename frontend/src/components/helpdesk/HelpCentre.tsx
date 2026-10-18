@@ -1,11 +1,12 @@
 import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import ThumbDownIcon from '@mui/icons-material/ThumbDownOutlined';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpOutlined';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CardContent, Chip, InputAdornment, List, ListItemButton, MenuItem, Stack,
+  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CardContent, Chip, InputAdornment, List, ListItemButton, MenuItem, Paper, Stack,
   TextField, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
@@ -15,7 +16,7 @@ import { api, download, formatDateTime, uploadForm, type Realm } from '../../api
 import { ErrorAlert, Loading } from '../common';
 import { tr } from '../../locale/ui';
 import { CloseRequest, Conversation, FilePicker, ReplyBox, TicketStatusChip, messageForm } from './parts';
-import type { Article, Category, TicketRow, TicketView } from './types';
+import type { AnswerHit, Article, Category, Suggestion, TicketRow, TicketView } from './types';
 
 export type HelpMode = 'applicant' | 'student' | 'staff' | 'public';
 
@@ -50,6 +51,7 @@ export default function HelpCentre({ mode, intro }: { mode: HelpMode; intro?: st
                 <Typography fontWeight={600}>We have received your request {created.ticketNo}.</Typography>
                 <Typography variant="body2">Keep this code to follow it: <Box component="strong" sx={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 2 }}>{created.code}</Box></Typography>
                 <Typography variant="body2">We have also sent the number and the code by SMS.</Typography>
+                {created.ticket.suggestionOutcome === 'INSTANT' && <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>We may already have the answer: open the request to read it.</Typography>}
               </Alert>
             ) : (
               <AskForm mode={mode} base={base} realm={realm} onDone={(r) => setCreated(r as GuestCreated)} />
@@ -155,8 +157,38 @@ function AskForm({ mode, base, realm, onDone, onCancel }: {
   const categories = useQuery({ queryKey: ['help', base, 'categories'], queryFn: () => api<Category[]>(`${base}/categories`, mode === 'public' ? {} : { realm }) });
   const [f, setF] = useState({ name: '', phone: '', email: '', categoryId: '', subject: '', body: '' });
   const [files, setFiles] = useState<File[]>([]);
-  const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const [picked, setPicked] = useState(false);      // the person chose the category themselves: the guess no longer changes it
+  const [guessed, setGuessed] = useState<string>();
+  const [solved, setSolved] = useState<AnswerHit | null>(null);
+  const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => {
+    if (k === 'categoryId') { setPicked(true); setGuessed(undefined); }
+    setF({ ...f, [k]: e.target.value });
+  };
   const chosen = categories.data?.find((c) => String(c.id) === f.categoryId);
+  const auth = mode === 'public' ? {} : { realm };
+
+  // while the person writes: answers that may already solve it, and where the request belongs
+  const [draft, setDraft] = useState({ subject: '', body: '' });
+  useEffect(() => {
+    const h = setTimeout(() => setDraft({ subject: f.subject.trim(), body: f.body.trim() }), 700);
+    return () => clearTimeout(h);
+  }, [f.subject, f.body]);
+  const enough = draft.subject.length + draft.body.length >= 12;
+  const suggestion = useQuery({
+    queryKey: ['help', base, 'suggest', draft], enabled: enough, staleTime: 60_000, placeholderData: (prev) => prev,
+    queryFn: () => api<Suggestion>(`${base}/suggest`, { ...auth, method: 'POST', body: draft }),
+  });
+  const hints = enough ? suggestion.data : undefined;
+  useEffect(() => {
+    const g = hints?.category;
+    if (!g || picked || !categories.data?.some((c) => c.id === g.id)) return;
+    setF((x) => (x.categoryId === String(g.id) ? x : { ...x, categoryId: String(g.id) }));
+    setGuessed(String(g.id));
+  }, [hints, picked, categories.data]);
+  const solvedIt = useMutation({
+    mutationFn: (a: AnswerHit) => api(`${base}/suggest/solved`, { ...auth, method: 'POST', body: { articleId: a.id } }),
+    onSuccess: (_, a) => setSolved(a),
+  });
   const send = useMutation({
     mutationFn: () => {
       const form = messageForm(f.body, files, { categoryId: f.categoryId, subject: f.subject,
@@ -166,6 +198,22 @@ function AskForm({ mode, base, realm, onDone, onCancel }: {
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['help', realm, 'mine'] }); onDone(r); },
   });
   const ready = f.categoryId && f.subject.trim().length >= 3 && f.body.trim() && (mode !== 'public' || (f.name.trim() && f.phone.trim()));
+  if (solved) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="success" icon={<AutoAwesomeIcon />}>
+            <Typography fontWeight={600}>{`Glad that solved it: “${solved.title}”.`}</Typography>
+            <Typography variant="body2">There is no need to send a request. You can find this answer again under Answers to common questions.</Typography>
+          </Alert>
+          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
+            <Button onClick={() => setSolved(null)}>I still need to ask</Button>
+            {onCancel && <Button variant="contained" onClick={onCancel}>Done</Button>}
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card>
       <CardContent>
@@ -183,12 +231,15 @@ function AskForm({ mode, base, realm, onDone, onCancel }: {
           )}
           {mode === 'public' && <TextField label="Email (optional)" type="email" value={f.email} onChange={set('email')} inputProps={{ maxLength: 120 }} />}
           <TextField select label="What is it about?" required value={f.categoryId} onChange={set('categoryId')}
-            helperText={chosen ? <>{chosen.description}{chosen.description ? ' · ' : ''}{`We aim to reply within ${chosen.responseHours} hours`}</> : undefined}>
+            helperText={chosen ? <>{guessed === f.categoryId && <><AutoAwesomeIcon sx={{ fontSize: 14, verticalAlign: '-2px', mr: 0.5 }} />{'We think it is about this; change it if not.'}{' · '}</>}{chosen.description}{chosen.description ? ' · ' : ''}{`We aim to reply within ${chosen.responseHours} hours`}</> : undefined}>
             {categories.data?.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
           </TextField>
           <TextField label="Subject" required value={f.subject} onChange={set('subject')} inputProps={{ maxLength: 200 }} placeholder="e.g. My control number has not arrived" />
           <TextField label="Describe the problem" required multiline minRows={4} value={f.body} onChange={set('body')} inputProps={{ maxLength: 5000 }}
             helperText="Say what you tried and what you see. Do not write your password." />
+          {hints && hints.answers.length > 0 && (
+            <SuggestedAnswers answers={hints.answers} busy={solvedIt.isPending} onSolved={(a) => solvedIt.mutate(a)} />
+          )}
           <FilePicker files={files} onChange={setFiles} />
           <ErrorAlert error={send.error ?? categories.error} />
           <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -198,6 +249,47 @@ function AskForm({ mode, base, realm, onDone, onCancel }: {
         </Stack>
       </CardContent>
     </Card>
+  );
+}
+
+/** Published answers that match what the person is writing, shown before they send. */
+function SuggestedAnswers({ answers, onSolved, busy }: { answers: AnswerHit[]; onSolved: (a: AnswerHit) => void; busy?: boolean }) {
+  return (
+    <Box role="region" aria-label={tr('Answers that may help')} sx={{ border: 1, borderColor: 'success.light', bgcolor: '#F1F8F4', borderRadius: 2, p: 1.5 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <AutoAwesomeIcon fontSize="small" color="success" />
+        <Typography fontWeight={600}>These answers may help before you send</Typography>
+      </Stack>
+      {answers.map((a) => (
+        <Accordion key={a.id} disableGutters variant="outlined" sx={{ '&:before': { display: 'none' }, mb: 0.75, borderRadius: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Stack spacing={0.25}>
+              <Typography fontWeight={600}>{a.title}</Typography>
+              {a.categoryName && <Typography variant="caption" color="text.secondary">{a.categoryName}</Typography>}
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{a.body}</Typography>
+            <Button size="small" variant="contained" color="success" sx={{ mt: 1.5 }} disabled={busy} onClick={() => onSolved(a)}>This solved it</Button>
+          </AccordionDetails>
+        </Accordion>
+      ))}
+      <Typography variant="caption" color="text.secondary">Not what you need? Carry on and send your request.</Typography>
+    </Box>
+  );
+}
+
+/** The answer the assistant gave when the request was sent: did it solve the problem? */
+function InstantAnswerCheck({ busy, onAnswer }: { busy?: boolean; onAnswer: (helpful: boolean) => void }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: 'success.light' }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+        <Typography sx={{ flexGrow: 1 }}>Did the suggested answer solve your problem?</Typography>
+        <Button variant="contained" color="success" disabled={busy} onClick={() => onAnswer(true)}>Yes, close my request</Button>
+        <Button variant="outlined" disabled={busy} onClick={() => onAnswer(false)}>No, I still need help</Button>
+      </Stack>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>Either way, the office can still read your request.</Typography>
+    </Paper>
   );
 }
 
@@ -226,16 +318,18 @@ function RequestDetail({ id, realm, onBack }: { id: number; realm: Realm; onBack
   const done = (v: TicketView) => { qc.setQueryData(key, v); qc.invalidateQueries({ queryKey: ['help', realm, 'mine'] }); };
   const reply = useMutation({ mutationFn: ({ body, files }: { body: string; files: File[] }) => uploadForm<TicketView>(`/api/help/tickets/${id}/messages`, realm, messageForm(body, files), 'POST'), onSuccess: done });
   const close = useMutation({ mutationFn: (satisfied: boolean | null) => api<TicketView>(`/api/help/tickets/${id}/close`, { realm, method: 'POST', body: { satisfied } }), onSuccess: done });
+  const verdict = useMutation({ mutationFn: (helpful: boolean) => api<TicketView>(`/api/help/tickets/${id}/assistant`, { realm, method: 'POST', body: { helpful } }), onSuccess: done });
   if (!q.data) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
   const v = q.data;
   return (
     <Stack spacing={2}>
       <TicketHeader v={v} onBack={onBack} />
       <Conversation messages={v.messages} ourSide="REQUESTER" onOpen={(a) => download(`/api/help/attachments/${a.id}`, realm, a.fileName)} />
+      {v.suggestionOutcome === 'INSTANT' && v.canReply && <InstantAnswerCheck busy={verdict.isPending} onAnswer={(h) => verdict.mutate(h)} />}
       {v.canReply && <ReplyBox onSend={(body, files) => reply.mutateAsync({ body, files })} sending={reply.isPending} placeholder="Reply to the office" />}
-      {v.canClose && <CloseRequest busy={close.isPending} onClose={(s) => close.mutate(s)} />}
+      {v.canClose && v.suggestionOutcome !== 'INSTANT' && <CloseRequest busy={close.isPending} onClose={(s) => close.mutate(s)} />}
       {!v.canReply && v.ticket.status === 'CLOSED' && <Typography color="text.secondary">This request is closed. Ask again if you still need help.</Typography>}
-      <ErrorAlert error={reply.error ?? close.error} />
+      <ErrorAlert error={reply.error ?? close.error ?? verdict.error} />
     </Stack>
   );
 }
@@ -271,6 +365,8 @@ function GuestRequest({ access, onBack }: { access: { ticketNo: string; code: st
   });
   const close = useMutation({ mutationFn: (satisfied: boolean | null) => api<TicketView>('/api/public/help/tickets/close', { method: 'POST', body: { ...access, satisfied } }),
     onSuccess: (v) => qc.setQueryData(key, v) });
+  const verdict = useMutation({ mutationFn: (helpful: boolean) => api<TicketView>('/api/public/help/tickets/assistant', { method: 'POST', body: { ...access, helpful } }),
+    onSuccess: (v) => qc.setQueryData(key, v) });
   if (q.error) return <Stack spacing={2}><Box><Button startIcon={<ArrowBackIcon />} onClick={onBack}>Back</Button></Box><ErrorAlert error={q.error} /></Stack>;
   if (!q.data) return <Loading />;
   const v = q.data;
@@ -279,9 +375,10 @@ function GuestRequest({ access, onBack }: { access: { ticketNo: string; code: st
       <TicketHeader v={v} onBack={onBack} back="Back" />
       <Conversation messages={v.messages} ourSide="REQUESTER"
         onOpen={(a) => download(`/api/public/help/tickets/attachments/${a.id}`, 'applicant', a.fileName, 'POST', access)} />
+      {v.suggestionOutcome === 'INSTANT' && v.canReply && <InstantAnswerCheck busy={verdict.isPending} onAnswer={(h) => verdict.mutate(h)} />}
       {v.canReply && <ReplyBox onSend={(body, files) => reply.mutateAsync({ body, files })} sending={reply.isPending} placeholder="Reply to the office" />}
-      {v.canClose && <CloseRequest busy={close.isPending} onClose={(s) => close.mutate(s)} />}
-      <ErrorAlert error={reply.error ?? close.error} />
+      {v.canClose && v.suggestionOutcome !== 'INSTANT' && <CloseRequest busy={close.isPending} onClose={(s) => close.mutate(s)} />}
+      <ErrorAlert error={reply.error ?? close.error ?? verdict.error} />
       <Chip variant="outlined" label="Keep your request number and code private: anyone with both can read this conversation." sx={{ alignSelf: 'flex-start', height: 'auto', py: 0.5, '& .MuiChip-label': { whiteSpace: 'normal' } }} />
     </Stack>
   );

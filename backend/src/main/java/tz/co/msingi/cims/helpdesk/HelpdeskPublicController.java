@@ -49,6 +49,34 @@ public class HelpdeskPublicController {
     public record Vote(boolean helpful) {
     }
 
+    public record Draft(String subject, String body) {
+    }
+
+    public record Solved(Long articleId) {
+    }
+
+    public record Feedback(String ticketNo, String code, boolean helpful) {
+    }
+
+    @PostMapping("/suggest")
+    public tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.Suggestion suggest(@RequestBody Draft d, HttpServletRequest req) {
+        limit(follow, req);
+        return service.suggestFor("GUEST", d.subject(), d.body());
+    }
+
+    @PostMapping("/suggest/solved")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void solved(@RequestBody Solved s, HttpServletRequest req) {
+        limit(follow, req);
+        service.solvedBeforeAsking("GUEST", s.articleId());
+    }
+
+    @PostMapping("/tickets/assistant")
+    public TicketView assistantFeedback(@RequestBody Feedback f, HttpServletRequest req) {
+        limit(follow, req);
+        return service.guestAssistantFeedback(f.ticketNo(), f.code(), f.helpful());
+    }
+
     @GetMapping("/categories")
     public List<CategoryView> categories() {
         return categories.forAudience("GUEST");

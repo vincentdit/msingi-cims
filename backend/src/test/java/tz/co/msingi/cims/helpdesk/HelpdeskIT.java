@@ -240,7 +240,8 @@ class HelpdeskIT {
         assertThat(sms("HELPDESK_REPLY_GUEST")).hasSize(1);
         JsonNode reply = s.body(send(multipart("/api/public/help/tickets/reply"), null, Map.of("ticketNo", no, "code", code, "body", "It works, thanks"), PDF)
                 .andExpect(status().isOk()));
-        long att = reply.at("/messages/2/attachments/0/id").asLong();
+        JsonNode mine = reply.get("messages").get(reply.get("messages").size() - 1);
+        long att = mine.at("/attachments/0/id").asLong();
         s.call(post("/api/public/help/tickets/attachments/" + att), null, "{\"ticketNo\":\"" + no + "\",\"code\":\"" + code + "\"}").andExpect(status().isOk());
         s.call(post("/api/public/help/tickets/close"), null, "{\"ticketNo\":\"" + no + "\",\"code\":\"" + code + "\",\"satisfied\":true}")
                 .andExpect(jsonPath("$.ticket.status").value("CLOSED"));

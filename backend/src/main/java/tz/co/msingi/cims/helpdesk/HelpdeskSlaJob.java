@@ -32,6 +32,7 @@ public class HelpdeskSlaJob {
     private final HelpdeskService helpdesk;
     private final HelpdeskNotifier notifier;
     private final SupportService support;
+    private final tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant assistant;
 
     @Scheduled(cron = "${cims.helpdesk.sla-cron:0 */10 * * * *}", zone = "Africa/Dar_es_Salaam")
     public void run() {
@@ -72,6 +73,7 @@ public class HelpdeskSlaJob {
         for (Long id : done) {
             jdbc.update("update helpdesk_tickets set status = 'CLOSED', closed_at = now(), updated_at = now() where id = ?", id);
             helpdesk.addMessage(id, "SYSTEM", null, "CIMS", "Closed automatically " + HelpdeskService.REOPEN_DAYS + " days after it was resolved", false);
+            assistant.learn(id, null);   // not reopened: the reply is learned, not as confirmed
         }
     }
 

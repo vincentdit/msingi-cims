@@ -38,6 +38,29 @@ public class HelpdeskController {
     public record Vote(boolean helpful) {
     }
 
+    public record Draft(String subject, String body) {
+    }
+
+    public record Solved(Long articleId) {
+    }
+
+    @Operation(summary = "Answers likely to solve what is being written, and the category guessed")
+    @PostMapping("/suggest")
+    public tz.co.msingi.cims.helpdesk.assistant.HelpdeskAssistant.Suggestion suggest(@RequestBody Draft d) {
+        return service.suggestFor(type(), d.subject(), d.body());
+    }
+
+    @PostMapping("/suggest/solved")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void solved(@RequestBody Solved s) {
+        service.solvedBeforeAsking(type(), s.articleId());
+    }
+
+    @PostMapping("/tickets/{id}/assistant")
+    public TicketView assistantFeedback(@PathVariable Long id, @RequestBody Vote v) {
+        return service.requesterAssistantFeedback(id, v.helpful());
+    }
+
     @GetMapping("/categories")
     public List<CategoryView> categories() {
         return categories.forAudience(type());

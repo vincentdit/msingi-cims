@@ -1,11 +1,13 @@
 import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAddOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, FormGroup,
   InputAdornment, MenuItem, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, Tabs, TextField,
-  ToggleButton, ToggleButtonGroup, Typography,
+  ToggleButton, ToggleButtonGroup, Typography, Paper,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +22,9 @@ import HelpCentre from '../../components/helpdesk/HelpCentre';
 import {
   CloseRequest, Conversation, DueText, FilePicker, PRIORITY_LABEL, PriorityChip, ReplyBox, STATUS_LABEL, SUPPORT_CATEGORY, TicketStatusChip, formatPhone, messageForm,
 } from '../../components/helpdesk/parts';
-import type { Article, Category, Counts, SupportRow, SupportView, TicketRow, TicketView } from '../../components/helpdesk/types';
+import type {
+  Article, AssistantStats, Category, Counts, Gap, StaffSuggestions, SuggestedReply, SupportRow, SupportView, TicketRow, TicketView,
+} from '../../components/helpdesk/types';
 
 const staff = { realm: 'staff' as const };
 const OFFICES = ['ADMISSIONS_OFFICER', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'EXAMINATIONS_OFFICER', 'HOSTEL_WARDEN', 'IPT_COORDINATOR', 'CLEARANCE_OFFICER',
@@ -177,10 +181,13 @@ export function HelpdeskTicketPage() {
   });
   const act = useMutation({ mutationFn: ({ path, body }: { path: string; body: unknown }) => api<TicketView | undefined>(`/api/helpdesk/tickets/${id}/${path}`, { ...staff, method: 'POST', body }), onSuccess: done });
   const [escalating, setEscalating] = useState(false);
+  const [draft, setDraft] = useState<{ text: string; n: number }>();
+  const [saving, setSaving] = useState<Partial<Article> | null>(null);
   if (!q.data) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
   const v = q.data;
   const t = v.ticket;
   const me = user('staff')?.id;
+  const open = ['OPEN', 'IN_PROGRESS', 'WAITING'].includes(t.status);
   return (
     <>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/staff/helpdesk')} sx={{ mb: 1 }}>Helpdesk</Button>
@@ -194,9 +201,14 @@ export function HelpdeskTicketPage() {
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={2}>
-            <Conversation messages={v.messages} ourSide="STAFF" onOpen={(a) => download(`/api/helpdesk/attachments/${a.id}`, 'staff', a.fileName)} />
+            <Conversation messages={v.messages} ourSide="STAFF" onOpen={(a) => download(`/api/helpdesk/attachments/${a.id}`, 'staff', a.fileName)}
+              actions={(m) => v.canManage && m.authorType === 'STAFF' && !m.internal && m.body.length >= 15 && (
+                <Button size="small" startIcon={<BookmarkAddIcon />} sx={{ mt: 0.5, ml: -0.5 }} onClick={() => setSaving(answerFrom(t, m.body))}>Save as an answer</Button>
+              )} />
+            {v.canManage && open && <SuggestedReplies ticket={t} onUse={(r) => setDraft({ text: r.text, n: Date.now() })}
+              onMove={(categoryId) => act.mutate({ path: 'route', body: { categoryId } })} />}
             {v.canManage && (
-              <ReplyBox staff statuses={STAFF_STATUSES} sending={message.isPending} placeholder={`Reply to ${t.requesterName}`}
+              <ReplyBox staff statuses={STAFF_STATUSES} sending={message.isPending} placeholder={`Reply to ${t.requesterName}`} draft={draft}
                 onSend={(body, files, o) => message.mutateAsync({ body, files, internal: o.internal, statusAfter: o.statusAfter })} />
             )}
             {!v.canManage && <Alert severity="info">You can read this request; the office that answers it replies.</Alert>}
@@ -254,7 +266,63 @@ export function HelpdeskTicketPage() {
         </Grid>
       </Grid>
       {escalating && <EscalateDialog ticketId={t.id} onClose={() => setEscalating(false)} onDone={() => { setEscalating(false); q.refetch(); }} />}
+      <ArticleDialog editing={saving} onClose={() => setSaving(null)} />
     </>
+  );
+}
+
+/** A new answer prefilled from a reply on a request: the question is the subject, for the kind of person who asked. */
+const answerFrom = (t: TicketRow, body: string): Partial<Article> => ({
+  title: t.subject, body, categoryId: t.categoryId, published: true,
+  forApplicants: t.requesterType === 'APPLICANT' || t.requesterType === 'GUEST', forStudents: t.requesterType === 'STUDENT',
+  forStaff: t.requesterType === 'STAFF', forPublic: t.requesterType === 'GUEST',
+});
+
+/**
+ * Replies the assistant suggests for a request: published answers that match it and replies that solved similar requests before.
+ * "Use" puts the text in the reply box to adjust before sending. When the request seems to belong to another category, says so.
+ */
+function SuggestedReplies({ ticket, onUse, onMove }: { ticket: TicketRow; onUse: (r: SuggestedReply) => void; onMove: (categoryId: number) => void }) {
+  const q = useQuery({ queryKey: ['helpdesk', 'suggestions', ticket.id, ticket.categoryId], staleTime: 5 * 60_000,
+    queryFn: () => api<StaffSuggestions>(`/api/helpdesk/tickets/${ticket.id}/suggestions`, staff) });
+  const [shown, setShown] = useState(2);
+  const used = useMutation({ mutationFn: (id: number) => api(`/api/helpdesk/suggestions/${id}/used`, { ...staff, method: 'POST' }) });
+  const use = (r: SuggestedReply) => { onUse(r); if (r.source === 'PAST_REPLY') used.mutate(r.sourceId); };
+  const guess = q.data?.category;
+  const replies = q.data?.replies ?? [];
+  if (!replies.length && !(guess && guess.id !== ticket.categoryId)) return null;
+  return (
+    <Box role="region" aria-label={tr('Suggested replies')} sx={{ border: 1, borderColor: 'success.light', bgcolor: '#F1F8F4', borderRadius: 2, p: 1.5 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <AutoAwesomeIcon fontSize="small" color="success" />
+        <Typography fontWeight={600}>Suggested replies</Typography>
+      </Stack>
+      {guess && guess.id !== ticket.categoryId && (
+        <Alert severity="info" sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => onMove(guess.id)}>Move</Button>}>
+          {`This looks like ${guess.name}.`}
+        </Alert>
+      )}
+      <Stack spacing={1}>
+        {replies.slice(0, shown).map((r) => (
+          <Paper key={`${r.source}${r.sourceId}`} variant="outlined" sx={{ p: 1.25, borderRadius: 1.5 }}>
+            <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" fontWeight={600}>{r.title}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {r.source === 'ANSWER' ? 'Published answer' : r.confirmed ? `Solved request ${r.ticketNo}` : `Reply on request ${r.ticketNo}`}
+                  {' · '}{`${Math.round(r.confidence * 100)}% match`}
+                </Typography>
+              </Box>
+              <Button size="small" variant="outlined" onClick={() => use(r)} sx={{ flexShrink: 0 }}>Use</Button>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, whiteSpace: 'pre-wrap', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              {r.text}
+            </Typography>
+          </Paper>
+        ))}
+      </Stack>
+      {replies.length > shown && <Button size="small" sx={{ mt: 0.5 }} onClick={() => setShown(replies.length)}>{`Show ${replies.length - shown} more`}</Button>}
+    </Box>
   );
 }
 
@@ -274,7 +342,8 @@ interface Stats { categoryId?: number; name: string; received: number; resolved:
 
 function PerformanceTab() {
   const [days, setDays] = useState(30);
-  const q = useQuery({ queryKey: ['helpdesk', 'performance', days], queryFn: () => api<{ overall: Stats; categories: Stats[] }>(`/api/helpdesk/performance?days=${days}`, staff) });
+  const q = useQuery({ queryKey: ['helpdesk', 'performance', days],
+    queryFn: () => api<{ overall: Stats; categories: Stats[]; assistant?: AssistantStats }>(`/api/helpdesk/performance?days=${days}`, staff) });
   const pct = (n?: number) => (n == null ? '—' : `${n}%`);
   const row = (s: Stats, bold = false) => (
     <TableRow key={s.categoryId ?? 'all'} sx={bold ? { '& td': { fontWeight: 700 } } : undefined}>
@@ -316,8 +385,40 @@ function PerformanceTab() {
           Requests raised in the period, in the categories you answer. "Helped" is what requesters said when they closed their request.
         </Typography>
         <ErrorAlert error={q.error} />
+        {q.data?.assistant && <AssistantFigures a={q.data.assistant} />}
       </CardContent>
     </Card>
+  );
+}
+
+/** What the assistant did in the period. */
+function AssistantFigures({ a }: { a: AssistantStats }) {
+  const share = (n: number, of: number) => (of ? `${Math.round((100 * n) / of)}%` : '—');
+  const figures = [
+    { value: String(a.solvedBeforeAsking), label: 'Solved before asking', hint: 'People who found the answer while writing and did not send a request' },
+    { value: String(a.instantAnswers), label: 'Answered at once', hint: 'Requests that got a suggested answer as soon as they were sent' },
+    { value: share(a.instantAccepted, a.instantAccepted + a.instantRejected), label: 'Answer at once solved it', hint: `${a.instantAccepted} yes, ${a.instantRejected} no` },
+    { value: share(a.categoryRight, a.categoryGuessed), label: 'Category guessed right', hint: 'The category stayed the one the assistant predicted' },
+    { value: String(a.learnedReplies), label: 'Replies learned', hint: 'Replies from solved requests, now suggested to staff' },
+  ];
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <AutoAwesomeIcon fontSize="small" color="success" />
+        <Typography variant="subtitle1" fontWeight={600}>The assistant</Typography>
+      </Stack>
+      <Grid container spacing={1.5}>
+        {figures.map((f) => (
+          <Grid key={f.label} size={{ xs: 6, sm: 4, md: 2.4 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, height: '100%' }} title={tr(f.hint)}>
+              <Typography variant="h5" fontWeight={700}>{f.value}</Typography>
+              <Typography variant="body2">{f.label}</Typography>
+              <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
   );
 }
 
@@ -327,19 +428,11 @@ const AUDIENCES = [{ key: 'forApplicants', label: 'Applicants' }, { key: 'forStu
   { key: 'forPublic', label: 'Public help page' }] as const;
 
 function ArticlesTab() {
-  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['helpdesk', 'articles'], queryFn: () => api<Article[]>('/api/helpdesk/articles', staff) });
-  const categories = useQuery({ queryKey: ['helpdesk', 'categories'], queryFn: () => api<Category[]>('/api/helpdesk/categories', staff) });
   const [editing, setEditing] = useState<Partial<Article> | null>(null);
-  const save = useMutation({
-    mutationFn: (a: Partial<Article>) => api(a.id ? `/api/helpdesk/articles/${a.id}` : '/api/helpdesk/articles', { ...staff, method: a.id ? 'PUT' : 'POST',
-      body: { categoryId: a.categoryId ?? null, title: a.title, body: a.body, forApplicants: !!a.forApplicants, forStudents: !!a.forStudents, forStaff: !!a.forStaff,
-        forPublic: !!a.forPublic, published: !!a.published } }),
-    onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['helpdesk', 'articles'] }); },
-  });
-  const remove = useMutation({ mutationFn: (id: number) => api(`/api/helpdesk/articles/${id}`, { ...staff, method: 'DELETE' }),
-    onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['helpdesk', 'articles'] }); } });
   return (
+    <Stack spacing={2.5}>
+    <Gaps onWrite={(g) => setEditing({ title: g.question, body: g.answer ?? '', categoryId: g.categoryId, forApplicants: true, forStudents: true, published: true })} />
     <Card>
       <CardContent>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
@@ -373,7 +466,28 @@ function ArticlesTab() {
         )}
         <ErrorAlert error={q.error} />
       </CardContent>
-      <Dialog open={!!editing} onClose={() => setEditing(null)} fullWidth maxWidth="md">
+      <ArticleDialog editing={editing} onClose={() => setEditing(null)} />
+    </Card>
+    </Stack>
+  );
+}
+
+/** Writing or changing an answer (also from a reply on a request, or from a question asked often). */
+function ArticleDialog({ editing: start, onClose }: { editing: Partial<Article> | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const categories = useQuery({ queryKey: ['helpdesk', 'categories'], queryFn: () => api<Category[]>('/api/helpdesk/categories', staff) });
+  const [editing, setEditing] = useState<Partial<Article> | null>(start);
+  useEffect(() => setEditing(start), [start]);
+  const finished = () => { onClose(); qc.invalidateQueries({ queryKey: ['helpdesk', 'articles'] }); qc.invalidateQueries({ queryKey: ['helpdesk', 'gaps'] }); };
+  const save = useMutation({
+    mutationFn: (a: Partial<Article>) => api(a.id ? `/api/helpdesk/articles/${a.id}` : '/api/helpdesk/articles', { ...staff, method: a.id ? 'PUT' : 'POST',
+      body: { categoryId: a.categoryId ?? null, title: a.title, body: a.body, forApplicants: !!a.forApplicants, forStudents: !!a.forStudents, forStaff: !!a.forStaff,
+        forPublic: !!a.forPublic, published: !!a.published } }),
+    onSuccess: finished,
+  });
+  const remove = useMutation({ mutationFn: (id: number) => api(`/api/helpdesk/articles/${id}`, { ...staff, method: 'DELETE' }), onSuccess: finished });
+  return (
+      <Dialog open={!!editing} onClose={onClose} fullWidth maxWidth="md">
         <DialogTitle>{editing?.id ? 'Edit the answer' : 'Add an answer'}</DialogTitle>
         {editing && (
           <DialogContent dividers>
@@ -401,10 +515,52 @@ function ArticlesTab() {
         )}
         <DialogActions>
           {editing?.id && <Button color="error" onClick={() => remove.mutate(editing.id!)} disabled={remove.isPending} sx={{ mr: 'auto' }}>Delete</Button>}
-          <Button onClick={() => setEditing(null)}>Cancel</Button>
+          <Button onClick={onClose}>Cancel</Button>
           <Button variant="contained" disabled={save.isPending || !editing?.title?.trim() || !editing?.body?.trim()} onClick={() => editing && save.mutate(editing)}>Save</Button>
         </DialogActions>
       </Dialog>
+  );
+}
+
+/** Questions asked several times that no answer covers yet, grouped by what they are about. */
+function Gaps({ onWrite }: { onWrite: (g: Gap) => void }) {
+  const [days, setDays] = useState(90);
+  const q = useQuery({ queryKey: ['helpdesk', 'gaps', days], queryFn: () => api<Gap[]>(`/api/helpdesk/gaps?days=${days}`, staff) });
+  if (!q.data?.length && !q.error) return null;
+  return (
+    <Card sx={{ borderColor: 'success.light' }} variant="outlined">
+      <CardContent>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1} sx={{ mb: 1 }}>
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <AutoAwesomeIcon fontSize="small" color="success" />
+              <Typography variant="h6">Asked often, no answer yet</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary">Requests that are alike and that no published answer covers. Writing an answer lets people solve these themselves.</Typography>
+          </Box>
+          <TextField select size="small" label="Period" value={days} onChange={(e) => setDays(Number(e.target.value))} sx={{ width: 190, flexShrink: 0 }}>
+            <MenuItem value={30}>Last 30 days</MenuItem><MenuItem value={90}>Last 90 days</MenuItem><MenuItem value={365}>Last 12 months</MenuItem>
+          </TextField>
+        </Stack>
+        <Stack divider={<Divider flexItem />}>
+          {q.data?.map((g) => (
+            <Stack key={g.topic + g.latest} direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }} sx={{ py: 1.25 }}>
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography fontWeight={600}>{g.question}</Typography>
+                  <Chip size="small" label={`${g.requests} requests`} />
+                  {g.categoryName && <Typography variant="caption" color="text.secondary">{g.categoryName}</Typography>}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ overflowWrap: 'anywhere' }}>
+                  {g.examples.filter((e) => e !== g.question).map((e, i) => <Fragment key={i}>{i > 0 && ' · '}“{e}”</Fragment>)}
+                </Typography>
+              </Box>
+              <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => onWrite(g)} sx={{ flexShrink: 0 }}>Write an answer</Button>
+            </Stack>
+          ))}
+        </Stack>
+        <ErrorAlert error={q.error} />
+      </CardContent>
     </Card>
   );
 }
