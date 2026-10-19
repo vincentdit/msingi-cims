@@ -20,6 +20,7 @@ import type {
 } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles, useSemesterChoice } from './MarksPages';
+import { tr } from '../../locale/ui';
 
 const staff = { realm: 'staff' as const };
 const ACADEMIC = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'];
@@ -342,7 +343,7 @@ function ModulesTable({ offerings, onAdd }: { offerings: TimetableOffering[]; on
               {offerings.map((o) => (
                 <TableRow key={o.id} sx={{ bgcolor: o.slots ? undefined : 'action.hover' }}>
                   <TableCell><strong>{o.code}</strong> {o.title}<Typography variant="caption" color="text.secondary" display="block">{o.departmentName ?? ''}</Typography></TableCell>
-                  <TableCell>{o.cohorts.map((c) => `${c.programmeCode} (${c.yearOfStudy})${c.category === 'ELECTIVE' ? ' elective' : ''}`).join(', ') || '—'}</TableCell>
+                  <TableCell>{o.cohorts.map((c) => `${c.programmeCode} (${c.yearOfStudy})${c.category === 'ELECTIVE' ? ` ${tr('elective')}` : ''}`).join(', ') || '—'}</TableCell>
                   <TableCell>{o.lecturers.map((p) => p.fullName).join(', ') || <Typography variant="body2" color="warning.main">Not allocated</Typography>}</TableCell>
                   <TableCell align="right">{o.students}</TableCell>
                   <TableCell align="right">{o.slots ? `${hours(o.minutesPerWeek)} · ${o.slots}` : 'No class'}</TableCell>
