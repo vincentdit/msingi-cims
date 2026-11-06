@@ -27,3 +27,8 @@ zap/
 
 # Maven output kept by CI
 build.log
+# Server-only deployment files: keys, certificates, Let's Encrypt challenges
+deploy/secrets/
+deploy/certs/
+deploy/acme/*
+!deploy/acme/.gitkeep

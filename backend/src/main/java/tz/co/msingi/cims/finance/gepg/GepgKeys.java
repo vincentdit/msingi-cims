@@ -2,19 +2,51 @@ package tz.co.msingi.cims.finance.gepg;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.core.env.Environment;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.stereotype.Component;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * The keys of the live GePG connection: CIMS's private key (a PKCS#12 keystore) to sign what it sends, and GePG's public
  * certificate to check what GePG sends (bill acknowledgements, control numbers, payments, reconciliations). Read once at
- * start-up; CIMS refuses to start in live mode without them. Also loaded when a keystore is configured in simulated mode, so
- * GePG's signed callbacks can be tested before bills go live.
+ * start-up; CIMS refuses to start in live mode without them. In simulated mode they are loaded only when the keystore and
+ * GePG's certificate are both there and readable, so GePG's signed callbacks can be tested before bills go live; paths left
+ * over from the production template, pointing at files that are not there, no longer stop a simulated server from starting.
  */
 @Slf4j
 @Component
-@ConditionalOnExpression("'${cims.gepg.mode:simulated}' == 'live' or '${cims.gepg.live.keystore:}' != ''")
+@Conditional(GepgKeys.Wanted.class)
 public class GepgKeys {
+
+    /** Live mode: always (and a missing key stops start-up). Simulated mode: only when both files can be read. */
+    static class Wanted implements Condition {
+        private static final Logger LOG = LoggerFactory.getLogger(GepgKeys.class);
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            Environment env = context.getEnvironment();
+            if ("live".equalsIgnoreCase(env.getProperty("cims.gepg.mode", "simulated").trim())) return true;
+            String keystore = env.getProperty("cims.gepg.live.keystore", "").trim();
+            if (keystore.isEmpty()) return false;
+            String certificate = env.getProperty("cims.gepg.live.gepg-certificate", "").trim();
+            if (readable(keystore) && readable(certificate)) return true;
+            LOG.warn("GePG is simulated: the keys at {} and {} are not readable, so signed GePG callbacks cannot be tested. "
+                    + "Leave CIMS_GEPG_KEYSTORE and CIMS_GEPG_CERTIFICATE empty until the keys are installed.", keystore, certificate);
+            return false;
+        }
+
+        static boolean readable(String path) {
+            return path != null && !path.isBlank() && Files.isReadable(Path.of(path));
+        }
+    }
 
     private final GepgCrypto crypto;
 

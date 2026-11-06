@@ -62,6 +62,7 @@ services:
     volumes:
       - ./nginx/cims.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro             # fullchain.pem and privkey.pem (wildcard for the institutions' sub-domains)
+      - ./acme:/var/www/acme:ro                  # Let's Encrypt webroot: renewals without stopping the proxy (scripts/cert-renewal.sh)
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1/actuator/health/liveness >/dev/null || exit 1"]
       interval: 30s

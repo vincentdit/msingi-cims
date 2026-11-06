@@ -1,0 +1,7 @@
+# Production profile (SPRING_PROFILES_ACTIVE=prod, set by deploy/docker-compose.prod.yml).
+cims:
+  payments:
+    # Off in production unless switched on for a rehearsal: with it on, the "Simulate payment" buttons mark fees as paid
+    # without money. A pilot that rehearses sets CIMS_ALLOW_PAYMENT_SIMULATION=true in deploy/.env and removes it before
+    # real payments; CIMS then logs a warning at every start-up while it is on.
+    allow-simulation: ${CIMS_ALLOW_PAYMENT_SIMULATION:false}

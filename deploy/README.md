@@ -22,7 +22,7 @@ cp deploy/.env.example deploy/.env           # fill in every CHANGE value
 mkdir -p deploy/secrets deploy/certs
 openssl rand -base64 48 > deploy/secrets/backup-passphrase   # keep a copy OFF the server: without it backups cannot be read
 chmod 600 deploy/secrets/* deploy/.env
-# TLS certificate: deploy/certs/fullchain.pem and privkey.pem (wildcard *.cims.co.tz, e.g. from Let's Encrypt DNS challenge)
+# TLS certificate: deploy/certs/fullchain.pem and privkey.pem (one certificate for every host: scripts/certs.sh, below)
 docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
 docker compose -f deploy/docker-compose.prod.yml logs -f backend   # "Production settings checked", then "Started CimsApplication"
 ```
@@ -54,6 +54,43 @@ shred -u jwt.pem
    `/reconciliation` (give GePG these addresses).
 
 The `gov-mocks` project plays GePG for development and UAT rehearsal (`dev-keys/` holds TEST-ONLY keys).
+
+## Pilot server (small VPS)
+
+The first pilot runs on one small VPS (NetPoa Cloud VPS 1: 2 vCPU, about 2 GB of memory, 38 GB disk, Ubuntu 24.04) at
+`/opt/msingi-cims`, with the platform console on `app.cims.ac.tz` and the first college on `bahari.cims.ac.tz`. DNS stays
+with the domain's registrar (an A record per host, pointing at the server). Everything below is in this folder.
+
+| What | File or command |
+|---|---|
+| Memory limits and smaller PostgreSQL settings | `docker-compose.memory.yml` + `postgres/postgresql.small.conf`; `CIMS_DB_POOL=10` |
+| The `cims` shortcut (both compose files and `.env`) | `source /opt/msingi-cims/deploy/scripts/cims-env.sh` |
+| Swap, firewall, fail2ban, security updates (once) | `scripts/harden-server.sh` |
+| Certificates renewed without stopping the proxy | `scripts/certs.sh setup` once, then `scripts/certs.sh add <host>` for each new college |
+| Backups proved: backup, restore test, counts, disk | `scripts/check-backups.sh` (quarterly, and after any backup change) |
+| Platform address opens the platform sign-in | `nginx/cims.conf` (any host starting with `app.`) |
+| NACTVET reachable when the server's DNS answer is not | `NACTE_PREFER_IP=41.93.76.6` in `.env` |
+| GePG simulated with no keys installed | leave the four `CIMS_GEPG_*` key settings empty |
+| Rehearsing payments | `CIMS_ALLOW_PAYMENT_SIMULATION=true` (off by default in production; CIMS warns at start-up while it is on) |
+
+Updating the server from a Windows PC (only `backend`, `frontend` and `deploy` are sent; `.env`, `secrets` and `certs` stay
+on the server):
+
+```powershell
+cd C:\dev\msingi-cims
+tar.exe -czf "$env:TEMP\cims-update.tar.gz" --exclude=node_modules --exclude=target --exclude=dist --exclude=.env --exclude=secrets --exclude=certs --exclude=acme backend frontend deploy
+scp "$env:TEMP\cims-update.tar.gz" root@<server>:/root/
+```
+
+```bash
+cd /opt/msingi-cims && tar -xzf /root/cims-update.tar.gz && source deploy/scripts/cims-env.sh
+cims exec -T backup backup.sh                     # a backup before any upgrade
+cims build backend frontend backup && cims up -d
+cims logs --tail=60 backend                       # "Production settings checked", then "Started CimsApplication"
+```
+
+Before real money: `CIMS_ALLOW_PAYMENT_SIMULATION` removed, payment routes confirmed with the college, SMTP and SMS set,
+`BACKUP_OFFSITE_CMD` set and `scripts/check-backups.sh` passed, `scripts/certs.sh check` showing every host.
 
 ## Backups and restore
 

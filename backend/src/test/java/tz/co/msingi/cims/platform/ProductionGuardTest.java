@@ -29,4 +29,25 @@ class ProductionGuardTest {
                 .withProperty("cims.gepg.live.keystore", "/run/secrets/cims/gepg-sp.p12");
         assertThat(ProductionGuard.problems(prod)).isEmpty();
     }
+
+    @Test
+    void simulatedPaymentsAndChannelsAreWarnedAbout() {
+        MockEnvironment rehearsal = new MockEnvironment()
+                .withProperty("cims.payments.allow-simulation", "true")
+                .withProperty("cims.gepg.mode", "simulated")
+                .withProperty("cims.collection.mode", "statement")
+                .withProperty("cims.sms.mode", "simulated")
+                .withProperty("cims.email.mode", "smtp");
+        assertThat(ProductionGuard.warnings(rehearsal)).hasSize(3)
+                .anyMatch(w -> w.contains("payment simulation is ON")).anyMatch(w -> w.startsWith("GePG")).anyMatch(w -> w.startsWith("SMS"));
+        assertThat(ProductionGuard.problems(rehearsal)).noneMatch(p -> p.contains("simulat"));
+
+        MockEnvironment live = new MockEnvironment()
+                .withProperty("cims.payments.allow-simulation", "false")
+                .withProperty("cims.gepg.mode", "live")
+                .withProperty("cims.collection.mode", "statement")
+                .withProperty("cims.sms.mode", "live")
+                .withProperty("cims.email.mode", "smtp");
+        assertThat(ProductionGuard.warnings(live)).isEmpty();
+    }
 }

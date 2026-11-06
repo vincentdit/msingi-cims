@@ -1,0 +1,22 @@
+# Small pilot server (about 2 GB of memory, e.g. the NetPoa Cloud VPS 1 that runs the first pilot): memory limits per
+# container and smaller PostgreSQL settings. Use it on top of the production stack:
+#
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.memory.yml --env-file deploy/.env up -d
+#
+# (deploy/scripts/cims-env.sh defines a "cims" shortcut that always passes these files.) Set CIMS_DB_POOL=10 in .env.
+# These are starting limits, not a measured capacity: watch "docker stats" and restarts before onboarding more colleges.
+services:
+  db:
+    mem_limit: 384m
+    volumes:
+      - ./postgres/postgresql.small.conf:/etc/postgresql/postgresql.conf:ro
+  backend:
+    mem_limit: 896m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx512m -Duser.timezone=Africa/Dar_es_Salaam"
+  frontend:
+    mem_limit: 64m
+  proxy:
+    mem_limit: 64m
+  backup:
+    mem_limit: 128m

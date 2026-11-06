@@ -14,7 +14,8 @@ import java.util.List;
  * With the {@code prod} profile, CIMS refuses to start on settings that are only safe in development (NFR-SEC-03): a missing
  * data-encryption key, generated sign-in keys (every restart would sign everyone out, and two servers would not trust each
  * other's tokens), default callback secrets, verification codes returned in responses, the demo institution, or the
- * test-only GePG keys.
+ * test-only GePG keys. It also lists, as warnings, what still runs simulated, above all the payment simulation buttons, which
+ * must be off before real money is collected.
  */
 @Slf4j
 @Component
@@ -34,7 +35,22 @@ public class ProductionGuard {
             problems.forEach(p -> log.error("Production setting: {}", p));
             throw new IllegalStateException("CIMS will not start in production with unsafe settings: " + String.join("; ", problems));
         }
+        warnings(env).forEach(w -> log.warn("Production setting: {}", w));
         log.info("Production settings checked");
+    }
+
+    /** Settings that are allowed (a pilot may rehearse with them) but must be changed before real use. */
+    static List<String> warnings(Environment env) {
+        List<String> w = new ArrayList<>();
+        if (env.getProperty("cims.payments.allow-simulation", Boolean.class, false)) {
+            w.add("payment simulation is ON (CIMS_ALLOW_PAYMENT_SIMULATION=true): staff and applicants can mark fees as paid "
+                    + "without money. Switch it off before real payments.");
+        }
+        for (String[] m : new String[][]{{"cims.gepg.mode", "GePG"}, {"cims.collection.mode", "the institutions' own collection accounts"},
+                {"cims.sms.mode", "SMS"}, {"cims.email.mode", "email"}}) {
+            if ("simulated".equalsIgnoreCase(env.getProperty(m[0], "simulated").trim())) w.add(m[1] + " is simulated (" + m[0] + ")");
+        }
+        return w;
     }
 
     static List<String> problems(Environment env) {
