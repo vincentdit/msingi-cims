@@ -765,6 +765,8 @@
 "Candidates": "Watahiniwa",
 "Candidates / seats": "Watahiniwa / viti",
 "Cannot be in the future": "Haiwezi kuwa ya baadaye",
+"Cannot reach the CIMS server": "Imeshindikana kufikia seva ya CIMS",
+"Cannot reach the CIMS server. Check your internet connection; if it is working, CIMS may be restarting after an update, so try again in a minute.": "Imeshindikana kufikia seva ya CIMS. Hakikisha intaneti yako inafanya kazi; kama inafanya kazi, huenda CIMS inawashwa upya baada ya kusasishwa, hivyo jaribu tena baada ya dakika moja.",
 "Cannot scan? Enter this key:": "Huwezi kuskani? Ingiza ufunguo huu:",
 "Capacity": "Uwezo",
 "Capped: a supplementary grade cannot be higher": "Kikomo: daraja la mtihani wa marudio haliwezi kuwa juu zaidi",

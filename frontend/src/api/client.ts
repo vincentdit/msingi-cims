@@ -49,7 +49,9 @@ const UNREACHABLE: Problem = {
   status: 503,
   code: 'SERVER_UNREACHABLE',
   title: 'Cannot reach the CIMS server',
-  detail: 'Cannot reach the CIMS server. Please check your connection and try again. (Developers: is the backend running, and does the frontend proxy point at it?)',
+  detail: import.meta.env.DEV
+    ? 'Cannot reach the CIMS server. Please check your connection and try again. (Developers: is the backend running, and does the frontend proxy point at it?)'
+    : 'Cannot reach the CIMS server. Check your internet connection; if it is working, CIMS may be restarting after an update, so try again in a minute.',
 };
 
 export class ApiError extends Error {
