@@ -9,6 +9,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { SessionProvider } from './auth/session';
 import { InstitutionProvider } from './components/InstitutionContext';
+import { GlobalProgress } from './components/Progress';
 import i18n from './i18n';
 import { loadUiDictionary } from './locale/dictionary';
 
@@ -22,6 +23,7 @@ const ready = i18n.language === 'sw' ? loadUiDictionary() : Promise.resolve();
 ready.then(() => ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <GlobalProgress />
       <SessionProvider>
         <BrowserRouter>
           <InstitutionProvider>

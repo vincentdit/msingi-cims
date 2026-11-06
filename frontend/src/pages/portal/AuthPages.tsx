@@ -9,6 +9,7 @@ import type { TokenResponse } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
 import { NewPasswordFields, PasswordField, passwordOk } from '../../components/PasswordFields';
+import { Busy, Waiting } from '../../components/Progress';
 
 interface OtpSent {
   maskedPhone: string;
@@ -90,7 +91,8 @@ export function RegisterPage() {
               </TextField>
             </Stack>
             <ErrorAlert error={lookup.error} />
-            <Button type="submit" variant="contained" size="large" disabled={lookup.isPending || !index.trim()}>{lookup.isPending ? '…' : t('auth.find')}</Button>
+            <Button type="submit" variant="contained" size="large" disabled={lookup.isPending || !index.trim()}>{lookup.isPending ? <Busy label={t('common.fetching')} /> : t('auth.find')}</Button>
+            <Waiting active={lookup.isPending} message={t('auth.fetchingNecta')} />
             <Link component={RouterLink} to="/login" textAlign="center">{t('auth.haveAccount')}</Link>
           </Stack>
         </form>

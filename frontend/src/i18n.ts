@@ -60,7 +60,7 @@ const en = {
     devCode: 'Development mode — your code is {{code}}',
     nectaIntro: 'Start with your Form Four (CSEE) index number and the year you sat the examination. We fetch your name and results from NECTA, so you do not type them.',
     indexNumber: 'Form Four index number', indexHelp: 'As on your certificate, e.g. S0101/0001', examYear: 'Year of examination',
-    find: 'Find my results', notMe: 'Not me — change the index number', isMe: 'Yes, this is me', confirmTitle: 'Is this you?',
+    find: 'Find my results', fetchingNecta: 'Fetching your name and results from NECTA…', notMe: 'Not me — change the index number', isMe: 'Yes, this is me', confirmTitle: 'Is this you?',
     division: 'Division {{division}}', points: '{{points}} points', sexF: 'Female', sexM: 'Male',
     alreadyRegistered: 'This index number already has an account. Sign in with your phone number or index number, or reset your password.',
     accountFor: 'Account for {{name}} · {{index}}', step1: 'Your NECTA results', step2: 'Your account',
@@ -328,7 +328,7 @@ const en = {
     necta: 'Other CSEE / ACSEE sitting', nta: 'NTA award', nva: 'NVA (VETA) award', other: 'Other non-NTA award', none: 'No other award',
     noneText: 'You can continue without adding another award.', added: 'Qualifications you have added',
     notAccepted: 'Not accepted', notAcceptedReason: 'The Admissions Office did not accept this qualification: {{reason}}. You can remove it and add it again with the correct details.',
-    nectaText: 'Another Form Four sitting or your Form Six results, fetched from NECTA by index number and year.', fetchNecta: 'Fetch from NECTA',
+    nectaText: 'Another Form Four sitting or your Form Six results, fetched from NECTA by index number and year.', fetchNecta: 'Fetch from NECTA', fetchingNecta: 'Fetching the results from NECTA…', fetchingNactvet: 'Fetching the award from NACTVET…',
     ntaText: 'Your NTA award is fetched from NACTVET by your registration number and the year you graduated. The names on it must match yours.',
     regNo: 'Registration number', gradYear: 'Graduation year', fetchNactvet: 'Fetch from NACTVET',
     nvaText: 'A VETA (NVA) award. The Admissions Office checks it against your certificate.', certNo: 'Certificate number',
@@ -472,7 +472,8 @@ const en = {
     details: 'Details and fees',
   },
   idle: { title: 'Still there?', body: 'You will be signed out in {{seconds}} seconds because nothing happened for a while.', stay: 'Stay signed in', out: 'Sign out', signedOut: 'You were signed out after a time with no activity.' },
-  common: { loading: 'Loading…', error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
+  common: { loading: 'Loading…', fetching: 'Fetching…', stillWorking: 'Still working ({{s}} s). The other system is answering slowly; please wait.',
+    error: 'Something went wrong', retry: 'Try again', yes: 'Yes', no: 'No', poweredBy: 'Powered by Msingi Technologies Ltd' },
 };
 
 const sw: typeof en = {
@@ -532,7 +533,7 @@ const sw: typeof en = {
     devCode: 'Hali ya majaribio — namba yako ni {{code}}',
     nectaIntro: 'Anza na namba yako ya mtihani wa kidato cha nne (CSEE) na mwaka uliofanya mtihani. Tunachukua jina na matokeo yako kutoka NECTA, hivyo huhitaji kuyaandika.',
     indexNumber: 'Namba ya mtihani wa kidato cha nne', indexHelp: 'Kama ilivyo kwenye cheti chako, k.m. S0101/0001', examYear: 'Mwaka wa mtihani',
-    find: 'Tafuta matokeo yangu', notMe: 'Si mimi — badilisha namba ya mtihani', isMe: 'Ndiyo, ni mimi', confirmTitle: 'Je, huyu ni wewe?',
+    find: 'Tafuta matokeo yangu', fetchingNecta: 'Inachukua jina na matokeo yako kutoka NECTA…', notMe: 'Si mimi — badilisha namba ya mtihani', isMe: 'Ndiyo, ni mimi', confirmTitle: 'Je, huyu ni wewe?',
     division: 'Daraja {{division}}', points: 'Pointi {{points}}', sexF: 'Mwanamke', sexM: 'Mwanaume',
     alreadyRegistered: 'Namba hii ya mtihani tayari ina akaunti. Ingia kwa namba ya simu au namba ya mtihani, au badilisha nenosiri.',
     accountFor: 'Akaunti ya {{name}} · {{index}}', step1: 'Matokeo yako ya NECTA', step2: 'Akaunti yako',
@@ -800,7 +801,7 @@ const sw: typeof en = {
     necta: 'Mtihani mwingine wa CSEE / ACSEE', nta: 'Tuzo ya NTA', nva: 'Tuzo ya NVA (VETA)', other: 'Tuzo nyingine isiyo ya NTA', none: 'Sina tuzo nyingine',
     noneText: 'Unaweza kuendelea bila kuongeza tuzo nyingine.', added: 'Sifa ulizoongeza',
     notAccepted: 'Haikukubaliwa', notAcceptedReason: 'Ofisi ya Udahili haikukubali sifa hii: {{reason}}. Unaweza kuiondoa na kuiongeza tena kwa taarifa sahihi.',
-    nectaText: 'Mtihani mwingine wa kidato cha nne au matokeo ya kidato cha sita, kutoka NECTA kwa namba ya mtihani na mwaka.', fetchNecta: 'Pata kutoka NECTA',
+    nectaText: 'Mtihani mwingine wa kidato cha nne au matokeo ya kidato cha sita, kutoka NECTA kwa namba ya mtihani na mwaka.', fetchNecta: 'Pata kutoka NECTA', fetchingNecta: 'Inachukua matokeo kutoka NECTA…', fetchingNactvet: 'Inachukua tuzo kutoka NACTVET…',
     ntaText: 'Tuzo yako ya NTA inachukuliwa kutoka NACTVET kwa namba yako ya usajili na mwaka uliohitimu. Majina yaliyo juu yake lazima yalingane na yako.',
     regNo: 'Namba ya usajili', gradYear: 'Mwaka wa kuhitimu', fetchNactvet: 'Pata kutoka NACTVET',
     nvaText: 'Tuzo ya VETA (NVA). Ofisi ya Udahili huihakiki kwa cheti chako.', certNo: 'Namba ya cheti',
@@ -945,7 +946,8 @@ const sw: typeof en = {
     details: 'Maelezo na ada',
   },
   idle: { title: 'Bado upo?', body: 'Utatolewa baada ya sekunde {{seconds}} kwa sababu hakuna kilichofanyika kwa muda.', stay: 'Endelea', out: 'Toka', signedOut: 'Ulitolewa baada ya muda bila shughuli yoyote.' },
-  common: { loading: 'Inapakia…', error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
+  common: { loading: 'Inapakia…', fetching: 'Inatafuta…', stillWorking: 'Bado inaendelea (sekunde {{s}}). Mfumo mwingine unajibu polepole; tafadhali subiri.',
+    error: 'Hitilafu imetokea', retry: 'Jaribu tena', yes: 'Ndiyo', no: 'Hapana', poweredBy: 'Imewezeshwa na Msingi Technologies Ltd' },
 };
 
 const saved = (() => {

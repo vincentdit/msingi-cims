@@ -140,7 +140,17 @@ export async function privateImageUrl(path: string, realm: Realm): Promise<strin
 }
 
 /** Downloads a file from the API with the session token (e.g. CSV exports); method POST for documents issued on request. */
-export async function download(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET', body?: unknown) {
+/** Work done outside React Query (downloads, uploads), counted so the progress bar at the top shows it too. */
+export function trackBusy<T>(work: Promise<T>): Promise<T> {
+  window.dispatchEvent(new CustomEvent('cims-busy', { detail: 1 }));
+  return work.finally(() => window.dispatchEvent(new CustomEvent('cims-busy', { detail: -1 })));
+}
+
+export function download(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET', body?: unknown) {
+  return trackBusy(downloadNow(path, realm, filename, method, body));
+}
+
+async function downloadNow(path: string, realm: Realm, filename: string, method: 'GET' | 'POST' = 'GET', body?: unknown) {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (TENANT) headers['X-Tenant'] = TENANT;

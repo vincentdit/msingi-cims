@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import type { Application, Qualification } from '../../api/types';
 import { ErrorAlert, Loading } from '../../components/common';
+import { Busy, Waiting } from '../../components/Progress';
 
 type Path = 'necta' | 'nta' | 'nva' | 'other' | 'none';
 const OTHER_LEVELS = ['CERTIFICATE', 'DIPLOMA', 'ADVANCED_DIPLOMA', 'DEGREE', 'MASTERS', 'OTHER'] as const;
@@ -117,8 +118,9 @@ function NectaSitting({ onAdded }: { onAdded: () => void }) {
           </TextField>
           <TextField size="small" label={t('app.indexNumber')} placeholder="S0101/0001" value={f.index} onChange={(e) => setF({ ...f, index: e.target.value })} required />
           <TextField size="small" label={t('app.year')} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value.replace(/\D/g, '') })} required sx={{ maxWidth: { sm: 110 } }} />
-          <Button type="submit" variant="contained" disabled={m.isPending || !f.index.trim()}>{m.isPending ? '…' : t('other.fetchNecta')}</Button>
+          <Button type="submit" variant="contained" disabled={m.isPending || !f.index.trim()}>{m.isPending ? <Busy label={t('common.fetching')} /> : t('other.fetchNecta')}</Button>
         </Stack>
+        <Box sx={{ mt: 1 }}><Waiting active={m.isPending} message={t('other.fetchingNecta')} /></Box>
         <ErrorAlert error={m.error} />
       </form>
     </Panel>
@@ -138,8 +140,9 @@ function NtaAward({ onAdded }: { onAdded: () => void }) {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <TextField size="small" label={t('other.regNo')} placeholder="NS0816/0129/2015" value={f.reg} onChange={(e) => setF({ ...f, reg: e.target.value.toUpperCase() })} required sx={{ flex: 1 }} />
           <TextField size="small" label={t('other.gradYear')} value={f.year} onChange={(e) => setF({ ...f, year: e.target.value.replace(/\D/g, '') })} required sx={{ maxWidth: { sm: 140 } }} />
-          <Button type="submit" variant="contained" disabled={m.isPending || !f.reg.trim()}>{m.isPending ? '…' : t('other.fetchNactvet')}</Button>
+          <Button type="submit" variant="contained" disabled={m.isPending || !f.reg.trim()}>{m.isPending ? <Busy label={t('common.fetching')} /> : t('other.fetchNactvet')}</Button>
         </Stack>
+        <Box sx={{ mt: 1 }}><Waiting active={m.isPending} message={t('other.fetchingNactvet')} /></Box>
         <ErrorAlert error={m.error} />
       </form>
     </Panel>
