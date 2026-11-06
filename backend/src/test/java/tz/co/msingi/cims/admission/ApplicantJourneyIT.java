@@ -30,6 +30,8 @@ class ApplicantJourneyIT {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired TestData data;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
 
     TestData.Institution inst;
     String tenant;
@@ -185,6 +187,37 @@ class ApplicantJourneyIT {
         // the first number is free again
         call(post("/api/applicant-auth/login"), null, """
                 {"login":"0688000999","password":"Kifaru#Mto47"}""").andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theCodeAlsoGoesByEmailAndAMistypedPhoneOrEmailCanBeCorrected() throws Exception {
+        JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
+                {"indexNumber":"S0101/0008","examYear":2025,"phone":"0688 000 701","email":"neema.typo@example.com","password":"Kifaru#Mto47","acceptPrivacyNotice":true}""")
+                .andExpect(status().isCreated()));
+        assertThat(reg.get("maskedEmail").asText()).isEqualTo("n***o@example.com");
+        assertThat(reg.get("message").asText()).contains("by email to n***o@example.com");
+        // the email outbox keeps the code masked
+        java.util.List<String> bodies = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x ->
+                jdbc.queryForList("select body from email_messages where to_address = 'neema.typo@example.com'", String.class)));
+        assertThat(bodies)
+                .singleElement().asString().contains("******").doesNotContain(reg.get("devOtp").asText());
+
+        // the wrong password cannot move the registration
+        call(post("/api/applicant-auth/change-contact"), null, """
+                {"phone":"0688000701","password":"Wrong#Pass99","newPhone":"0688 000 702","newEmail":"neema@example.com"}""")
+                .andExpect(jsonPath("$.code").value("WRONG_PASSWORD"));
+        JsonNode moved = body(call(post("/api/applicant-auth/change-contact"), null, """
+                {"phone":"0688000701","password":"Kifaru#Mto47","newPhone":"0688 000 702","newEmail":"neema@example.com"}""")
+                .andExpect(status().isOk()));
+        assertThat(moved.get("maskedEmail").asText()).isEqualTo("n***a@example.com");
+        // the first code no longer works; the new one confirms the corrected number
+        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")
+                .andExpect(status().isUnprocessableEntity());
+        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + moved.get("devOtp").asText() + "\"}")
+                .andExpect(status().isOk());
+        call(post("/api/applicant-auth/change-contact"), null, """
+                {"phone":"0688000702","password":"Kifaru#Mto47","newPhone":"0688 000 703"}""")
+                .andExpect(jsonPath("$.code").value("ALREADY_VERIFIED"));
     }
 
     @Test

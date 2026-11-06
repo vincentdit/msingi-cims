@@ -71,6 +71,16 @@ public class ApplicantAuthController {
         return accounts.verifyPhone(req.phone(), req.code());
     }
 
+    @Operation(summary = "Correct the phone number or email of a registration not yet confirmed (with its password) and send a new code")
+    @PostMapping("/change-contact")
+    public OtpSentResponse changeContact(@Valid @RequestBody tz.co.msingi.cims.admission.service.AdmissionDtos.ChangeContactRequest req,
+                                         HttpServletRequest http) {
+        if (!lookupLimiter.tryAcquire("contact:" + http.getRemoteAddr())) {
+            throw new TooManyRequestsException("Too many attempts. Please wait a minute and try again.");
+        }
+        return accounts.changeContact(req);
+    }
+
     @Operation(summary = "Send a new verification code")
     @PostMapping("/resend-code")
     public OtpSentResponse resend(@Valid @RequestBody PhoneRequest req) {

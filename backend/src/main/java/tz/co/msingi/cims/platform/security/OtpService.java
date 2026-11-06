@@ -29,6 +29,7 @@ public class OtpService {
     private final PasswordEncoder encoder;
     private final Messaging messaging;
     private final OtpProperties props;
+    private final org.springframework.beans.factory.ObjectProvider<tz.co.msingi.cims.notification.email.EmailService> emails;
     private final SecureRandom random = new SecureRandom();
 
     /** Creates a new code (invalidating earlier ones), sends it by SMS and returns it. */
@@ -43,7 +44,28 @@ public class OtpService {
         otp.setExpiresAt(OffsetDateTime.now().plus(props.ttl()));
         repository.save(otp);
         messaging.securityCode(user.getPhone(), code, java.util.Map.of("institution", institutionName, "minutes", props.ttl().toMinutes()));
+        emailCopy(user, purpose, code, institutionName);
         return code;
+    }
+
+    /**
+     * The same code by email, for an applicant who gave an email address: SMS can be slow or not arrive, and the person may have
+     * mistyped the number. Only for confirming the account and resetting the password, never for the second sign-in factor.
+     */
+    private void emailCopy(UserAccount user, String purpose, String code, String institutionName) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) return;
+        if (!PURPOSE_PHONE_VERIFICATION.equals(purpose) && !PURPOSE_PASSWORD_RESET.equals(purpose)) return;
+        tz.co.msingi.cims.notification.email.EmailService email = emails.getIfAvailable();
+        if (email == null || tz.co.msingi.cims.platform.tenancy.TenantContext.current().isEmpty()) return;
+        boolean reset = PURPOSE_PASSWORD_RESET.equals(purpose);
+        String subject = (reset ? "Your password reset code — " : "Your verification code — ") + institutionName;
+        String text = "%s is your " + institutionName + (reset ? " code to reset your password." : " code to confirm your applicant account.")
+                + " It expires in " + props.ttl().toMinutes() + " minutes. Do not share it with anyone. If you did not ask for it, ignore this email.";
+        try {
+            email.queueSecret(user.getEmail(), user.getFullName(), subject, String.format(text, code), String.format(text, "******"));
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(OtpService.class).warn("Could not queue the code by email: {}", e.getMessage());
+        }
     }
 
     /** Verifies and consumes a code. Throws a business error if it is wrong, expired or used up. */

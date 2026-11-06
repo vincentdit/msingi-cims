@@ -60,7 +60,7 @@ public final class AdmissionDtos {
                                      boolean alreadyRegistered, String premNumber) {
     }
 
-    public record RegisterResponse(Long userId, String maskedPhone, String message, String devOtp, String fullName) {
+    public record RegisterResponse(Long userId, String maskedPhone, String message, String devOtp, String fullName, String maskedEmail) {
     }
 
     public record VerifyRequest(@NotBlank String phone, @NotBlank @Pattern(regexp = "\\d{4,8}") String code) {
@@ -76,7 +76,18 @@ public final class AdmissionDtos {
                                        @NotBlank @Pattern(regexp = PASSWORD_RULE, message = PASSWORD_MESSAGE) @tz.co.msingi.cims.platform.security.NotBreached String newPassword) {
     }
 
-    public record OtpSentResponse(String maskedPhone, String message, String devOtp) {
+    public record OtpSentResponse(String maskedPhone, String message, String devOtp, String maskedEmail) {
+        public OtpSentResponse(String maskedPhone, String message, String devOtp) {
+            this(maskedPhone, message, devOtp, null);
+        }
+    }
+
+    /**
+     * A registration not yet confirmed: the phone number or email was mistyped. The password chosen at registration proves it is the
+     * same person, so nobody else can move someone's registration to their own phone.
+     */
+    public record ChangeContactRequest(@NotBlank String phone, @NotBlank @Size(max = 200) String password, @NotBlank String newPhone,
+                                       @Email @Size(max = 120) String newEmail) {
     }
 
     // ------------------------------------------------------------------ applicant profile

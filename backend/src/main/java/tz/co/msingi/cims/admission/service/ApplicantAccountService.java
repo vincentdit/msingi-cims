@@ -121,8 +121,7 @@ public class ApplicantAccountService {
         String code = otp.issue(user, OtpService.PURPOSE_PHONE_VERIFICATION, institutionName());
         audit.recordAs(user.getId(), user.getFullName(), existing == null ? "REGISTER" : "REGISTER_RESTARTED", "Applicant", a.getId(),
                 Map.of("privacyNotice", privacyNoticeVersion, "index", idx.indexNumber(), "year", idx.year()));
-        return new RegisterResponse(user.getId(), PhoneNumbers.mask(phone),
-                "We sent a verification code by SMS to " + PhoneNumbers.mask(phone) + ".", devCode(code), r.candidateName());
+        return new RegisterResponse(user.getId(), PhoneNumbers.mask(phone), sentTo(phone, email), devCode(code), r.candidateName(), maskEmail(email));
     }
 
     /**
@@ -172,7 +171,63 @@ public class ApplicantAccountService {
             throw new BusinessRuleException("ALREADY_VERIFIED", "This phone number is already verified. Please sign in.");
         }
         String code = otp.issue(user, OtpService.PURPOSE_PHONE_VERIFICATION, institutionName());
-        return new OtpSentResponse(PhoneNumbers.mask(user.getPhone()), "A new code has been sent.", devCode(code));
+        return new OtpSentResponse(PhoneNumbers.mask(user.getPhone()), "A new code has been sent. " + sentTo(user.getPhone(), user.getEmail()),
+                devCode(code), maskEmail(user.getEmail()));
+    }
+
+    static final int MAX_WRONG_PASSWORDS = 5;
+
+    /**
+     * Corrects the phone number or email of a registration not yet confirmed, and sends a new code to them. The password chosen at
+     * registration must be given; after {@value #MAX_WRONG_PASSWORDS} wrong passwords the registration can only be started again.
+     */
+    @Transactional(noRollbackFor = BusinessRuleException.class)
+    public OtpSentResponse changeContact(tz.co.msingi.cims.admission.service.AdmissionDtos.ChangeContactRequest req) {
+        UserAccount user = users.findByLogin(PhoneNumbers.normalise(req.phone()))
+                .filter(u -> u.getUserType() == UserAccount.UserType.APPLICANT)
+                .orElseThrow(() -> new BusinessRuleException("NOT_FOUND", "No registration waiting for confirmation was found for this phone number."));
+        if (user.getStatus() != UserAccount.Status.PENDING_VERIFICATION) {
+            throw new BusinessRuleException("ALREADY_VERIFIED", "This account is already confirmed. Sign in and change your contacts on your profile.");
+        }
+        if (user.getFailedLogins() >= MAX_WRONG_PASSWORDS) {
+            throw new BusinessRuleException("TOO_MANY_ATTEMPTS", "Too many wrong passwords. Create the account again with your index number.");
+        }
+        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+            user.setFailedLogins(user.getFailedLogins() + 1);
+            throw new BusinessRuleException("WRONG_PASSWORD", "The password is not the one you chose when creating the account.");
+        }
+        String phone = PhoneNumbers.normalise(req.newPhone());
+        String email = blankToNull(req.newEmail());
+        if (users.findByLogin(phone).filter(u -> !u.getId().equals(user.getId())).isPresent()) {
+            throw new BusinessRuleException("PHONE_REGISTERED", "This phone number already has an account. Sign in or reset your password.");
+        }
+        if (email != null && users.findByLogin(email).filter(u -> !u.getId().equals(user.getId())).isPresent()) {
+            throw new BusinessRuleException("EMAIL_REGISTERED", "This email address already has an account.");
+        }
+        String before = PhoneNumbers.mask(user.getPhone());
+        user.setFailedLogins(0);
+        user.setUsername(phone);
+        user.setPhone(phone);
+        user.setEmail(email);
+        applicants.findByUserId(user.getId()).ifPresent(a -> {
+            a.setPhone(phone);
+            a.setEmail(email);
+        });
+        String code = otp.issue(user, OtpService.PURPOSE_PHONE_VERIFICATION, institutionName());
+        audit.recordAs(user.getId(), user.getFullName(), "REGISTRATION_CONTACT_CHANGED", "UserAccount", user.getId(),
+                Map.of("phoneBefore", before, "phone", PhoneNumbers.mask(phone), "email", email == null ? "" : maskEmail(email)));
+        return new OtpSentResponse(PhoneNumbers.mask(phone), sentTo(phone, email), devCode(code), maskEmail(email));
+    }
+
+    private static String sentTo(String phone, String email) {
+        return "We sent a verification code by SMS to " + PhoneNumbers.mask(phone) + (email == null ? "" : " and by email to " + maskEmail(email)) + ".";
+    }
+
+    static String maskEmail(String email) {
+        if (email == null || email.isBlank()) return null;
+        int at = email.indexOf('@');
+        if (at <= 0) return "***";
+        return email.charAt(0) + "***" + (at > 1 ? email.substring(at - 1, at) : "") + email.substring(at);
     }
 
     /** Always answers the same way, so the endpoint cannot be used to discover registered numbers. */

@@ -14,6 +14,7 @@ interface OtpSent {
   maskedPhone: string;
   message: string;
   devOtp?: string;
+  maskedEmail?: string | null;
 }
 
 function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
@@ -71,7 +72,7 @@ export function RegisterPage() {
   const m = useMutation({
     mutationFn: () => api<OtpSent & { userId: number }>('/api/applicant-auth/register', { method: 'POST',
       body: { indexNumber: candidate!.indexNumber, examYear: candidate!.examYear, phone: f.phone, email: f.email || null, password: f.password, acceptPrivacyNotice: f.acceptPrivacyNotice } }),
-    onSuccess: (r) => navigate('/verify-phone', { state: { phone: f.phone, masked: r.maskedPhone, devOtp: r.devOtp } }),
+    onSuccess: (r) => navigate('/verify-phone', { state: { phone: f.phone, email: f.email, masked: r.maskedPhone, maskedEmail: r.maskedEmail, devOtp: r.devOtp } }),
   });
   const reset = () => { setCandidate(null); setConfirmed(false); lookup.reset(); m.reset(); };
 
@@ -157,31 +158,68 @@ export function VerifyPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { signIn } = useSession();
-  const state = (useLocation().state ?? {}) as { phone?: string; masked?: string; devOtp?: string };
+  const state = (useLocation().state ?? {}) as { phone?: string; email?: string; masked?: string; maskedEmail?: string | null; devOtp?: string };
   const [phone, setPhone] = useState(state.phone ?? '');
+  const [knownPhone, setKnownPhone] = useState(!!state.phone);
+  const [sentTo, setSentTo] = useState({ phone: state.masked ?? state.phone ?? '', email: state.maskedEmail ?? null });
   const [code, setCode] = useState('');
   const [devOtp, setDevOtp] = useState(state.devOtp);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [c, setC] = useState({ phone: state.phone ?? '', email: state.email ?? '', password: '' });
+  const sent = (r: OtpSent) => { setDevOtp(r.devOtp); setSentTo({ phone: r.maskedPhone, email: r.maskedEmail ?? null }); setCode(''); };
   const verify = useMutation({
     mutationFn: () => api<TokenResponse>('/api/applicant-auth/verify', { method: 'POST', body: { phone, code } }),
     onSuccess: (tok) => { signIn('applicant', tok); navigate('/application'); },
   });
   const resend = useMutation({
     mutationFn: () => api<OtpSent>('/api/applicant-auth/resend-code', { method: 'POST', body: { phone } }),
-    onSuccess: (r) => setDevOtp(r.devOtp),
+    onSuccess: (r) => { sent(r); setNotice(t('auth.codeResent')); },
+  });
+  const change = useMutation({
+    mutationFn: () => api<OtpSent>('/api/applicant-auth/change-contact', { method: 'POST',
+      body: { phone, password: c.password, newPhone: c.phone, newEmail: c.email.trim() || null } }),
+    onSuccess: (r) => {
+      sent(r); setPhone(c.phone); setKnownPhone(true); setEditing(false); setC({ ...c, password: '' });
+      setNotice(t('auth.contactChanged'));
+    },
   });
 
   return (
-    <AuthCard title={t('auth.verifyTitle')} subtitle={t('auth.verifyText', { phone: state.masked ?? phone })}>
-      <form onSubmit={(e) => { e.preventDefault(); verify.mutate(); }}>
-        <Stack spacing={2}>
-          <DevCode code={devOtp} />
-          {!state.phone && <TextField label={t('auth.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} required />}
-          <TextField label={t('auth.code')} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} required inputMode="numeric" autoComplete="one-time-code" slotProps={{ htmlInput: { maxLength: 8, style: { letterSpacing: 6, fontSize: 22 } } }} />
-          <ErrorAlert error={verify.error ?? resend.error} />
-          <Button type="submit" variant="contained" size="large" disabled={verify.isPending}>{t('auth.verify')}</Button>
-          <Button onClick={() => resend.mutate()} disabled={resend.isPending || !phone}>{t('auth.resend')}</Button>
-        </Stack>
-      </form>
+    <AuthCard title={t('auth.verifyTitle')}
+      subtitle={sentTo.email ? t('auth.verifyTextBoth', { phone: sentTo.phone, email: sentTo.email }) : t('auth.verifyText', { phone: sentTo.phone })}>
+      {!editing ? (
+        <form onSubmit={(e) => { e.preventDefault(); verify.mutate(); }}>
+          <Stack spacing={2}>
+            <DevCode code={devOtp} />
+            {notice && <Alert severity="success" onClose={() => setNotice(null)}>{notice}</Alert>}
+            {!knownPhone && <TextField label={t('auth.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} required />}
+            <TextField label={t('auth.code')} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} required inputMode="numeric" autoComplete="one-time-code" slotProps={{ htmlInput: { maxLength: 8, style: { letterSpacing: 6, fontSize: 22 } } }} />
+            <ErrorAlert error={verify.error ?? resend.error} />
+            <Button type="submit" variant="contained" size="large" disabled={verify.isPending}>{t('auth.verify')}</Button>
+            <Button onClick={() => resend.mutate()} disabled={resend.isPending || !phone}>{t('auth.resend')}</Button>
+            {phone && (
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                {t('auth.wrongContact')}{' '}
+                <Link component="button" type="button" onClick={() => { setC({ ...c, phone: c.phone || phone }); setEditing(true); setNotice(null); }}>{t('auth.correctIt')}</Link>
+              </Typography>
+            )}
+          </Stack>
+        </form>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); change.mutate(); }}>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={600}>{t('auth.correctTitle')}</Typography>
+            <Typography variant="body2" color="text.secondary">{t('auth.correctText')}</Typography>
+            <TextField label={t('auth.phone')} value={c.phone} onChange={(e) => setC({ ...c, phone: e.target.value })} required inputMode="tel" autoComplete="tel" />
+            <TextField label={t('auth.email')} type="email" value={c.email} onChange={(e) => setC({ ...c, email: e.target.value })} autoComplete="email" />
+            <PasswordField label={t('auth.passwordChosen')} value={c.password} onChange={(e) => setC({ ...c, password: e.target.value })} autoComplete="current-password" required />
+            <ErrorAlert error={change.error} />
+            <Button type="submit" variant="contained" size="large" disabled={change.isPending || !c.phone.trim() || !c.password}>{t('auth.saveAndSend')}</Button>
+            <Button onClick={() => { setEditing(false); change.reset(); }}>{t('auth.back')}</Button>
+          </Stack>
+        </form>
+      )}
     </AuthCard>
   );
 }
