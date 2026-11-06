@@ -29,6 +29,11 @@ public final class Csv {
 
     /** Parses CSV text into rows of cells. Handles quoted cells, escaped quotes, CRLF and a UTF-8 BOM. */
     public static List<List<String>> parse(String text) {
+        return parse(text, ',');
+    }
+
+    /** As {@link #parse(String)} with another separator (';' or a tab, as some bank exports use). */
+    public static List<List<String>> parse(String text, char separator) {
         List<List<String>> rows = new ArrayList<>();
         List<String> row = new ArrayList<>();
         StringBuilder cell = new StringBuilder();
@@ -49,7 +54,7 @@ public final class Csv {
                 }
             } else if (ch == '"' && cell.isEmpty()) {
                 quoted = true;
-            } else if (ch == ',') {
+            } else if (ch == separator) {
                 row.add(cell.toString());
                 cell.setLength(0);
             } else if (ch == '\n' || ch == '\r') {

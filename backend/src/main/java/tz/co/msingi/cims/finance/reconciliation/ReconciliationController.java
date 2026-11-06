@@ -75,6 +75,13 @@ public class ReconciliationController {
         return service.post(itemId, req == null ? null : req.note());
     }
 
+    @Operation(summary = "Post every open payment missing in CIMS for the day (a statement's payments, in one step)")
+    @PostMapping("/{id}/post-all")
+    @PreAuthorize(WORK)
+    public ReconciliationView postAll(@PathVariable Long id, @Valid @RequestBody(required = false) PostRequest req) {
+        return service.postAll(id, req == null ? null : req.note());
+    }
+
     @Operation(summary = "Resolve an exception with an explanation")
     @PostMapping("/items/{itemId}/resolve")
     @PreAuthorize(WORK)

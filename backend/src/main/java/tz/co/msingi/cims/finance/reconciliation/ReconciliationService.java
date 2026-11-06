@@ -10,6 +10,7 @@ import tz.co.msingi.cims.finance.domain.ControlNumber;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.ControlNumberRepository;
 import tz.co.msingi.cims.finance.domain.FinanceRepositories.PaymentRepository;
 import tz.co.msingi.cims.finance.domain.Payment;
+import tz.co.msingi.cims.finance.reconciliation.ReconciliationFile.Line;
 import tz.co.msingi.cims.finance.reconciliation.ReconciliationDtos.DayRow;
 import tz.co.msingi.cims.finance.reconciliation.ReconciliationDtos.ItemView;
 import tz.co.msingi.cims.finance.reconciliation.ReconciliationDtos.MonthView;
@@ -24,14 +25,11 @@ import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -56,27 +54,6 @@ import java.util.stream.Collectors;
 public class ReconciliationService {
 
     static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
-    static final String HEADER = "PayRefId,SpBillId,BillCtrNum,PspTrxId,PspName,PaidAmt,Ccy,TrxDtTm,UsdPayChnl,PyrCellNum";
-
-    /** Accepted column names (GePG's and plain ones), normalised to lower case without separators. */
-    private static final Map<String, String> COLUMNS = Map.ofEntries(
-            Map.entry("payrefid", "receipt"), Map.entry("gepgreceiptno", "receipt"), Map.entry("receipt", "receipt"), Map.entry("receiptno", "receipt"),
-            Map.entry("spbillid", "bill"), Map.entry("billid", "bill"),
-            Map.entry("billctrnum", "control"), Map.entry("controlno", "control"), Map.entry("controlnumber", "control"),
-            Map.entry("psptrxid", "pspReceipt"), Map.entry("pspreceiptno", "pspReceipt"),
-            Map.entry("pspname", "psp"), Map.entry("psp", "psp"),
-            Map.entry("paidamt", "amount"), Map.entry("amount", "amount"),
-            Map.entry("ccy", "currency"), Map.entry("currency", "currency"),
-            Map.entry("trxdttm", "paidAt"), Map.entry("paidat", "paidAt"), Map.entry("date", "paidAt"),
-            Map.entry("usdpaychnl", "channel"), Map.entry("channel", "channel"),
-            Map.entry("pyrcellnum", "phone"), Map.entry("phone", "phone"),
-            // statements from a payment collector, mobile money operator or bank (private and faith-based institutions)
-            Map.entry("transactionid", "receipt"), Map.entry("transid", "receipt"), Map.entry("trxid", "receipt"), Map.entry("receiptnumber", "receipt"),
-            Map.entry("reference", "control"), Map.entry("paymentreference", "control"), Map.entry("accountreference", "control"),
-            Map.entry("billreference", "control"), Map.entry("ref", "control"),
-            Map.entry("provider", "psp"), Map.entry("operator", "psp"), Map.entry("bank", "psp"),
-            Map.entry("transactiondate", "paidAt"), Map.entry("paymentdate", "paidAt"), Map.entry("msisdn", "phone"));
-
     private final GepgReconciliationRepository reconciliations;
     private final ReconciliationItemRepository items;
     private final ReconciliationSignoffRepository signoffs;
@@ -87,10 +64,6 @@ public class ReconciliationService {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final tz.co.msingi.cims.finance.gepg.GepgGateway gepg;
 
-    private record Line(int lineNo, String receipt, String bill, String control, String pspReceipt, String psp, BigDecimal amount,
-                        OffsetDateTime paidAt, String channel, String phone) {
-    }
-
     // ------------------------------------------------------------------ import and matching
 
     @Transactional
@@ -98,7 +71,7 @@ public class ReconciliationService {
         if (date.isAfter(LocalDate.now(ZONE))) {
             throw new BusinessRuleException("FUTURE_DATE", "A day can be reconciled only once it has started");
         }
-        return importLines(date, fileName, parse(csv, date), GepgReconciliation.Source.FILE, CurrentUser.name());
+        return importLines(date, fileName, ReconciliationFile.parse(csv, date).lines(), GepgReconciliation.Source.FILE, CurrentUser.name());
     }
 
     /** One transaction of GePG's reconciliation answer (live GePG, {@code gepgSpReconcResp}). */
@@ -265,9 +238,33 @@ public class ReconciliationService {
         }
         i.setPaymentId(p.getId());
         i.setCimsAmount(p.getAmount());
-        resolve(i, Resolution.POSTED, note == null || note.isBlank() ? "Posted from GePG reconciliation (callback not received)" : note.trim());
+        resolve(i, Resolution.POSTED, note == null || note.isBlank() ? postedFrom(i.getReconciliation()) : note.trim());
         audit.record("GEPG_RECONCILIATION_POSTED", "Payment", p.getId(), Map.of("receipt", i.getGepgReceiptNo(), "amount", i.getGepgAmount()));
         return view(i.getReconciliation());
+    }
+
+    /**
+     * Posts every open "missing in CIMS" line of the day at once: the usual case for a statement, where CIMS learns of payments only from
+     * it. Lines whose bill CIMS does not know stay open for an explanation.
+     */
+    @Transactional
+    public ReconciliationView postAll(Long reconciliationId, String note) {
+        GepgReconciliation r = require(reconciliationId);
+        if (r.getStatus() == GepgReconciliation.Status.CLOSED) {
+            throw new BusinessRuleException("RECONCILIATION_CLOSED", "This day's reconciliation is closed");
+        }
+        List<ReconciliationItem> open = items.findByReconciliationIdOrderByIdAsc(r.getId()).stream()
+                .filter(i -> i.getKind() == Kind.MISSING_IN_CIMS && i.getStatus() == ReconciliationItem.Status.OPEN).toList();
+        if (open.isEmpty()) throw new BusinessRuleException("NOTHING_TO_POST", "There are no open payments to post for this day");
+        for (ReconciliationItem i : open) {
+            try {
+                post(i.getId(), note);
+            } catch (BusinessRuleException e) {
+                throw new BusinessRuleException(e.getCode(), "Line " + i.getLineNo() + " (" + i.getGepgReceiptNo() + "): " + e.getMessage());
+            }
+        }
+        audit.record("GEPG_RECONCILIATION_POSTED_ALL", "GepgReconciliation", r.getId(), Map.of("date", r.getReconDate().toString(), "posted", open.size()));
+        return view(r);
     }
 
     /** Resolves an exception with an explanation (e.g. "settled with GePG", "bank reversal"). */
@@ -376,7 +373,7 @@ public class ReconciliationService {
     /** CIMS payments of a date in GePG's file layout: for comparing by hand or testing an import. */
     @Transactional(readOnly = true)
     public String cimsPaymentsFile(LocalDate date) {
-        StringBuilder sb = new StringBuilder(HEADER).append('\n');
+        StringBuilder sb = new StringBuilder(ReconciliationFile.HEADER).append('\n');
         DateTimeFormatter f = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
         for (Payment p : paymentsOn(date)) {
             String bill = controlNumbers.findByControlNo(p.getControlNo()).map(ControlNumber::getBillId).orElse("");
@@ -409,76 +406,6 @@ public class ReconciliationService {
         return new ReconciliationView(r.getId(), r.getReconDate(), r.getSource().name(), r.getFileName(), r.getStatus().name(),
                 r.getGepgCount(), r.getGepgTotal(), r.getCimsCount(), r.getCimsTotal(), r.getMatchedCount(), r.getExceptionCount(), open, rate,
                 r.getImportedAt(), r.getImportedByName(), r.getClosedAt(), r.getClosedByName(), views);
-    }
-
-    // ------------------------------------------------------------------ parsing
-
-    /** All rows are validated first; nothing is imported if any row is wrong. */
-    private List<Line> parse(String text, LocalDate date) {
-        List<List<String>> rows;
-        try {
-            rows = Csv.parse(text);
-        } catch (IllegalArgumentException e) {
-            throw new BusinessRuleException("INVALID_FILE", e.getMessage());
-        }
-        if (rows.isEmpty()) throw new BusinessRuleException("INVALID_FILE", "The file is empty");
-        Map<String, Integer> col = new HashMap<>();
-        List<String> header = rows.get(0);
-        for (int c = 0; c < header.size(); c++) {
-            String key = COLUMNS.get(header.get(c).trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z]", ""));
-            if (key != null) col.putIfAbsent(key, c);
-        }
-        if (!col.containsKey("receipt") || !col.containsKey("amount") || !(col.containsKey("bill") || col.containsKey("control"))) {
-            throw new BusinessRuleException("INVALID_FILE", "The file needs at least PayRefId, PaidAmt and SpBillId or BillCtrNum columns (GePG: " + HEADER
-                    + "), or TransactionId, Amount and Reference for a mobile money, collector or bank statement");
-        }
-        List<String> errors = new ArrayList<>();
-        List<Line> out = new ArrayList<>();
-        for (int r = 1; r < rows.size(); r++) {
-            List<String> row = rows.get(r);
-            int lineNo = r + 1;
-            String receipt = cell(row, col, "receipt");
-            String amountText = cell(row, col, "amount").replace(",", "");
-            String currency = cell(row, col, "currency");
-            if (receipt.isEmpty()) { errors.add("Line " + lineNo + ": PayRefId is missing"); continue; }
-            if (receipt.length() > 40) { errors.add("Line " + lineNo + ": PayRefId is too long"); continue; }
-            BigDecimal amount;
-            try {
-                amount = new BigDecimal(amountText).setScale(2, RoundingMode.HALF_UP);
-            } catch (NumberFormatException | ArithmeticException e) {
-                errors.add("Line " + lineNo + ": PaidAmt '" + amountText + "' is not a number"); continue;
-            }
-            if (amount.signum() <= 0) { errors.add("Line " + lineNo + ": PaidAmt must be more than zero"); continue; }
-            if (!currency.isEmpty() && !currency.equalsIgnoreCase("TZS")) { errors.add("Line " + lineNo + ": only TZS collections are reconciled here"); continue; }
-            OffsetDateTime paidAt;
-            try {
-                paidAt = parseTime(cell(row, col, "paidAt"), date);
-            } catch (DateTimeParseException e) {
-                errors.add("Line " + lineNo + ": TrxDtTm '" + cell(row, col, "paidAt") + "' is not a date and time"); continue;
-            }
-            out.add(new Line(lineNo, receipt, blankToNull(cell(row, col, "bill")), blankToNull(cell(row, col, "control")),
-                    truncate(blankToNull(cell(row, col, "pspReceipt")), 60), truncate(blankToNull(cell(row, col, "psp")), 60), amount, paidAt,
-                    truncate(blankToNull(cell(row, col, "channel")), 30), truncate(blankToNull(cell(row, col, "phone")), 20)));
-        }
-        if (!errors.isEmpty()) {
-            throw new BusinessRuleException("INVALID_FILE", errors.size() + " line(s) need correcting: "
-                    + String.join("; ", errors.subList(0, Math.min(10, errors.size()))) + (errors.size() > 10 ? "; …" : ""));
-        }
-        return out;
-    }
-
-    static OffsetDateTime parseTime(String s, LocalDate date) {
-        if (s == null || s.isBlank()) return date.atTime(12, 0).atZone(ZONE).toOffsetDateTime();
-        String t = s.trim().replace(' ', 'T');
-        try {
-            return OffsetDateTime.parse(t);
-        } catch (DateTimeParseException e) {
-            try {
-                return LocalDateTime.parse(t).atZone(ZONE).toOffsetDateTime();
-            } catch (DateTimeParseException e2) {
-                return LocalDate.parse(t).atTime(12, 0).atZone(ZONE).toOffsetDateTime();
-            }
-        }
     }
 
     private ReconciliationItem fromLine(GepgReconciliation r, Line l) {
@@ -523,17 +450,9 @@ public class ReconciliationService {
         return i;
     }
 
-    private static String cell(List<String> row, Map<String, Integer> col, String key) {
-        Integer i = col.get(key);
-        return i == null || i >= row.size() ? "" : row.get(i).trim();
-    }
-
-    private static String blankToNull(String s) {
-        return s == null || s.isBlank() ? null : s;
-    }
-
-    private static String truncate(String s, int max) {
-        return s == null || s.length() <= max ? s : s.substring(0, max);
+    private static String postedFrom(GepgReconciliation r) {
+        return r.getSource() == GepgReconciliation.Source.API ? "Posted from GePG reconciliation (callback not received)"
+                : "Posted from " + (r.getFileName() == null || r.getFileName().isBlank() ? "the day's file" : r.getFileName());
     }
 
     private static BigDecimal sum(List<Payment> list) {

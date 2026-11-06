@@ -173,6 +173,34 @@ class CollectionPaymentsIT {
     }
 
     @Test
+    void privateInstitutionImportsItsMobileMoneyStatementAndPostsTheDayInOneStep() throws Exception {
+        TestData.Institution inst = institution(Ownership.PRIVATE);
+        AdmissionScenario s = new AdmissionScenario(mvc, json, inst.tenant().getCode(), inst);
+        String accountant = s.staffToken("accountant");
+        ControlNumber a = bill(inst, "150000");
+        ControlNumber b = bill(inst, "60000");
+        LocalDate today = LocalDate.now(ZoneId.of("Africa/Dar_es_Salaam"));
+        String d = today.format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+        String csv = "M-PESA BUSINESS STATEMENT\n"
+                + "Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance\n"
+                + "SKA001," + d + " 09:14:22,Pay Bill from 255712345678 Acc. " + a.getControlNo() + ",Completed,\"150,000.00\",,\n"
+                + "SKA002," + d + " 10:02:00,Pay Bill from 255712345679 Acc. " + b.getControlNo() + ",Completed,\"60,000.00\",,\n"
+                + "SKA003," + d + " 10:30:00,Business charge,Completed,,\"1,000.00\",\n"
+                + "SKA004," + d + " 11:00:00,Pay Bill from 255712345670 Acc. CANTEEN,Completed,\"5,000.00\",,\n";
+        JsonNode rec = s.body(s.call(post("/api/finance/reconciliations"), accountant,
+                json.writeValueAsString(java.util.Map.of("date", today.toString(), "fileName", "mpesa.csv", "csv", csv))).andExpect(status().isOk()));
+        assertThat(rec.get("gepgCount").asInt()).isEqualTo(3);
+        JsonNode done = s.body(s.call(post("/api/finance/reconciliations/" + rec.get("id").asLong() + "/post-all"), accountant, "{}").andExpect(status().isOk()));
+        assertThat(done.get("openExceptions").asInt()).isEqualTo(1); // the canteen payment has no reference and waits for an explanation
+        List<Payment> paidA = TenantContext.callAs(inst.info(), () -> tx.execute(x -> billing.paymentsFor(a.getInvoice().getId())));
+        assertThat(paidA).hasSize(1);
+        List<Payment> paidB = TenantContext.callAs(inst.info(), () -> tx.execute(x -> billing.paymentsFor(b.getInvoice().getId())));
+        assertThat(paidB).hasSize(1);
+        s.call(post("/api/finance/reconciliations/" + rec.get("id").asLong() + "/post-all"), accountant, "{}")
+                .andExpect(jsonPath("$.code").value("NOTHING_TO_POST"));
+    }
+
+    @Test
     void publicInstitutionUsesGepgAndListsNoAccounts() throws Exception {
         TestData.Institution inst = institution(Ownership.PUBLIC);
         AdmissionScenario s = new AdmissionScenario(mvc, json, inst.tenant().getCode(), inst);

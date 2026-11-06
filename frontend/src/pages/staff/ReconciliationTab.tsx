@@ -25,6 +25,15 @@ const KIND: Record<string, { label: string; help: string; colour: 'success' | 'w
   UNKNOWN_BILL: { label: 'Unknown bill', help: 'The file reports a bill or reference CIMS did not issue (another institution’s, a test, or a mistyped reference)', colour: 'info' },
 };
 
+/** In statement mode CIMS learns of payments only from the statement, so a paid reference is simply ready to post. */
+const STATEMENT_KIND: typeof KIND = {
+  ...KIND,
+  MISSING_IN_CIMS: { label: 'Ready to post', help: 'A credit on the statement with a valid CIMS payment reference. Post it to issue the receipt and credit the payer.', colour: 'info' },
+  MATCHED: { label: 'Matched', help: 'On the statement and already posted in CIMS with the same amount', colour: 'success' },
+  UNKNOWN_BILL: { label: 'No reference', help: 'A credit without a CIMS payment reference CIMS issued (other income, a mistyped or missing reference). Explain it, or find the payer and record it under their invoice.', colour: 'warning' },
+};
+const useKinds = () => (useGepg() ? KIND : STATEMENT_KIND);
+
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Daily reconciliation of GePG's file (public institutions) or the collector's or bank's statement (private and faith-based), and the Bursar's monthly sign-off (FR-FIN-05). */
@@ -162,9 +171,8 @@ function ImportDialog({ date, onClose, onDone }: { date: string; onClose: () => 
         <Typography variant="body2" sx={{ mb: 2 }}>
           {gepg ? <>Download the day’s reconciliation file from the GePG portal as CSV (columns PayRefId, SpBillId, BillCtrNum, PspTrxId, PspName, PaidAmt, Ccy,
           TrxDtTm, UsdPayChnl, PyrCellNum). Payments are matched by GePG receipt number.</>
-            : <>Export the day’s statement from the collector, mobile money or bank portal as CSV with at least the columns <strong>TransactionId</strong>, <strong>Reference</strong> (the
-          12-digit CIMS payment reference) and <strong>Amount</strong>; TransactionDate, Provider or Bank and MSISDN are used when present. Payments are matched by transaction id.</>}
-          {' '}A file with any invalid line is rejected as a whole.
+            : `Download the statement from the bank or mobile money portal and save it as CSV (in Excel: Save As, CSV). It can be the statement exactly as downloaded, covering one day or the whole month: CIMS takes the completed credits dated ${formatDate(date)}, skips debits, charges, failed transactions and other days, and reads the 12-digit CIMS payment reference from the reference or narration. A collector’s file with TransactionId, Reference and Amount columns works too. Payments are matched by transaction id, so importing the same statement again is safe.`}
+          {' '}A file with an unreadable amount or date is rejected as a whole.
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
           <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
@@ -199,6 +207,9 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
   id: number; canWork: boolean; onBack: () => void; onReimport: (date: string) => void; importDialog: ReactNode;
 }) {
   const qc = useQueryClient();
+  const gepg = useGepg();
+  const KIND = useKinds();
+  const [postingAll, setPostingAll] = useState(false);
   const [resolving, setResolving] = useState<ReconciliationItem | null>(null);
   const [posting, setPosting] = useState<ReconciliationItem | null>(null);
   const [showMatched, setShowMatched] = useState(false);
@@ -215,6 +226,8 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
   const exceptions = r.items.filter((i) => i.kind !== 'MATCHED');
   const matched = r.items.filter((i) => i.kind === 'MATCHED');
   const anyResolved = r.items.some((i) => i.status === 'RESOLVED');
+  const toPost = exceptions.filter((i) => i.kind === 'MISSING_IN_CIMS' && i.status === 'OPEN');
+  const toPostTotal = toPost.reduce((t, i) => t + (i.gepgAmount ?? 0), 0);
   return (
     <Stack spacing={2.5}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
@@ -227,6 +240,7 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
           </Typography>
         </Box>
         {open && canWork && !anyResolved && <Button startIcon={<UploadFileIcon />} onClick={() => onReimport(r.date)}>Re-import</Button>}
+        {open && canWork && toPost.length > 1 && <Button variant="outlined" onClick={() => setPostingAll(true)}>{`Post all ${toPost.length} payments`}</Button>}
         {open && canWork && (
           <Tooltip title={r.openExceptions ? 'Resolve every exception first' : ''}>
             <span><Button variant="contained" disabled={!!r.openExceptions || close.isPending} onClick={() => close.mutate()}>Close day</Button></span>
@@ -246,7 +260,7 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
 
       <Card><CardContent>
         <Typography variant="h6" sx={{ mb: 1 }}>Exceptions</Typography>
-        {!exceptions.length ? <Typography color="text.secondary">None. Every line in the file matches a CIMS payment.</Typography> : (
+        {!exceptions.length ? <Typography color="text.secondary">{gepg ? 'None. Every line in the file matches a CIMS payment.' : 'None. Every credit on the statement is posted in CIMS.'}</Typography> : (
           <TableContainer><Table size="small">
             <TableHead><TableRow>
               <TableCell>Exception</TableCell><TableCell>Receipt</TableCell><TableCell>Payer / bill</TableCell>
@@ -310,13 +324,43 @@ function DayDetail({ id, canWork, onBack, onReimport, importDialog }: {
       </CardContent></Card>
 
       {resolving && <NoteDialog item={resolving} onClose={() => setResolving(null)} onDone={(x) => { done(x); setResolving(null); }} />}
+      {postingAll && <PostAllDialog id={id} count={toPost.length} total={toPostTotal} statement={!gepg} onClose={() => setPostingAll(false)}
+        onDone={(x) => { done(x); setPostingAll(false); }} />}
       {posting && <PostDialog item={posting} onClose={() => setPosting(null)} onDone={(x) => { done(x); setPosting(null); }} />}
       {importDialog}
     </Stack>
   );
 }
 
+function PostAllDialog({ id, count, total, statement, onClose, onDone }: {
+  id: number; count: number; total: number; statement: boolean; onClose: () => void; onDone: (r: Reconciliation) => void;
+}) {
+  const m = useMutation({
+    mutationFn: () => api<Reconciliation>(`/api/finance/reconciliations/${id}/post-all`, { ...staff, method: 'POST', body: {} }),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{`Post ${count} payments`}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ mb: 1.5 }}>
+          {statement
+            ? `The ${count} credits with a valid payment reference, ${formatTzs(total)} in all, are posted to their invoices: each payer gets a receipt and their balance and clearance are updated.`
+            : `The ${count} payments in the file that never reached CIMS, ${formatTzs(total)} in all, are posted to their bills as if the notices had arrived.`}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">Check the totals against the statement first. Lines without a reference stay open for you to explain.</Typography>
+        <ErrorAlert error={m.error} />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={m.isPending} onClick={() => m.mutate()}>{`Post ${count} payments`}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function NoteDialog({ item, onClose, onDone }: { item: ReconciliationItem; onClose: () => void; onDone: (r: Reconciliation) => void }) {
+  const KIND = useKinds();
   const [note, setNote] = useState('');
   const m = useMutation({
     mutationFn: () => api<Reconciliation>(`/api/finance/reconciliations/items/${item.id}/resolve`, { ...staff, method: 'POST', body: { note } }),
@@ -347,13 +391,16 @@ function PostDialog({ item, onClose, onDone }: { item: ReconciliationItem; onClo
   });
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Post payment from the file</DialogTitle>
+      <DialogTitle>{gepg ? 'Post payment from the file' : 'Post payment from the statement'}</DialogTitle>
       <DialogContent>
         <Typography sx={{ mb: 1 }}>
-          {gepg ? 'GePG' : item.pspName ?? 'The collector'} collected <strong>{formatTzs(item.gepgAmount ?? 0)}</strong> (receipt {item.gepgReceiptNo}) for bill {item.billId ?? item.controlNo}, but the payment notice never reached CIMS.
+          {gepg
+            ? <>GePG collected <strong>{formatTzs(item.gepgAmount ?? 0)}</strong> (receipt {item.gepgReceiptNo}) for bill {item.billId ?? item.controlNo}, but the payment notice never reached CIMS.</>
+            : `The statement shows ${formatTzs(item.gepgAmount ?? 0)} received (transaction ${item.gepgReceiptNo}) with payment reference ${item.controlNo}.`}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Posting records the payment as if the notice had arrived: a receipt is issued, the amount is allocated to the bill and the payer’s balance and clearance are updated.
+          {gepg ? 'Posting records the payment as if the notice had arrived: a receipt is issued, the amount is allocated to the bill and the payer’s balance and clearance are updated.'
+            : 'Posting records the payment: a receipt is issued, the amount is allocated to the invoice and the payer’s balance and clearance are updated.'}
         </Typography>
         <ErrorAlert error={m.error} />
       </DialogContent>
