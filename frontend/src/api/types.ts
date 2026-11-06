@@ -618,6 +618,14 @@ export interface AcademicYear {
   current: boolean;
 }
 
+export interface Intake {
+  id: number;
+  code: string;
+  name: string;
+  startMonth: number;
+  active: boolean;
+}
+
 export interface FeeItem {
   id: number;
   code: string;

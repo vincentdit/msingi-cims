@@ -14,7 +14,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import {
   CALENDAR_EVENT_KINDS, type AcademicCalendar, type AcademicYear, type CalendarEvent, type CourseModule, type Curriculum,
-  type CurriculumModuleSlot, type CurriculumSummary, type Department, type ElectiveRule, type Programme, type Semester,
+  type CurriculumModuleSlot, type CurriculumSummary, type Department, type ElectiveRule, type Intake, type Programme, type Semester,
 } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
@@ -35,6 +35,10 @@ function useRoles() {
 
 export function useYears() {
   return useQuery({ queryKey: ['staff', 'years'], queryFn: () => api<AcademicYear[]>('/api/academic/years', staff) });
+}
+
+export function useIntakes() {
+  return useQuery({ queryKey: ['staff', 'intakes'], queryFn: () => api<Intake[]>('/api/academic/intakes', staff) });
 }
 
 /** The year to show first: the current one, otherwise the latest. */
@@ -66,6 +70,9 @@ export function CalendarPage() {
   const del = useMutation({ mutationFn: (id: number) => api(`/api/academic/calendar-events/${id}`, { ...staff, method: 'DELETE' }), onSuccess: refresh });
   const year = years.data?.find((y) => y.id === yearId);
   const nextNo = (cal.data?.semesters.length ?? 0) + 1;
+  const intakes = useIntakes();
+  const setupNeeded = (years.data && !years.data.length) || (intakes.data && !intakes.data.some((i) => i.active));
+  const setup = (years.data && intakes.data) ? <YearsAndIntakes years={years.data} intakes={intakes.data} canEdit={canEdit} /> : null;
 
   return (
     <Container maxWidth="lg" disableGutters>
@@ -75,7 +82,8 @@ export function CalendarPage() {
             {(years.data ?? []).map((y) => <MenuItem key={y.id} value={y.id}>{y.code}{y.current ? ' (current)' : ''}</MenuItem>)}
           </TextField>
         } />
-      <ErrorAlert error={years.error ?? cal.error ?? del.error} />
+      <ErrorAlert error={years.error ?? intakes.error ?? cal.error ?? del.error} />
+      {setupNeeded && <Box sx={{ mb: 3 }}>{setup}</Box>}
       {cal.isLoading && <Loading />}
       {cal.data && year && (
         <Stack spacing={3}>
@@ -148,9 +156,185 @@ export function CalendarPage() {
           </Box>
         </Stack>
       )}
+      {!setupNeeded && setup && <Box sx={{ mt: 4 }}>{setup}</Box>}
       {sem && year && <SemesterDialog form={sem} year={year} onClose={() => setSem(null)} onSaved={() => { setSem(null); refresh(); }} />}
       {ev && cal.data && <EventDialog form={ev} semesters={cal.data.semesters} onClose={() => setEv(null)} onSaved={() => { setEv(null); refresh(); }} />}
     </Container>
+  );
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** NACTVET's two intakes, offered in one click to a college that has none yet. */
+const STANDARD_INTAKES = [
+  { code: 'SEPTEMBER', name: 'September', startMonth: 9 },
+  { code: 'MARCH', name: 'March', startMonth: 3 },
+];
+
+/** The year after the latest one, or the one running now (October to September) when there is none. */
+function suggestYear(years: AcademicYear[]) {
+  const latest = [...years].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+  const now = new Date();
+  const first = latest ? Number(latest.code.slice(0, 4)) + 1 : (now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1);
+  return yearForm(first, !years.length);
+}
+
+function yearForm(first: number, current: boolean): YearForm {
+  return { code: `${first}/${first + 1}`, startDate: `${first}-10-01`, endDate: `${first + 1}-09-30`, current };
+}
+
+type YearForm = { id?: number; code: string; startDate: string; endDate: string; current: boolean };
+type IntakeForm = { id?: number; code: string; name: string; startMonth: number; active: boolean };
+
+/**
+ * The academic years and intakes that admission windows, fees, registration and reports are tied to. A new college sees this
+ * first, with the year to add and NACTVET's September and March intakes ready to add in one click.
+ */
+function YearsAndIntakes({ years, intakes, canEdit }: { years: AcademicYear[]; intakes: Intake[]; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const [year, setYear] = useState<YearForm | null>(null);
+  const [intake, setIntake] = useState<IntakeForm | null>(null);
+  const standard = useMutation({
+    mutationFn: async () => {
+      for (const i of STANDARD_INTAKES.filter((x) => !intakes.some((y) => y.code === x.code))) {
+        await api<Intake>('/api/academic/intakes', { ...staff, method: 'POST', body: { ...i, active: true } });
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['staff', 'intakes'] }),
+  });
+  const sorted = [...years].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Typography variant="h6">Academic years and intakes</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Admission windows, fee structures, registration and reports belong to an academic year and an intake. Add the year students will join, and the intakes the college takes.
+        </Typography>
+        {!canEdit && (!years.length || !intakes.length) && (
+          <Alert severity="info" sx={{ mb: 2 }}>The institution administrator or the Deputy Principal (Academic) adds academic years and intakes.</Alert>
+        )}
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600}>Academic years</Typography>
+              {canEdit && <Button size="small" startIcon={<AddIcon />} onClick={() => setYear(suggestYear(years))}>Add year</Button>}
+            </Stack>
+            {!years.length ? <Alert severity="warning">No academic year yet. Add one before creating an admission window.</Alert> : (
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Year</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell />{canEdit && <TableCell />}</TableRow></TableHead>
+                <TableBody>
+                  {sorted.map((y) => (
+                    <TableRow key={y.id}>
+                      <TableCell sx={{ fontWeight: 600 }}>{y.code}</TableCell>
+                      <TableCell>{formatDate(y.startDate)}</TableCell>
+                      <TableCell>{formatDate(y.endDate)}</TableCell>
+                      <TableCell>{y.current && <Chip size="small" color="success" label="Current" />}</TableCell>
+                      {canEdit && <TableCell align="right"><IconButton size="small" aria-label={`Edit ${y.code}`} onClick={() => setYear({ ...y })}><EditIcon fontSize="small" /></IconButton></TableCell>}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Grid>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600}>Intakes</Typography>
+              {canEdit && <Button size="small" startIcon={<AddIcon />} onClick={() => setIntake({ code: '', name: '', startMonth: 9, active: true })}>Add intake</Button>}
+            </Stack>
+            {!intakes.length ? (
+              <Alert severity="warning" action={canEdit && <Button color="inherit" size="small" disabled={standard.isPending} onClick={() => standard.mutate()}>Add both</Button>}>
+                No intake yet. Most colleges take NACTVET’s September and March intakes.
+              </Alert>
+            ) : (
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Intake</TableCell><TableCell>Starts</TableCell><TableCell />{canEdit && <TableCell />}</TableRow></TableHead>
+                <TableBody>
+                  {intakes.map((i) => (
+                    <TableRow key={i.id} sx={{ opacity: i.active ? 1 : 0.55 }}>
+                      <TableCell sx={{ fontWeight: 600 }}>{i.name}</TableCell>
+                      <TableCell>{MONTHS[i.startMonth - 1]}</TableCell>
+                      <TableCell>{!i.active && <Chip size="small" label="Not in use" />}</TableCell>
+                      {canEdit && <TableCell align="right"><IconButton size="small" aria-label={`Edit ${i.name}`} onClick={() => setIntake({ ...i })}><EditIcon fontSize="small" /></IconButton></TableCell>}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            <ErrorAlert error={standard.error} />
+          </Grid>
+        </Grid>
+      </CardContent>
+      {year && <YearDialog form={year} years={years} onClose={() => setYear(null)} />}
+      {intake && <IntakeDialog form={intake} onClose={() => setIntake(null)} />}
+    </Card>
+  );
+}
+
+function YearDialog({ form, years, onClose }: { form: YearForm; years: AcademicYear[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState(form);
+  const [datesTouched, setDatesTouched] = useState(!!form.id);
+  const codeOk = /^\d{4}\/\d{4}$/.test(f.code) && Number(f.code.slice(5)) === Number(f.code.slice(0, 4)) + 1;
+  const setCode = (code: string) => {
+    const first = Number(code.slice(0, 4));
+    const valid = /^\d{4}\/\d{4}$/.test(code) && Number(code.slice(5)) === first + 1;
+    setF(valid && !datesTouched ? { ...yearForm(first, f.current), id: f.id } : { ...f, code });
+  };
+  const date = (k: 'startDate' | 'endDate') => (v: string) => { setDatesTouched(true); setF({ ...f, [k]: v }); };
+  const save = useMutation({
+    mutationFn: () => api<AcademicYear>(f.id ? `/api/academic/years/${f.id}` : '/api/academic/years', { ...staff, method: f.id ? 'PUT' : 'POST', body: f }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff', 'years'] }); onClose(); },
+  });
+  const otherCurrent = years.find((y) => y.current && y.id !== f.id);
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <DialogTitle>{f.id ? `Edit ${form.code}` : 'New academic year'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField required label="Academic year" value={f.code} onChange={(e) => setCode(e.target.value.trim())} placeholder="2026/2027"
+              error={!!f.code && !codeOk} helperText={f.code && !codeOk ? 'Two consecutive years, e.g. 2026/2027' : 'e.g. 2026/2027'} />
+            <DateField label="Starts" value={f.startDate} onChange={date('startDate')} />
+            <DateField label="Ends" value={f.endDate} onChange={date('endDate')} />
+            <FormControlLabel control={<Switch checked={f.current} onChange={(e) => setF({ ...f, current: e.target.checked })} />}
+              label={otherCurrent && f.current ? `Current year (instead of ${otherCurrent.code})` : 'Current year'} />
+          </Stack>
+          <ErrorAlert error={save.error} />
+        </DialogContent>
+        <DialogActions><Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={!codeOk || !f.startDate || !f.endDate || f.endDate <= f.startDate || save.isPending}>Save</Button></DialogActions>
+      </form>
+    </Dialog>
+  );
+}
+
+function IntakeDialog({ form, onClose }: { form: IntakeForm; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState(form);
+  const code = f.id ? f.code : f.name.toUpperCase().replace(/[^A-Z]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 20);
+  const save = useMutation({
+    mutationFn: () => api<Intake>(f.id ? `/api/academic/intakes/${f.id}` : '/api/academic/intakes', { ...staff, method: f.id ? 'PUT' : 'POST', body: { ...f, code } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff', 'intakes'] }); onClose(); },
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <DialogTitle>{f.id ? `Edit ${form.name}` : 'New intake'}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField required label="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. September" />
+            <TextField select label="Studies start in" value={f.startMonth} onChange={(e) => setF({ ...f, startMonth: Number(e.target.value) })}>
+              {MONTHS.map((m, i) => <MenuItem key={m} value={i + 1}>{m}</MenuItem>)}
+            </TextField>
+            {f.id && <FormControlLabel control={<Switch checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} />}
+              label={f.active ? 'In use' : 'Not in use (new windows cannot choose it)'} />}
+          </Stack>
+          <ErrorAlert error={save.error} />
+        </DialogContent>
+        <DialogActions><Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={code.length < 2 || !f.name.trim() || save.isPending}>Save</Button></DialogActions>
+      </form>
+    </Dialog>
   );
 }
 

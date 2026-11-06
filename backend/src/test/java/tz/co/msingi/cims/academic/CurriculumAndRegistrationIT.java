@@ -68,6 +68,20 @@ class CurriculumAndRegistrationIT {
     }
 
     @Test
+    void administratorsAddAcademicYearsAndIntakesWithPlainErrors() throws Exception {
+        String year = "{\"code\":\"2091/2092\",\"startDate\":\"2091-10-01\",\"endDate\":\"2092-09-30\",\"current\":false}";
+        s.call(post("/api/academic/years"), viewer, year).andExpect(status().isForbidden());
+        s.call(post("/api/academic/years"), admin, year).andExpect(status().isCreated());
+        s.call(post("/api/academic/years"), dpa, year).andExpect(jsonPath("$.code").value("YEAR_EXISTS"));
+        s.call(post("/api/academic/years"), admin, year.replace("2091/2092", "2093/2095")).andExpect(jsonPath("$.code").value("INVALID_YEAR_CODE"));
+        String intake = "{\"code\":\"JUNE_TEST\",\"name\":\"June\",\"startMonth\":6,\"active\":true}";
+        s.call(post("/api/academic/intakes"), admin, intake).andExpect(status().isCreated());
+        s.call(post("/api/academic/intakes"), admin, intake).andExpect(jsonPath("$.code").value("INTAKE_EXISTS"));
+        JsonNode list = s.body(s.call(get("/api/academic/intakes"), officer, null).andExpect(status().isOk()));
+        assertThat(list.findValuesAsText("code")).contains("JUNE_TEST");
+    }
+
+    @Test
     void curriculaAreVersionedCheckedAndApprovedBySomeoneElse() throws Exception {
         long m1 = module(hod, "ITU 04101", 12), m2 = module(hod, "ITU 04102", 10), e1 = module(hod, "ITU 04103", 8), e2 = module(hod, "ITU 04104", 8);
         s.call(post("/api/academic/modules"), hod, moduleJson("itu 04101", 5)).andExpect(jsonPath("$.code").value("DUPLICATE_CODE"));

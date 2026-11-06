@@ -7,9 +7,10 @@ import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, formatDateTime } from '../../api/client';
-import type { AcademicYear, AdmissionWindow, WindowEvent, WindowState, WindowStats } from '../../api/types';
+import type { AcademicYear, AdmissionWindow, Intake, WindowEvent, WindowState, WindowStats } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert } from '../../components/common';
+import { StaffLink } from '../../components/StaffLink';
 import { useGepg } from '../../components/HowToPay';
 
 const staff = { realm: 'staff' as const };
@@ -51,7 +52,9 @@ const inDays = (n: number, hour = 23, minute = 59) => { const d = new Date(); d.
 export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWindow | null; onClose: () => void; onSaved: (w: AdmissionWindow) => void }) {
   const gepg = useGepg();
   const years = useQuery({ queryKey: ['staff', 'years'], queryFn: () => api<AcademicYear[]>('/api/academic/years', staff) });
-  const intakes = useQuery({ queryKey: ['staff', 'intakes'], queryFn: () => api<{ id: number; name: string }[]>('/api/academic/intakes', staff) });
+  const intakesQ = useQuery({ queryKey: ['staff', 'intakes'], queryFn: () => api<Intake[]>('/api/academic/intakes', staff) });
+  // intakes no longer in use cannot be chosen, except the one an existing window already has
+  const intakes = { data: intakesQ.data?.filter((i) => i.active || i.id === win?.intakeId) };
   const open = win?.state === 'OPEN';
   const [f, setF] = useState({
     name: win?.name ?? '', academicYearId: win?.academicYearId ?? 0, intakeId: win?.intakeId ?? 0,
@@ -75,6 +78,13 @@ export function WindowFormDialog({ win, onClose, onSaved }: { win: AdmissionWind
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{win ? `Edit ${win.name}` : 'New admission window'}</DialogTitle>
       <DialogContent>
+        {((years.data && !years.data.length) || (intakes.data && !intakes.data.length)) && (
+          <Alert severity="warning" sx={{ mb: 1 }} action={<Button color="inherit" size="small" component={StaffLink} to="/staff/calendar">Set up</Button>}>
+            {years.data && !years.data.length && intakes.data && !intakes.data.length ? 'There is no academic year or intake yet.'
+              : years.data && !years.data.length ? 'There is no academic year yet.' : 'There is no intake in use yet.'}
+            {' '}Add them under Academic calendar → Academic years and intakes, then come back to create the window.
+          </Alert>
+        )}
         <Grid container spacing={2} sx={{ mt: 0.5 }}>
           <Grid size={12}><TextField fullWidth label="Name" value={f.name} onChange={set('name')} placeholder="e.g. 2027/2028 September Intake" /></Grid>
           <Grid size={{ xs: 12, sm: 6 }}>

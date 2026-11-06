@@ -49,6 +49,13 @@ public class AcademicService {
             throw new BusinessRuleException("INVALID_DATES", "End date must be after start date");
         }
         AcademicYear y = id == null ? new AcademicYear() : years.findById(id).orElseThrow(() -> new NotFoundException("Academic year", id));
+        years.findByCode(req.code()).filter(o -> !o.getId().equals(id)).ifPresent(o -> {
+            throw new BusinessRuleException("YEAR_EXISTS", "The academic year " + req.code() + " already exists");
+        });
+        int first = Integer.parseInt(req.code().substring(0, 4));
+        if (Integer.parseInt(req.code().substring(5)) != first + 1) {
+            throw new BusinessRuleException("INVALID_YEAR_CODE", "The academic year runs over two consecutive years, e.g. " + first + "/" + (first + 1));
+        }
         if (req.current()) {
             years.clearCurrent();
         }
@@ -70,6 +77,9 @@ public class AcademicService {
     @Transactional
     public IntakeView saveIntake(Long id, IntakeRequest req) {
         Intake i = id == null ? new Intake() : intakes.findById(id).orElseThrow(() -> new NotFoundException("Intake", id));
+        intakes.findByCode(req.code()).filter(o -> !o.getId().equals(id)).ifPresent(o -> {
+            throw new BusinessRuleException("INTAKE_EXISTS", "There is already an intake with the code " + req.code() + " (" + o.getName() + ")");
+        });
         i.setCode(req.code());
         i.setName(req.name());
         i.setStartMonth(req.startMonth());
