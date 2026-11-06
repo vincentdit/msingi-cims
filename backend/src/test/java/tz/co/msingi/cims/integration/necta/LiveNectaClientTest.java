@@ -28,6 +28,9 @@ class LiveNectaClientTest {
     final ObjectMapper json = new ObjectMapper();
     final AtomicReference<String> response = new AtomicReference<>(FOUND);
     final AtomicReference<JsonNode> request = new AtomicReference<>();
+    /** Answers "not found" this many times before the real answer, as NECTA's API sometimes does. */
+    final java.util.concurrent.atomic.AtomicInteger notFoundFirst = new java.util.concurrent.atomic.AtomicInteger();
+    final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
     HttpServer server;
     String baseUrl;
 
@@ -36,7 +39,9 @@ class LiveNectaClientTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/results/individual", ex -> {
             request.set(json.readTree(ex.getRequestBody()));
-            byte[] out = response.get().getBytes(StandardCharsets.UTF_8);
+            calls.incrementAndGet();
+            String answer = notFoundFirst.getAndDecrement() > 0 ? "{\"status\":{\"code\":0,\"message\":\"Not found\"}}" : response.get();
+            byte[] out = answer.getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
             ex.sendResponseHeaders(200, out.length);
             ex.getResponseBody().write(out);
@@ -108,5 +113,29 @@ class LiveNectaClientTest {
     void theApiKeyMustBeConfigured() {
         assertThatThrownBy(() -> new LiveNectaClient(baseUrl, "/api/results/individual", " ", 2, 5))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("NECTA_API_KEY");
+    }
+
+    @Test
+    void aMomentaryNotFoundIsAskedAgainAndTheCandidateIsFound() {
+        notFoundFirst.set(2);
+        NectaClient.NectaResult r = client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow();
+        assertThat(r.firstName()).isEqualTo("Neema");
+        assertThat(calls.get()).isEqualTo(3);
+    }
+
+    @Test
+    void aCandidateFoundOnceIsNotAskedForAgain() {
+        LiveNectaClient c = client();
+        c.fetchResults(NectaClient.ExamType.CSEE, "S0101/0001", 2023).orElseThrow();
+        notFoundFirst.set(5); // NECTA would now say "not found": the account step still gets the candidate the lookup found
+        assertThat(c.fetchResults(NectaClient.ExamType.CSEE, "s0101/0001", 2023)).isPresent();
+        assertThat(calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void aCandidateNectaNeverFindsIsNotFoundAfterThreeAttempts() {
+        response.set("{\"status\":{\"code\":0,\"message\":\"Candidate not found\"}}");
+        assertThat(client().fetchResults(NectaClient.ExamType.CSEE, "S0101/0000", 2023)).isEmpty();
+        assertThat(calls.get()).isEqualTo(LiveNectaClient.ATTEMPTS);
     }
 }
