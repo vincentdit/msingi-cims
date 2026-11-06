@@ -3,6 +3,7 @@
 cims:
   otp:
     expose-in-response: true
+    expose-reset-code: true
   demo:
     seed: true
   platform:

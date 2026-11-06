@@ -90,7 +90,8 @@ cims:
     length: 6
     ttl: 10m
     max-attempts: 5
-    expose-in-response: false     # NEVER true in production
+    # shows sign-up codes on screen; for testing a pilot server before an SMS provider is chosen (refused when SMS is live)
+    expose-in-response: ${CIMS_OTP_SHOW_ON_SCREEN:false}
   gepg:
     mode: ${CIMS_GEPG_MODE:simulated}
     callback-secret: ${CIMS_GEPG_CALLBACK_SECRET:change-me}

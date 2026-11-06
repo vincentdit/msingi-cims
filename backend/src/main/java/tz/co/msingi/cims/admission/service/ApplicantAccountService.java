@@ -177,6 +177,9 @@ public class ApplicantAccountService {
 
     static final int MAX_WRONG_PASSWORDS = 5;
 
+    @org.springframework.beans.factory.annotation.Value("${cims.otp.expose-reset-code:false}")
+    private boolean exposeResetCode;
+
     /**
      * Corrects the phone number or email of a registration not yet confirmed, and sends a new code to them. The password chosen at
      * registration must be given; after {@value #MAX_WRONG_PASSWORDS} wrong passwords the registration can only be started again.
@@ -238,7 +241,8 @@ public class ApplicantAccountService {
                 .filter(u -> u.getUserType() == UserAccount.UserType.APPLICANT)
                 .map(u -> otp.issue(u, OtpService.PURPOSE_PASSWORD_RESET, institutionName()))
                 .orElse(null);
-        return new OtpSentResponse(PhoneNumbers.mask(phone), "If the number is registered, a reset code has been sent.", devCode(code));
+        // not shown on a test server (it would let anyone reset any applicant's password); only local development and the tests
+        return new OtpSentResponse(PhoneNumbers.mask(phone), "If the number is registered, a reset code has been sent.", exposeResetCode ? code : null);
     }
 
     @Transactional(noRollbackFor = BusinessRuleException.class)

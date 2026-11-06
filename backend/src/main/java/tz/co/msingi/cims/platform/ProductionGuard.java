@@ -46,6 +46,9 @@ public class ProductionGuard {
             w.add("payment simulation is ON (CIMS_ALLOW_PAYMENT_SIMULATION=true): staff and applicants can mark fees as paid "
                     + "without money. Switch it off before real payments.");
         }
+        if (env.getProperty("cims.otp.expose-in-response", Boolean.class, false) && smsSimulated(env)) {
+            w.add("sign-up codes are shown on screen (CIMS_OTP_SHOW_ON_SCREEN=true): for testing only. Set it to false before real applicants register.");
+        }
         for (String[] m : new String[][]{{"cims.gepg.mode", "GePG"}, {"cims.collection.mode", "the institutions' own collection accounts"},
                 {"cims.sms.mode", "SMS"}, {"cims.email.mode", "email"}}) {
             if ("simulated".equalsIgnoreCase(env.getProperty(m[0], "simulated").trim())) w.add(m[1] + " is simulated (" + m[0] + ")");
@@ -60,7 +63,9 @@ public class ProductionGuard {
                 && (blank(env.getProperty("cims.security.private-key-pem")) || blank(env.getProperty("cims.security.public-key-pem")))) {
             p.add("CIMS_JWT_PRIVATE_KEY and CIMS_JWT_PUBLIC_KEY are not set");
         }
-        if (env.getProperty("cims.otp.expose-in-response", Boolean.class, false)) p.add("cims.otp.expose-in-response must be false");
+        if (env.getProperty("cims.otp.expose-in-response", Boolean.class, false) && !smsSimulated(env)) {
+            p.add("verification codes are shown on screen (CIMS_OTP_SHOW_ON_SCREEN=true) while SMS is live: set it to false");
+        }
         if (env.getProperty("cims.demo.seed", Boolean.class, false)) p.add("cims.demo.seed must be false");
         for (String k : List.of("cims.gepg.callback-secret", "cims.collection.callback-secret", "cims.sms.callback-secret", "cims.billing.callback-secret")) {
             String v = env.getProperty(k);
@@ -69,6 +74,10 @@ public class ProductionGuard {
         String ks = env.getProperty("cims.gepg.live.keystore", "");
         if (ks.contains("dev-keys") || ks.contains("-test.")) p.add("the GePG keystore is the TEST-ONLY development key");
         return p;
+    }
+
+    private static boolean smsSimulated(Environment env) {
+        return "simulated".equalsIgnoreCase(env.getProperty("cims.sms.mode", "simulated").trim());
     }
 
     private static boolean blank(String s) {

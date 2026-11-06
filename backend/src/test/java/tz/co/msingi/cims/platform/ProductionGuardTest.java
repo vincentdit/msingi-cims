@@ -12,6 +12,7 @@ class ProductionGuardTest {
     void developmentSettingsAreRefusedAndProperOnesPass() {
         MockEnvironment dev = new MockEnvironment()
                 .withProperty("cims.otp.expose-in-response", "true")
+                .withProperty("cims.sms.mode", "live")
                 .withProperty("cims.demo.seed", "true")
                 .withProperty("cims.gepg.callback-secret", "change-me")
                 .withProperty("cims.sms.callback-secret", "test-sms-secret")
@@ -28,6 +29,15 @@ class ProductionGuardTest {
                 .withProperty("cims.sms.callback-secret", "1e2f3a4b")
                 .withProperty("cims.gepg.live.keystore", "/run/secrets/cims/gepg-sp.p12");
         assertThat(ProductionGuard.problems(prod)).isEmpty();
+    }
+
+    @Test
+    void codesOnScreenAreOnlyAllowedWhileSmsIsSimulated() {
+        MockEnvironment testing = new MockEnvironment().withProperty("cims.otp.expose-in-response", "true").withProperty("cims.sms.mode", "simulated");
+        assertThat(ProductionGuard.problems(testing)).noneMatch(p -> p.contains("CIMS_OTP_SHOW_ON_SCREEN"));
+        assertThat(ProductionGuard.warnings(testing)).anyMatch(w -> w.contains("CIMS_OTP_SHOW_ON_SCREEN"));
+        MockEnvironment live = new MockEnvironment().withProperty("cims.otp.expose-in-response", "true").withProperty("cims.sms.mode", "live");
+        assertThat(ProductionGuard.problems(live)).anyMatch(p -> p.contains("CIMS_OTP_SHOW_ON_SCREEN"));
     }
 
     @Test
