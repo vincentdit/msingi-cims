@@ -9,10 +9,11 @@ import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api, formatDateTime } from '../../api/client';
-import type { Department, IssuedPassword, Programme, RoleGrant, RoleInfo, RoleScope, StaffUser, StaffUserSummary } from '../../api/types';
+import type { Department, IssuedPassword, OrgStructure, OrgUnit, Programme, RoleGrant, RoleInfo, RoleScope, StaffUser, StaffUserSummary } from '../../api/types';
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { StaffLink } from '../../components/StaffLink';
+import { JobTitleField } from '../../components/JobTitleField';
 
 const staff = { realm: 'staff' as const };
 const STATUS: Record<StaffUser['status'], { label: string; color: 'success' | 'default' | 'error' | 'warning' }> = {
@@ -118,6 +119,13 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
   const depts = useQuery({ queryKey: ['staff', 'departments'], queryFn: () => api<Department[]>('/api/academic/departments', staff) });
   const progs = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const sponsors = useQuery({ queryKey: ['staff', 'sponsors'], queryFn: () => api<{ id: number; name: string }[]>('/api/finance/sponsors', staff) });
+  // titles already in use: on other accounts, and on the positions of the organisation structure
+  const people = useQuery({ queryKey: ['staff', 'users'], queryFn: () => api<StaffUser[]>('/api/admin/users', staff) });
+  const org = useQuery({ queryKey: ['staff', 'organisation'], queryFn: () => api<OrgStructure>('/api/organisation', staff) });
+  const usedTitles = useMemo(() => {
+    const walk = (units: OrgUnit[]): string[] => units.flatMap((u) => [...u.positions.map((p) => p.title), ...walk(u.children)]);
+    return [...(people.data ?? []).map((p) => p.jobTitle ?? '').filter(Boolean), ...walk(org.data?.roots ?? [])];
+  }, [people.data, org.data]);
   const [f, setF] = useState({
     username: user?.username ?? '', fullName: user?.fullName ?? '', jobTitle: user?.jobTitle ?? '', email: user?.email ?? '',
     phone: user?.phone ? '0' + user.phone.replace(/^255/, '') : '',
@@ -158,7 +166,9 @@ function UserDialog({ user, roles, readOnly, onClose, onIssued }: {
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>{tf('fullName', 'Full name', { required: true })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{tf('username', 'Username', { required: true, disabled: readOnly || !!user, helperText: user ? 'A username cannot be changed.' : 'Used to sign in, e.g. a.mrisho' })}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{tf('jobTitle', 'Job title')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <JobTitleField value={f.jobTitle} onChange={(v) => setF((x) => ({ ...x, jobTitle: v }))} roles={Object.keys(grants)} used={usedTitles} disabled={readOnly} />
+          </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{tf('email', 'Email')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{tf('phone', 'Mobile number', { placeholder: '0712345678' })}</Grid>
         </Grid>
