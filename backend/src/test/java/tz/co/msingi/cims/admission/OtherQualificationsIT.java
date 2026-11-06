@@ -58,7 +58,10 @@ class OtherQualificationsIT {
         s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS5123/0000/2019\",\"graduationYear\":2022}")
                 .andExpect(jsonPath("$.code").value("NTA_AWARD_NOT_FOUND"));
         s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS5123/9999/2019\",\"graduationYear\":2022}")
-                .andExpect(jsonPath("$.code").value("NTA_AWARD_NAME_MISMATCH"));
+                .andExpect(jsonPath("$.code").value("NTA_AWARD_NAME_MISMATCH"))
+                // the award holder's names (someone else's) are not shown to the applicant
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsStringIgnoringCase("SOMEONE"))))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.startsWith("The names on this NTA award do not match your names from NECTA (")));
         s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS5123/0001/2019\"}").andExpect(status().isBadRequest());
 
         // a verified NTA award counts for programmes that accept prior awards; it can be removed again

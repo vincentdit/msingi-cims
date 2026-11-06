@@ -253,8 +253,9 @@ public class ApplicantProfileService {
         boolean first = !mine.isEmpty() && mine.get(0).equals(theirs.get(0));
         boolean second = mine.size() < 2 || theirs.size() < 2 || mine.get(1).equals(theirs.get(1));
         if (!first || !second) {
-            throw new BusinessRuleException("NTA_AWARD_NAME_MISMATCH", "The names on this NTA award (" + String.join(" ", theirs)
-                    + ") do not match your names from NECTA (" + String.join(" ", mine) + "). You can only add an award that is yours.");
+            // the award holder's names are not shown: they belong to someone else
+            throw new BusinessRuleException("NTA_AWARD_NAME_MISMATCH", "The names on this NTA award do not match your names from NECTA ("
+                    + String.join(" ", mine) + "). You can only add an award that is yours.");
         }
     }
 
