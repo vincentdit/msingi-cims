@@ -59,6 +59,12 @@ function Suspended({ detail }: { detail?: string }) {
   );
 }
 
+/** Whether the Simulate payment buttons show: in development, or while the server allows test payments. */
+export function useSimulatePayments(): boolean {
+  const inst = useContext(Ctx);
+  return import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true' || !!inst?.paymentSimulation;
+}
+
 export function useInstitution(): Institution {
   const v = useContext(Ctx);
   if (!v) throw new Error('useInstitution outside InstitutionProvider');

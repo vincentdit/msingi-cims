@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs } from '../../api/client';
+import { useSimulatePayments } from '../../components/InstitutionContext';
 import type { AdmissionWindow, Application, Profile, Qualification, Statement } from '../../api/types';
 import { ErrorAlert, Loading, humanise, statusColour } from '../../components/common';
 import { DetailsStep, FeeStep, ProgrammesStep, ResultsStep, ReviewStep } from './steps';
@@ -234,10 +235,10 @@ function Outcome({ app }: { app: Application }) {
   }
 }
 
-const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
 /** BP-06: the year's fees with the control number or payment reference; the first instalment is needed for registration. */
 function FeesCard() {
+  const SHOW_DEV_TOOLS = useSimulatePayments();
   const { t } = useTranslation();
   const words = usePayWords();
   const qc = useQueryClient();

@@ -33,6 +33,8 @@ export interface Institution {
   payment?: { mode: 'GEPG' | 'COLLECTION'; channels: PaymentChannel[] };
   /** Minutes without activity before each kind of user is signed out. */
   idleMinutes?: { staff: number; student: number; applicant: number };
+  /** The server lets test payments through (CIMS_ALLOW_PAYMENT_SIMULATION): the Simulate payment buttons are shown. */
+  paymentSimulation?: boolean;
 }
 
 /** One account a private or faith-based institution is paid into. */

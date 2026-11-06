@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
+import { useSimulatePayments } from '../../components/InstitutionContext';
 import type { Application, EligibilityResult, Fee, Profile, ProgrammeEligibility, Qualification } from '../../api/types';
 import { AreaPicker } from '../../components/AreaPicker';
 import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
@@ -19,7 +20,6 @@ import { ErrorAlert, Loading } from '../../components/common';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
 import { chosenProgramme, forgetChoice } from '../portal/applyFor';
 
-const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
 function useInvalidate() {
   const qc = useQueryClient();
@@ -151,6 +151,7 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
 
 // ---------------------------------------------------------------- Fee
 export function FeeStep({ app, onNext }: { app: Application; onNext: () => void }) {
+  const SHOW_DEV_TOOLS = useSimulatePayments();
   const { t } = useTranslation();
   const words = usePayWords();
   const invalidate = useInvalidate();

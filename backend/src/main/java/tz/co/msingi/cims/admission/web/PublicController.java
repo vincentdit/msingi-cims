@@ -42,8 +42,13 @@ public class PublicController {
     public record InstitutionView(String code, String name, String shortName, String nactvetRegNo, String contactEmail,
                                   String contactPhone, Map<String, Object> branding, PhotoView campusPhoto, PhotoView logo,
                                   tz.co.msingi.cims.finance.collection.PaymentChannelService.PublicPayment payment,
-                                  tz.co.msingi.cims.platform.privacy.SecuritySettingsService.IdleMinutes idleMinutes) {
+                                  tz.co.msingi.cims.platform.privacy.SecuritySettingsService.IdleMinutes idleMinutes,
+                                  boolean paymentSimulation) {
     }
+
+    /** Testing period (CIMS_ALLOW_PAYMENT_SIMULATION): the portals show their Simulate payment buttons. */
+    @org.springframework.beans.factory.annotation.Value("${cims.payments.allow-simulation:false}")
+    private boolean paymentSimulation;
 
     @Operation(summary = "Institution name and branding for the portal")
     @GetMapping("/institution")
@@ -51,7 +56,7 @@ public class PublicController {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
         return new InstitutionView(t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactEmail(),
                 t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), photos.view(InstitutionPhoto.Kind.LOGO).orElse(null),
-                payments.forPayers(), security.idle());
+                payments.forPayers(), security.idle(), paymentSimulation);
     }
 
     @Operation(summary = "The facts the applicants' privacy notice shows: version, institution, contacts and retention of applications")

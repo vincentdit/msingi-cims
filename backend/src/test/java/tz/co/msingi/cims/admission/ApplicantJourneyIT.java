@@ -190,6 +190,11 @@ class ApplicantJourneyIT {
     }
 
     @Test
+    void thePortalIsToldWhetherTestPaymentsAreAllowed() throws Exception {
+        assertThat(body(call(get("/api/public/institution"), null, null).andExpect(status().isOk())).has("paymentSimulation")).isTrue();
+    }
+
+    @Test
     void theCodeAlsoGoesByEmailAndAMistypedPhoneOrEmailCanBeCorrected() throws Exception {
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
                 {"indexNumber":"S0101/0008","examYear":2025,"phone":"0688 000 701","email":"neema.typo@example.com","password":"Kifaru#Mto47","acceptPrivacyNotice":true}""")

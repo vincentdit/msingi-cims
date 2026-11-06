@@ -23,7 +23,7 @@ import StudentAttendanceCard from './StudentAttendanceCard';
 import StudentClearanceCard from './StudentClearanceCard';
 import StudentHostelCard from './StudentHostelCard';
 import StudentIptCard from './StudentIptCard';
-import { useInstitution } from '../../components/InstitutionContext';
+import { useInstitution, useSimulatePayments } from '../../components/InstitutionContext';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
 import StudentTransferCard from './StudentTransferCard';
 import PrivacyCard from '../../components/PrivacyCard';
@@ -33,7 +33,6 @@ import HealthCoverCard from '../../components/HealthCoverCard';
 import { PasswordField } from '../../components/PasswordFields';
 
 const student = { realm: 'student' as const };
-const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_TOOLS === 'true';
 
 // ============================================================ sign-in
 
@@ -205,6 +204,7 @@ export function ClearanceRow({ c }: { c: Clearance }) {
 // ============================================================ fees (FR-STU-02)
 
 export function StudentFees() {
+  const SHOW_DEV_TOOLS = useSimulatePayments();
   const { t } = useTranslation();
   const words = usePayWords();
   const qc = useQueryClient();
