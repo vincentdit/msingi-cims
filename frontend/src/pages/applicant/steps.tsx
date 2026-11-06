@@ -18,6 +18,7 @@ import { AreaPicker } from '../../components/AreaPicker';
 import { PrimarySchoolPicker } from '../../components/PrimarySchoolPicker';
 import { ErrorAlert, Loading } from '../../components/common';
 import { HowToPay, usePayWords } from '../../components/HowToPay';
+import { NationalityField } from '../../components/NationalityField';
 import { chosenProgramme, forgetChoice } from '../portal/applyFor';
 
 
@@ -74,7 +75,7 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
     queryFn: () => api<{ disabilities: string[]; relationships: string[] }>('/api/public/profile-options') });
   const [f, setF] = useState<Partial<Profile> | null>(null);
   // initialise once — later refetches must not overwrite what the applicant is typing
-  useEffect(() => { if (profile.data && f === null) setF(profile.data); }, [profile.data, f]);
+  useEffect(() => { if (profile.data && f === null) setF({ ...profile.data, nationality: profile.data.nationality || 'Tanzanian' }); }, [profile.data, f]);
   const save = useMutation({
     mutationFn: () => api<Profile>('/api/applicant/profile', { method: 'PUT', realm: 'applicant', body: f }),
     onSuccess: () => { invalidate(); onNext(); },
@@ -99,7 +100,7 @@ export function DetailsStep({ onNext }: { onNext: () => void }) {
             <MenuItem value="M">{t('auth.sexM')}</MenuItem>
           </TextField>
           {field('dateOfBirth', t('profile.dateOfBirth'), { type: 'date', required: true, fullWidth: true, slotProps: { inputLabel: { shrink: true } } })}
-          {field('nationality', t('profile.nationality'), { required: true, placeholder: 'Tanzanian', fullWidth: true })}
+          <NationalityField label={t('profile.nationality')} required value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })} />
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField select fullWidth label={t('profile.disability')} value={options.data?.disabilities.find((d) => d.toLowerCase() === (f.disability ?? '').toLowerCase()) ?? f.disability ?? ''}
