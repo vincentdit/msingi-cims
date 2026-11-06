@@ -103,25 +103,46 @@ public class HealthCoverController {
         return service.recheck(academicYearId);
     }
 
-    @Operation(summary = "Bill the NHIF contribution to every current student with no cover recorded for the year")
-    @PostMapping("/api/health-covers/bill")
-    @PreAuthorize(BURSARY)
-    public HealthCoverService.Result bill(@RequestParam(required = false) Long academicYearId) {
-        return service.billUncovered(academicYearId);
+    @Operation(summary = "Put every current student with no cover recorded for the year on the institution route (registered with NHIF by the institution)")
+    @PostMapping("/api/health-covers/enrol")
+    @PreAuthorize(REGISTRY)
+    public HealthCoverService.Result enrol(@RequestParam(required = false) Long academicYearId) {
+        return service.enrolUncovered(academicYearId);
     }
 
-    @Operation(summary = "Send students whose contribution is paid to NHIF for registration under the student package")
+    @Operation(summary = "Step 1: register with NHIF every student waiting (NHIF Student Registration API)")
     @PostMapping("/api/health-covers/registrations")
     @PreAuthorize(REGISTRY)
-    public HealthCoverService.Batch send(@RequestParam(required = false) Long academicYearId) {
-        return service.sendToNhif(academicYearId);
+    public HealthCoverService.Result register(@RequestParam(required = false) Long academicYearId) {
+        return service.registerWithNhif(academicYearId);
     }
 
-    @Operation(summary = "Ask NHIF how a registration batch went")
+    @Operation(summary = "Step 2: apply to NHIF for the cards of every student NHIF has registered, in one batch")
+    @PostMapping("/api/health-covers/card-applications")
+    @PreAuthorize(REGISTRY)
+    public HealthCoverService.Result apply(@RequestParam(required = false) Long academicYearId, @RequestParam(required = false) String intakeCode) {
+        return service.applyForCards(academicYearId, intakeCode);
+    }
+
+    @Operation(summary = "NHIF's intakes for the institution (for a card application)")
+    @GetMapping("/api/health-covers/nhif-intakes")
+    @PreAuthorize(REGISTRY)
+    public List<tz.co.msingi.cims.integration.nhif.NhifClient.Intake> intakes() {
+        return service.intakes();
+    }
+
+    @Operation(summary = "Ask NHIF for the control numbers of a card application")
     @PostMapping("/api/health-covers/registrations/{id}/check")
     @PreAuthorize(REGISTRY)
     public HealthCoverService.Batch check(@PathVariable Long id) {
         return service.check(id);
+    }
+
+    @Operation(summary = "Rehearsal with NHIF simulated: mark every student awaiting payment as paid and give them a card")
+    @PostMapping("/api/health-covers/simulate-nhif")
+    @PreAuthorize(REGISTRY)
+    public HealthCoverService.Result simulate(@RequestParam(required = false) Long academicYearId) {
+        return service.simulatePaymentsAndCards(academicYearId);
     }
 
     @GetMapping("/api/health-covers/registrations/{id}/items")

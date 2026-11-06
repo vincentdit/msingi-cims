@@ -2,13 +2,13 @@ package tz.co.msingi.cims.health;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tz.co.msingi.cims.common.Csv;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 import tz.co.msingi.cims.common.exception.NotFoundException;
-import tz.co.msingi.cims.finance.domain.Invoice;
 import tz.co.msingi.cims.finance.service.BillingService;
 import tz.co.msingi.cims.integration.http.ExternalSystemUnavailableException;
 import tz.co.msingi.cims.integration.nhif.NhifClient;
@@ -31,15 +31,18 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Students' health insurance with NHIF. Every student needs cover for the academic year, in one of two ways:
+ * Students' health insurance with NHIF, through NHIF's Student Registration API. Every student needs cover for the academic year,
+ * in one of two ways:
  * <ul>
  *   <li><b>Own card</b>: a student already covered (e.g. as a parent's dependant) gives the NHIF card number; CIMS checks it with
- *       NHIF (active, not expired, held by this student) and records the result.</li>
- *   <li><b>Through the institution</b>: a student without cover is billed NHIF's student contribution; once it is paid (or waived),
- *       the Registrar sends the student to NHIF with others in a batch, and NHIF's card number comes back.</li>
+ *       NHIF (active, held by this student) and records the result.</li>
+ *   <li><b>Through the institution</b>, the institution being NHIF's registration agent:
+ *       READY → the Registrar registers the students with NHIF → REGISTERED → applies for their cards in a batch → APPLIED →
+ *       NHIF gives each student a control number → AWAITING_PAYMENT → the student pays NHIF → PAID → NHIF issues the card →
+ *       ACTIVE. NHIF reports each step by calling the institution back ({@link #callback}); the Registrar can also fetch the control
+ *       numbers. A student who already had a card through the institution renews it (category 2) without registering again.</li>
  * </ul>
- * The Bursar can bill every current student still without cover at once. When the institution requires it, semester registration
- * waits until the student is covered (or the contribution is paid and registration with NHIF is under way).
+ * When the institution requires it, semester registration waits until the student is covered or has paid NHIF.
  */
 @Slf4j
 @Service
@@ -50,22 +53,31 @@ public class HealthCoverService {
     private static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH);
     /** Statuses as shown: the stored ones, EXPIRED for an active card past its date, NONE for no cover recorded. */
-    static final List<String> STATUSES = List.of("ACTIVE", "EXPIRED", "INVALID", "AWAITING_PAYMENT", "READY", "SUBMITTED", "REJECTED", "NONE");
+    static final List<String> STATUSES = List.of("ACTIVE", "EXPIRED", "INVALID", "READY", "REGISTERED", "APPLIED", "AWAITING_PAYMENT", "PAID",
+            "SUBMITTED", "REJECTED", "NONE");
+    /** Under way through the institution (counted together in the overview). */
+    static final List<String> UNDER_WAY = List.of("READY", "REGISTERED", "APPLIED", "AWAITING_PAYMENT", "PAID", "SUBMITTED");
 
     private final JdbcTemplate jdbc;
     private final NhifClient nhif;
+    private final NhifSetupService setup;
     private final IntegrationSettingsService settings;
     private final BillingService billing;
     private final SecretCipher cipher;
     private final Messaging messaging;
     private final AuditService audit;
+    private final Environment env;
 
     public record InvoiceInfo(Long id, String invoiceNo, BigDecimal amount, BigDecimal balance, String status, String controlNo) {
     }
 
+    /** NHIF's bill for the student's card: the control number to pay, the amount, and when NHIF confirmed the payment. */
+    public record NhifBill(String controlNo, String invoiceNo, BigDecimal amount, LocalDate paidOn) {
+    }
+
     public record Cover(Long id, Long studentId, String registrationNo, String studentName, String programmeCode, int yearOfStudy,
                         String academicYear, String route, String status, String cardNo, String holderName, String scheme, LocalDate validTo,
-                        String reason, OffsetDateTime checkedAt, String batchRef, InvoiceInfo invoice) {
+                        String reason, OffsetDateTime checkedAt, String batchRef, InvoiceInfo invoice, NhifBill nhifBill, Integer category) {
     }
 
     /** A student's cover for the year, with what the student can do about it. */
@@ -76,13 +88,13 @@ public class HealthCoverService {
     public record ProgrammeRow(String code, String name, long students, long active, long underWay, long problems, long none) {
     }
 
-    public record Batch(Long id, String academicYear, String batchRef, String status, int students, int registered, int rejected,
-                        String submittedByName, OffsetDateTime submittedAt, OffsetDateTime checkedAt) {
+    public record Batch(Long id, String kind, String academicYear, String batchRef, String status, int students, int registered, int rejected,
+                        String submittedByName, OffsetDateTime submittedAt, OffsetDateTime checkedAt, String intakeCode) {
     }
 
-    public record Overview(boolean enabled, boolean required, BigDecimal contribution, String institutionCode, String mode, Long academicYearId,
-                           String academicYear, long students, Map<String, Long> counts, long expiringSoon, List<ProgrammeRow> programmes,
-                           List<Batch> batches) {
+    public record Overview(boolean enabled, boolean required, BigDecimal contribution, String institutionCode, String mode, boolean setUp,
+                           Long academicYearId, String academicYear, long students, Map<String, Long> counts, long expiringSoon,
+                           List<ProgrammeRow> programmes, List<Batch> batches) {
     }
 
     public record Result(String summary, int done, List<String> problems) {
@@ -122,7 +134,7 @@ public class HealthCoverService {
 
     /**
      * Whether the student may register for a semester of the given academic year: always when the institution does not require
-     * health cover; otherwise when the cover is active, or the contribution is paid and registration with NHIF is under way.
+     * health cover; otherwise when the cover is active, or the student has paid NHIF (the card follows).
      */
     @Transactional(readOnly = true)
     public boolean coveredForRegistration(Long studentId, Long academicYearId) {
@@ -131,13 +143,14 @@ public class HealthCoverService {
         Integer n = jdbc.queryForObject("""
                 select count(*) from health_covers c left join invoices i on i.id = c.invoice_id
                 where c.student_id = ? and c.academic_year_id = ?
-                  and (c.status in ('READY', 'SUBMITTED') or (c.status = 'ACTIVE' and (c.valid_to is null or c.valid_to >= ?))
-                       or (c.status = 'AWAITING_PAYMENT' and i.status in ('PAID', 'CREDITED')))""", Integer.class, studentId, academicYearId, today());
+                  and (c.status in ('PAID', 'SUBMITTED') or (c.status = 'ACTIVE' and (c.valid_to is null or c.valid_to >= ?))
+                       or (c.status in ('READY', 'AWAITING_PAYMENT') and i.status in ('PAID', 'CREDITED')))""",
+                Integer.class, studentId, academicYearId, today());
         return n != null && n > 0;
     }
 
     private StudentCover recordCard(Person p, String raw) {
-        String code = settings.nhifCode();
+        settings.nhifCode();
         String card = NhifClient.normalise(raw);
         if (card == null) throw new BusinessRuleException("INVALID_CARD", "Enter the NHIF card number as printed on the card (letters and digits).");
         Map<String, Object> y = year(null);
@@ -147,24 +160,22 @@ public class HealthCoverService {
         if (other != null && other > 0) {
             throw new BusinessRuleException("CARD_IN_USE", "This NHIF card is already recorded for another student. Contact the Registrar if it is yours.");
         }
-        refresh();
         Cover existing = cover(p.id(), yid);
         if (existing != null && "INSTITUTION".equals(existing.route())) {
-            if (List.of("READY", "SUBMITTED", "ACTIVE").contains(existing.status())) {
+            if (List.of("APPLIED", "AWAITING_PAYMENT", "PAID", "SUBMITTED", "ACTIVE").contains(existing.status())) {
                 throw new BusinessRuleException("REGISTRATION_UNDER_WAY", "ACTIVE".equals(existing.status())
                         ? "You are already covered through the institution (card " + existing.cardNo() + ")."
-                        : "Your NHIF contribution is paid and your registration with NHIF is under way. Ask the Registrar if you also have your own card.");
+                        : "The institution has already applied to NHIF for your card. Ask the Registrar if you also have your own card.");
             }
             if (existing.invoice() != null) billing.cancelIfUnpaid(existing.invoice().id(), "Student gave their own NHIF card instead");
         }
-        NhifClient.Card c = nhif.verifyCard(card);
+        NhifClient.CardCheck c = nhif.verifyStudentCard(setup.agent(), card);
         String status;
         String reason = null;
-        LocalDate today = LocalDate.now(ZONE);
-        if ("NOT_FOUND".equals(c.status())) {
+        if (c.error() != null) {
             status = "INVALID";
-            reason = "NHIF has no member with this card number. Check the number on the card.";
-        } else if (!"ACTIVE".equals(c.status()) || (c.validTo() != null && c.validTo().isBefore(today))) {
+            reason = "NHIF does not know this card number" + (c.error().message() == null ? "" : " (" + c.error().message() + ")") + ". Check the number on the card.";
+        } else if (!c.active()) {
             status = "INVALID";
             reason = "NHIF says the cover on this card is not active" + (c.remarks() == null ? "" : " (" + c.remarks() + ")")
                     + ". Renew it, or choose to be registered through the institution.";
@@ -174,59 +185,66 @@ public class HealthCoverService {
         } else {
             status = "ACTIVE";
         }
-        Long id = upsert(p.id(), yid, "OWN_CARD", status, card, c.fullName(), c.scheme(), c.validTo(), null, reason);
-        jdbc.update("update health_covers set checked_at = now() where id = ?", id);
+        Long id = upsert(p.id(), yid, "OWN_CARD", status, card, c.fullName(), "Student card", null, reason);
+        jdbc.update("update health_covers set checked_at = now(), verification_code = ? where id = ?", c.verificationCode(), id);
         audit.record("NHIF_CARD_CHECKED", "Student", p.id(), Map.of("card", "…" + card.substring(Math.max(0, card.length() - 4)), "status", status));
-        log.debug("NHIF card for student {} at {}: {}", p.id(), code, status);
-        return studentCover(p, y, "ACTIVE".equals(status) ? "NHIF confirmed the card: you are covered" + (c.validTo() == null ? "." : " until "
-                + DAY.format(c.validTo()) + ".") : reason);
+        return studentCover(p, y, "ACTIVE".equals(status) ? "NHIF confirmed the card: you are covered." : reason);
     }
 
     private StudentCover chooseInstitution(Person p) {
         settings.nhifCode();
         Map<String, Object> y = year(null);
         Long yid = (Long) y.get("id");
-        refresh();
         Cover existing = cover(p.id(), yid);
         if (existing != null && "INSTITUTION".equals(existing.route())) {
             if ("REJECTED".equals(existing.status())) {
-                // sent again: what was paid still counts, so only an unpaid contribution waits for payment
-                boolean paid = existing.invoice() == null || List.of("PAID", "CREDITED").contains(existing.invoice().status());
-                jdbc.update("update health_covers set status = ?, reason = null, batch_id = null, updated_at = now() where id = ?",
-                        paid ? "READY" : "AWAITING_PAYMENT", existing.id());
+                String renewal = previousInstitutionCard(p.id(), yid);
+                jdbc.update("""
+                        update health_covers set status = ?, card_no = ?, category = ?, reason = null, batch_id = null, application_batch_id = null,
+                          correlation_id = null, nhif_control_no = null, nhif_invoice_no = null, nhif_amount = null, updated_at = now() where id = ?""",
+                        renewal != null ? "REGISTERED" : "READY", renewal, renewal != null ? 2 : null, existing.id());
                 audit.record("NHIF_REGISTRATION_RETRIED", "Student", p.id(), Map.of("year", y.get("code")));
                 return studentCover(p, y, "The institution will send you to NHIF again.");
             }
             return studentCover(p, y, null);
         }
-        if (existing != null && "OWN_CARD".equals(existing.route()) && covered(existing)) {
+        if (existing != null && "OWN_CARD".equals(existing.route()) && "ACTIVE".equals(existing.status())) {
             throw new BusinessRuleException("ALREADY_COVERED", "You are already covered by NHIF card " + existing.cardNo() + ".");
         }
-        BigDecimal amount = settings.get().nhifContribution();
-        Long id = upsert(p.id(), yid, "INSTITUTION", amount.signum() > 0 ? "AWAITING_PAYMENT" : "READY", null, null, null, null, null, null);
-        if (amount.signum() > 0) bill(p, id, yid, (String) y.get("code"), amount);
-        audit.record("NHIF_INSTITUTION_CHOSEN", "Student", p.id(), Map.of("year", y.get("code"), "amount", amount));
-        return studentCover(p, y, amount.signum() > 0
-                ? "Pay the NHIF contribution with the GePG control number shown. The institution then registers you with NHIF."
-                : "The institution will register you with NHIF.");
+        enrol(p.id(), yid);
+        audit.record("NHIF_INSTITUTION_CHOSEN", "Student", p.id(), Map.of("year", y.get("code")));
+        return studentCover(p, y, "The institution will register you with NHIF and apply for your card. NHIF then sends you a control number to "
+                + "pay the student contribution" + amountText() + ".");
     }
 
-    private void bill(Person p, Long coverId, Long yid, String yearCode, BigDecimal amount) {
-        String what = "NHIF student health insurance, " + yearCode;
-        Invoice inv = billing.createInvoice(new BillingService.NewInvoice(Invoice.PayerType.STUDENT, p.id(), p.name(), p.phone(), p.email(), PURPOSE,
-                coverId, what, List.of(new BillingService.NewInvoice.Line("NHIF", what, amount)), yid, null));
-        jdbc.update("update health_covers set invoice_id = ? where id = ?", inv.getId(), coverId);
-        billing.ensureControlNumber(inv.getId());
+    /** Puts a student on the institution route: renewing a card the institution got them before, or registering them with NHIF. */
+    private Long enrol(Long studentId, Long yid) {
+        String renewal = previousInstitutionCard(studentId, yid);
+        Long id = upsert(studentId, yid, "INSTITUTION", renewal != null ? "REGISTERED" : "READY", renewal, null, null, null, null);
+        jdbc.update("update health_covers set category = ? where id = ?", renewal != null ? 2 : null, id);
+        return id;
+    }
+
+    /** The student card NHIF issued through the institution in an earlier year, renewed with a category 2 application. */
+    private String previousInstitutionCard(Long studentId, Long yid) {
+        return jdbc.queryForList("""
+                select c.card_no from health_covers c join academic_years y on y.id = c.academic_year_id
+                where c.student_id = ? and c.academic_year_id <> ? and c.route = 'INSTITUTION' and c.status = 'ACTIVE' and c.card_no is not null
+                order by y.start_date desc limit 1""", String.class, studentId, yid).stream().findFirst().orElse(null);
+    }
+
+    private String amountText() {
+        BigDecimal a = settings.get().nhifContribution();
+        return a == null || a.signum() <= 0 ? "" : " (about TZS " + String.format("%,.0f", a) + ")";
     }
 
     // ------------------------------------------------------------------ the office
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Overview overview(Long academicYearId) {
         var s = settings.get();
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
-        refresh();
         Map<String, Long> counts = new LinkedHashMap<>();
         STATUSES.forEach(k -> counts.put(k, 0L));
         long students = 0;
@@ -246,12 +264,10 @@ public class HealthCoverService {
             names.put(code, (String) r.get("name"));
             long[] a = byProgramme.computeIfAbsent(code, k -> new long[5]);
             a[0] += n;
-            switch (st) {
-                case "ACTIVE" -> a[1] += n;
-                case "AWAITING_PAYMENT", "READY", "SUBMITTED" -> a[2] += n;
-                case "NONE" -> a[4] += n;
-                default -> a[3] += n;
-            }
+            if ("ACTIVE".equals(st)) a[1] += n;
+            else if (UNDER_WAY.contains(st)) a[2] += n;
+            else if ("NONE".equals(st)) a[4] += n;
+            else a[3] += n;
         }
         List<ProgrammeRow> rows = byProgramme.entrySet().stream()
                 .map(e -> new ProgrammeRow(e.getKey(), names.get(e.getKey()), e.getValue()[0], e.getValue()[1], e.getValue()[2], e.getValue()[3], e.getValue()[4]))
@@ -262,16 +278,16 @@ public class HealthCoverService {
                 Long.class, yid, LocalDate.now(ZONE), LocalDate.now(ZONE).plusDays(30));
         List<Batch> batches = jdbc.query(BATCH_SQL + " where b.academic_year_id = ? order by b.submitted_at desc, b.id desc limit 20", this::batchRow, yid);
         String code = s.nhifCode() != null ? s.nhifCode() : settings.institutionCode();
-        return new Overview(s.nhifEnabled(), s.nhifRequired(), s.nhifContribution(), code, settings.view().modes().get("NHIF"), yid,
+        var st = setup.view();
+        return new Overview(s.nhifEnabled(), s.nhifRequired(), s.nhifContribution(), code, st.mode(), st.complete() || "SIMULATED".equals(st.mode()), yid,
                 (String) y.get("code"), students, counts, soon == null ? 0 : soon, rows, batches);
     }
 
     /** Current students with their cover for the year; {@code status} as shown (NONE for no cover), at most 1,000 rows. */
-    @Transactional
+    @Transactional(readOnly = true)
     public List<Cover> list(Long academicYearId, String status, Long programmeId, String q) {
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
-        refresh();
         List<Object> args = new ArrayList<>(List.of(today(), yid));
         StringBuilder where = new StringBuilder(" where s.status in ('ADMITTED', 'ACTIVE')");
         if (status != null && !status.isBlank()) {
@@ -284,11 +300,13 @@ public class HealthCoverService {
             args.add(programmeId);
         }
         if (q != null && !q.isBlank()) {
-            where.append(" and (upper(s.registration_no) like ? or upper(concat_ws(' ', s.first_name, s.middle_name, s.surname)) like ? or c.card_no like ?)");
+            where.append(" and (upper(s.registration_no) like ? or upper(concat_ws(' ', s.first_name, s.middle_name, s.surname)) like ? or c.card_no like ?"
+                    + " or c.nhif_control_no like ?)");
             String like = "%" + q.trim().toUpperCase() + "%";
             args.add(like);
             args.add(like);
             args.add(like.replaceAll("[^A-Z0-9%]", ""));
+            args.add(like.replaceAll("[^0-9%]", ""));
         }
         return jdbc.query(COVER_SQL + where + " order by p.code, s.year_of_study, s.surname, s.first_name limit 1000", (rs, i) -> cover(rs, (String) y.get("code")),
                 args.toArray());
@@ -298,6 +316,7 @@ public class HealthCoverService {
     @Transactional
     public Result recheck(Long academicYearId) {
         settings.nhifCode();
+        NhifClient.Agent agent = setup.agent();
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
         List<Map<String, Object>> rows = jdbc.queryForList("""
@@ -305,167 +324,306 @@ public class HealthCoverService {
                 where c.academic_year_id = ? and c.route = 'OWN_CARD' and c.card_no is not null and s.status in ('ADMITTED', 'ACTIVE') order by c.id""", yid);
         int checked = 0, changed = 0;
         List<String> problems = new ArrayList<>();
-        LocalDate today = LocalDate.now(ZONE);
         for (Map<String, Object> r : rows) {
-            NhifClient.Card c;
+            NhifClient.CardCheck c;
             try {
-                c = nhif.verifyCard((String) r.get("card_no"));
+                c = nhif.verifyStudentCard(agent, (String) r.get("card_no"));
             } catch (ExternalSystemUnavailableException e) {
                 problems.add("NHIF stopped answering after " + checked + " card(s): " + e.getMessage());
                 break;
             }
             checked++;
-            boolean ok = "ACTIVE".equals(c.status()) && (c.validTo() == null || !c.validTo().isBefore(today))
-                    && (c.fullName() == null || sameSurname(c.fullName(), (String) r.get("surname")));
+            boolean ok = c.active() && (c.fullName() == null || sameSurname(c.fullName(), (String) r.get("surname")));
             String status = ok ? "ACTIVE" : "INVALID";
-            String reason = ok ? null : "NOT_FOUND".equals(c.status()) ? "NHIF has no member with this card number"
-                    : !"ACTIVE".equals(c.status()) || (c.validTo() != null && c.validTo().isBefore(today)) ? "NHIF says the cover is not active"
+            String reason = ok ? null : c.error() != null ? "NHIF does not know this card number"
+                    : !c.active() ? "NHIF says the cover is not active" + (c.remarks() == null ? "" : " (" + c.remarks() + ")")
                     : "NHIF holds this card for " + c.fullName();
             if (!status.equals(r.get("status"))) {
                 changed++;
                 if (!ok) problems.add(r.get("registration_no") + ": " + reason);
             }
             jdbc.update("""
-                    update health_covers set status = ?, holder_name = ?, scheme = ?, valid_to = ?, reason = ?, checked_at = now(), updated_at = now()
-                    where id = ?""", status, c.fullName(), c.scheme(), c.validTo(), reason, r.get("id"));
+                    update health_covers set status = ?, holder_name = coalesce(?, holder_name), verification_code = ?, reason = ?, checked_at = now(),
+                      updated_at = now() where id = ?""", status, c.fullName(), c.verificationCode(), reason, r.get("id"));
         }
         audit.record("NHIF_CARDS_RECHECKED", "HealthCover", null, Map.of("year", y.get("code"), "checked", checked, "changed", changed));
         return new Result(checked + " card(s) checked with NHIF, " + changed + " changed", checked, problems);
     }
 
-    /** Bills NHIF's contribution to every current student with no cover recorded for the year (they are registered through the institution). */
+    /** Puts every current student with no cover recorded for the year on the institution route (registered by the institution). */
     @Transactional
-    public Result billUncovered(Long academicYearId) {
+    public Result enrolUncovered(Long academicYearId) {
         settings.nhifCode();
-        BigDecimal amount = settings.get().nhifContribution();
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
-        List<Person> people = jdbc.query(PERSON_SQL + " where s.status in ('ADMITTED', 'ACTIVE')"
-                + " and not exists (select 1 from health_covers c where c.student_id = s.id and c.academic_year_id = ?) order by s.registration_no",
-                (rs, i) -> person(rs), yid);
-        for (Person p : people) {
-            Long id = upsert(p.id(), yid, "INSTITUTION", amount.signum() > 0 ? "AWAITING_PAYMENT" : "READY", null, null, null, null, null, null);
-            if (amount.signum() > 0) bill(p, id, yid, (String) y.get("code"), amount);
-        }
-        audit.record("NHIF_CONTRIBUTIONS_BILLED", "HealthCover", null, Map.of("year", y.get("code"), "students", people.size(), "amount", amount));
-        return new Result(people.isEmpty() ? "Every current student already has cover recorded for " + y.get("code")
-                : people.size() + " student(s) billed the NHIF contribution" + (amount.signum() > 0 ? " of TZS " + String.format("%,.0f", amount) : ""),
-                people.size(), List.of());
+        List<Long> ids = jdbc.queryForList("""
+                select s.id from students s where s.status in ('ADMITTED', 'ACTIVE')
+                  and not exists (select 1 from health_covers c where c.student_id = s.id and c.academic_year_id = ?) order by s.registration_no""",
+                Long.class, yid);
+        ids.forEach(id -> enrol(id, yid));
+        audit.record("NHIF_STUDENTS_ENROLLED", "HealthCover", null, Map.of("year", y.get("code"), "students", ids.size()));
+        return new Result(ids.isEmpty() ? "Every current student already has cover recorded for " + y.get("code")
+                : ids.size() + " student(s) to be registered with NHIF through the institution", ids.size(), List.of());
     }
 
-    /** Sends every student whose contribution is paid (or waived) to NHIF in one batch, then asks NHIF how it went. */
+    /**
+     * Step 1: registers with NHIF every student waiting (READY). Students NHIF takes become REGISTERED; those it refuses are REJECTED
+     * with NHIF's reason. Students CIMS cannot send yet (no Form Four index number; neither NIDA number nor photo) are listed.
+     */
     @Transactional
-    public Batch sendToNhif(Long academicYearId) {
-        String code = settings.nhifCode();
+    public Result registerWithNhif(Long academicYearId) {
+        settings.nhifCode();
+        NhifClient.Agent agent = setup.agent();
+        int level = setup.educationLevel();
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
-        refresh();
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                select c.id as cover_id, s.registration_no, s.first_name, s.middle_name, s.surname, s.sex, s.date_of_birth, s.nin_encrypted, s.phone,
-                       s.email, p.name as programme, s.year_of_study
-                from health_covers c join students s on s.id = c.student_id join programmes p on p.id = s.programme_id
-                where c.academic_year_id = ? and c.status = 'READY' order by s.registration_no""", yid);
-        if (rows.isEmpty()) {
-            throw new BusinessRuleException("NOTHING_TO_SEND", "No student is waiting to be registered with NHIF for " + y.get("code")
-                    + ": students are sent once their contribution is paid.");
-        }
-        List<NhifClient.Student> list = new ArrayList<>();
-        Map<String, Long> coverByReg = new HashMap<>();
+        String yearCode = (String) y.get("code");
+        List<Map<String, Object>> rows = jdbc.queryForList(STUDENT_SQL + " where c.academic_year_id = ? and c.status = 'READY' order by s.registration_no", yid);
+        if (rows.isEmpty()) throw new BusinessRuleException("NOTHING_TO_SEND", "No student is waiting to be registered with NHIF for " + yearCode + ".");
+        List<NhifClient.Registration> list = new ArrayList<>();
+        List<Long> covers = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
         for (Map<String, Object> r : rows) {
-            String enc = (String) r.get("nin_encrypted");
+            String index = NhifClient.formFourIndex((String) r.get("necta_index_number"), r.get("necta_exam_year") == null ? null : ((Number) r.get("necta_exam_year")).intValue());
+            String nin = nin(r);
+            String photo = nin == null ? NhifPhoto.base64(r.get("photo") instanceof byte[] b ? b : null) : null;
+            if (index == null) {
+                problems.add(r.get("registration_no") + ": CIMS has no Form Four index number for this student (Students › edit)");
+                continue;
+            }
+            if (nin == null && photo == null) {
+                problems.add(r.get("registration_no") + ": NHIF needs the NIDA number or a passport photo (Students › edit)");
+                continue;
+            }
             java.sql.Date dob = (java.sql.Date) r.get("date_of_birth");
-            list.add(new NhifClient.Student((String) r.get("registration_no"), (String) r.get("first_name"), (String) r.get("middle_name"),
-                    (String) r.get("surname"), (String) r.get("sex"), dob == null ? null : dob.toLocalDate(), enc == null ? null : cipher.decrypt(enc),
-                    (String) r.get("phone"), (String) r.get("email"), (String) r.get("programme"), ((Number) r.get("year_of_study")).intValue()));
-            coverByReg.put(((String) r.get("registration_no")).toUpperCase(), ((Number) r.get("cover_id")).longValue());
+            list.add(new NhifClient.Registration((String) r.get("first_name"), (String) r.get("middle_name"), (String) r.get("surname"),
+                    "F".equals(r.get("sex")) ? "Female" : "Male", dob == null ? null : dob.toLocalDate(), (String) r.get("email"), localPhone((String) r.get("phone")),
+                    nin, index, (String) r.get("registration_no"), level, (String) r.get("programme"), (String) r.get("faculty"),
+                    ((Number) r.get("year_of_study")).intValue(), yearCode, intake(r), photo));
+            covers.add(((Number) r.get("cover_id")).longValue());
         }
-        NhifClient.Submission sub = nhif.registerStudents(code, (String) y.get("code"), list);
-        if (sub.batchRef() == null) throw new ExternalSystemUnavailableException("NHIF", "NHIF accepted the batch but gave no reference. Please try again.", null);
-        Long batchId = jdbc.queryForObject("""
-                insert into nhif_registration_batches (tenant_id, academic_year_id, batch_ref, students, rejected, submitted_by_name)
-                values (cims_current_tenant(), ?, ?, ?, ?, ?) returning id""", Long.class, yid, sub.batchRef(), list.size(), sub.rejected().size(), CurrentUser.name());
-        for (Long cid : coverByReg.values()) {
-            jdbc.update("update health_covers set status = 'SUBMITTED', batch_id = ?, reason = null, updated_at = now() where id = ?", batchId, cid);
+        if (list.isEmpty()) return new Result("No student could be sent to NHIF yet", 0, problems);
+        NhifClient.BulkResult res = nhif.registerStudents(agent, list);
+        Long batchId = newBatch(yid, "REGISTRATION", "REG-" + yearCode.substring(0, 4) + "-" + System.currentTimeMillis() % 1_000_000, list.size(), null);
+        java.util.Set<Integer> failed = new java.util.HashSet<>();
+        for (NhifClient.Failure f : res.failed()) {
+            int i = f.index() >= 0 && f.index() < list.size() ? f.index() : indexOf(list, f.identifier());
+            if (i < 0) continue;
+            failed.add(i);
+            reject(covers.get(i), f.reason());
+            problems.add(list.get(i).admissionNo() + ": " + f.reason());
         }
-        for (NhifClient.Rejected r : sub.rejected()) {
-            Long cid = r.registrationNo() == null ? null : coverByReg.get(r.registrationNo().toUpperCase());
-            if (cid != null) reject(cid, r.reason());
+        for (int i = 0; i < covers.size(); i++) {
+            if (failed.contains(i)) continue;
+            jdbc.update("update health_covers set status = 'REGISTERED', batch_id = ?, reason = null, updated_at = now() where id = ?", batchId, covers.get(i));
         }
-        audit.record("NHIF_REGISTRATION_SENT", "NhifRegistrationBatch", batchId, Map.of("year", y.get("code"), "students", list.size(), "ref", sub.batchRef()));
-        try {
-            return check(batchId);
-        } catch (ExternalSystemUnavailableException e) {
-            log.warn("NHIF status of {} not available yet: {}", sub.batchRef(), e.getMessage());
-            return batch(batchId);
-        }
+        finishBatch(batchId, list.size() - failed.size(), failed.size(), res.failed());
+        audit.record("NHIF_STUDENTS_REGISTERED", "NhifRegistrationBatch", batchId, Map.of("year", yearCode, "sent", list.size(), "rejected", failed.size()));
+        return new Result((list.size() - failed.size()) + " of " + list.size() + " student(s) registered with NHIF" + (failed.isEmpty() ? "" : "; "
+                + failed.size() + " not accepted"), list.size() - failed.size(), problems);
     }
 
-    /** Asks NHIF how a batch went: issued cards make the cover active, refusals are recorded with NHIF's reason. */
+    /**
+     * Step 2: applies to NHIF for the cards of every REGISTERED student, in one batch (category 1: new card by NIDA number;
+     * category 2: renewal of a card the institution got the student before). NHIF takes the whole batch or none of it; when it
+     * refuses, the students it named are REJECTED with its reason and the others stay REGISTERED, to be sent again.
+     */
+    @Transactional
+    public Result applyForCards(Long academicYearId, String intakeCode) {
+        String agentNo = settings.nhifCode();
+        NhifClient.Agent agent = setup.agent();
+        int level = setup.educationLevel();
+        Map<String, Object> y = year(academicYearId);
+        Long yid = (Long) y.get("id");
+        String yearCode = (String) y.get("code");
+        List<Map<String, Object>> rows = jdbc.queryForList(STUDENT_SQL + " where c.academic_year_id = ? and c.status = 'REGISTERED' order by s.registration_no", yid);
+        if (rows.isEmpty()) throw new BusinessRuleException("NOTHING_TO_APPLY", "No student registered with NHIF is waiting for a card application for " + yearCode + ".");
+        String batchIntake = intakeCode != null && intakeCode.matches("\\d{6}") ? intakeCode : intake(rows.get(0));
+        Long batchId = newBatch(yid, "CARD_APPLICATION", "pending", rows.size(), batchIntake);
+        String batchNo = NhifClient.batchNo(agentNo, yearCode, String.format("%05d", batchId) + "-" + settings.institutionCode().replaceAll("[^A-Za-z0-9]", ""));
+        jdbc.update("update nhif_registration_batches set batch_ref = ? where id = ?", batchNo, batchId);
+        List<NhifClient.CardApplicationItem> items = new ArrayList<>();
+        List<Long> covers = new ArrayList<>();
+        List<String> regNos = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            Long coverId = ((Number) r.get("cover_id")).longValue();
+            String card = (String) r.get("card_no");
+            String nin = nin(r);
+            int category = card != null ? 2 : 1;
+            if (category == 1 && nin == null) {
+                problems.add(r.get("registration_no") + ": NHIF needs the student's NIDA number for a new card (Students › edit)");
+                continue;
+            }
+            items.add(new NhifClient.CardApplicationItem("HC" + coverId + "-" + batchId, category == 1 ? nin : null, localPhone((String) r.get("phone")),
+                    intake(r), category == 2 ? card : null, level, ((Number) r.get("year_of_study")).intValue(), category));
+            covers.add(coverId);
+            regNos.add((String) r.get("registration_no"));
+        }
+        if (items.isEmpty()) {
+            jdbc.update("delete from nhif_registration_batches where id = ?", batchId);
+            return new Result("No card application could be sent to NHIF yet", 0, problems);
+        }
+        jdbc.update("update nhif_registration_batches set students = ? where id = ?", items.size(), batchId);
+        NhifClient.BulkResult res = nhif.applyForCards(agent, batchNo, batchIntake, "CIMS card application, " + yearCode + ", " + items.size() + " student(s)", items);
+        if (!res.fullSuccess() || res.succeeded() == 0) {
+            int named = 0;
+            for (NhifClient.Failure f : res.failed()) {
+                int i = f.index() >= 0 && f.index() < items.size() ? f.index() : -1;
+                for (int k = 0; k < items.size() && i < 0; k++) if (items.get(k).correlationId().equals(f.identifier())) i = k;
+                if (i < 0) {
+                    problems.add("NHIF: " + f.reason());
+                    continue;
+                }
+                named++;
+                reject(covers.get(i), f.reason());
+                problems.add(regNos.get(i) + ": " + f.reason());
+            }
+            finishBatch(batchId, 0, named, res.failed());
+            audit.record("NHIF_CARD_APPLICATION_REFUSED", "NhifRegistrationBatch", batchId, Map.of("batchNo", batchNo, "items", items.size()));
+            return new Result("NHIF did not take the card application (it takes all students or none): " + named + " student(s) need correcting; the others "
+                    + "stay ready to be sent again", 0, problems);
+        }
+        for (int i = 0; i < covers.size(); i++) {
+            jdbc.update("""
+                    update health_covers set status = 'APPLIED', application_batch_id = ?, correlation_id = ?, category = ?, reason = null, updated_at = now()
+                    where id = ?""", batchId, items.get(i).correlationId(), items.get(i).category(), covers.get(i));
+        }
+        finishBatch(batchId, items.size(), 0, List.of());
+        audit.record("NHIF_CARDS_APPLIED", "NhifRegistrationBatch", batchId, Map.of("batchNo", batchNo, "students", items.size()));
+        int numbered = 0;
+        try {
+            numbered = fetchControlNumbers(batchId);
+        } catch (ExternalSystemUnavailableException e) {
+            log.warn("NHIF control numbers for {} not available yet: {}", batchNo, e.getMessage());
+        }
+        return new Result("Card application " + batchNo + " sent for " + items.size() + " student(s)" + (numbered > 0 ? "; " + numbered
+                + " control number(s) received" : "; NHIF sends the control numbers shortly"), items.size(), problems);
+    }
+
+    /** Asks NHIF for the control numbers of a card application (when its callbacks have not all arrived). */
     @Transactional
     public Batch check(Long batchId) {
-        String code = settings.nhifCode();
         Batch b = batch(batchId);
-        NhifClient.Status st = nhif.registrationStatus(code, b.batchRef());
-        Map<String, Map<String, Object>> covers = new HashMap<>();
-        for (Map<String, Object> r : jdbc.queryForList("""
-                select c.id, c.status, s.registration_no, s.phone, upper(concat_ws(' ', s.first_name, s.middle_name, s.surname)) as name
-                from health_covers c join students s on s.id = c.student_id where c.batch_id = ?""", batchId)) {
-            covers.put(((String) r.get("registration_no")).toUpperCase(), r);
+        if ("CARD_APPLICATION".equals(b.kind())) fetchControlNumbers(batchId);
+        jdbc.update("update nhif_registration_batches set checked_at = now() where id = ?", batchId);
+        return batch(batchId);
+    }
+
+    private int fetchControlNumbers(Long batchId) {
+        Batch b = batch(batchId);
+        int n = 0;
+        for (NhifClient.ControlNumber cn : nhif.controlNumbers(setup.agent(), b.batchRef())) {
+            if (cn.controlNo() == null) continue;
+            List<Long> ids = jdbc.queryForList("select id from health_covers where correlation_id = ? and application_batch_id = ?", Long.class,
+                    cn.correlationId(), batchId);
+            if (ids.isEmpty()) continue;
+            if (controlNumber(ids.get(0), cn.controlNo(), cn.invoiceNo(), cn.amount())) n++;
         }
-        for (NhifClient.Item i : st.items()) {
-            Map<String, Object> c = i.registrationNo() == null ? null : covers.get(i.registrationNo().toUpperCase());
-            if (c == null || !"SUBMITTED".equals(c.get("status"))) continue;   // unknown, or already decided
-            Long cid = ((Number) c.get("id")).longValue();
-            if ("REGISTERED".equals(i.status()) && i.cardNo() != null) {
-                jdbc.update("""
-                        update health_covers set status = 'ACTIVE', card_no = ?, valid_to = ?, holder_name = ?, scheme = 'Student package', reason = null,
-                          checked_at = now(), updated_at = now() where id = ?""", NhifClient.normalise(i.cardNo()), i.validTo(), c.get("name"), cid);
-                messaging.event("NHIF_CARD_ISSUED", (String) c.get("phone"), Map.of("cardNo", i.cardNo(),
-                        "validTo", i.validTo() == null ? "the end of the year" : DAY.format(i.validTo())));
-            } else if ("REJECTED".equals(i.status())) {
-                reject(cid, i.reason());
-                messaging.event("NHIF_REGISTRATION_REJECTED", (String) c.get("phone"), Map.of("reason", i.reason() == null ? "no reason given" : i.reason()));
-            }
-        }
+        return n;
+    }
+
+    /** NHIF's control number for a cover; the student is told by SMS. False when the cover already had it (or is further on). */
+    boolean controlNumber(Long coverId, String controlNo, String invoiceNo, BigDecimal amount) {
+        int changed = jdbc.update("""
+                update health_covers set status = 'AWAITING_PAYMENT', nhif_control_no = ?, nhif_invoice_no = coalesce(?, nhif_invoice_no), nhif_amount = ?,
+                  checked_at = now(), updated_at = now() where id = ? and status in ('APPLIED', 'REGISTERED')""", controlNo, invoiceNo, amount, coverId);
+        if (changed == 0) return false;
+        String phone = jdbc.queryForObject("select s.phone from health_covers c join students s on s.id = c.student_id where c.id = ?", String.class, coverId);
+        messaging.event("NHIF_CONTROL_NUMBER", phone, Map.of("controlNo", controlNo, "amount", amount == null ? "the student contribution" : String.format("%,.0f", amount)));
+        return true;
+    }
+
+    /** NHIF confirms the student paid. */
+    boolean paid(Long coverId, String controlNo, LocalDate on) {
+        int changed = jdbc.update("""
+                update health_covers set status = 'PAID', nhif_paid_on = ?, checked_at = now(), updated_at = now()
+                where id = ? and status in ('AWAITING_PAYMENT', 'APPLIED')""", on == null ? today() : on, coverId);
+        if (changed == 0) return false;
+        String phone = jdbc.queryForObject("select s.phone from health_covers c join students s on s.id = c.student_id where c.id = ?", String.class, coverId);
+        messaging.event("NHIF_PAYMENT_CONFIRMED", phone, Map.of("controlNo", controlNo == null ? "" : controlNo));
+        return true;
+    }
+
+    /** NHIF issued the card: the cover is active until the end of the academic year. */
+    boolean cardIssued(Long coverId, String cardNo) {
+        Map<String, Object> c = jdbc.queryForMap("""
+                select c.status, s.phone, upper(concat_ws(' ', s.first_name, s.middle_name, s.surname)) as name, y.end_date
+                from health_covers c join students s on s.id = c.student_id join academic_years y on y.id = c.academic_year_id where c.id = ?""", coverId);
+        if ("ACTIVE".equals(c.get("status"))) return false;
+        LocalDate validTo = ((java.sql.Date) c.get("end_date")).toLocalDate();
         jdbc.update("""
-                update nhif_registration_batches b set
-                  registered = (select count(*) from health_covers c where c.batch_id = b.id and c.status = 'ACTIVE'),
-                  rejected = (select count(*) from health_covers c where c.batch_id = b.id and c.status = 'REJECTED'),
-                  status = case when not exists (select 1 from health_covers c where c.batch_id = b.id and c.status = 'SUBMITTED') then 'COMPLETED' else 'SUBMITTED' end,
-                  checked_at = now()
-                where b.id = ?""", batchId);
-        Batch after = batch(batchId);
-        audit.record("NHIF_REGISTRATION_CHECKED", "NhifRegistrationBatch", batchId, Map.of("registered", after.registered(), "rejected", after.rejected()));
-        return after;
+                update health_covers set status = 'ACTIVE', card_no = ?, valid_to = ?, holder_name = ?, scheme = 'Student package', reason = null,
+                  checked_at = now(), updated_at = now() where id = ?""", NhifClient.normalise(cardNo) != null ? NhifClient.normalise(cardNo) : cardNo,
+                validTo, c.get("name"), coverId);
+        messaging.event("NHIF_CARD_ISSUED", (String) c.get("phone"), Map.of("cardNo", cardNo, "validTo", DAY.format(validTo)));
+        return true;
+    }
+
+    void rejected(Long coverId, String reason) {
+        reject(coverId, reason);
+        String phone = jdbc.queryForObject("select s.phone from health_covers c join students s on s.id = c.student_id where c.id = ?", String.class, coverId);
+        messaging.event("NHIF_REGISTRATION_REJECTED", phone, Map.of("reason", reason == null ? "no reason given" : reason));
+    }
+
+    /**
+     * Rehearsal only (NHIF simulated): what NHIF's payment and card callbacks would do for every student awaiting payment, as if each
+     * had paid NHIF, so the whole flow can be tried before the institution has NHIF credentials.
+     */
+    @Transactional
+    public Result simulatePaymentsAndCards(Long academicYearId) {
+        if ("live".equalsIgnoreCase(env.getProperty("cims.nhif.mode", "simulated"))) {
+            throw new BusinessRuleException("NHIF_LIVE", "NHIF is live: payments and cards come from NHIF itself.");
+        }
+        Long yid = (Long) year(academicYearId).get("id");
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                select c.id, c.nhif_control_no from health_covers c where c.academic_year_id = ? and c.status in ('AWAITING_PAYMENT', 'PAID') order by c.id""", yid);
+        int n = 0;
+        for (Map<String, Object> r : rows) {
+            Long id = ((Number) r.get("id")).longValue();
+            paid(id, (String) r.get("nhif_control_no"), today());
+            cardIssued(id, String.format("SN%09d", Math.floorMod(("card" + id).hashCode(), 1_000_000_000)));
+            n++;
+        }
+        audit.record("NHIF_SIMULATED_PAYMENTS", "HealthCover", null, Map.of("students", n));
+        return new Result(n == 0 ? "No student is waiting to pay NHIF" : n + " student(s) marked paid and given a card (simulated)", n, List.of());
     }
 
     @Transactional(readOnly = true)
     public List<Cover> batchItems(Long batchId) {
         Batch b = batch(batchId);
         Long yid = jdbc.queryForObject("select academic_year_id from nhif_registration_batches where id = ?", Long.class, batchId);
-        return jdbc.query(COVER_SQL + " where c.batch_id = ? order by s.registration_no", (rs, i) -> cover(rs, b.academicYear()), today(), yid, batchId);
+        String col = "CARD_APPLICATION".equals(b.kind()) ? "c.application_batch_id" : "c.batch_id";
+        return jdbc.query(COVER_SQL + " where " + col + " = ? order by s.registration_no", (rs, i) -> cover(rs, b.academicYear()), today(), yid, batchId);
     }
 
-    /** Students waiting to be registered (contribution paid) and those sent, in a template for NHIF's portal when the API is not used. */
+    /** NHIF's intakes for the institution (to choose the intake of a card application). */
+    @Transactional(readOnly = true)
+    public List<NhifClient.Intake> intakes() {
+        settings.nhifCode();
+        return nhif.intakes(setup.agent());
+    }
+
+    /**
+     * Students waiting to be registered and those under way, in the columns of NHIF's CreateStudentDto, for NHIF's portal when the
+     * API is not used.
+     */
     @Transactional
     public String registrationFile(Long academicYearId) {
         Map<String, Object> y = year(academicYearId);
         Long yid = (Long) y.get("id");
-        refresh();
-        String code = settings.get().nhifCode() != null ? settings.get().nhifCode() : settings.institutionCode();
-        StringBuilder sb = new StringBuilder(Csv.line("S/N", "Institution code", "Academic year", "Registration no.", "Surname", "First name", "Middle name",
-                "Sex", "Date of birth", "NIN", "Phone", "Email", "Programme", "Year of study", "Contribution receipt", "Status"));
+        int level = setup.educationLevel();
+        StringBuilder sb = new StringBuilder(Csv.line("FirstName", "MiddleName", "Surname", "Gender", "DateOfBirth", "Email", "MobileNo", "NationalId",
+                "FormFourIndexNo", "AdmissionNo", "EducationLevelID", "ProgrammeOfStudy", "CollageFaculty", "YearOfStudy", "AcademicYear", "IntakeCode",
+                "CardNo", "ControlNo", "Status"));
         int n = 0;
-        for (Map<String, Object> r : jdbc.queryForList("""
-                select s.registration_no, s.surname, s.first_name, s.middle_name, s.sex, s.date_of_birth, s.nin_encrypted, s.phone, s.email,
-                       p.name as programme, s.year_of_study, i.invoice_no, c.status
-                from health_covers c join students s on s.id = c.student_id join programmes p on p.id = s.programme_id
-                left join invoices i on i.id = c.invoice_id
-                where c.academic_year_id = ? and c.status in ('READY', 'SUBMITTED') order by s.registration_no""", yid)) {
-            String enc = (String) r.get("nin_encrypted");
-            sb.append(Csv.line(++n, code, y.get("code"), r.get("registration_no"), r.get("surname"), r.get("first_name"), r.get("middle_name"), r.get("sex"),
-                    r.get("date_of_birth"), enc == null ? "" : cipher.decrypt(enc), r.get("phone"), r.get("email"), r.get("programme"), r.get("year_of_study"),
-                    r.get("invoice_no"), r.get("status")));
+        for (Map<String, Object> r : jdbc.queryForList(STUDENT_SQL + " where c.academic_year_id = ? and c.status in ('READY', 'REGISTERED', 'APPLIED', "
+                + "'AWAITING_PAYMENT', 'PAID', 'SUBMITTED') order by s.registration_no", yid)) {
+            n++;
+            sb.append(Csv.line(r.get("first_name"), r.get("middle_name"), r.get("surname"), "F".equals(r.get("sex")) ? "Female" : "Male", r.get("date_of_birth"),
+                    r.get("email"), localPhone((String) r.get("phone")), nin(r), NhifClient.formFourIndex((String) r.get("necta_index_number"),
+                            r.get("necta_exam_year") == null ? null : ((Number) r.get("necta_exam_year")).intValue()), r.get("registration_no"), level,
+                    r.get("programme"), r.get("faculty"), r.get("year_of_study"), y.get("code"), intake(r), r.get("card_no"), r.get("nhif_control_no"), r.get("status")));
         }
         audit.record("NHIF_FILE_DOWNLOADED", "HealthCover", null, Map.of("year", y.get("code"), "students", n));
         return sb.toString();
@@ -482,15 +640,30 @@ public class HealthCoverService {
     private static final String COVER_SQL = """
             select c.id, s.id as student_id, s.registration_no, concat_ws(' ', s.first_name, s.middle_name, s.surname) as name, p.code, s.year_of_study,
                    c.route,\s""" + SHOWN + """
-             as shown, c.card_no, c.holder_name, c.scheme, c.valid_to, c.reason, c.checked_at, b.batch_ref,
-                   i.id as invoice_id, i.invoice_no, i.total_amount, i.total_amount - i.paid_amount as balance, i.status as invoice_status
+             as shown, c.card_no, c.holder_name, c.scheme, c.valid_to, c.reason, c.checked_at, coalesce(ab.batch_ref, b.batch_ref) as batch_ref,
+                   i.id as invoice_id, i.invoice_no, i.total_amount, i.total_amount - i.paid_amount as balance, i.status as invoice_status,
+                   c.nhif_control_no, c.nhif_invoice_no, c.nhif_amount, c.nhif_paid_on, c.category
             from students s join programmes p on p.id = s.programme_id
             left join health_covers c on c.student_id = s.id and c.academic_year_id = ?
             left join nhif_registration_batches b on b.id = c.batch_id
+            left join nhif_registration_batches ab on ab.id = c.application_batch_id
             left join invoices i on i.id = c.invoice_id""";
 
+    /** A cover with what NHIF needs about the student (Form Four index from the application, faculty, intake, photo). */
+    private static final String STUDENT_SQL = """
+            select c.id as cover_id, c.status, c.card_no, c.nhif_control_no, s.registration_no, s.first_name, s.middle_name, s.surname, s.sex,
+                   s.date_of_birth, s.nin_encrypted, s.phone, s.email, s.year_of_study, p.name as programme,
+                   coalesce(f.name, d.name) as faculty, a.necta_index_number, a.necta_exam_year, ey.start_date as entry_start, i.start_month,
+                   ph.data as photo
+            from health_covers c join students s on s.id = c.student_id join programmes p on p.id = s.programme_id
+            left join departments d on d.id = p.department_id left join faculties f on f.id = d.faculty_id
+            left join applicants a on a.id = s.applicant_id
+            join academic_years ey on ey.id = s.entry_academic_year_id join intakes i on i.id = s.intake_id
+            left join student_photos ph on ph.student_id = s.id""";
+
     private static final String BATCH_SQL = """
-            select b.id, y.code, b.batch_ref, b.status, b.students, b.registered, b.rejected, b.submitted_by_name, b.submitted_at, b.checked_at
+            select b.id, b.kind, y.code, b.batch_ref, b.status, b.students, b.registered, b.rejected, b.submitted_by_name, b.submitted_at, b.checked_at,
+                   b.intake_code
             from nhif_registration_batches b join academic_years y on y.id = b.academic_year_id""";
 
     private static final String PERSON_SQL = """
@@ -499,31 +672,65 @@ public class HealthCoverService {
     private record Person(Long id, String registrationNo, String name, String surname, String phone, String email) {
     }
 
-    /** Contributions paid, or written off by a waiver, make the student ready to be sent to NHIF. */
-    private void refresh() {
-        jdbc.update("""
-                update health_covers c set status = 'READY', updated_at = now() from invoices i
-                where c.invoice_id = i.id and c.status = 'AWAITING_PAYMENT' and i.status in ('PAID', 'CREDITED')""");
+    private Long newBatch(Long yid, String kind, String ref, int students, String intake) {
+        return jdbc.queryForObject("""
+                insert into nhif_registration_batches (tenant_id, academic_year_id, kind, batch_ref, students, intake_code, submitted_by_name)
+                values (cims_current_tenant(), ?, ?, ?, ?, ?, ?) returning id""", Long.class, yid, kind, ref, students, intake, CurrentUser.name());
     }
 
-    private static boolean covered(Cover c) {
-        return c != null && List.of("ACTIVE", "READY", "SUBMITTED").contains(c.status());
+    private void finishBatch(Long batchId, int registered, int rejected, List<NhifClient.Failure> failures) {
+        String text = failures.isEmpty() ? null : String.join("\n", failures.stream()
+                .map(f -> (f.identifier() == null ? "#" + f.index() : f.identifier()) + ": " + f.reason()).toList());
+        jdbc.update("update nhif_registration_batches set registered = ?, rejected = ?, status = 'COMPLETED', failures = ?, checked_at = now() where id = ?",
+                registered, rejected, text, batchId);
+    }
+
+    private String nin(Map<String, Object> r) {
+        String enc = (String) r.get("nin_encrypted");
+        if (enc == null) return null;
+        String n = cipher.decrypt(enc).replaceAll("\\D", "");
+        return n.length() == 20 ? n : null;
+    }
+
+    /** The intake the student joined in, as NHIF's YYYYMM (the entry year, and the month the intake starts). */
+    private static String intake(Map<String, Object> r) {
+        LocalDate start = ((java.sql.Date) r.get("entry_start")).toLocalDate();
+        int month = r.get("start_month") == null ? start.getMonthValue() : ((Number) r.get("start_month")).intValue();
+        int year = month < start.getMonthValue() ? start.getYear() + 1 : start.getYear();
+        return NhifClient.intakeCode(year, month);
+    }
+
+    /** 255712345678 → 0712345678, as NHIF writes mobile numbers. */
+    static String localPhone(String phone) {
+        if (phone == null) return null;
+        String d = phone.replaceAll("\\D", "");
+        if (d.startsWith("255") && d.length() == 12) return "0" + d.substring(3);
+        return d.length() == 9 ? "0" + d : d;
+    }
+
+    private static int indexOf(List<NhifClient.Registration> list, String identifier) {
+        if (identifier == null) return -1;
+        for (int i = 0; i < list.size(); i++) {
+            var r = list.get(i);
+            if (identifier.equalsIgnoreCase(r.formFourIndexNo()) || identifier.equalsIgnoreCase(r.admissionNo())) return i;
+        }
+        return -1;
     }
 
     private StudentCover studentCover(Person p, Map<String, Object> y, String message) {
         var s = settings.get();
         Map<String, Object> year = y != null ? y : year(null);
-        refresh();
         Cover c = cover(p.id(), (Long) year.get("id"));
         if (c != null && c.invoice() != null && !"PAID".equals(c.invoice().status()) && c.invoice().balance().signum() > 0) {
             var cn = billing.currentControlNumber(c.invoice().id());
             InvoiceInfo inv = c.invoice();
             c = new Cover(c.id(), c.studentId(), c.registrationNo(), c.studentName(), c.programmeCode(), c.yearOfStudy(), c.academicYear(), c.route(),
                     c.status(), c.cardNo(), c.holderName(), c.scheme(), c.validTo(), c.reason(), c.checkedAt(), c.batchRef(),
-                    new InvoiceInfo(inv.id(), inv.invoiceNo(), inv.amount(), inv.balance(), inv.status(), cn == null ? null : cn.getControlNo()));
+                    new InvoiceInfo(inv.id(), inv.invoiceNo(), inv.amount(), inv.balance(), inv.status(), cn == null ? null : cn.getControlNo()), c.nhifBill(),
+                    c.category());
         }
         return new StudentCover(p.id(), s.nhifEnabled(), s.nhifRequired(), s.nhifContribution(), (Long) year.get("id"), (String) year.get("code"), c,
-                covered(c), message);
+                c != null && List.of("ACTIVE", "PAID", "SUBMITTED").contains(c.status()), message);
     }
 
     private Cover cover(Long studentId, Long yearId) {
@@ -536,21 +743,23 @@ public class HealthCoverService {
         Long id = rs.getObject("id") == null ? null : rs.getLong("id");
         InvoiceInfo inv = rs.getObject("invoice_id") == null ? null : new InvoiceInfo(rs.getLong("invoice_id"), rs.getString("invoice_no"),
                 rs.getBigDecimal("total_amount"), rs.getBigDecimal("balance"), rs.getString("invoice_status"), null);
+        NhifBill bill = rs.getString("nhif_control_no") == null ? null : new NhifBill(rs.getString("nhif_control_no"), rs.getString("nhif_invoice_no"),
+                rs.getBigDecimal("nhif_amount"), rs.getObject("nhif_paid_on", LocalDate.class));
         return new Cover(id, rs.getLong("student_id"), rs.getString("registration_no"), rs.getString("name"), rs.getString("code"), rs.getInt("year_of_study"),
                 year, rs.getString("route"), rs.getString("shown"), rs.getString("card_no"), rs.getString("holder_name"), rs.getString("scheme"),
-                rs.getObject("valid_to", LocalDate.class), rs.getString("reason"), rs.getObject("checked_at", OffsetDateTime.class), rs.getString("batch_ref"), inv);
+                rs.getObject("valid_to", LocalDate.class), rs.getString("reason"), rs.getObject("checked_at", OffsetDateTime.class), rs.getString("batch_ref"), inv,
+                bill, rs.getObject("category") == null ? null : rs.getInt("category"));
     }
 
-    private Long upsert(Long studentId, Long yid, String route, String status, String card, String holder, String scheme, LocalDate validTo,
-                        Long invoiceId, String reason) {
+    private Long upsert(Long studentId, Long yid, String route, String status, String card, String holder, String scheme, LocalDate validTo, String reason) {
         return jdbc.queryForObject("""
-                insert into health_covers (tenant_id, student_id, academic_year_id, route, status, card_no, holder_name, scheme, valid_to, invoice_id, reason,
-                  recorded_by_name)
-                values (cims_current_tenant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                insert into health_covers (tenant_id, student_id, academic_year_id, route, status, card_no, holder_name, scheme, valid_to, reason, recorded_by_name)
+                values (cims_current_tenant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (student_id, academic_year_id) do update set route = excluded.route, status = excluded.status, card_no = excluded.card_no,
-                  holder_name = excluded.holder_name, scheme = excluded.scheme, valid_to = excluded.valid_to, invoice_id = excluded.invoice_id,
-                  reason = excluded.reason, batch_id = null, checked_at = null, recorded_by_name = excluded.recorded_by_name, updated_at = now()
-                returning id""", Long.class, studentId, yid, route, status, card, holder, scheme, validTo, invoiceId, reason, CurrentUser.name());
+                  holder_name = excluded.holder_name, scheme = excluded.scheme, valid_to = excluded.valid_to, invoice_id = null,
+                  reason = excluded.reason, batch_id = null, application_batch_id = null, correlation_id = null, category = null, nhif_control_no = null,
+                  nhif_invoice_no = null, nhif_amount = null, nhif_paid_on = null, checked_at = null, recorded_by_name = excluded.recorded_by_name, updated_at = now()
+                returning id""", Long.class, studentId, yid, route, status, card, holder, scheme, validTo, reason, CurrentUser.name());
     }
 
     private void reject(Long coverId, String reason) {
@@ -560,13 +769,13 @@ public class HealthCoverService {
 
     private Batch batch(Long id) {
         List<Batch> l = jdbc.query(BATCH_SQL + " where b.id = ?", this::batchRow, id);
-        if (l.isEmpty()) throw new NotFoundException("NHIF registration batch", id);
+        if (l.isEmpty()) throw new NotFoundException("NHIF batch", id);
         return l.get(0);
     }
 
     private Batch batchRow(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
-        return new Batch(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
-                rs.getObject(9, OffsetDateTime.class), rs.getObject(10, OffsetDateTime.class));
+        return new Batch(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6), rs.getInt(7), rs.getInt(8),
+                rs.getString(9), rs.getObject(10, OffsetDateTime.class), rs.getObject(11, OffsetDateTime.class), rs.getString(12));
     }
 
     /** The given academic year, or the current one. */

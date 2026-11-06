@@ -30,6 +30,6 @@ mock:
   tamisemi:
     api-key: ${MOCK_TAMISEMI_API_KEY:mock-tamisemi-key}
   nhif:
-    api-key: ${MOCK_NHIF_API_KEY:mock-nhif-key}
-    # Seconds before NHIF has decided a registration batch (PENDING until then)
-    processing-seconds: ${MOCK_NHIF_PROCESSING_SECONDS:5}
+    # The registration agent's credentials for /nhif/connect/token (SystemId 1, SubSystemId 2 are accepted)
+    client-id: ${MOCK_NHIF_CLIENT_ID:mock-agent}
+    client-secret: ${MOCK_NHIF_CLIENT_SECRET:mock-secret}

@@ -162,18 +162,32 @@ async function addSel() {
 }
 async function nhif() {
   const s = await call('GET', '/mock/nhif');
-  return `<div class="card"><h2>Add a member card</h2><div class="body bar">
+  const cb = s.callback, cr = s.credentials;
+  return `<div class="card"><h2>Agent credentials (enter in CIMS › Integrations › NHIF)</h2><div class="body muted">
+    Client id <b>${esc(cr.clientId)}</b> · secret <b>${esc(cr.clientSecret)}</b> · SystemId <b>${cr.systemId}</b> · SubSystemId <b>${cr.subSystemId}</b>.
+    Card checks by the last digit: 0 not found · 9 inactive · 8 someone else's · otherwise active. Registration: no date of birth 2070,
+    no index 2113, admission number ending in 7 refused (2111). Card application: category 1 needs a registered NIDA number; category 2 a card starting SN.</div></div>
+  <div class="card"><h2>Calling the institution back</h2><div class="body bar">
+    <input id="cbUrl" placeholder="Callback URL" size="34" value="${esc(cb.callbackUrl)}"> <input id="cbTok" placeholder="Token URL" size="34" value="${esc(cb.tokenUrl)}">
+    <input id="cbId" placeholder="Client id" size="16" value="${esc(cb.clientId)}"> <input id="cbSec" placeholder="${cb.secretSet ? 'Secret set (enter to change)' : 'Client secret'}" size="18">
+    <button onclick="setCb()">Save</button></div><div class="body muted">From CIMS › Integrations › NHIF › Callback credentials. Without them the mock records callbacks but does not send them.</div></div>
+  <div class="card"><h2>Card applications</h2>${table([
+    ['Batch', a => esc(a.batchNo)], ['Correlation', a => esc(a.correlationId)], ['Category', a => a.category], ['Control no.', a => esc(a.controlNo)],
+    ['Amount', a => a.amount], ['Status', a => `<span class="${a.status === 'ISSUED' ? 'ok' : ''}">${esc(a.status)}</span>`], ['Card', a => esc(a.issuedCard || '')],
+    ['', a => a.status === 'AWAITING_PAYMENT' ? `<button onclick="call('POST','/mock/nhif/pay?controlNo=${a.controlNo}').then(()=>{toast('Paid');load()})">Mark paid</button>`
+      : a.status === 'PAID' ? `<button onclick="call('POST','/mock/nhif/issue?controlNo=${a.controlNo}').then(()=>{toast('Card issued');load()})">Issue card</button>` : '']
+  ], s.applications, 'None yet. From CIMS: Health insurance → Register with NHIF, then Apply for cards.')}</div>
+  <div class="card"><h2>Registered students</h2>${table([
+    ['Form Four index', x => esc(x.formFourIndexNo)], ['Name', x => esc(x.fullName)], ['Admission no.', x => esc(x.admissionNo)], ['Intake', x => esc(x.intakeCode)], ['At', x => esc(x.registeredAt)]
+  ], s.students, 'None yet.')}</div>
+  <div class="card"><h2>Callbacks</h2>${table([
+    ['Kind', c => esc(c.kind)], ['Payload', c => `<code>${esc(JSON.stringify(c.payload))}</code>`], ['Result', c => esc(c.result)], ['At', c => esc(c.at)]
+  ], s.callbacks, 'None yet.')}</div>
+  <div class="card"><h2>Add a member card</h2><div class="body bar">
     <input id="nCard" placeholder="Card number" size="14"> <input id="nName" placeholder="Holder's full name" size="22">
     <select id="nStatus"><option>ACTIVE</option><option>INACTIVE</option></select>
     <button onclick="call('POST','/mock/nhif/cards?cardNo='+encodeURIComponent($('#nCard').value)+'&fullName='+encodeURIComponent($('#nName').value)+'&status='+$('#nStatus').value).then(()=>{toast('Card added');load()})">Add</button>
-    <button onclick="if(confirm('Forget all cards and batches?')) call('POST','/mock/nhif/reset').then(load)">Reset</button>
-  </div><div class="body muted">Other card numbers by the last digit: 0 not found · 9 inactive · 8 active but someone else's · otherwise active.
-    Registration: no date of birth is rejected on receipt; registration numbers ending in 7 are refused; decisions after ${s.processingSeconds}s.</div></div>
-  <div class="card"><h2>Registration batches</h2>${table([
-    ['Batch', b => esc(b.batchRef)], ['Institution', b => esc(b.institutionCode)], ['Year', b => esc(b.academicYear)], ['Received', b => b.received],
-    ['Rejected on receipt', b => b.rejected.length], ['Registered', b => b.items.filter(i => i.status === 'REGISTERED').length],
-    ['Refused', b => b.items.filter(i => i.status === 'REJECTED').length], ['At', b => esc(b.receivedAt)]
-  ], s.batches, 'None yet. Send students whose NHIF contribution is paid from CIMS (Health insurance → Send to NHIF).')}</div>
+    <button onclick="if(confirm('Forget all cards, students and applications?')) call('POST','/mock/nhif/reset').then(load)">Reset</button></div></div>
   <div class="card"><h2>Known cards</h2>${table([
     ['Card', c => esc(c.cardNo)], ['Holder', c => esc(c.fullName)], ['Status', c => `<span class="${c.status === 'ACTIVE' ? 'ok' : 'bad'}">${esc(c.status)}</span>`],
     ['Scheme', c => esc(c.scheme)], ['Valid to', c => esc(c.validTo)], ['From', c => esc(c.source)]
@@ -182,6 +196,11 @@ async function nhif() {
     ['Card', c => esc(c.card)], ['Result', c => `<span class="${c.status === 'ACTIVE' ? 'ok' : 'bad'}">${esc(c.status)}</span>`], ['At', c => esc(c.at)]
   ], s.checks, 'No checks yet.')}</div>`;
 }
+async function setCb() {
+  const q = new URLSearchParams({ callbackUrl: $('#cbUrl').value, tokenUrl: $('#cbTok').value, clientId: $('#cbId').value });
+  if ($('#cbSec').value) q.set('clientSecret', $('#cbSec').value);
+  await call('POST', '/mock/nhif/callback?' + q); toast('Saved'); load();
+}
 async function load() {
   try {
     outages();
@@ -189,7 +208,7 @@ async function load() {
     $('#main').innerHTML = html;
   } catch (e) { console.error(e); }
 }
-renderTabs(); load(); setInterval(() => { if (tab === 'GePG' || tab === 'NIDA' || tab === 'NHIF') load(); }, 4000);
+renderTabs(); load(); setInterval(() => { if (tab === 'GePG' || tab === 'NIDA') load(); }, 4000);
 </script>
 </body>
 </html>

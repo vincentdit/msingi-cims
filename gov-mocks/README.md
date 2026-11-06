@@ -10,10 +10,10 @@ developer's computer:
 | **NIDA** | FR-INT-06 | Checks a NIN against names and date of birth |
 | **MUSE** | FR-INT-07 | Receives summarised fee journals; refuses unbalanced ones and duplicates |
 | **TAMISEMI** | FR-INT-08 | Lists the students it selected to an institution |
-| **NHIF** | FR-INT-10 | Checks students' health insurance cards; registers students under the student package and issues cards |
+| **NHIF** | FR-INT-10 | Student Registration API v2: agent token, student registration, card applications with control numbers, card checks, intakes; calls CIMS back on payment and card issue |
 
-GePG follows its specification's message shapes and status codes. **The HESLB, NIDA, MUSE, TAMISEMI and NHIF paths and fields
-are placeholders** until each body issues the institution its interface document; CIMS reads every path from configuration
+GePG and NHIF follow their specifications' message shapes and error codes (NHIF: *Student Registration API Documentation*, v2).
+**The HESLB, NIDA, MUSE and TAMISEMI paths and fields are placeholders** until each body issues the institution its interface document; CIMS reads every path from configuration
 (`cims.heslb.*`, `cims.nida.*`, `cims.muse.*`, `cims.tamisemi.*`, `cims.nhif.*`), so only configuration changes then. Everything is kept in
 memory: restarting the mock forgets it.
 
@@ -44,7 +44,8 @@ Or with Docker: `docker compose --profile mocks up -d gov-mocks nactvet-mock` (f
 | `MOCK_CIMS_URL` | `http://localhost:8085` | Where CIMS runs: control numbers, payments and reconciliations are posted there |
 | `MOCK_GEPG_KEYSTORE`, `MOCK_GEPG_SP_CERTIFICATE` | `../dev-keys/…` | The mock's GePG key and CIMS's certificate (TEST-ONLY, see `dev-keys/README.md`) |
 | `MOCK_GEPG_DELAY_MS` | `1500` | How long GePG takes to send the control number and the reconciliation |
-| `MOCK_HESLB_API_KEY`, `MOCK_NIDA_API_KEY`, `MOCK_MUSE_API_KEY`, `MOCK_TAMISEMI_API_KEY`, `MOCK_NHIF_API_KEY` | `mock-…-key` | Keys CIMS must send in `X-Api-Key` (the `gov-mocks` profile sends these) |
+| `MOCK_HESLB_API_KEY`, `MOCK_NIDA_API_KEY`, `MOCK_MUSE_API_KEY`, `MOCK_TAMISEMI_API_KEY` | `mock-…-key` | Keys CIMS must send in `X-Api-Key` (the `gov-mocks` profile sends these) |
+| `MOCK_NHIF_CLIENT_ID`, `MOCK_NHIF_CLIENT_SECRET` | `mock-agent`, `mock-secret` | NHIF registration agent credentials for `/nhif/connect/token` (enter them in CIMS › Integrations › NHIF with SystemId 1, SubSystemId 2) |
 
 ## GePG
 
@@ -71,9 +72,25 @@ does not know to the next reconciliation (an exception to resolve).
 | `POST /nida/api/v1/verify` | NIN of 20 digits starting with the birth date (YYYYMMDD): ending in 9 → NOT_FOUND; other birth date → MISMATCH; otherwise VALID |
 | `POST /muse/api/v1/journals` | Debits must equal credits; credit lines need a GFS code; the same `batch_ref` again → 409 with the journal already posted |
 | `GET /tamisemi/api/v1/selections?institution_code&year` | Selections added on the dashboard (random students, or one with a chosen index number) |
-| `POST /nhif/api/v1/cards/verify` | `card_no` ending in 0 → NOT_FOUND; 9 → INACTIVE; 8 → ACTIVE but held by NEEMA JOHN KIMARO; otherwise ACTIVE to the next 30 June. Cards issued by registration or added on the dashboard answer with their holder |
-| `POST /nhif/api/v1/student-registrations` | Students without a date of birth are rejected on receipt; registration numbers ending in 7 are refused (already a member); the others get a card valid to 30 June at the end of the academic year |
-| `GET /nhif/api/v1/student-registrations/status?institution_code&batch_ref` | `PROCESSING` (items `PENDING`) for `MOCK_NHIF_PROCESSING_SECONDS` (default 5), then `COMPLETED` with each student `REGISTERED` (card number) or `REJECTED` (reason) |
+### NHIF Student Registration API (v2)
+
+Token `POST /nhif/connect/token` (form: `client_id`, `client_secret`, `grant_type=client_credentials`, `scope`); every call
+then sends `Authorization: Bearer`, `SystemId` and `SubSystemId` (required on `/student/register`, error 4001/4002 without).
+Answers are NHIF's `BulkOperationResult` (`succeeded`, `failed[index, identifier, errors[code, field, message]]`,
+`totalRequested`, `hasFailures`, `isFullSuccess`), with HTTP 400 when anything failed.
+
+| Path | Rules |
+|---|---|
+| `POST /nhif/api/v2/student/register`, `/students/register` | No date of birth → 2070; Form Four index not `S0101-0001-2023` → 2113; admission number ending in 7 → 2111 (already a member) |
+| `POST /nhif/api/v2/student/cardapplication` | All-or-nothing. Batch number not `id/startYear/endYear/serial` → 2124; category 1 without a NIDA number → 2131, or one not registered → 3020; category 2 card not starting `SN` → 2139; repeated correlation id → 3017. Otherwise each student gets a control number (995…) for TZS 50,400 |
+| `GET /nhif/api/v2/studentcontrolnobybatchno?batchNo` | The batch's control numbers |
+| `GET /nhif/api/v2/verifystudentcard?cardNo` | Card ending in 0 → failed 2137; 9 → INACTIVE; 8 → ACTIVE held by NEEMA JOHN KIMARO; otherwise ACTIVE. Cards issued here answer with the holder; a registered NIDA number answers too |
+| `GET /nhif/api/v2/agentintakes` | October and March intakes of the current academic year |
+| `POST /nhif/api/v2/student/changerequest` | Accepted; an `Approved` change-request callback follows |
+
+Callbacks: enter the institution's callback URL, token URL and callback credentials (CIMS › Integrations › NHIF › Callback
+credentials) on the dashboard. The mock then gets a token and calls CIMS back on each card application (control number),
+**Mark paid** (payment) and **Issue card** (card number), as NHIF does. Without them the callbacks are listed but not sent.
 
 The institution code is CIMS's NACTVET registration number for the institution (e.g. `REG/DEMO/001`) unless another code
 is entered under Integrations.
@@ -85,4 +102,4 @@ Developer endpoints: `GET /mock/status`, `POST /mock/outage?system=GEPG&on=true`
 
 `GovMocksTest`: GePG bill → signed control number callback → payment → reconciliation against a stand-in CIMS; forged
 signatures, unbalanced bills and XML entities refused; NIDA rules; HESLB beneficiaries and disbursement; MUSE balance and
-duplicates; TAMISEMI selections and outage; NHIF card rules, student registration and the cards it issues.
+duplicates; TAMISEMI selections and outage; NHIF token, registration, all-or-nothing card application, control numbers and the callbacks for payment and card issue.

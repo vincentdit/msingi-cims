@@ -52,6 +52,7 @@ export default function IntegrationsPage() {
     { key: 'heslb', label: 'HESLB', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT') },
     { key: 'muse', label: 'MUSE postings', show: has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
     { key: 'tamisemi', label: 'TAMISEMI selections', show: has(roles, 'INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER') },
+    { key: 'nhif', label: 'NHIF', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR') },
   ].filter((t) => t.show);
   const [tab, setTab] = useState(tabs[0].key);
   return (
@@ -65,6 +66,7 @@ export default function IntegrationsPage() {
       {tab === 'heslb' && <HeslbTab registry={has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR')} bursary={has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT')} />}
       {tab === 'muse' && <MuseTab />}
       {tab === 'tamisemi' && <TamisemiTab />}
+      {tab === 'nhif' && <NhifTab admin={has(roles, 'INSTITUTION_ADMIN')} />}
     </Container>
   );
 }
@@ -92,7 +94,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
       <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>Connections</Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {Object.entries(q.data!.modes).filter(([k]) => gepg || s.nhifEnabled || k !== 'GEPG').map(([k, v]) => (
+          {Object.entries(q.data!.modes).filter(([k]) => gepg || k !== 'GEPG').map(([k, v]) => (
             <Chip key={k} size="small" color={v === 'LIVE' ? 'success' : 'default'} variant={v === 'LIVE' ? 'filled' : 'outlined'}
               label={`${SYSTEMS[k] ?? k}: ${v === 'LIVE' ? 'live' : 'simulated'}`} />
           ))}
@@ -101,9 +103,8 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           Msingi switches each connection to live once the body has given access. You are known to NACTVET and HESLB as <b>{q.data!.institutionCode}</b> unless you enter another code.
         </Typography>
       </CardContent></Card>
-      {(gepg || s.nhifEnabled) && <Card><CardContent>
-        <Typography variant="subtitle2" gutterBottom>{gepg ? 'GePG' : 'GePG (NHIF contributions)'}</Typography>
-        {!gepg && <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Fees are paid into your own accounts, but NHIF contributions are government payments and always go through GePG with a control number.</Typography>}
+      {gepg && <Card><CardContent>
+        <Typography variant="subtitle2" gutterBottom>GePG</Typography>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSpCode', 'SP code', 'e.g. SP19921')}</Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>{text('gepgSubSpCode', 'Sub SP code', 'Collection account')}</Grid>
@@ -123,10 +124,10 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
           <Grid size={{ xs: 12, sm: 4 }}>{text('museCashAccount', 'Bank account in MUSE')}</Grid>
           <Grid size={{ xs: 12 }}>{flag('nidaEnabled', 'Check National Identification Numbers with NIDA')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{flag('nhifEnabled', 'NHIF health insurance')}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{text('nhifCode', 'Code at NHIF (optional)')}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{text('nhifCode', 'NHIF agent number', 'The first part of card application batch numbers')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="NHIF student contribution (TZS)" type="number" fullWidth disabled={!canEdit} value={s.nhifContribution ?? ''}
-              helperText={gepg ? 'Per year; 0 when the institution pays NHIF itself' : 'Per year, paid through GePG with a control number; 0 when the institution pays NHIF itself'} inputProps={{ min: 0, step: 100 }}
+              helperText="Per year, as NHIF bills it: shown to students; NHIF sends each student the control number" inputProps={{ min: 0, step: 100 }}
               onChange={(e) => setS({ ...s, nhifContribution: e.target.value === '' ? null : Number(e.target.value) })} />
           </Grid>
           <Grid size={{ xs: 12 }}>{flag('nhifRequired', 'Students need health insurance before semester registration')}</Grid>
@@ -406,6 +407,114 @@ function NactvetTab() {
           )}
         </DialogContent>
         <DialogActions><Button onClick={() => setOpen(null)}>Close</Button></DialogActions>
+      </Dialog>
+    </Stack>
+  );
+}
+
+interface NhifSetup {
+  enabled: boolean; mode: string; agentNo: string; clientId?: string; secretSet: boolean; scope?: string; systemId?: number; subSystemId?: number;
+  educationLevel: number; complete: boolean; callbackClientId?: string; callbackCreatedAt?: string; callbackUrl: string; tokenUrl: string;
+}
+interface CallbackCredentials { clientId: string; clientSecret: string; tokenUrl: string; callbackUrl: string }
+const LEVELS: Record<number, string> = { 1: 'Bachelor', 2: 'College', 3: 'Advanced Level', 4: 'Ordinary Level', 5: 'Primary Level' };
+
+/**
+ * The institution as an NHIF registration agent (Student Registration API): the credentials NHIF issued, and the credentials CIMS
+ * makes for NHIF's callbacks (control numbers, payments, cards).
+ */
+function NhifTab({ admin }: { admin: boolean }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['nhif-setup'], queryFn: () => api<NhifSetup>('/api/nhif-setup', staff) });
+  const [f, setF] = useState({ clientId: '', clientSecret: '', scope: '', systemId: '', subSystemId: '', educationLevel: 2 });
+  const [made, setMade] = useState<CallbackCredentials | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => {
+    if (q.data) setF({ clientId: q.data.clientId ?? '', clientSecret: '', scope: q.data.scope ?? '', systemId: q.data.systemId?.toString() ?? '',
+      subSystemId: q.data.subSystemId?.toString() ?? '', educationLevel: q.data.educationLevel });
+  }, [q.data]);
+  const save = useMutation({
+    mutationFn: () => api<NhifSetup>('/api/nhif-setup', { ...staff, method: 'PUT', body: {
+      clientId: f.clientId, clientSecret: f.clientSecret || null, scope: f.scope, systemId: f.systemId === '' ? null : Number(f.systemId),
+      subSystemId: f.subSystemId === '' ? null : Number(f.subSystemId), educationLevel: f.educationLevel } }),
+    onSuccess: (v) => { qc.setQueryData(['nhif-setup'], v); setF((x) => ({ ...x, clientSecret: '' })); },
+  });
+  const make = useMutation({
+    mutationFn: () => api<CallbackCredentials>('/api/nhif-setup/callback-credentials', { ...staff, method: 'POST' }),
+    onSuccess: (c) => { setMade(c); setConfirm(false); qc.invalidateQueries({ queryKey: ['nhif-setup'] }); },
+  });
+  if (q.isLoading || !q.data) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
+  const d = q.data;
+  const field = (k: 'clientId' | 'scope' | 'systemId' | 'subSystemId', label: string, help?: string, type = 'text') => (
+    <TextField label={label} value={f[k]} helperText={help} disabled={!admin} fullWidth type={type}
+      onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+  );
+  return (
+    <Stack spacing={2}>
+      {!d.enabled && (
+        <Alert severity="info">NHIF health insurance is switched off: switch it on under Settings first.</Alert>
+      )}
+      <Card><CardContent>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+          <Typography variant="subtitle2" sx={{ flex: 1 }}>Registration agent credentials (from NHIF)</Typography>
+          <Chip size="small" color={d.mode === 'LIVE' ? 'success' : 'default'} variant={d.mode === 'LIVE' ? 'filled' : 'outlined'}
+            label={d.mode === 'LIVE' ? 'NHIF live' : 'NHIF simulated'} />
+          <Chip size="small" color={d.complete ? 'success' : 'warning'} label={d.complete ? 'Complete' : 'Not complete'} />
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {`NHIF gives each institution a client id and secret for its Student Registration API, with the SystemId and SubSystemId to send. CIMS uses them to register students, apply for their cards and receive the control numbers. Card application batches start with the agent number ${d.agentNo}.`}
+          {d.mode !== 'LIVE' && ' While NHIF is simulated, everything can be tried without them.'}
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>{field('clientId', 'Client id')}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField label="Client secret" type="password" value={f.clientSecret} disabled={!admin} fullWidth autoComplete="new-password"
+              helperText={d.secretSet ? 'Saved (never shown). Leave blank to keep it.' : 'Not saved yet'} onChange={(e) => setF({ ...f, clientSecret: e.target.value })} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>{field('scope', 'Scope', 'As NHIF issued it')}</Grid>
+          <Grid size={{ xs: 6, sm: 3, md: 3 }}>{field('systemId', 'SystemId', undefined, 'number')}</Grid>
+          <Grid size={{ xs: 6, sm: 3, md: 3 }}>{field('subSystemId', 'SubSystemId', undefined, 'number')}</Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField select label="Education level at NHIF" value={f.educationLevel} disabled={!admin} fullWidth
+              onChange={(e) => setF({ ...f, educationLevel: Number(e.target.value) })}>
+              {Object.entries(LEVELS).map(([k, v]) => <MenuItem key={k} value={Number(k)}>{`${k} · ${v}`}</MenuItem>)}
+            </TextField>
+          </Grid>
+        </Grid>
+        <ErrorAlert error={save.error} />
+        {save.isSuccess && <Alert severity="success" sx={{ mt: 1 }}>Saved.</Alert>}
+        {admin && <Box sx={{ mt: 2 }}><Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>Save</Button></Box>}
+      </CardContent></Card>
+
+      <Card><CardContent>
+        <Typography variant="subtitle2" gutterBottom>Callbacks (to give NHIF)</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          NHIF tells the institution about control numbers, payments and issued cards by calling it back. Give NHIF these two addresses and the callback credentials; NHIF exchanges the credentials for a token at the token address before each callback.
+        </Typography>
+        <Table size="small" sx={{ mb: 1.5 }}><TableBody>
+          <TableRow><TableCell sx={{ width: 180 }}>Callback URL</TableCell><TableCell sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{d.callbackUrl}</TableCell></TableRow>
+          <TableRow><TableCell>Token URL</TableCell><TableCell sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{d.tokenUrl}</TableCell></TableRow>
+          <TableRow><TableCell>Client id</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{d.callbackClientId ?? '—'}</TableCell></TableRow>
+          <TableRow><TableCell>Made</TableCell><TableCell>{d.callbackCreatedAt ? formatDateTime(d.callbackCreatedAt) : 'Not yet'}</TableCell></TableRow>
+        </TableBody></Table>
+        {made && (
+          <Alert severity="warning" sx={{ mb: 1.5 }} onClose={() => setMade(null)}>
+            <Typography variant="body2" gutterBottom>Copy the secret now and give it to NHIF securely: it is not shown again.</Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{`client_id: ${made.clientId}`}</Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{`client_secret: ${made.clientSecret}`}</Typography>
+          </Alert>
+        )}
+        <ErrorAlert error={make.error} />
+        {admin && <Button variant="outlined" onClick={() => (d.callbackClientId ? setConfirm(true) : make.mutate())} disabled={make.isPending}>
+          {d.callbackClientId ? 'Make new callback credentials' : 'Make callback credentials'}</Button>}
+      </CardContent></Card>
+
+      <Dialog open={confirm} onClose={() => setConfirm(false)} maxWidth="xs" fullWidth>
+        <DialogContent><Typography>The current callback credentials stop working at once, and NHIF's callbacks fail until NHIF has the new ones. Make new ones?</Typography></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirm(false)}>Cancel</Button>
+          <Button variant="contained" color="warning" disabled={make.isPending} onClick={() => make.mutate()}>Make new credentials</Button>
+        </DialogActions>
       </Dialog>
     </Stack>
   );

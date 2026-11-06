@@ -53,6 +53,7 @@ public class SecurityConfig {
             "/api/integrations/collections/**",
             "/api/integrations/msingi-billing/**",
             "/api/integrations/sms/**",
+            "/api/integrations/nhif/**",
             "/actuator/health/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
@@ -70,12 +71,23 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(new CimsJwtConverter())))
+                .oauth2ResourceServer(rs -> rs.bearerTokenResolver(bearerTokens())
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(new CimsJwtConverter())))
                 .addFilterAfter(sessionGuard, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
                 .headers(h -> h
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"))
                         .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)));
         return http.build();
+    }
+
+    /**
+     * Bearer tokens are CIMS sign-ins, except on NHIF's callbacks: NHIF sends the token CIMS issued it for callbacks (checked by the
+     * callback endpoint itself), which must not be read as a sign-in.
+     */
+    private static org.springframework.security.oauth2.server.resource.web.BearerTokenResolver bearerTokens() {
+        var standard = new org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver();
+        return request -> request.getRequestURI().substring(request.getContextPath().length()).startsWith("/api/integrations/nhif/")
+                ? null : standard.resolve(request);
     }
 
     /** The session guard runs inside the security chain only, after the token is read. */

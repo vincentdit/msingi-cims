@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static tz.co.msingi.govmocks.gepg.GepgXml.el;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.gepg.delay-ms=50", "mock.nhif.processing-seconds=0"})
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.gepg.delay-ms=50"})
 class GovMocksTest {
 
     /** CIMS's side of the test keys: signs as CIMS, checks GePG's signatures. */
@@ -123,34 +123,104 @@ class GovMocksTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void nhifCardsAndStudentRegistration() {
-        assertThat(nhifCard("1023-4561")).containsEntry("status", "ACTIVE").containsEntry("card_no", "10234561");
-        assertThat(nhifCard("10234560")).containsEntry("status", "NOT_FOUND");
-        assertThat(nhifCard("10234569")).containsEntry("status", "INACTIVE");
-        assertThat(nhifCard("10234568")).containsEntry("full_name", "NEEMA JOHN KIMARO");
-        Map<String, Object> reg = http().post().uri("/nhif/api/v1/student-registrations").header("X-Api-Key", "mock-nhif-key").contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("institution_code", "REG/DEMO/001", "academic_year", "2027/2028", "students", List.of(
-                        Map.of("registration_no", "DEMO/27/0001", "first_name", "Asha", "surname", "Mwinyi", "date_of_birth", "2006-03-04"),
-                        Map.of("registration_no", "DEMO/27/0007", "first_name", "Juma", "surname", "Ali", "date_of_birth", "2006-03-04"),
-                        Map.of("registration_no", "DEMO/27/0002", "first_name", "Neema", "surname", "Said"))))
-                .retrieve().body(Map.class);
-        assertThat((List<?>) reg.get("rejected")).hasSize(1);
-        Map<String, Object> st = http().get().uri("/nhif/api/v1/student-registrations/status?institution_code=REG/DEMO/001&batch_ref=" + reg.get("batch_ref"))
-                .header("X-Api-Key", "mock-nhif-key").retrieve().body(Map.class);
-        assertThat(st).containsEntry("state", "COMPLETED");
-        List<Map<String, Object>> items = (List<Map<String, Object>>) st.get("items");
-        assertThat(items).extracting(i -> i.get("status")).containsExactly("REGISTERED", "REJECTED");
-        assertThat(items.get(0).get("valid_to")).isEqualTo("2028-06-30");
-        // the issued card is now a known member, with the student's name
-        assertThat(nhifCard((String) items.get(0).get("card_no"))).containsEntry("status", "ACTIVE").containsEntry("full_name", "ASHA MWINYI");
-        assertThatThrownBy(() -> http().post().uri("/nhif/api/v1/cards/verify").header("X-Api-Key", "wrong").contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("card_no", "1")).retrieve().body(Map.class)).isInstanceOf(HttpClientErrorException.Unauthorized.class);
+    void nhifStudentRegistrationApi() throws IOException {
+        http().post().uri("/mock/nhif/reset").retrieve().toBodilessEntity();
+        // the agent's token
+        assertThatThrownBy(() -> nhifToken("wrong")).isInstanceOf(HttpClientErrorException.BadRequest.class);
+        String token = nhifToken("mock-secret");
+        assertThatThrownBy(() -> http().get().uri("/nhif/api/v2/verifystudentcard?cardNo=1234").header("Authorization", "Bearer nope")
+                .retrieve().body(Map.class)).isInstanceOf(HttpClientErrorException.Unauthorized.class);
+
+        // cards by the last digit
+        assertThat(nhifCard(token, "SN1234561")).extractingByKey("succeeded").asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP).containsEntry("remarks", "ACTIVE");
+        assertThat(nhifCard(token, "SN1234560")).containsEntry("succeeded", null);
+        assertThat((Map<String, Object>) nhifCard(token, "SN1234568").get("succeeded")).containsEntry("fullName", "NEEMA JOHN KIMARO");
+
+        // registration: SystemId/SubSystemId required on the single endpoint; refusals named per student
+        assertThatThrownBy(() -> http().post().uri("/nhif/api/v2/student/register").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("formFourIndexNo", "S0101-0001-2023")).retrieve().body(Map.class)).isInstanceOf(HttpClientErrorException.BadRequest.class);
+        String nin = "20060304111110000112";
+        Map<String, Object> reg = nhif(token).post().uri("/nhif/api/v2/students/register").contentType(MediaType.APPLICATION_JSON).body(List.of(
+                        Map.of("firstName", "Asha", "surname", "Mwinyi", "dateOfBirth", "2006-03-04", "formFourIndexNo", "S0101-0001-2023", "admissionNo", "DEMO/27/0001", "nationalId", nin),
+                        Map.of("firstName", "Juma", "surname", "Ali", "dateOfBirth", "2006-03-04", "formFourIndexNo", "S0101-0002-2023", "admissionNo", "DEMO/27/0007")))
+                .exchange((req, res) -> res.bodyTo(Map.class));
+        assertThat(reg).containsEntry("succeeded", 1).containsEntry("isFullSuccess", false);
+        assertThat((List<Map<String, Object>>) reg.get("failed")).singleElement().satisfies(f -> assertThat(f).containsEntry("index", 1));
+
+        // the institution's callback: a stand-in token endpoint and callback address
+        List<String> callbacks = new CopyOnWriteArrayList<>();
+        HttpServer inst = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        inst.createContext("/", ex -> {
+            String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            byte[] out;
+            if (ex.getRequestURI().getPath().endsWith("/token")) out = "{\"access_token\":\"T1\",\"expires_in\":3600}".getBytes(StandardCharsets.UTF_8);
+            else {
+                callbacks.add(ex.getRequestHeaders().getFirst("Authorization") + " " + body);
+                out = "{\"statusCode\":200,\"message\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
+            }
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, out.length);
+            try (OutputStream os = ex.getResponseBody()) {
+                os.write(out);
+            }
+        });
+        inst.start();
+        try {
+            String base = "http://127.0.0.1:" + inst.getAddress().getPort();
+            http().post().uri("/mock/nhif/callback?callbackUrl={c}&tokenUrl={t}&clientId=cims-x&clientSecret=s3", base + "/callback", base + "/token")
+                    .retrieve().toBodilessEntity();
+
+            // card application: all-or-nothing, then a control number by callback and by batch
+            Map<String, Object> bad = nhif(token).post().uri("/nhif/api/v2/student/cardapplication").contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("batchNo", "AG1/2027/2028/00001-X", "intakeCode", "202710", "details", List.of(
+                            Map.of("correlationID", "HC1-1", "nationalID", nin, "mobileNo", "0712345678", "category", 1),
+                            Map.of("correlationID", "HC2-1", "nationalID", "20060304111110000999", "mobileNo", "0712345679", "category", 1))))
+                    .exchange((req, res) -> res.bodyTo(Map.class));
+            assertThat(bad).containsEntry("succeeded", 0);
+            Map<String, Object> ok = nhif(token).post().uri("/nhif/api/v2/student/cardapplication").contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("batchNo", "AG1/2027/2028/00002-X", "intakeCode", "202710", "details", List.of(
+                            Map.of("correlationID", "HC1-2", "nationalID", nin, "mobileNo", "0712345678", "category", 1))))
+                    .retrieve().body(Map.class);
+            assertThat(ok).containsEntry("isFullSuccess", true);
+            List<Map<String, Object>> cn = nhif(token).get().uri("/nhif/api/v2/studentcontrolnobybatchno?batchNo={b}", "AG1/2027/2028/00002-X").retrieve().body(List.class);
+            String controlNo = (String) cn.get(0).get("controlNo");
+            assertThat(controlNo).startsWith("995");
+            http().post().uri("/mock/nhif/pay?controlNo=" + controlNo).retrieve().toBodilessEntity();
+            Map<String, Object> issued = http().post().uri("/mock/nhif/issue?controlNo=" + controlNo).retrieve().body(Map.class);
+            String card = (String) issued.get("issuedCard");
+            assertThat(card).startsWith("SN");
+            assertThat(callbacks).hasSize(3).allMatch(c -> c.startsWith("Bearer T1 "));
+            assertThat(callbacks.get(0)).contains("\"invoiceAmount\"").contains(controlNo).contains("S0101-0001-2023");
+            assertThat(callbacks.get(1)).contains("\"status\":\"Paid\"");
+            assertThat(callbacks.get(2)).contains("\"cardno\":\"" + card + "\"");
+            // the issued card is now known by its holder's name, and the NIDA number answers too
+            assertThat((Map<String, Object>) nhifCard(token, card).get("succeeded")).containsEntry("fullName", "ASHA MWINYI");
+            assertThat((Map<String, Object>) nhifCard(token, nin).get("succeeded")).containsEntry("remarks", "ACTIVE");
+            assertThat((List<?>) nhif(token).get().uri("/nhif/api/v2/agentintakes").retrieve().body(List.class)).hasSize(2);
+        } finally {
+            inst.stop(0);
+        }
     }
 
     @SuppressWarnings("unchecked")
-    Map<String, Object> nhifCard(String no) {
-        return http().post().uri("/nhif/api/v1/cards/verify").header("X-Api-Key", "mock-nhif-key").contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("card_no", no)).retrieve().body(Map.class);
+    String nhifToken(String secret) {
+        org.springframework.util.LinkedMultiValueMap<String, String> form = new org.springframework.util.LinkedMultiValueMap<>();
+        form.add("client_id", "mock-agent");
+        form.add("client_secret", secret);
+        form.add("grant_type", "client_credentials");
+        form.add("scope", "student.registration");
+        Map<String, Object> t = http().post().uri("/nhif/connect/token").contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().body(Map.class);
+        return (String) t.get("access_token");
+    }
+
+    RestClient nhif(String token) {
+        return RestClient.builder().baseUrl("http://127.0.0.1:" + port).defaultHeader("Authorization", "Bearer " + token)
+                .defaultHeader("SystemId", "1").defaultHeader("SubSystemId", "2").build();
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> nhifCard(String token, String no) {
+        return nhif(token).get().uri("/nhif/api/v2/verifystudentcard?cardNo={c}", no).retrieve().body(Map.class);
     }
 
     @Test

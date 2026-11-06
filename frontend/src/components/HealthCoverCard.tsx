@@ -6,10 +6,12 @@ import { api, formatDate, formatDateTime } from '../api/client';
 import { ErrorAlert } from './common';
 
 export interface HealthInvoice { id: number; invoiceNo: string; amount: number; balance: number; status: string; controlNo?: string }
+/** NHIF's own bill for the student card: the control number the student pays NHIF with. */
+export interface NhifBill { controlNo: string; invoiceNo?: string; amount?: number; paidOn?: string }
 export interface HealthCover {
   id: number; studentId: number; registrationNo: string; studentName: string; programmeCode: string; yearOfStudy: number; academicYear: string;
   route?: 'OWN_CARD' | 'INSTITUTION'; status: string; cardNo?: string; holderName?: string; scheme?: string; validTo?: string; reason?: string;
-  checkedAt?: string; batchRef?: string; invoice?: HealthInvoice;
+  checkedAt?: string; batchRef?: string; invoice?: HealthInvoice; nhifBill?: NhifBill; category?: number;
 }
 interface StudentCover {
   studentId: number; enabled: boolean; required: boolean; contribution: number; academicYearId: number; academicYear: string;
@@ -17,14 +19,15 @@ interface StudentCover {
 }
 
 export const HEALTH_COLOUR: Record<string, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
-  ACTIVE: 'success', EXPIRED: 'error', INVALID: 'error', REJECTED: 'error', AWAITING_PAYMENT: 'warning', READY: 'info', SUBMITTED: 'info', NONE: 'default',
+  ACTIVE: 'success', EXPIRED: 'error', INVALID: 'error', REJECTED: 'error', AWAITING_PAYMENT: 'warning', READY: 'info', REGISTERED: 'info', APPLIED: 'info',
+  PAID: 'info', SUBMITTED: 'info', NONE: 'default',
 };
 
 const tzs = (n: number) => Number(n).toLocaleString('en-GB', { maximumFractionDigits: 0 });
 
 /**
  * A student's health insurance with NHIF for the current academic year: their own NHIF card (checked with NHIF), or registration
- * through the institution after paying NHIF's student contribution. Students use it in the portal; the Registrar on the student
+ * through the institution, with NHIF's control number to pay and the card that follows. Students use it in the portal; the Registrar on the student
  * record (others on the record see it read-only).
  */
 export default function HealthCoverCard({ studentId, canEdit = true }: { studentId?: number; canEdit?: boolean }) {
@@ -52,7 +55,7 @@ export default function HealthCoverCard({ studentId, canEdit = true }: { student
     return <Card sx={{ mb: 2 }}><CardContent>{title}<Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t('health.off')}</Typography></CardContent></Card>;
   }
   const status = c?.status ?? 'NONE';
-  const canGiveCard = canEdit && (!c || ['INVALID', 'EXPIRED', 'AWAITING_PAYMENT', 'REJECTED', 'NONE'].includes(status) || (c.route === 'OWN_CARD' && editing));
+  const canGiveCard = canEdit && (!c || ['INVALID', 'EXPIRED', 'READY', 'REGISTERED', 'REJECTED', 'NONE'].includes(status) || (c.route === 'OWN_CARD' && editing));
   const canChooseInstitution = canEdit && (!c || (c.route === 'OWN_CARD' && status !== 'ACTIVE'));
   const unpaid = c?.invoice && c.invoice.balance > 0 && c.invoice.status !== 'CANCELLED' && status === 'AWAITING_PAYMENT';
   return (
@@ -73,6 +76,15 @@ export default function HealthCoverCard({ studentId, canEdit = true }: { student
             {c.validTo && <Typography variant="body2">{t('health.validTo', { date: formatDate(c.validTo) })}</Typography>}
             {c.checkedAt && <Typography variant="caption" color="text.secondary" display="block">{t('health.checked', { when: formatDateTime(c.checkedAt) })}</Typography>}
             {c.reason && !message && <Alert severity="warning" sx={{ mt: 1 }}>{c.reason}</Alert>}
+            {c.route === 'INSTITUTION' && status === 'APPLIED' && <Alert severity="info" sx={{ mt: 1 }}>{t('health.applied')}</Alert>}
+            {c.nhifBill && status === 'AWAITING_PAYMENT' && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                {t('health.payNhif', { amount: c.nhifBill.amount != null ? tzs(c.nhifBill.amount) : tzs(d.contribution), controlNo: c.nhifBill.controlNo })}
+              </Alert>
+            )}
+            {c.nhifBill && status === 'PAID' && (
+              <Alert severity="success" sx={{ mt: 1 }}>{t('health.paidNhif', { on: c.nhifBill.paidOn ? ` (${formatDate(c.nhifBill.paidOn)})` : '' })}</Alert>
+            )}
             {unpaid && (
               <Alert severity="info" sx={{ mt: 1 }}>
                 {c.invoice!.controlNo ? t('health.pay', { amount: tzs(c.invoice!.balance), controlNo: c.invoice!.controlNo })

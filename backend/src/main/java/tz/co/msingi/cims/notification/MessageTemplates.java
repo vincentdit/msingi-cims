@@ -175,6 +175,14 @@ public final class MessageTemplates {
                 List.of("cardNo", "validTo", "institution"), Set.of("cardNo"),
                 "{institution}: NHIF has registered you for health insurance. Your NHIF card number is {cardNo}, valid until {validTo}.",
                 "{institution}: NHIF imekusajili kwa bima ya afya. Namba ya kadi yako ya NHIF ni {cardNo}, inatumika hadi {validTo}.", s);
+        add("NHIF_CONTROL_NUMBER", "NHIF control number", "NHIF answers the institution's card application with the control number the student pays", "Registry",
+                List.of("controlNo", "amount", "institution"), Set.of("controlNo"),
+                "{institution}: pay TZS {amount} for your NHIF student health insurance with control number {controlNo} (M-Pesa, Tigo Pesa, Airtel Money or bank). NHIF then issues your card.",
+                "{institution}: lipa TZS {amount} kwa bima ya afya ya NHIF ya mwanafunzi kwa namba ya malipo {controlNo} (M-Pesa, Tigo Pesa, Airtel Money au benki). NHIF itatoa kadi yako.", s);
+        add("NHIF_PAYMENT_CONFIRMED", "NHIF payment confirmed", "NHIF confirms the student's payment for the student package", "Registry",
+                List.of("controlNo", "institution"), Set.of(),
+                "{institution}: NHIF has received your payment ({controlNo}). Your NHIF card is being prepared; its number will be sent to you.",
+                "{institution}: NHIF imepokea malipo yako ({controlNo}). Kadi yako ya NHIF inaandaliwa; namba yake utatumiwa.", s);
         add("NHIF_REGISTRATION_REJECTED", "NHIF registration not accepted", "NHIF does not register a student sent by the institution", "Registry",
                 List.of("reason", "institution"), Set.of(),
                 "{institution}: NHIF did not register you for health insurance: {reason}. See Health insurance on the student portal or contact Registry.",

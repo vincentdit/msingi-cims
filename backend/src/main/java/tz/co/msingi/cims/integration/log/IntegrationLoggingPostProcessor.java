@@ -87,6 +87,9 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (result instanceof SmsGateway.Result r && !r.accepted()) return r.error() == null ? "Not accepted by the SMS gateway" : r.error();
         if (result instanceof GepgGateway.ControlNumberResponse r && !r.issued() && r.errorMessage() != null) return r.errorMessage();
         if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r && !"POSTED".equals(r.status())) return r.status() + ": " + r.message();
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.BulkResult r && r.succeeded() == 0 && !r.fullSuccess()) {
+            return "None taken: " + r.failed().get(0).reason();
+        }
         return null;
     }
 
@@ -98,9 +101,8 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (result instanceof tz.co.msingi.cims.integration.nida.NidaClient.Result r) return "NIN " + r.status();
         if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r) return "Posted as " + r.museRef();
         if (result instanceof tz.co.msingi.cims.integration.heslb.HeslbClient.SubmissionResult r) return r.accepted() + " of " + r.received() + " accepted";
-        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Card r) return "Card " + r.status();
-        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Submission r) return "Batch " + r.batchRef() + " · " + r.received() + " received";
-        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.Status r) return r.state() + " · " + r.items().size() + " decided";
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.CardCheck r) return r.error() != null ? "Card unknown" : "Card " + r.remarks();
+        if (result instanceof tz.co.msingi.cims.integration.nhif.NhifClient.BulkResult r) return r.succeeded() + " of " + r.totalRequested() + " taken";
         if (result instanceof tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.Status r) return r.state() + " · " + r.items().size() + " decided";
         if (result instanceof String s && s.length() <= 60) return "Reference " + s;
         return null;
@@ -128,10 +130,11 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
                 case MUSE -> args.length >= 1 && args[0] instanceof tz.co.msingi.cims.integration.muse.MuseClient.Journal j ? "journal " + j.batchRef() : null;
                 case TAMISEMI -> args.length >= 2 ? args[0] + " " + args[1] : null;
                 case NHIF -> switch (op) {
-                    case "verifyCard" -> args.length >= 1 && args[0] instanceof String c ? "card …" + (c.length() > 4 ? c.substring(c.length() - 4) : c) : null;
-                    case "registerStudents" -> args.length >= 3 && args[2] instanceof Collection<?> c ? args[1] + " · " + c.size() + " students" : null;
-                    case "registrationStatus" -> args.length >= 2 ? "batch " + args[1] : null;
-                    default -> null;
+                    case "verifyStudentCard" -> args.length >= 2 && args[1] instanceof String c ? "card …" + (c.length() > 4 ? c.substring(c.length() - 4) : c) : null;
+                    case "registerStudents" -> args.length >= 2 && args[1] instanceof Collection<?> c ? c.size() + " student(s)" : null;
+                    case "applyForCards" -> args.length >= 5 && args[4] instanceof Collection<?> c ? "batch " + args[1] + " · " + c.size() + " student(s)" : null;
+                    case "controlNumbers" -> args.length >= 2 ? "batch " + args[1] : null;
+                    default -> op;
                 };
                 case SMS -> args.length >= 1 ? mask(String.valueOf(args[0])) + (args.length >= 4 && args[3] != null ? " · " + args[3] : "") : null;
             };

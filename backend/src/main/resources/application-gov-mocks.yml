@@ -4,6 +4,7 @@
 #   cd nactvet-mock; .\mvnw.cmd spring-boot:run      (port 8099)
 # then run CIMS with profiles dev,gov-mocks (add nactvet-mock for admission verification too).
 # Enter a GePG SP code, sub SP code, system id and GFS code, and switch on HESLB / NIDA / MUSE / TAMISEMI / NHIF, under Integrations.
+# For NHIF also enter the mock's credentials under Integrations › NHIF (below).
 cims:
   gepg:
     mode: live
@@ -31,9 +32,12 @@ cims:
     base-url: http://localhost:8098
     api-key: mock-tamisemi-key
   nhif:
+    # NHIF Student Registration API mock: under Integrations › NHIF enter client id mock-agent, secret mock-secret, scope
+    # student.registration, SystemId 1 and SubSystemId 2 (the mock accepts those)
     mode: live
-    base-url: http://localhost:8098
-    api-key: mock-nhif-key
+    base-url: http://localhost:8098/nhif
+    token-path: /connect/token
+    api-path: /api/v2
   nactvet:
     submission:
       mode: live

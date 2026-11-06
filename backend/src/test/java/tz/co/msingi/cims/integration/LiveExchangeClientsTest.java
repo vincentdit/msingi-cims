@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import tz.co.msingi.cims.integration.heslb.HeslbClient;
 import tz.co.msingi.cims.integration.heslb.LiveHeslbClient;
 import tz.co.msingi.cims.integration.http.ExternalSystemUnavailableException;
+import tz.co.msingi.cims.integration.nhif.NhifClient;
 import tz.co.msingi.cims.integration.muse.LiveMuseClient;
 import tz.co.msingi.cims.integration.muse.MuseClient;
 import tz.co.msingi.cims.integration.nactvet.LiveNactvetSubmissionClient;
@@ -43,7 +44,9 @@ class LiveExchangeClientsTest {
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            received.add(ex.getRequestMethod() + " " + ex.getRequestURI() + " key=" + ex.getRequestHeaders().getFirst("X-Api-Key") + " " + body);
+            received.add(ex.getRequestMethod() + " " + ex.getRequestURI() + " key=" + ex.getRequestHeaders().getFirst("X-Api-Key")
+                    + " auth=" + ex.getRequestHeaders().getFirst("Authorization") + " sys=" + ex.getRequestHeaders().getFirst("SystemId") + "/"
+                    + ex.getRequestHeaders().getFirst("SubSystemId") + " " + body);
             byte[] out = answers.getOrDefault(path, "{}").getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
             ex.sendResponseHeaders(statuses.getOrDefault(path, 200), out.length);
@@ -117,31 +120,78 @@ class LiveExchangeClientsTest {
 
     @Test
     void nhif() {
-        tz.co.msingi.cims.integration.nhif.LiveNhifClient c = new tz.co.msingi.cims.integration.nhif.LiveNhifClient(base, "k5", "/card", "/reg", "/status");
-        answers.put("/card", "{\"card_no\":\"10234561\",\"status\":\"Active\",\"full_name\":\"ASHA JUMA MWINYI\",\"scheme\":\"Dependant\",\"valid_to\":\"2028-06-30\"}");
-        var card = c.verifyCard("10234561");
-        assertThat(card.status()).isEqualTo("ACTIVE");
-        assertThat(card.validTo()).isEqualTo(LocalDate.of(2028, 6, 30));
-        assertThat(received.get(0)).startsWith("POST /card").contains("key=k5").contains("\"card_no\":\"10234561\"");
-        answers.put("/card", "{\"card_no\":\"1\",\"status\":\"NOT FOUND\"}");
-        assertThat(c.verifyCard("1").status()).isEqualTo("NOT_FOUND");
+        var c = new tz.co.msingi.cims.integration.nhif.LiveNhifClient(base, "/connect/token", "/api/v2");
+        var agent = new NhifClient.Agent("agent-1", "s3cret", "student.registration", 7, 8);
+        assertThat(agent.toString()).doesNotContain("s3cret");
+        answers.put("/connect/token", "{\"access_token\":\"TOK1\",\"token_type\":\"Bearer\",\"expires_in\":3600}");
 
-        answers.put("/reg", "{\"batch_ref\":\"NHIF-1\",\"received\":2,\"rejected\":[{\"registration_no\":\"R2\",\"reason\":\"Date of birth is required\"}]}");
-        var sub = c.registerStudents("INST", "2027/2028", List.of(new tz.co.msingi.cims.integration.nhif.NhifClient.Student("R1", "Asha", null, "Mwinyi", "F",
-                LocalDate.of(2006, 3, 4), "20060304111110000112", "0712", null, "ODIT", 1)));
-        assertThat(sub.batchRef()).isEqualTo("NHIF-1");
-        assertThat(sub.rejected()).extracting(tz.co.msingi.cims.integration.nhif.NhifClient.Rejected::reason).containsExactly("Date of birth is required");
-        assertThat(received.get(2)).contains("\"package\":\"STUDENT\"").contains("\"date_of_birth\":\"2006-03-04\"");
-        answers.put("/status", "{\"state\":\"completed\",\"items\":[{\"registration_no\":\"R1\",\"status\":\"registered\",\"card_no\":\"SN1\",\"valid_to\":\"2028-06-30\"}]}");
-        var st = c.registrationStatus("INST", "NHIF-1");
-        assertThat(st.state()).isEqualTo("COMPLETED");
-        assertThat(st.items().get(0).status()).isEqualTo("REGISTERED");
-        assertThat(received.get(3)).startsWith("GET /status?").contains("batch_ref=NHIF-1");
-        statuses.put("/status", 503);
-        assertThatThrownBy(() -> c.registrationStatus("INST", "NHIF-1")).isInstanceOf(ExternalSystemUnavailableException.class);
-        assertThat(tz.co.msingi.cims.integration.nhif.NhifClient.normalise(" 1023-4561 ")).isEqualTo("10234561");
-        assertThat(tz.co.msingi.cims.integration.nhif.NhifClient.normalise("12")).isNull();
+        // one student → /student/register, with the token and both headers; a refusal named per student comes back as a result
+        answers.put("/api/v2/student/register", "{\"succeeded\":0,\"failed\":[{\"index\":0,\"identifier\":\"S0101-0001-2023\","
+                + "\"errors\":[{\"code\":2111,\"field\":\"FirstName\",\"message\":\"A member with the same first name already exists.\"}]}],"
+                + "\"totalRequested\":1,\"hasFailures\":true,\"isFullSuccess\":false}");
+        statuses.put("/api/v2/student/register", 400);
+        var one = c.registerStudents(agent, List.of(registration("S0101-0001-2023")));
+        assertThat(one.fullSuccess()).isFalse();
+        assertThat(one.failed()).singleElement().satisfies(f -> {
+            assertThat(f.identifier()).isEqualTo("S0101-0001-2023");
+            assertThat(f.reason()).contains("2111");
+        });
+        assertThat(received.get(0)).startsWith("POST /connect/token").contains("client_id=agent-1").contains("grant_type=client_credentials");
+        assertThat(received.get(1)).startsWith("POST /api/v2/student/register").contains("auth=Bearer TOK1").contains("sys=7/8")
+                .contains("\"formFourIndexNo\":\"S0101-0001-2023\"").contains("\"dateOfBirth\":\"2006-03-04\"").contains("\"gender\":\"Female\"");
+
+        // several → /students/register, wrapped in data; the token is reused
+        answers.put("/api/v2/students/register", "{\"data\":{\"succeeded\":2,\"failed\":[],\"totalRequested\":2,\"isFullSuccess\":true}}");
+        assertThat(c.registerStudents(agent, List.of(registration("S0101-0001-2023"), registration("S0101-0002-2023"))).fullSuccess()).isTrue();
+        assertThat(received.get(2)).startsWith("POST /api/v2/students/register");
+
+        // card application and control numbers
+        answers.put("/api/v2/student/cardapplication", "{\"succeeded\":1,\"failed\":[],\"totalRequested\":1,\"isFullSuccess\":true}");
+        var applied = c.applyForCards(agent, "AG1/2027/2028/00001-X", "202710", "Students 2027/2028", List.of(
+                new NhifClient.CardApplicationItem("HC1-1", "20060304111110000112", "0712345678", "202710", null, 2, 1, 1)));
+        assertThat(applied.fullSuccess()).isTrue();
+        assertThat(received.get(3)).contains("\"batchNo\":\"AG1/2027/2028/00001-X\"").contains("\"correlationID\":\"HC1-1\"").contains("\"category\":1")
+                .doesNotContain("\"cardNo\"");
+        answers.put("/api/v2/studentcontrolnobybatchno", "[{\"correlationID\":\"HC1-1\",\"batchNo\":\"AG1/2027/2028/00001-X\",\"controlNo\":\"995000000001\","
+                + "\"invoiceNo\":\"INV-1\",\"invoiceAmount\":50400.00,\"categoryID\":1}]");
+        var cn = c.controlNumbers(agent, "AG1/2027/2028/00001-X");
+        assertThat(cn).singleElement().satisfies(x -> {
+            assertThat(x.controlNo()).isEqualTo("995000000001");
+            assertThat(x.amount()).isEqualByComparingTo("50400");
+        });
+        assertThat(received.get(4)).startsWith("GET /api/v2/studentcontrolnobybatchno?batchNo=AG1");
+
+        // card check: succeeded / failed
+        answers.put("/api/v2/verifystudentcard", "{\"succeeded\":{\"cardNo\":\"SN1234561\",\"fullName\":\"ASHA JUMA MWINYI\",\"remarks\":\"ACTIVE\","
+                + "\"contributionEnds\":-1,\"verificationCode\":\"X1\"},\"failed\":null}");
+        assertThat(c.verifyStudentCard(agent, "SN1234561").active()).isTrue();
+        answers.put("/api/v2/verifystudentcard", "{\"succeeded\":null,\"failed\":{\"code\":2137,\"field\":\"cardNo\",\"message\":\"CardNo does not exist or is not valid.\"}}");
+        var bad = c.verifyStudentCard(agent, "SN1234560");
+        assertThat(bad.active()).isFalse();
+        assertThat(bad.error().code()).isEqualTo(2137);
+
+        // intakes
+        answers.put("/api/v2/agentintakes", "[{\"intakeName\":\"October 2027 Intake\",\"intakeCode\":\"202710\",\"startDate\":\"2027-10-01T00:00:00\",\"endDate\":\"2027-10-31\"}]");
+        assertThat(c.intakes(agent)).singleElement().satisfies(i -> assertThat(i.startDate()).isEqualTo(LocalDate.of(2027, 10, 1)));
+
+        // an expired token: 401 → a new token, once
+        int before = (int) received.stream().filter(r -> r.startsWith("POST /connect/token")).count();
+        statuses.put("/api/v2/agentintakes", 401);
+        assertThatThrownBy(() -> c.intakes(agent)).isInstanceOf(ExternalSystemUnavailableException.class).hasMessageContaining("credentials");
+        assertThat(received.stream().filter(r -> r.startsWith("POST /connect/token")).count()).isEqualTo(before + 1);
+        statuses.put("/api/v2/agentintakes", 503);
+        assertThatThrownBy(() -> c.intakes(agent)).isInstanceOf(ExternalSystemUnavailableException.class);
+
+        assertThat(NhifClient.normalise(" sn-1023-4561 ")).isEqualTo("SN10234561");
+        assertThat(NhifClient.normalise("12")).isNull();
+        assertThat(NhifClient.formFourIndex("S0101/0001", 2023)).isEqualTo("S0101-0001-2023");
+        assertThat(NhifClient.batchNo("NH-12", "2027/2028", "00001-X")).isEqualTo("NH12/2027/2028/00001-X");
         assertThat(tz.co.msingi.cims.health.HealthCoverServiceTestAccess.sameSurname("ASHA JUMA MWINYI", "Mwinyi")).isTrue();
         assertThat(tz.co.msingi.cims.health.HealthCoverServiceTestAccess.sameSurname("NEEMA JOHN KIMARO", "Mwinyi")).isFalse();
+    }
+
+    static NhifClient.Registration registration(String index) {
+        return new NhifClient.Registration("Asha", "Juma", "Mwinyi", "Female", LocalDate.of(2006, 3, 4), "asha@example.com", "0712345678",
+                "20060304111110000112", index, "DEMO/27/0001", 2, "Ordinary Diploma in IT", "ICT", 1, "2027/2028", "202710", null);
     }
 }
