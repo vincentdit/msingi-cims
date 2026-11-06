@@ -1,4 +1,5 @@
 import HelpIcon from '@mui/icons-material/HelpOutline';
+import AlmanacIcon from '@mui/icons-material/CalendarMonthOutlined';
 import NotificationsIcon from '@mui/icons-material/NotificationsOutlined';
 import ResultsIcon from '@mui/icons-material/GradingOutlined';
 import TimetableIcon from '@mui/icons-material/CalendarViewWeekOutlined';
@@ -41,7 +42,7 @@ export default function StudentLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dash = useQuery({ queryKey: ['student', 'dashboard'], queryFn: () => api<StudentDashboard>('/api/student/dashboard', { realm: 'student' }) });
-  const current = pathname.startsWith('/student/notices') || pathname.startsWith('/student/help') ? false
+  const current = pathname.startsWith('/student/notices') || pathname.startsWith('/student/help') || pathname.startsWith('/student/almanac') ? false
     : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
   const label = (key: string) => t(`student.${key}`);
@@ -63,6 +64,11 @@ export default function StudentLayout() {
             <IconButton aria-label={t('student.navNotices')} onClick={() => navigate('/student/notices')}
               color={pathname.startsWith('/student/notices') ? 'primary' : 'default'}>
               <Badge color="error" badgeContent={unread}><NotificationsIcon /></Badge>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Almanac">
+            <IconButton aria-label="Almanac" onClick={() => navigate('/student/almanac')} color={pathname.startsWith('/student/almanac') ? 'primary' : 'default'}>
+              <AlmanacIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title={t('student.navHelp')}>

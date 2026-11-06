@@ -1,4 +1,5 @@
 /** The student part of CIMS, loaded only when someone opens it (keeps the admission portal small on phones). */
+import { PublishedAlmanac } from '../pages/portal/PublishedPages';
 import HelpCentre from '../components/helpdesk/HelpCentre';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from '../auth/session';
@@ -21,6 +22,7 @@ export default function StudentApp() {
         <Route path="check-in" element={<CheckInPage />} />
         <Route path="fees" element={<StudentFees />} />
         <Route path="notices" element={<StudentNotices />} />
+        <Route path="almanac" element={<PublishedAlmanac realm="student" />} />
         <Route path="profile" element={<StudentProfilePage />} />
         <Route path="help" element={<HelpCentre mode="student" intro="Find an answer, or ask the office that can help and follow the reply here." />} />
       </Route>

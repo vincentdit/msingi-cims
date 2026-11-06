@@ -1,3 +1,4 @@
+import { usePublishedLinks } from './publishedLinks';
 import HelpIcon from '@mui/icons-material/HelpOutline';
 import { AppBar, Avatar, Box, Button, Container, IconButton, Stack, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +15,7 @@ function initials(name: string) {
 
 /** Public, institution-branded layout for applicants. Mobile first. */
 export default function PortalLayout() {
+  const published = usePublishedLinks();
   const inst = useInstitution();
   const { t, i18n } = useTranslation();
   const { user, signOut } = useSession();
@@ -70,6 +72,9 @@ export default function PortalLayout() {
               {inst.contactPhone ? ` · ${inst.contactPhone}` : ''}{inst.contactEmail ? ` · ${inst.contactEmail}` : ''}
             </Typography>
             <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" rowGap={0.5} sx={{ '& > *': { whiteSpace: 'nowrap' } }}>
+              {published.almanac && <Typography variant="body2" color="text.secondary" component={RouterLink} to="/almanac" sx={{ textDecoration: 'none' }}>Almanac</Typography>}
+              {published.organisation && <Typography variant="body2" color="text.secondary" component={RouterLink} to="/organisation" sx={{ textDecoration: 'none' }}>
+                Organisation structure</Typography>}
               <Typography variant="body2" color="text.secondary" component={RouterLink} to="/verify" sx={{ textDecoration: 'none' }}>
                 {t('verify.title')}
               </Typography>

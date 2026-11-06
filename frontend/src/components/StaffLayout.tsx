@@ -48,6 +48,8 @@ import AlumniIcon from '@mui/icons-material/Diversity3';
 import ImportIcon from '@mui/icons-material/DriveFolderUpload';
 import TimetableIcon from '@mui/icons-material/ViewWeek';
 import ExamTimetableIcon from '@mui/icons-material/EventNote';
+import AlmanacIcon from '@mui/icons-material/CalendarMonth';
+import OrganisationIcon from '@mui/icons-material/AccountTree';
 import IdleSignOut from './IdleSignOut';
 import { disabledLinkStyles } from './StaffLink';
 import { Alert, Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
@@ -72,6 +74,10 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'dashboard', to: '/staff', label: 'Dashboard', icon: <DashboardIcon />, end: true },
     { page: 'approvals', to: '/staff/approvals', label: 'Approvals', icon: <ApprovalsIcon /> },
     { page: 'reports', to: '/staff/reports', label: 'Reports', icon: <AssessmentIcon /> },
+  ] },
+  { title: 'Institution', items: [
+    { page: 'almanac', to: '/staff/almanac', label: 'Almanac', icon: <AlmanacIcon /> },
+    { page: 'organisation', to: '/staff/organisation', label: 'Organisation structure', icon: <OrganisationIcon /> },
   ] },
   { title: 'Admissions', items: [
     { page: 'windows', to: '/staff/windows', label: 'Admission windows', icon: <EventIcon /> },

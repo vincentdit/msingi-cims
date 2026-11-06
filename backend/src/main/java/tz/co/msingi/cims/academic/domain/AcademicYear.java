@@ -26,4 +26,8 @@ public class AcademicYear extends BaseEntity {
 
     @Column(name = "is_current", nullable = false)
     private boolean current;
+
+    /** When the year's almanac was published to students and the public site (null: staff only). */
+    private java.time.OffsetDateTime almanacPublishedAt;
+    private String almanacPublishedBy;
 }

@@ -34,6 +34,8 @@ import NoticesPage from '../pages/staff/NoticesPage';
 import MessagingPage from '../pages/staff/MessagingPage';
 import DashboardPage from '../pages/staff/DashboardPage';
 import ReportsPage from '../pages/staff/ReportsPage';
+import AlmanacPage from '../pages/staff/AlmanacPage';
+import OrganisationPage from '../pages/staff/OrganisationPage';
 import { CalendarPage, CurriculaPage, CurriculumEditorPage } from '../pages/staff/AcademicPages';
 import SemesterRegistrationsPage from '../pages/staff/SemesterRegistrationsPage';
 import HealthInsurancePage from '../pages/staff/HealthInsurancePage';
@@ -70,6 +72,8 @@ export default function StaffApp() {
         <Route path="helpdesk/:id" element={<HelpdeskTicketPage />} />
         <Route path="help" element={<StaffHelpPage />} />
         <Route path="calendar" element={<CalendarPage />} />
+        <Route path="almanac" element={<AlmanacPage />} />
+        <Route path="organisation" element={<OrganisationPage />} />
         <Route path="marks" element={<MarksPage />} />
         <Route path="marks/:id" element={<OfferingPage />} />
         <Route path="teaching" element={<TeachingPage />} />

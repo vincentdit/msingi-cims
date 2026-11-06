@@ -45,15 +45,33 @@ public final class CurriculumDtos {
     }
 
     public record EventRequest(@NotNull Long academicYearId, Long semesterId, @NotNull CalendarEvent.Kind kind,
-                               @NotBlank @Size(max = 150) String title, @NotNull LocalDate startDate, @NotNull LocalDate endDate) {
+                               @NotBlank @Size(max = 150) String title, @NotNull LocalDate startDate, @NotNull LocalDate endDate,
+                               CalendarEvent.Audience audience, @Size(max = 150) String venue, @Size(max = 150) String responsible,
+                               @Size(max = 500) String description) {
     }
 
     public record EventView(Long id, Long academicYearId, Long semesterId, String semesterName, String kind, String title, LocalDate startDate,
-                            LocalDate endDate) {
+                            LocalDate endDate, String audience, String venue, String responsible, String description) {
         static EventView of(CalendarEvent e) {
             return new EventView(e.getId(), e.getAcademicYear().getId(), e.getSemester() == null ? null : e.getSemester().getId(),
-                    e.getSemester() == null ? null : e.getSemester().getName(), e.getKind().name(), e.getTitle(), e.getStartDate(), e.getEndDate());
+                    e.getSemester() == null ? null : e.getSemester().getName(), e.getKind().name(), e.getTitle(), e.getStartDate(), e.getEndDate(),
+                    e.getAudience().name(), e.getVenue(), e.getResponsible(), e.getDescription());
         }
+    }
+
+    /**
+     * One line of the almanac: an entry of the calendar (with an id), or a date that comes from a semester (teaching, registration,
+     * marks entry), which is changed on the semester itself.
+     */
+    public record AlmanacEntry(Long eventId, String kind, String title, LocalDate startDate, LocalDate endDate, String audience, String venue,
+                               String responsible, String description, String semesterName, boolean fromSemester) {
+    }
+
+    public record AlmanacView(Long academicYearId, String academicYear, LocalDate startDate, LocalDate endDate, boolean published,
+                             java.time.OffsetDateTime publishedAt, String publishedBy, List<AlmanacEntry> entries) {
+    }
+
+    public record AlmanacYear(Long id, String code, boolean current, boolean published) {
     }
 
     public record CalendarView(Long academicYearId, String academicYear, List<SemesterView> semesters, List<EventView> events) {

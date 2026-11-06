@@ -92,6 +92,37 @@ public class CurriculumController {
         calendar.deleteEvent(id);
     }
 
+    // ------------------------------------------------------------------ almanac
+
+    @Operation(summary = "Academic years with an almanac: every year for staff, the published ones for students")
+    @GetMapping("/almanac/years")
+    @PreAuthorize(tz.co.msingi.cims.platform.security.StaffAccess.ANY + " or hasRole('STUDENT')")
+    public List<CurriculumDtos.AlmanacYear> almanacYears() {
+        return calendar.almanacYears(reader());
+    }
+
+    @Operation(summary = "The almanac of a year: the calendar's dates and the institution's activities (students: what is for them, once published)")
+    @GetMapping("/almanac")
+    @PreAuthorize(tz.co.msingi.cims.platform.security.StaffAccess.ANY + " or hasRole('STUDENT')")
+    public CurriculumDtos.AlmanacView almanac(@RequestParam Long academicYearId) {
+        return calendar.almanac(academicYearId, reader());
+    }
+
+    @Operation(summary = "Publish the year's almanac to students and the public site (publish=false takes it back to staff only)")
+    @PostMapping("/almanac/{academicYearId}/publish")
+    @PreAuthorize(CALENDAR)
+    public CurriculumDtos.AlmanacView publishAlmanac(@PathVariable Long academicYearId, @RequestParam(defaultValue = "true") boolean publish) {
+        return calendar.publishAlmanac(academicYearId, publish);
+    }
+
+    private static AcademicCalendarService.Reader reader() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean student = auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_STUDENT".equals(a.getAuthority()));
+        boolean staff = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().startsWith("ROLE_") && !"ROLE_STUDENT".equals(a.getAuthority())
+                && !"ROLE_APPLICANT".equals(a.getAuthority()));
+        return staff ? AcademicCalendarService.Reader.STAFF : student ? AcademicCalendarService.Reader.STUDENT : AcademicCalendarService.Reader.PUBLIC;
+    }
+
     // ------------------------------------------------------------------ modules
 
     @GetMapping("/modules")

@@ -3,6 +3,9 @@ package tz.co.msingi.cims.academic.curriculum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.AlmanacEntry;
+import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.AlmanacView;
+import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.AlmanacYear;
 import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.CalendarView;
 import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.EventRequest;
 import tz.co.msingi.cims.academic.curriculum.CurriculumDtos.EventView;
@@ -144,6 +147,84 @@ public class AcademicCalendarService {
         e.setTitle(req.title().trim());
         e.setStartDate(req.startDate());
         e.setEndDate(req.endDate());
+        e.setAudience(req.audience() == null ? CalendarEvent.Audience.ALL : req.audience());
+        e.setVenue(blankToNull(req.venue()));
+        e.setResponsible(blankToNull(req.responsible()));
+        e.setDescription(blankToNull(req.description()));
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    // ------------------------------------------------------------------ almanac
+
+    public enum Reader { STAFF, STUDENT, PUBLIC }
+
+    /**
+     * The almanac of a year for a reader: staff see everything (published or not); students see a published year's entries for
+     * everyone and for students; the public site sees a published year's entries for everyone. The semesters' own dates (teaching,
+     * registration, late registration, marks entry) are part of it.
+     */
+    @Transactional(readOnly = true)
+    public AlmanacView almanac(Long academicYearId, Reader reader) {
+        AcademicYear y = year(academicYearId);
+        boolean published = y.getAlmanacPublishedAt() != null;
+        if (reader != Reader.STAFF && !published) throw new NotFoundException("Almanac", academicYearId);
+        java.util.List<AlmanacEntry> out = new java.util.ArrayList<>();
+        for (CalendarEvent e : events.findByAcademicYearIdOrderByStartDateAscIdAsc(y.getId())) {
+            if (!visible(e.getAudience(), reader)) continue;
+            out.add(new AlmanacEntry(e.getId(), e.getKind().name(), e.getTitle(), e.getStartDate(), e.getEndDate(), e.getAudience().name(),
+                    e.getVenue(), e.getResponsible(), e.getDescription(), e.getSemester() == null ? null : e.getSemester().getName(), false));
+        }
+        for (Semester s : semesters.findByAcademicYearIdOrderBySemesterNoAsc(y.getId())) {
+            String n = s.getName();
+            out.add(derived("TEACHING", n + ": teaching begins", s.getStartDate(), s.getStartDate(), n));
+            out.add(derived("TEACHING", n + ": semester ends", s.getEndDate(), s.getEndDate(), n));
+            out.add(derived("REGISTRATION", n + ": registration", s.getRegistrationOpens(), s.getRegistrationCloses(), n));
+            if (s.getLateRegistrationCloses() != null && s.getLateRegistrationCloses().isAfter(s.getRegistrationCloses())) {
+                out.add(derived("REGISTRATION", n + ": late registration", s.getRegistrationCloses().plusDays(1), s.getLateRegistrationCloses(), n));
+            }
+            if (reader == Reader.STAFF && s.getMarksEntryOpens() != null) {
+                LocalDate to = s.getMarksEntryCloses() != null ? s.getMarksEntryCloses() : s.getMarksEntryOpens();
+                AlmanacEntry m = derived("MARKS_ENTRY", n + ": examination marks entry", s.getMarksEntryOpens(), to, n);
+                out.add(new AlmanacEntry(null, m.kind(), m.title(), m.startDate(), m.endDate(), "STAFF", null, "Examinations Office", null, n, true));
+            }
+        }
+        out.sort(java.util.Comparator.comparing(AlmanacEntry::startDate).thenComparing(AlmanacEntry::endDate).thenComparing(AlmanacEntry::title));
+        return new AlmanacView(y.getId(), y.getCode(), y.getStartDate(), y.getEndDate(), published, y.getAlmanacPublishedAt(),
+                reader == Reader.STAFF ? y.getAlmanacPublishedBy() : null, out);
+    }
+
+    private static AlmanacEntry derived(String kind, String title, LocalDate from, LocalDate to, String semester) {
+        return new AlmanacEntry(null, kind, title, from, to, "ALL", null, null, null, semester, true);
+    }
+
+    private static boolean visible(CalendarEvent.Audience a, Reader reader) {
+        return switch (reader) {
+            case STAFF -> true;
+            case STUDENT -> a != CalendarEvent.Audience.STAFF;
+            case PUBLIC -> a == CalendarEvent.Audience.ALL;
+        };
+    }
+
+    /** The years with an almanac the reader may see (staff: every year), the current one first. */
+    @Transactional(readOnly = true)
+    public java.util.List<AlmanacYear> almanacYears(Reader reader) {
+        return years.findAllByOrderByStartDateDesc().stream()
+                .filter(y -> reader == Reader.STAFF || y.getAlmanacPublishedAt() != null)
+                .sorted(java.util.Comparator.comparing(AcademicYear::isCurrent).reversed())
+                .map(y -> new AlmanacYear(y.getId(), y.getCode(), y.isCurrent(), y.getAlmanacPublishedAt() != null)).toList();
+    }
+
+    /** Publishes the year's almanac to students and the public site, or takes it back to staff only. */
+    @Transactional
+    public AlmanacView publishAlmanac(Long academicYearId, boolean publish) {
+        AcademicYear y = year(academicYearId);
+        y.setAlmanacPublishedAt(publish ? java.time.OffsetDateTime.now() : null);
+        y.setAlmanacPublishedBy(publish ? tz.co.msingi.cims.platform.security.CurrentUser.name() : null);
+        audit.record(publish ? "ALMANAC_PUBLISHED" : "ALMANAC_WITHDRAWN", "AcademicYear", y.getId(), Map.of("year", y.getCode()));
+        return almanac(y.getId(), Reader.STAFF);
     }
 
     private AcademicYear year(Long id) {

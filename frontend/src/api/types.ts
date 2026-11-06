@@ -905,7 +905,9 @@ export interface Semester {
   lateRegistrationFee: number;
 }
 
-export const CALENDAR_EVENT_KINDS = ['REGISTRATION', 'TEACHING', 'MARKS_ENTRY', 'EXAMINATIONS', 'RESULTS', 'HOLIDAY', 'GRADUATION', 'OTHER'] as const;
+export const CALENDAR_EVENT_KINDS = ['TEACHING', 'REGISTRATION', 'EXAMINATIONS', 'MARKS_ENTRY', 'RESULTS', 'GRADUATION', 'MEETING', 'ACTIVITY', 'DEADLINE', 'HOLIDAY', 'OTHER'] as const;
+export const ALMANAC_AUDIENCES = ['ALL', 'STAFF', 'STUDENTS'] as const;
+export type AlmanacAudience = (typeof ALMANAC_AUDIENCES)[number];
 
 export interface CalendarEvent {
   id: number;
@@ -916,6 +918,80 @@ export interface CalendarEvent {
   title: string;
   startDate: string;
   endDate: string;
+  audience: AlmanacAudience;
+  venue?: string | null;
+  responsible?: string | null;
+  description?: string | null;
+}
+
+/** A line of the almanac: a calendar entry (eventId), or a date taken from a semester (fromSemester). */
+export interface AlmanacEntry {
+  eventId?: number | null;
+  kind: (typeof CALENDAR_EVENT_KINDS)[number];
+  title: string;
+  startDate: string;
+  endDate: string;
+  audience: AlmanacAudience;
+  venue?: string | null;
+  responsible?: string | null;
+  description?: string | null;
+  semesterName?: string | null;
+  fromSemester: boolean;
+}
+
+export interface Almanac {
+  academicYearId: number;
+  academicYear: string;
+  startDate: string;
+  endDate: string;
+  published: boolean;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
+  entries: AlmanacEntry[];
+}
+
+export interface AlmanacYear {
+  id: number;
+  code: string;
+  current: boolean;
+  published: boolean;
+}
+
+export const ORG_UNIT_KINDS = ['BOARD', 'COMMITTEE', 'OFFICE', 'DIRECTORATE', 'FACULTY', 'DEPARTMENT', 'UNIT', 'SECTION', 'CAMPUS'] as const;
+export type OrgUnitKind = (typeof ORG_UNIT_KINDS)[number];
+
+export interface OrgPosition {
+  id: number;
+  title: string;
+  head: boolean;
+  holderUserId?: number | null;
+  holder?: string | null;
+  acting: boolean;
+  sortOrder: number;
+}
+
+export interface OrgUnit {
+  id: number;
+  parentId?: number | null;
+  kind: OrgUnitKind;
+  name: string;
+  shortName?: string | null;
+  departmentId?: number | null;
+  advisory: boolean;
+  sortOrder: number;
+  description?: string | null;
+  positions: OrgPosition[];
+  children: OrgUnit[];
+}
+
+export interface OrgStructure {
+  published: boolean;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
+  unitCount: number;
+  positionCount: number;
+  vacantCount: number;
+  roots: OrgUnit[];
 }
 
 export interface AcademicCalendar {

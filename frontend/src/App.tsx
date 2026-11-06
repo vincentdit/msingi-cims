@@ -15,6 +15,8 @@ const PlatformApp = lazy(() => import('./apps/PlatformApp'));
 const ApplicationPage = lazy(() => import('./pages/applicant/ApplicationPage'));
 const HelpPage = lazy(() => import('./pages/portal/HelpPage'));
 const ProgrammePage = lazy(() => import('./pages/portal/ProgrammePage'));
+const AlmanacPublicPage = lazy(() => import('./pages/portal/PublishedPages').then((m) => ({ default: m.AlmanacPublicPage })));
+const OrganisationPublicPage = lazy(() => import('./pages/portal/PublishedPages').then((m) => ({ default: m.OrganisationPublicPage })));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="survey/:token" element={<TracerSurveyPage />} />
         <Route path="programmes/:code" element={<Lazy><ProgrammePage /></Lazy>} />
         <Route path="help" element={<Lazy><HelpPage /></Lazy>} />
+        <Route path="almanac" element={<Lazy><AlmanacPublicPage /></Lazy>} />
+        <Route path="organisation" element={<Lazy><OrganisationPublicPage /></Lazy>} />
         <Route path="application" element={<RequireAuth realm="applicant"><Lazy><ApplicationPage /></Lazy></RequireAuth>} />
       </Route>
       <Route path="student/*" element={<Lazy><StudentApp /></Lazy>} />

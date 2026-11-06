@@ -15,14 +15,17 @@ import tz.co.msingi.cims.common.BaseEntity;
 
 import java.time.LocalDate;
 
-/** A key date in the academic calendar (FR-ACA-04). */
+/** A key date in the academic calendar (FR-ACA-04), or an activity of the institution's almanac. */
 @Getter
 @Setter
 @Entity
 @Table(name = "calendar_events")
 public class CalendarEvent extends BaseEntity {
 
-    public enum Kind { REGISTRATION, TEACHING, MARKS_ENTRY, EXAMINATIONS, RESULTS, HOLIDAY, GRADUATION, OTHER }
+    public enum Kind { REGISTRATION, TEACHING, MARKS_ENTRY, EXAMINATIONS, RESULTS, HOLIDAY, GRADUATION, OTHER, MEETING, ACTIVITY, DEADLINE }
+
+    /** Who the entry is for: everyone (also the public site once published), staff only, or students (and staff). */
+    public enum Audience { ALL, STAFF, STUDENTS }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "academic_year_id")
@@ -41,4 +44,12 @@ public class CalendarEvent extends BaseEntity {
     private LocalDate startDate;
     @Column(nullable = false)
     private LocalDate endDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Audience audience = Audience.ALL;
+    private String venue;
+    /** The office or unit in charge (e.g. "Office of the Principal", "Examinations Office"). */
+    private String responsible;
+    private String description;
 }

@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
 import {
-  CALENDAR_EVENT_KINDS, type AcademicCalendar, type AcademicYear, type CalendarEvent, type CourseModule, type Curriculum,
+  ALMANAC_AUDIENCES, CALENDAR_EVENT_KINDS, type AcademicCalendar, type AcademicYear, type CalendarEvent, type CourseModule, type Curriculum,
   type CurriculumModuleSlot, type CurriculumSummary, type Department, type ElectiveRule, type Intake, type Programme, type Semester,
 } from '../../api/types';
 import { useSession } from '../../auth/session';
@@ -21,6 +21,13 @@ import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../co
 import { StaffLink } from '../../components/StaffLink';
 
 const staff = { realm: 'staff' as const };
+
+export const AUDIENCE_LABEL: Record<string, string> = { ALL: 'Everyone', STAFF: 'Staff only', STUDENTS: 'Students and staff' };
+const AUDIENCE_HELP: Record<string, string> = {
+  ALL: 'Also on the public site once the almanac is published',
+  STAFF: 'Only staff see it',
+  STUDENTS: 'On the student portal once published; not on the public site',
+};
 const CALENDAR_EDITORS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC'];
 const PREPARERS = ['INSTITUTION_ADMIN', 'DEPUTY_PRINCIPAL_ACADEMIC', 'HEAD_OF_DEPARTMENT', 'PROGRAMME_COORDINATOR'];
 const WINDOW_LABEL = { OPEN: 'Registration open', LATE: 'Late registration', NOT_OPEN: 'Not open yet', CLOSED: 'Registration closed' } as const;
@@ -51,7 +58,17 @@ function defaultYear(years?: AcademicYear[]) {
 
 type SemesterForm = Omit<Semester, 'id' | 'academicYear' | 'window' | 'lateRegistrationCloses' | 'marksEntryOpens' | 'marksEntryCloses' | 'lateRegistrationFee'>
   & { id?: number; lateRegistrationCloses: string; marksEntryOpens: string; marksEntryCloses: string; lateRegistrationFee: string };
-type EventForm = { id?: number; academicYearId: number; semesterId: string; kind: string; title: string; startDate: string; endDate: string };
+export type EventForm = { id?: number; academicYearId: number; semesterId: string; kind: string; title: string; startDate: string; endDate: string;
+  audience: string; venue: string; responsible: string; description: string };
+
+/** A new entry for a year: everyone sees it unless set otherwise. */
+export const newEvent = (academicYearId: number, kind = 'TEACHING'): EventForm =>
+  ({ academicYearId, semesterId: '', kind, title: '', startDate: '', endDate: '', audience: 'ALL', venue: '', responsible: '', description: '' });
+
+export const eventForm = (e: CalendarEvent | (Omit<CalendarEvent, 'id' | 'academicYearId'> & { id: number; academicYearId: number })): EventForm => ({
+  id: e.id, academicYearId: e.academicYearId, semesterId: e.semesterId ? String(e.semesterId) : '', kind: e.kind, title: e.title, startDate: e.startDate,
+  endDate: e.endDate, audience: e.audience ?? 'ALL', venue: e.venue ?? '', responsible: e.responsible ?? '', description: e.description ?? '',
+});
 
 export function CalendarPage() {
   const qc = useQueryClient();
@@ -129,7 +146,7 @@ export function CalendarPage() {
           <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography variant="h6">Key dates</Typography>
-              {canEdit && <Button startIcon={<AddIcon />} onClick={() => setEv({ academicYearId: year.id, semesterId: '', kind: 'TEACHING', title: '', startDate: '', endDate: '' })}>Add date</Button>}
+              {canEdit && <Button startIcon={<AddIcon />} onClick={() => setEv(newEvent(year.id))}>Add date</Button>}
             </Stack>
             <TableContainer component={Card}>
               <Table size="small">
@@ -143,7 +160,7 @@ export function CalendarPage() {
                       <TableCell>{e.semesterName ?? 'Whole year'}</TableCell>
                       {canEdit && (
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <IconButton size="small" aria-label="Edit" onClick={() => setEv({ ...e, semesterId: e.semesterId ? String(e.semesterId) : '' })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" aria-label="Edit" onClick={() => setEv(eventForm(e))}><EditIcon fontSize="small" /></IconButton>
                           <IconButton size="small" aria-label="Delete" onClick={() => { if (window.confirm(`Delete "${e.title}"?`)) del.mutate(e.id); }}><DeleteIcon fontSize="small" /></IconButton>
                         </TableCell>
                       )}
@@ -387,18 +404,22 @@ function SemesterDialog({ form: initial, year, onClose, onSaved }: { form: Semes
   );
 }
 
-function EventDialog({ form: initial, semesters, onClose, onSaved }: { form: EventForm; semesters: Semester[]; onClose: () => void; onSaved: () => void }) {
+export function EventDialog({ form: initial, semesters, onClose, onSaved, onDeleted }: {
+  form: EventForm; semesters: Semester[]; onClose: () => void; onSaved: () => void; onDeleted?: () => void;
+}) {
   const [f, setF] = useState(initial);
   const save = useMutation({
     mutationFn: () => api<CalendarEvent>(f.id ? `/api/academic/calendar-events/${f.id}` : '/api/academic/calendar-events', {
-      ...staff, method: f.id ? 'PUT' : 'POST', body: { ...f, semesterId: f.semesterId ? Number(f.semesterId) : null, endDate: f.endDate || f.startDate },
+      ...staff, method: f.id ? 'PUT' : 'POST', body: { ...f, semesterId: f.semesterId ? Number(f.semesterId) : null, endDate: f.endDate || f.startDate,
+        venue: f.venue.trim() || null, responsible: f.responsible.trim() || null, description: f.description.trim() || null },
     }),
     onSuccess: onSaved,
   });
+  const remove = useMutation({ mutationFn: () => api(`/api/academic/calendar-events/${f.id}`, { ...staff, method: 'DELETE' }), onSuccess: () => onDeleted?.() });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-        <DialogTitle>{f.id ? 'Edit date' : 'New key date'}</DialogTitle>
+        <DialogTitle>{f.id ? 'Edit entry' : 'New calendar entry'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={12}><TextField fullWidth required label="What" placeholder="e.g. Semester 1 examinations" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Grid>
@@ -409,10 +430,21 @@ function EventDialog({ form: initial, semesters, onClose, onSaved }: { form: Eve
               {semesters.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>)}</TextField></Grid>
             <Grid size={6}><DateField label="From" value={f.startDate} onChange={(v) => setF({ ...f, startDate: v })} /></Grid>
             <Grid size={6}><DateField label="To" value={f.endDate} onChange={(v) => setF({ ...f, endDate: v })} required={false} helper="Leave empty for one day" /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label="For" value={f.audience} onChange={(e) => setF({ ...f, audience: e.target.value })}
+              helperText={AUDIENCE_HELP[f.audience]}>
+              {ALMANAC_AUDIENCES.map((a) => <MenuItem key={a} value={a}>{AUDIENCE_LABEL[a]}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Venue" value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} placeholder="e.g. Main hall" /></Grid>
+            <Grid size={12}><TextField fullWidth label="Responsible office" value={f.responsible} onChange={(e) => setF({ ...f, responsible: e.target.value })}
+              placeholder="e.g. Office of the Principal, Examinations Office" /></Grid>
+            <Grid size={12}><TextField fullWidth multiline minRows={2} label="Notes (optional)" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })}
+              slotProps={{ htmlInput: { maxLength: 500 } }} /></Grid>
           </Grid>
-          <ErrorAlert error={save.error} />
+          <ErrorAlert error={save.error ?? remove.error} />
         </DialogContent>
-        <DialogActions><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="contained" disabled={save.isPending}>Save</Button></DialogActions>
+        <DialogActions>
+          {f.id && onDeleted && <Button color="error" sx={{ mr: 'auto' }} disabled={remove.isPending} onClick={() => { if (window.confirm(`Delete "${f.title}"?`)) remove.mutate(); }}>Delete</Button>}
+          <Button onClick={onClose}>Cancel</Button><Button type="submit" variant="contained" disabled={save.isPending}>Save</Button>
+        </DialogActions>
       </form>
     </Dialog>
   );

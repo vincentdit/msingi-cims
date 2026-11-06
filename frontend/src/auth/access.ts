@@ -29,7 +29,8 @@ const TEACHING = [...EXAMS_READERS, R.LECTURER, R.ASSESSOR, R.COORDINATOR];
 export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'healthInsurance' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
-  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help' | 'subscription';
+  | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help' | 'subscription'
+  | 'almanac' | 'organisation';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
@@ -82,6 +83,10 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   help: Object.values(R),
   // what the institution pays Msingi for CIMS
   subscription: [R.ADMIN],
+  // the institution's year and its organisation: every member of staff reads them (the administrator, and for the almanac the
+  // Deputy Principal (Academic), keep them)
+  almanac: Object.values(R),
+  organisation: Object.values(R),
 };
 
 export const can = (roles: readonly string[] | undefined, page: PageKey) => !!roles?.some((r) => PAGE_ROLES[page].includes(r));
@@ -93,6 +98,7 @@ const PATH_PAGE: Record<string, PageKey> = {
   'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', timetable: 'timetable', 'exam-timetable': 'examTimetable', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations', helpdesk: 'helpdesk', help: 'help', 'msingi-subscription': 'subscription',
+  almanac: 'almanac', organisation: 'organisation',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {
