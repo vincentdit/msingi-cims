@@ -43,7 +43,7 @@ public class ImportController {
 
     @GetMapping("/external-bodies")
     public List<String> bodies() {
-        return ImportService.EXTERNAL_BODIES;
+        return service.externalBodies();
     }
 
     @GetMapping("/batches/{id}")

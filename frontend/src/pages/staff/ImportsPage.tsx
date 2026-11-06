@@ -5,7 +5,7 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, download, formatDateTime, uploadForm } from '../../api/client';
 import type { AdmissionWindow } from '../../api/types';
 import { useSession } from '../../auth/session';
@@ -27,7 +27,7 @@ const KINDS: { kind: Kind; label: string; roles: string[]; intro: string }[] = [
   { kind: 'BALANCES', label: 'Opening balances', roles: ['INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT'],
     intro: 'What each student owed (positive) or had paid in excess (negative) when the institution moved to CIMS. A balance owed becomes an invoice; a credit is used against the next invoice.' },
   { kind: 'SELECTIONS', label: 'External selections', roles: ['INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER'],
-    intro: 'Students selected for the institution by TAMISEMI or another body. They join the admission window as selected, go to NACTVET verification and receive offers like other applicants; they are told by SMS to sign up with their index number.' },
+    intro: 'Students selected for the institution by another body (TAMISEMI for government institutions, the Ministry of Health, a sponsor…). They join the admission window as selected, go to NACTVET verification and receive offers like other applicants; they are told by SMS to sign up with their index number.' },
 ];
 
 /** Bringing data in from files: checked first, applied after another person signs off (BR-39, BR-08). */
@@ -56,7 +56,8 @@ function KindPanel({ k }: { k: (typeof KINDS)[number] }) {
   const windows = useQuery({ queryKey: ['staff', 'windows'], enabled: k.kind === 'SELECTIONS', queryFn: () => api<AdmissionWindow[]>('/api/admission/windows', staff) });
   const bodies = useQuery({ queryKey: ['imports', 'bodies'], enabled: k.kind === 'SELECTIONS', queryFn: () => api<string[]>('/api/imports/external-bodies', staff) });
   const [windowId, setWindowId] = useState('');
-  const [body, setBody] = useState('TAMISEMI');
+  const [body, setBody] = useState('');
+  useEffect(() => { if (!body && bodies.data?.length) setBody(bodies.data[0]); }, [bodies.data, body]);
   const [open, setOpen] = useState<Batch | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const up = useMutation({
@@ -80,7 +81,7 @@ function KindPanel({ k }: { k: (typeof KINDS)[number] }) {
                 {(windows.data ?? []).filter((w) => w.state !== 'DRAFT').map((w) => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
               </TextField>
               <TextField select size="small" label="Selected by" value={body} onChange={(e) => setBody(e.target.value)} sx={{ minWidth: 200 }}>
-                {(bodies.data ?? ['TAMISEMI']).map((b) => <MenuItem key={b} value={b}>{b.replace(/_/g, ' ')}</MenuItem>)}
+                {(bodies.data ?? []).map((b) => <MenuItem key={b} value={b}>{b.replace(/_/g, ' ')}</MenuItem>)}
               </TextField>
             </>
           )}

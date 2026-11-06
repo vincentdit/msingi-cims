@@ -51,6 +51,13 @@ public class ImportService {
     private final NumberSequenceService sequences;
     private final ImportValidator validator;
     private final ImportApplier applier;
+    private final tz.co.msingi.cims.integration.settings.IntegrationSettingsService integrations;
+
+    /** Who can have selected students for this institution: TAMISEMI selects for government institutions only. */
+    @Transactional(readOnly = true)
+    public List<String> externalBodies() {
+        return integrations.government() ? EXTERNAL_BODIES : EXTERNAL_BODIES.stream().filter(b -> !"TAMISEMI".equals(b)).toList();
+    }
 
     public record Problem(int row, String field, String message) {
     }
@@ -70,8 +77,9 @@ public class ImportService {
         requireRole(kind);
         if (kind == Kind.SELECTIONS) {
             if (windowId == null) throw new BusinessRuleException("WINDOW_REQUIRED", "Choose the admission window the selected students join.");
-            if (externalBody == null || !EXTERNAL_BODIES.contains(externalBody)) {
-                throw new BusinessRuleException("BODY_REQUIRED", "Choose who selected the students: " + String.join(", ", EXTERNAL_BODIES));
+            List<String> bodies = externalBodies();
+            if (externalBody == null || !bodies.contains(externalBody)) {
+                throw new BusinessRuleException("BODY_REQUIRED", "Choose who selected the students: " + String.join(", ", bodies));
             }
         }
         List<Map<String, String>> raw = TabularFile.read(data);

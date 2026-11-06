@@ -50,15 +50,16 @@ export default function IntegrationsPage() {
     { key: 'settings', label: 'Settings', show: true },
     { key: 'nactvet', label: 'NACTVET registration', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR') },
     { key: 'heslb', label: 'HESLB', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT') },
-    { key: 'muse', label: 'MUSE postings', show: has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
-    { key: 'tamisemi', label: 'TAMISEMI selections', show: has(roles, 'INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER') },
+    // MUSE (the government's accounting system) and TAMISEMI's selections concern government institutions only
+    { key: 'muse', label: 'MUSE postings', show: gepg && has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
+    { key: 'tamisemi', label: 'TAMISEMI selections', show: gepg && has(roles, 'INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER') },
     { key: 'nhif', label: 'NHIF', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR') },
     { key: 'mobile', label: 'Mobile money', show: !gepg && has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
   ].filter((t) => t.show);
   const [tab, setTab] = useState(tabs[0].key);
   return (
     <Container maxWidth="lg" disableGutters>
-      <PageTitle title="Integrations" subtitle={gepg ? 'Your codes at GePG, HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI.' : 'Your codes at HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI.'} />
+      <PageTitle title="Integrations" subtitle={gepg ? 'Your codes at GePG, HESLB, MUSE, TAMISEMI and NHIF, and the exchanges with NACTVET, HESLB, MUSE and TAMISEMI.' : 'Your codes at HESLB and NHIF, the exchanges with NACTVET and HESLB, and mobile money.'} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile sx={{ mb: 2 }}>
         {tabs.map((t) => <Tab key={t.key} value={t.key} label={t.label} />)}
       </Tabs>
@@ -96,7 +97,7 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
       <Card><CardContent>
         <Typography variant="subtitle2" gutterBottom>Connections</Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {Object.entries(q.data!.modes).filter(([k]) => gepg || k !== 'GEPG').map(([k, v]) => (
+          {Object.entries(q.data!.modes).filter(([k]) => gepg || !['GEPG', 'MUSE', 'TAMISEMI'].includes(k)).map(([k, v]) => (
             <Chip key={k} size="small" color={v === 'LIVE' ? 'success' : 'default'} variant={v === 'LIVE' ? 'filled' : 'outlined'}
               label={`${SYSTEMS[k] ?? k}: ${v === 'LIVE' ? 'live' : 'simulated'}`} />
           ))}
@@ -119,11 +120,13 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
         <Grid container spacing={2} alignItems="center">
           <Grid size={{ xs: 12, sm: 4 }}>{flag('heslbEnabled', 'HESLB loans')}</Grid>
           <Grid size={{ xs: 12, sm: 8 }}>{text('heslbCode', 'Code at HESLB (optional)')}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{flag('tamisemiEnabled', 'TAMISEMI selections')}</Grid>
-          <Grid size={{ xs: 12, sm: 8 }}>{text('tamisemiCode', 'Code at TAMISEMI (optional)')}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{flag('museEnabled', 'MUSE fee postings')}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{text('museVoteCode', 'Vote code')}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{text('museCashAccount', 'Bank account in MUSE')}</Grid>
+          {gepg && <>
+            <Grid size={{ xs: 12, sm: 4 }}>{flag('tamisemiEnabled', 'TAMISEMI selections')}</Grid>
+            <Grid size={{ xs: 12, sm: 8 }}>{text('tamisemiCode', 'Code at TAMISEMI (optional)')}</Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>{flag('museEnabled', 'MUSE fee postings')}</Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>{text('museVoteCode', 'Vote code')}</Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>{text('museCashAccount', 'Bank account in MUSE')}</Grid>
+          </>}
           <Grid size={{ xs: 12 }}>{flag('nidaEnabled', 'Check National Identification Numbers with NIDA')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{flag('nhifEnabled', 'NHIF health insurance')}</Grid>
           <Grid size={{ xs: 12, sm: 4 }}>{text('nhifCode', 'NHIF agent number', 'The first part of card application batch numbers')}</Grid>

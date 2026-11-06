@@ -58,8 +58,24 @@ public class IntegrationSettingsService {
                 (rs, i) -> new Settings(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getBoolean(5), rs.getString(6),
                         rs.getBoolean(7), rs.getBoolean(8), rs.getString(9), rs.getString(10), rs.getBoolean(11), rs.getString(12),
                         rs.getBoolean(13), rs.getString(14), rs.getBigDecimal(15), rs.getBoolean(16)));
-        return r.isEmpty() ? new Settings(null, null, null, null, false, null, false, false, null, null, false, null, false, null, DEFAULT_NHIF_CONTRIBUTION, false)
+        Settings x = r.isEmpty() ? new Settings(null, null, null, null, false, null, false, false, null, null, false, null, false, null, DEFAULT_NHIF_CONTRIBUTION, false)
                 : r.get(0);
+        if (!government() && (x.museEnabled() || x.tamisemiEnabled())) {
+            // MUSE and TAMISEMI serve government institutions only: switched off whatever was stored before the institution's ownership changed
+            x = new Settings(x.gepgSpCode(), x.gepgSubSpCode(), x.gepgSystemId(), x.gepgGfsCode(), x.heslbEnabled(), x.heslbCode(), x.nidaEnabled(),
+                    false, x.museVoteCode(), x.museCashAccount(), false, x.tamisemiCode(), x.nhifEnabled(), x.nhifCode(), x.nhifContribution(), x.nhifRequired());
+        }
+        return x;
+    }
+
+    /**
+     * Whether the institution is a government (public) one. MUSE (the government's accounting system) and TAMISEMI's selections to
+     * government colleges apply to these only; private and faith-based institutions do not see them.
+     */
+    @Transactional(readOnly = true)
+    public boolean government() {
+        String o = jdbc.queryForList("select ownership from tenants where id = cims_current_tenant()", String.class).stream().findFirst().orElse(null);
+        return tz.co.msingi.cims.platform.tenancy.Ownership.PUBLIC.equals(o);
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +86,9 @@ public class IntegrationSettingsService {
 
     @Transactional
     public View save(Settings s) {
+        if (!government() && (s.museEnabled() || s.tamisemiEnabled())) {
+            throw new BusinessRuleException("GOVERNMENT_ONLY", "MUSE fee postings and TAMISEMI selections are for government institutions only.");
+        }
         Settings before = get();
         Object[] args = {blank(s.gepgSpCode()), blank(s.gepgSubSpCode()), blank(s.gepgSystemId()), blank(s.gepgGfsCode()), s.heslbEnabled(),
                 upper(s.heslbCode()), s.nidaEnabled(), s.museEnabled(), blank(s.museVoteCode()), blank(s.museCashAccount()), s.tamisemiEnabled(),

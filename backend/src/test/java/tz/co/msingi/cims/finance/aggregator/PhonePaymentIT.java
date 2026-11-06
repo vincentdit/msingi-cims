@@ -74,6 +74,17 @@ class PhonePaymentIT {
         AdmissionScenario s = new AdmissionScenario(mvc, json, inst.tenant().getCode(), inst);
         String bursar = s.staffToken("bursar"), accountant = s.staffToken("accountant");
 
+        // MUSE and TAMISEMI are for government institutions only
+        s.call(put("/api/integration-settings"), bursar, "{\"tamisemiEnabled\":true}").andExpect(jsonPath("$.code").value("GOVERNMENT_ONLY"));
+        s.call(put("/api/integration-settings"), bursar, "{\"museEnabled\":true}").andExpect(jsonPath("$.code").value("GOVERNMENT_ONLY"));
+        s.call(put("/api/integration-settings"), bursar, "{\"heslbEnabled\":false}").andExpect(status().isOk());
+        TenantContext.runAs(inst.info(), () -> tx.executeWithoutResult(x -> jdbc.update("update integration_settings set tamisemi_enabled = true, muse_enabled = true")));   // stored before the ownership changed
+        JsonNode integ = s.body(s.call(get("/api/integration-settings"), bursar, null).andExpect(status().isOk()));
+        assertThat(integ.at("/settings/tamisemiEnabled").asBoolean()).isFalse();
+        assertThat(integ.at("/settings/museEnabled").asBoolean()).isFalse();
+        data.staff(inst.tenant(), "admissions", Role.ADMISSIONS_OFFICER);
+        assertThat(s.body(s.call(get("/api/imports/external-bodies"), s.staffToken("admissions"), null)).toString()).doesNotContain("TAMISEMI").contains("MINISTRY_OF_HEALTH");
+
         // nothing set up: no prompt offered, and asking for one is refused
         assertThat(s.body(s.call(get("/api/public/institution"), null, null)).at("/payment/phonePrompt/enabled").asBoolean()).isFalse();
         String[] a = applicantWithFee(s, inst, 1);
@@ -168,6 +179,8 @@ class PhonePaymentIT {
         s.call(put("/api/collection-account"), bursar, "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":true,\"phonePrompt\":true}")
                 .andExpect(jsonPath("$.code").value("GEPG_INSTITUTION"));
         assertThat(s.body(s.call(get("/api/collection-account"), bursar, null)).get("available").asBoolean()).isFalse();
+        s.call(put("/api/integration-settings"), bursar, "{\"tamisemiEnabled\":true,\"museEnabled\":true}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.settings.tamisemiEnabled").value(true));
     }
 
     ResultActions notify(TestData.Institution inst, String provider, String token, String body, Map<String, String> headers) throws Exception {
