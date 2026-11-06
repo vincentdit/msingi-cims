@@ -64,6 +64,7 @@ public class ApplicantFileService {
     private final ApplicantQualificationRepository qualifications;
     private final ApplicationService applicationService;
     private final TenantRepository tenants;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
     private final AuditService audit;
 
     /** What the office searches by. */
@@ -110,7 +111,10 @@ public class ApplicantFileService {
     public byte[] file(Long id) {
         ApplicationDetailView d = applicationService.detail(id);
         audit.record("APPLICATION_FILE_PRINTED", "Application", id, Map.of("reference", String.valueOf(d.application().referenceNo())));
-        return PdfRenderer.render(TEMPLATE.render(values(d), markup(d)), "application " + d.application().referenceNo());
+        Map<String, String> v = values(d);
+        Map<String, String> m = new HashMap<>(markup(d));
+        m.put("badge", principal.logoOnly(null, null).badge(v.get("institutionShortName"), 40));
+        return PdfRenderer.render(TEMPLATE.render(v, m), "application " + d.application().referenceNo());
     }
 
     // ------------------------------------------------------------------ helpers

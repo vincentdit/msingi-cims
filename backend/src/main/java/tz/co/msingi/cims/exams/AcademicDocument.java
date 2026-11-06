@@ -51,4 +51,7 @@ public class AcademicDocument extends BaseEntity {
     private OffsetDateTime issuedAt = OffsetDateTime.now();
     @Column(nullable = false)
     private String issuedByName;
+
+    /** The Principal record that signs this document (null on documents issued before the Principal was recorded). */
+    private Long signatoryId;
 }

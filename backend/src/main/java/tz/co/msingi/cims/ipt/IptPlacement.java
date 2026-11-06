@@ -53,6 +53,9 @@ public class IptPlacement extends BaseEntity {
     private String letterNo;
     private OffsetDateTime letterIssuedAt;
 
+    /** The Principal record that signs the placement letter (null on letters issued before the Principal was recorded). */
+    private Long letterSignatoryId;
+
     @Column(nullable = false, updatable = false)
     private OffsetDateTime requestedAt = OffsetDateTime.now();
 

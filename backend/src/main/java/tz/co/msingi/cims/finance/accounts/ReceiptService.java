@@ -48,6 +48,7 @@ public class ReceiptService {
     private final AccountService accounts;
     private final StudentRepository students;
     private final TenantRepository tenants;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
 
     /** The receipt for one of the signed-in applicant's or student's payments; anyone else's is "not found". */
     @Transactional(readOnly = true)
@@ -94,6 +95,7 @@ public class ReceiptService {
         v.put("invoiceBalance", "TZS " + AccountService.tzs(inv.balance()));
 
         Map<String, String> m = new HashMap<>();
+        m.put("badge", principal.logoOnly(null, null).badge(v.get("institutionShortName"), 40));
         String regNo = inv.getPayerType() == Invoice.PayerType.STUDENT
                 ? students.findById(inv.getPayerId()).map(Student::getRegistrationNo).orElse(null) : null;
         m.put("registrationRow", regNo == null ? "" : "<tr><th>Registration no.</th><td>" + HtmlTemplate.escape(regNo) + "</td></tr>");

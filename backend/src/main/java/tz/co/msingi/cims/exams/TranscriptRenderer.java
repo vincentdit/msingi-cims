@@ -1,6 +1,7 @@
 package tz.co.msingi.cims.exams;
 
 import tz.co.msingi.cims.common.document.HtmlTemplate;
+import tz.co.msingi.cims.common.document.OfficialMarks;
 import tz.co.msingi.cims.common.document.PdfRenderer;
 import tz.co.msingi.cims.common.document.QrCodes;
 
@@ -25,11 +26,11 @@ public final class TranscriptRenderer {
     private TranscriptRenderer() {
     }
 
-    public static byte[] pdf(TranscriptContent c) {
-        return PdfRenderer.render(html(c), "statement of results " + c.documentNo());
+    public static byte[] pdf(TranscriptContent c, OfficialMarks marks) {
+        return PdfRenderer.render(html(c, marks), "statement of results " + c.documentNo());
     }
 
-    static String html(TranscriptContent c) {
+    static String html(TranscriptContent c, OfficialMarks marks) {
         Map<String, String> v = new HashMap<>();
         v.put("institutionName", c.institutionName());
         String shortName = c.institutionShortName() == null || c.institutionShortName().isBlank()
@@ -56,6 +57,8 @@ public final class TranscriptRenderer {
         v.put("verificationCode", c.verificationCode());
         v.put("verificationUrlBase", urlBase(c.verificationUrl()));
         Map<String, String> m = new HashMap<>();
+        m.put("badge", marks.badge(v.get("institutionShortName"), 48));
+        m.put("signatureBlock", marks.signatureBlock(null, 1, 180));
         m.put("qrImage", "<img alt=\"QR code\" style=\"width: 70pt; height: 70pt;\" src=\"data:image/png;base64,"
                 + Base64.getEncoder().encodeToString(QrCodes.png(c.verificationUrl(), 300)) + "\" />");
         StringBuilder sb = new StringBuilder();

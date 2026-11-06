@@ -99,6 +99,7 @@ public class IptService {
 
     private final tz.co.msingi.cims.platform.security.DataScope scope;
     private final tz.co.msingi.cims.platform.letters.LetterTemplateService letterTemplates;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
     private final OrganisationRepository organisations;
     private final PeriodRepository periods;
     private final PlacementRepository placements;
@@ -337,6 +338,7 @@ public class IptService {
         int y = Year.now(ZONE).getValue();
         pl.setLetterNo(NumberSequenceService.format(t.getCode() + "/IPT/" + y + "/", sequences.next("IPT-LETTER-" + y), 5));
         pl.setLetterIssuedAt(OffsetDateTime.now());
+        pl.setLetterSignatoryId(principal.currentId());
     }
 
     // ------------------------------------------------------------------ one placement
@@ -369,7 +371,7 @@ public class IptService {
         String supervisor = pl.getInstitutionSupervisorId() == null ? null : users.findById(pl.getInstitutionSupervisorId()).map(UserAccount::getFullName).orElse(null);
         return PlacementLetter.render(t, pl, s, supervisor,
                 letterTemplates.body(tz.co.msingi.cims.platform.letters.LetterTemplateService.IPT_INTRO),
-                letterTemplates.body(tz.co.msingi.cims.platform.letters.LetterTemplateService.IPT_REQUESTS));
+                letterTemplates.body(tz.co.msingi.cims.platform.letters.LetterTemplateService.IPT_REQUESTS), principal.marksFor(pl.getLetterSignatoryId()));
     }
 
     // ------------------------------------------------------------------ logbook (FR-IPT-03)

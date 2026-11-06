@@ -63,4 +63,7 @@ public class AdmissionLetter extends BaseEntity {
     private OffsetDateTime revokedAt;
     private String revokedByName;
     private String revokeReason;
+
+    /** The Principal record that signs this letter (null on letters issued before the Principal was recorded). */
+    private Long signatoryId;
 }

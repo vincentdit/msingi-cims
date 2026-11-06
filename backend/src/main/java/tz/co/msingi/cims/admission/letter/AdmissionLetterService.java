@@ -51,6 +51,7 @@ public class AdmissionLetterService {
 
     private final tz.co.msingi.cims.notification.email.EmailService email;
     private final LetterTemplateService letterTemplates;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
 
     private static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
 
@@ -179,6 +180,7 @@ public class AdmissionLetterService {
         l.setIssuedBy(CurrentUser.id().orElse(null));
         l.setIssuedByName(CurrentUser.id().isPresent() ? CurrentUser.name() : "System");
         l.setReissueReason(reissueReason);
+        l.setSignatoryId(principal.currentId());
         letters.saveAndFlush(l);
         audit.record(edition == 1 ? "ADMISSION_LETTER_ISSUED" : "ADMISSION_LETTER_REISSUED", "AdmissionLetter", l.getId(),
                 reissueReason == null ? Map.of("letterNo", letterNo, "edition", edition)
@@ -193,7 +195,7 @@ public class AdmissionLetterService {
                         + "\nVerification code: " + code + "\nAnyone can check the letter at " + verificationUrl(tenant, code)
                         + "\n\n" + tenant.getName() + "\n(Sent by CIMS; please do not reply to this email.)",
                 new tz.co.msingi.cims.notification.email.EmailService.Attachment(letterNo.replaceAll("[^A-Za-z0-9]+", "-") + ".pdf",
-                        "application/pdf", AdmissionLetterRenderer.pdf(content))));
+                        "application/pdf", AdmissionLetterRenderer.pdf(content, marks(l)))));
         return l;
     }
 
@@ -221,7 +223,18 @@ public class AdmissionLetterService {
 
     private Download download(AdmissionLetter l) {
         String file = "admission-letter-" + l.getLetterNo().replaceAll("[^A-Za-z0-9]+", "-") + (l.getEdition() > 1 ? "-e" + l.getEdition() : "") + ".pdf";
-        return new Download(file, AdmissionLetterRenderer.pdf(l.getContent()));
+        return new Download(file, AdmissionLetterRenderer.pdf(l.getContent(), marks(l)));
+    }
+
+    /**
+     * The logo and signature printed on a letter: the Principal record it was issued with; on letters issued before the Principal
+     * was recorded, the name typed in the joining instructions (unsigned, as issued), or the current Principal when none was typed.
+     */
+    private tz.co.msingi.cims.common.document.OfficialMarks marks(AdmissionLetter l) {
+        if (l.getSignatoryId() != null) return principal.marksFor(l.getSignatoryId());
+        JoiningInstructions j = l.getContent().joining();
+        if (j != null && j.signatoryName() != null && !j.signatoryName().isBlank()) return principal.logoOnly(j.signatoryName(), j.signatoryTitle());
+        return principal.marks();
     }
 
     public record Download(String filename, byte[] content) {

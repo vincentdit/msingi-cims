@@ -13,6 +13,7 @@ import tz.co.msingi.cims.admission.letter.AdmissionLetterRenderer;
 import tz.co.msingi.cims.admission.letter.JoiningInstructions;
 import tz.co.msingi.cims.admission.letter.LetterContent;
 import tz.co.msingi.cims.ipt.PlacementLetter;
+import tz.co.msingi.cims.platform.branding.PrincipalService;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
 import tz.co.msingi.cims.platform.tenancy.TenantRepository;
@@ -32,6 +33,7 @@ public class LetterTemplateController {
 
     private final LetterTemplateService service;
     private final TenantRepository tenants;
+    private final PrincipalService principal;
 
     @GetMapping
     public List<LetterTemplateService.TemplateView> list() {
@@ -59,7 +61,8 @@ public class LetterTemplateController {
         byte[] pdf;
         if (code.startsWith("IPT_")) {
             Map<String, String> v = new HashMap<>();
-            v.put("primaryColor", "#1F4E8C");
+            Object c = t.getBranding() == null ? null : t.getBranding().get("primaryColor");
+            v.put("primaryColor", c != null && c.toString().matches("^#[0-9a-fA-F]{6}$") ? c.toString() : "#1F4E8C");
             v.put("shortName", t.getShortName() == null ? "CIMS" : t.getShortName());
             v.put("institutionName", t.getName());
             v.put("nactvetNo", t.getNactvetRegNo() == null ? "" : t.getNactvetRegNo());
@@ -81,22 +84,26 @@ public class LetterTemplateController {
             v.put("institutionSupervisor", "Mr. Daudi Lema");
             String intro = code.equals(LetterTemplateService.IPT_INTRO) ? s.body() : service.body(LetterTemplateService.IPT_INTRO);
             String req = code.equals(LetterTemplateService.IPT_REQUESTS) ? s.body() : service.body(LetterTemplateService.IPT_REQUESTS);
-            pdf = PlacementLetter.render(v, intro, req, "sample placement letter");
+            pdf = PlacementLetter.render(v, intro, req, principal.marks(), "sample placement letter");
         } else {
             Map<String, String> wording = new HashMap<>();
             for (String c : List.of(LetterTemplateService.ADMISSION_INTRO, LetterTemplateService.ADMISSION_TERMS, LetterTemplateService.ADMISSION_PAYMENT)) {
                 wording.put(c, c.equals(code) ? s.body() : service.body(c));
             }
-            Object colour = t.getBranding() == null ? null : t.getBranding().get("primaryColor");
-            LetterContent sample = new LetterContent(t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactPhone(), t.getContactEmail(),
-                    colour == null ? "" : colour.toString(), "SAMPLE/ADM/2027/000001", 1, LocalDate.now(), "Asha Juma Mwinyi",
-                    "P.O. Box 123\nMoshi, Kilimanjaro", "SAMPLE/APP/2027/000123", "NV2027-000123", "Ordinary Diploma in Information Technology",
-                    "Ordinary Diploma (NTA Level 6)", "NTA6-ICT-01", 6, "2027/2028", "September Intake", OffsetDateTime.now(),
-                    new JoiningInstructions(LocalDate.now().plusMonths(1), "08:00", "Main Hall", null, List.of("Original CSEE certificate"),
-                            List.of(), null, List.of(), "Principal's name", "Principal"),
-                    "SAMP-LE00-0000-0000", "https://example.ac.tz/verify/SAMP-LE00-0000-0000").withWording(wording);
-            pdf = AdmissionLetterRenderer.pdf(sample);
+            pdf = AdmissionLetterRenderer.pdf(sampleAdmissionLetter(t, wording), principal.marks());
         }
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).header("Content-Disposition", "inline; filename=\"sample-letter.pdf\"").body(pdf);
+    }
+
+    /** A sample admission letter for the institution with the given wording (previews of the wording and of the signature). */
+    public static LetterContent sampleAdmissionLetter(Tenant t, Map<String, String> wording) {
+        Object colour = t.getBranding() == null ? null : t.getBranding().get("primaryColor");
+        return new LetterContent(t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactPhone(), t.getContactEmail(),
+                colour == null ? "" : colour.toString(), "SAMPLE/ADM/2027/000001", 1, LocalDate.now(), "Asha Juma Mwinyi",
+                "P.O. Box 123\nMoshi, Kilimanjaro", "SAMPLE/APP/2027/000123", "NV2027-000123", "Ordinary Diploma in Information Technology",
+                "Ordinary Diploma (NTA Level 6)", "NTA6-ICT-01", 6, "2027/2028", "September Intake", OffsetDateTime.now(),
+                new JoiningInstructions(LocalDate.now().plusMonths(1), "08:00", "Main Hall", null, List.of("Original CSEE certificate"),
+                        List.of(), null, List.of(), null, null),
+                "SAMP-LE00-0000-0000", "https://example.ac.tz/verify/SAMP-LE00-0000-0000").withWording(wording);
     }
 }

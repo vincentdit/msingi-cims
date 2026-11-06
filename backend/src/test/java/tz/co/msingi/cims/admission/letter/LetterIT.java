@@ -165,7 +165,87 @@ class LetterIT {
         s.call(get("/api/admission/applications/" + a.applicationId() + "/admission-letter"), a.token(), null).andExpect(status().isForbidden());
     }
 
+    @Test
+    void lettersAreSignedByThePrincipalAndKeepTheSignatureTheyWereIssuedWith() throws Exception {
+        String admin = officer;                           // the test institution's officer is also its administrator
+        String clerk = s.staffToken("clerk");
+        String base = "/api/admin/institution/principal";
+        s.call(get(base), clerk, null).andExpect(status().isForbidden());
+        s.call(get(base), admin, null).andExpect(status().isNoContent());
+        s.call(mark("signature", scan()), admin, null).andExpect(jsonPath("$.code").value("PRINCIPAL_FIRST"));
+
+        s.call(put(base), admin, "{\"name\":\"Dr. Neema Mushi\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Principal")).andExpect(jsonPath("$.signature").value(false));
+        s.call(mark("signature", scan()), admin, null).andExpect(jsonPath("$.signature").value(true));
+        s.call(mark("stamp", scan(300)), admin, null).andExpect(jsonPath("$.stamp").value(true))
+                .andExpect(jsonPath("$.changeNote").value("Stamp uploaded"));
+        // the signature is shown to the administrator only, never on the public photo address
+        s.call(get(base + "/signature"), admin, null).andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        s.call(get(base + "/signature"), clerk, null).andExpect(status().isForbidden());
+        s.call(get("/api/public/institution/photos/signature"), null, null).andExpect(status().isNotFound());
+
+        // the window's joining instructions still name someone else: the letter is signed by the Principal
+        configure();
+        Applicant a = acceptedApplicant("S0101/0001");
+        String path = "/api/applicant/applications/" + a.applicationId() + "/admission-letter";
+        byte[] first = s.call(get(path), a.token(), null).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument doc = PDDocument.load(first)) {
+            assertThat(new PDFTextStripper().getText(doc)).contains("Dr. Neema Mushi", "Principal").doesNotContain("Dr. Amina Salum");
+            int images = 0;
+            for (var n : doc.getPage(0).getResources().getXObjectNames()) if (doc.getPage(0).getResources().isImageXObject(n)) images++;
+            assertThat(images).isGreaterThanOrEqualTo(3);   // signature, stamp, QR code
+        }
+
+        // a new Principal takes office: the signature is not carried over, the stamp is; the issued letter keeps its signatory
+        s.call(put(base), admin, "{\"name\":\"Mr. Juma Hassan\",\"title\":\"Principal\"}")
+                .andExpect(jsonPath("$.signature").value(false)).andExpect(jsonPath("$.stamp").value(true))
+                .andExpect(jsonPath("$.changes").value(4));
+        assertThat(s.body(s.call(get(base + "/history"), admin, null)).size()).isEqualTo(4);
+        byte[] again = s.call(get(path), a.token(), null).andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument doc = PDDocument.load(again)) {
+            assertThat(new PDFTextStripper().getText(doc)).contains("Dr. Neema Mushi").doesNotContain("Mr. Juma Hassan");
+        }
+        // a corrected letter is a new issue, signed by the Principal in office
+        s.call(post("/api/admission/applications/" + a.applicationId() + "/admission-letter/reissue"), officer, "{\"reason\":\"Name corrected\"}")
+                .andExpect(status().isOk());
+        try (PDDocument doc = PDDocument.load(s.call(get(path), a.token(), null).andReturn().getResponse().getContentAsByteArray())) {
+            assertThat(new PDFTextStripper().getText(doc)).contains("Mr. Juma Hassan").doesNotContain("Dr. Neema Mushi");
+        }
+        try (PDDocument doc = PDDocument.load(s.call(get(base + "/sample"), admin, null).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray())) {
+            assertThat(new PDFTextStripper().getText(doc)).contains("Mr. Juma Hassan", "SAMPLE/ADM/2027/000001");
+        }
+        s.call(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(base + "/stamp"), admin, null)
+                .andExpect(jsonPath("$.stamp").value(false)).andExpect(jsonPath("$.changeNote").value("Stamp removed"));
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    static byte[] scan() throws Exception {
+        return scan(600);
+    }
+
+    static byte[] scan(int width) throws Exception {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(width, 240, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var g = img.createGraphics();
+        g.setColor(java.awt.Color.WHITE);
+        g.fillRect(0, 0, width, 240);
+        g.setColor(new java.awt.Color(20, 30, 90));
+        g.fillOval(width / 6, 60, width * 2 / 3, 120);
+        g.dispose();
+        var out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "jpg", out);
+        return out.toByteArray();
+    }
+
+    static org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder mark(String kind, byte[] bytes) {
+        var b = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/admin/institution/principal/" + kind);
+        b.file(new org.springframework.mock.web.MockMultipartFile("file", kind + ".jpg", "image/jpeg", bytes));
+        b.with(r -> { r.setMethod("PUT"); return r; });
+        return b;
+    }
 
     private void configure() throws Exception {
         s.call(put("/api/admission/windows/" + s.inst.windowId() + "/joining-instructions"), officer, INSTRUCTIONS).andExpect(status().isOk());

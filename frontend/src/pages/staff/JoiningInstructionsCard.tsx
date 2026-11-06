@@ -36,13 +36,14 @@ export default function JoiningInstructionsCard({ win, canEdit }: { win: Admissi
         reportingDate: f.reportingDate, reportingTime: f.reportingTime || null, reportingVenue: f.reportingVenue,
         registrationDeadline: f.registrationDeadline || null, documentsToBring: fromLines(f.documentsToBring),
         itemsToBring: fromLines(f.itemsToBring), feesNote: f.feesNote || null, notes: fromLines(f.notes),
-        signatoryName: f.signatoryName, signatoryTitle: f.signatoryTitle,
+        // letters are signed by the Principal recorded on the Institution page
+        signatoryName: null, signatoryTitle: null,
       },
     }),
     onSuccess: () => { setForm(null); qc.invalidateQueries({ queryKey: ['staff'] }); },
   });
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => f && { ...f, [k]: e.target.value });
-  const valid = form && form.reportingDate && form.reportingVenue.trim() && form.signatoryName.trim() && form.signatoryTitle.trim();
+  const valid = form && form.reportingDate && form.reportingVenue.trim();
 
   return (
     <Card sx={{ mt: 3 }}>
@@ -54,7 +55,7 @@ export default function JoiningInstructionsCard({ win, canEdit }: { win: Admissi
           </Box>
           {canEdit && <Button startIcon={<EditIcon />} onClick={() => setForm(toForm(j))}>{j ? 'Edit' : 'Set up'}</Button>}
         </Stack>
-        {!j && <Alert severity="warning">Not set yet — admission letters cannot be issued until the reporting date, venue and signatory are set.</Alert>}
+        {!j && <Alert severity="warning">Not set yet — admission letters cannot be issued until the reporting date and venue are set.</Alert>}
         {j && (
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}>
@@ -70,8 +71,8 @@ export default function JoiningInstructionsCard({ win, canEdit }: { win: Admissi
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <Typography variant="body2" color="text.secondary">Signed by</Typography>
-              <Typography>{j.signatoryName}</Typography>
-              <Typography variant="body2">{j.signatoryTitle}</Typography>
+              <Typography>The Principal</Typography>
+              <Typography variant="body2" color="text.secondary">Name, signature and stamp are set on the Institution page.</Typography>
             </Grid>
           </Grid>
         )}
@@ -90,8 +91,7 @@ export default function JoiningInstructionsCard({ win, canEdit }: { win: Admissi
               <Grid size={{ xs: 12, md: 6 }}><TextField label="Items to bring (one per line)" fullWidth multiline minRows={4} value={form.itemsToBring} onChange={set('itemsToBring')} /></Grid>
               <Grid size={12}><TextField label="Fees" fullWidth multiline minRows={2} value={form.feesNote} onChange={set('feesNote')} helperText={gepg ? 'Amounts and how to pay. Fees are always paid through a GePG control number.' : 'Amounts and how to pay. Fees are paid into the college’s own mobile money and bank accounts with a payment reference.'} /></Grid>
               <Grid size={12}><TextField label="Other information (one per line)" fullWidth multiline minRows={2} value={form.notes} onChange={set('notes')} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField label="Signatory name" fullWidth required value={form.signatoryName} onChange={set('signatoryName')} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField label="Signatory title" fullWidth required value={form.signatoryTitle} onChange={set('signatoryTitle')} /></Grid>
+              <Grid size={12}><Alert severity="info">Letters are signed by the Principal, with the signature and stamp set on the Institution page.</Alert></Grid>
             </Grid>
             <Box sx={{ mt: 2 }}><ErrorAlert error={save.error} /></Box>
           </DialogContent>

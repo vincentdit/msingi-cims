@@ -1,6 +1,7 @@
 package tz.co.msingi.cims.graduation;
 
 import tz.co.msingi.cims.common.document.HtmlTemplate;
+import tz.co.msingi.cims.common.document.OfficialMarks;
 import tz.co.msingi.cims.common.document.PdfRenderer;
 import tz.co.msingi.cims.common.document.QrCodes;
 import tz.co.msingi.cims.platform.tenancy.Tenant;
@@ -25,7 +26,7 @@ public final class CertificateRenderer {
 
     public record Certificate(Tenant tenant, String name, String registrationNo, String award, String programme, String classification,
                               String completed, LocalDate awardedOn, String certificateNo, String verificationCode, String verificationUrl,
-                              boolean reprint) {
+                              boolean reprint, OfficialMarks marks) {
     }
 
     private CertificateRenderer() {
@@ -49,7 +50,8 @@ public final class CertificateRenderer {
             String qr = "<img alt=\"QR code\" style=\"width: 62pt; height: 62pt;\" src=\"data:image/png;base64,"
                     + Base64.getEncoder().encodeToString(QrCodes.png(c.verificationUrl(), 300)) + "\" />";
             sb.append("<div class=\"page").append(i == certs.size() - 1 ? " last" : "").append("\">")
-                    .append("<div class=\"center\"><div class=\"badge\">").append(e(shortName)).append("</div>")
+                    .append("<div class=\"center\"><table style=\"margin: 0 auto; border-collapse: collapse;\"><tr><td>")
+                    .append(c.marks().badge(shortName, 56)).append("</td></tr></table>")
                     .append("<div class=\"inst\">").append(e(t.getName())).append("</div>")
                     .append("<div class=\"reg\">Registered by the National Council for Technical and Vocational Education and Training")
                     .append(t.getNactvetRegNo() == null ? "" : " · " + e(t.getNactvetRegNo())).append("</div>")
@@ -71,7 +73,8 @@ public final class CertificateRenderer {
                     .append(e(c.certificateNo())).append("</div>").append(c.reprint() ? "<div class=\"copy\">REPRINT</div>" : "")
                     .append("</td></tr></table></td>")
                     .append("<td style=\"width: 33%;\"><div class=\"line\">Registrar</div></td>")
-                    .append("<td style=\"width: 33%;\"><div class=\"line\">Principal</div></td>")
+                    .append("<td style=\"width: 33%;\"><div style=\"width: 170pt; margin: 0 auto; font-size: 9pt; color: #374151;\">")
+                    .append(c.marks().signatureBlock(null, 1, 170)).append("</div></td>")
                     .append("</tr></table></div>");
         }
         return TEMPLATE.render(Map.of("primaryColor", HEX_COLOUR.matcher(colour).matches() ? colour : "#1F4E8C"), Map.of("pages", sb.toString()));

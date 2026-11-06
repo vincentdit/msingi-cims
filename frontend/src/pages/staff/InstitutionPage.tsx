@@ -1,10 +1,13 @@
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import UploadIcon from '@mui/icons-material/PhotoCamera';
-import { Alert, Box, Button, Card, CardContent, Container, Stack, TextField, Typography, useTheme } from '@mui/material';
+import PdfIcon from '@mui/icons-material/PictureAsPdf';
+import {
+  Alert, Box, Button, Card, CardContent, Checkbox, Container, Divider, FormControlLabel, List, ListItem, ListItemText, Stack, TextField, Typography, useTheme,
+} from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { api, formatDateTime, uploadForm } from '../../api/client';
+import { api, download, formatDateTime, privateImageUrl, uploadForm } from '../../api/client';
 import type { InstitutionPhoto } from '../../api/types';
 import { CampusIllustration } from '../../components/CampusIllustration';
 import { ErrorAlert, PageTitle } from '../../components/common';
@@ -95,6 +98,7 @@ export default function InstitutionPage() {
       <Grid container spacing={3} sx={{ mt: 0.5 }}>
         <Grid size={{ xs: 12, md: 5 }}><LogoCard /></Grid>
         <Grid size={{ xs: 12, md: 7 }}><ContactsCard /></Grid>
+        <Grid size={12}><PrincipalCard /></Grid>
       </Grid>
     </Container>
   );
@@ -102,7 +106,7 @@ export default function InstitutionPage() {
 
 const LOGO = '/api/admin/institution/photos/logo';
 
-/** The institution's logo: on the programme pages and the advert posters (PNG with a clear background works best). */
+/** The institution's logo: on the programme pages, the advert posters and the printed documents (PNG with a clear background works best). */
 function LogoCard() {
   const qc = useQueryClient();
   const logo = useQuery({ queryKey: ['staff', 'logo'], queryFn: async () => (await api<InstitutionPhoto | undefined>(LOGO, staff)) ?? null });
@@ -120,7 +124,8 @@ function LogoCard() {
       <CardContent>
         <Typography variant="h6">Logo</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-          Shown on the programme pages and the advert posters. A square PNG with a clear or white background works best:
+          Shown on the programme pages, the advert posters and at the top of every letter and document the institution prints
+          (admission letters, statements of results, certificates, ID cards, receipts). A square PNG with a clear or white background works best:
           PNG or JPEG, at least 200 pixels wide, up to 5 MB.
         </Typography>
         <Stack direction="row" spacing={2} alignItems="center">
@@ -137,7 +142,7 @@ function LogoCard() {
             {logo.data && <Button color="error" startIcon={<DeleteIcon />} disabled={remove.isPending} onClick={() => remove.mutate()}>Remove logo</Button>}
           </Stack>
         </Stack>
-        {logo.isSuccess && !logo.data && <Alert severity="info" sx={{ mt: 2 }}>Until a logo is uploaded, posters show the institution's initials.</Alert>}
+        {logo.isSuccess && !logo.data && <Alert severity="info" sx={{ mt: 2 }}>Until a logo is uploaded, posters and documents show the institution's initials.</Alert>}
         <ErrorAlert error={send.error ?? remove.error} />
       </CardContent>
     </Card>
@@ -203,3 +208,138 @@ function ContactsCard() {
     </Card>
   );
 }
+
+interface Principal {
+  id: number; name: string; title: string; signature: boolean; stamp: boolean; signatureUrl?: string | null; stampUrl?: string | null;
+  changeNote?: string | null; updatedByName: string; updatedAt: string; changes: number;
+}
+interface PrincipalChange { id: number; name: string; title: string; signature: boolean; stamp: boolean; changeNote?: string | null; byName: string; at: string }
+const PRINCIPAL = '/api/admin/institution/principal';
+
+/** A scanned signature or stamp, fetched with the administrator's session (it is never public). */
+function MarkImage({ url, alt }: { url?: string | null; alt: string }) {
+  const img = useQuery({ queryKey: ['staff', 'principal-image', url], enabled: !!url, staleTime: Infinity, retry: false,
+    queryFn: () => privateImageUrl(url!, 'staff') });
+  return (
+    <Box sx={{ height: 110, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: '#fff', display: 'grid', placeItems: 'center', overflow: 'hidden', p: 1 }}>
+      {url && img.data ? <Box component="img" src={img.data} alt={alt} sx={{ maxWidth: '100%', maxHeight: 94, objectFit: 'contain', display: 'block' }} />
+        : <Typography variant="caption" color="text.secondary">{url ? 'Loading…' : `No ${alt.toLowerCase()} yet`}</Typography>}
+    </Box>
+  );
+}
+
+/**
+ * The Principal, who signs every letter and document the institution issues: name, title, scanned signature and the stamp.
+ * Each change is kept, so documents already issued keep the signature they were issued with.
+ */
+function PrincipalCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['staff', 'principal'], queryFn: async () => (await api<Principal | undefined>(PRINCIPAL, staff)) ?? null });
+  const history = useQuery({ queryKey: ['staff', 'principal-history'], enabled: !!q.data, queryFn: () => api<PrincipalChange[]>(`${PRINCIPAL}/history`, staff) });
+  const [name, setName] = useState('');
+  const [title, setTitle] = useState('Principal');
+  const [keepBackground, setKeepBackground] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const sigFile = useRef<HTMLInputElement>(null);
+  const stampFile = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (q.data !== undefined) { setName(q.data?.name ?? ''); setTitle(q.data?.title ?? 'Principal'); } }, [q.data]);
+  const changed = (p: Principal) => { qc.setQueryData(['staff', 'principal'], p); qc.invalidateQueries({ queryKey: ['staff', 'principal-history'] }); };
+  const save = useMutation({ mutationFn: () => api<Principal>(PRINCIPAL, { ...staff, method: 'PUT', body: { name: name.trim(), title: title.trim() || 'Principal' } }),
+    onSuccess: changed });
+  const send = useMutation({
+    mutationFn: ({ mark, file }: { mark: 'signature' | 'stamp'; file: File }) => {
+      const form = new FormData(); form.append('file', file);
+      return uploadForm<Principal>(`${PRINCIPAL}/${mark}?keepBackground=${keepBackground}`, 'staff', form);
+    },
+    onSuccess: changed,
+  });
+  const remove = useMutation({ mutationFn: (mark: 'signature' | 'stamp') => api<Principal>(`${PRINCIPAL}/${mark}`, { ...staff, method: 'DELETE' }), onSuccess: changed });
+  const sample = useMutation({ mutationFn: () => download(`${PRINCIPAL}/sample`, 'staff', 'sample-signed-letter.pdf') });
+  const p = q.data;
+  const dirty = name.trim() !== (p?.name ?? '') || (title.trim() || 'Principal') !== (p?.title ?? 'Principal');
+  const newPerson = !!p && name.trim() !== '' && name.trim().replace(/\s+/g, ' ').toLowerCase() !== p.name.replace(/\s+/g, ' ').toLowerCase();
+  const picker = (mark: 'signature' | 'stamp', ref: React.RefObject<HTMLInputElement>) => (
+    <input ref={ref} type="file" accept="image/png,image/jpeg" hidden
+      onChange={(e) => { const f = e.target.files?.[0]; if (f) send.mutate({ mark, file: f }); e.target.value = ''; }} />
+  );
+  return (
+    <Card>
+      <CardContent>
+        <Typography variant="h6">Principal (signs letters and documents)</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+          Every letter and document the institution issues is signed by the Principal: admission letters, IPT placement letters, statements
+          of results, award certificates and student ID cards. Enter the Principal's name, then upload a scan of the signature and of the
+          institution's stamp. They are printed on documents only and never shown on the public portal. Documents already issued keep the
+          signature they were issued with, even after a new Principal takes office.
+        </Typography>
+        {q.isSuccess && !p && <Alert severity="warning" sx={{ mb: 2 }}>No Principal recorded yet. Until then, documents print “Principal” with a blank line to sign by hand.</Alert>}
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Stack spacing={1.5}>
+              <TextField size="small" label="Principal's full name" required value={name} onChange={(e) => setName(e.target.value)} inputProps={{ maxLength: 120 }}
+                helperText="As it should appear under the signature, e.g. Dr. Neema A. Mushi" />
+              <TextField size="small" label="Title" value={title} onChange={(e) => setTitle(e.target.value)} inputProps={{ maxLength: 120 }}
+                helperText="Usually Principal; Acting Principal while someone acts" />
+              {newPerson && <Alert severity="info">A different person: the old signature will not be used. Upload the new Principal's signature after saving. The stamp stays.</Alert>}
+              <Stack direction="row" spacing={1}>
+                <Button variant="contained" disabled={!name.trim() || !dirty || save.isPending} onClick={() => save.mutate()}>Save</Button>
+                <Button startIcon={<PdfIcon />} disabled={!p || sample.isPending} onClick={() => sample.mutate()}>Sample letter</Button>
+              </Stack>
+            </Stack>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Typography variant="subtitle2" gutterBottom>Signature</Typography>
+            <MarkImage url={p?.signatureUrl} alt="Signature" />
+            {picker('signature', sigFile)}
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Button size="small" variant="outlined" startIcon={<UploadIcon />} disabled={!p || send.isPending} onClick={() => sigFile.current?.click()}>
+                {p?.signature ? 'Replace signature' : 'Upload signature'}
+              </Button>
+              {p?.signature && <Button size="small" color="error" startIcon={<DeleteIcon />} disabled={remove.isPending} onClick={() => remove.mutate('signature')}>Remove</Button>}
+            </Stack>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Typography variant="subtitle2" gutterBottom>Stamp</Typography>
+            <MarkImage url={p?.stampUrl} alt="Stamp" />
+            {picker('stamp', stampFile)}
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Button size="small" variant="outlined" startIcon={<UploadIcon />} disabled={!p || send.isPending} onClick={() => stampFile.current?.click()}>
+                {p?.stamp ? 'Replace stamp' : 'Upload stamp'}
+              </Button>
+              {p?.stamp && <Button size="small" color="error" startIcon={<DeleteIcon />} disabled={remove.isPending} onClick={() => remove.mutate('stamp')}>Remove</Button>}
+            </Stack>
+          </Grid>
+        </Grid>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Sign (or stamp) in dark ink on plain white paper and scan or photograph it straight on: PNG or JPEG, up to 3 MB. The white paper is
+          made see-through so the signature and stamp sit naturally on the page.
+        </Typography>
+        <FormControlLabel control={<Checkbox size="small" checked={keepBackground} onChange={(e) => setKeepBackground(e.target.checked)} />}
+          label="Keep the background of the next upload as it is (for an image already prepared with a clear background)" />
+        <ErrorAlert error={save.error ?? send.error ?? remove.error ?? sample.error} />
+        {p && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                {p.changeNote ? `${p.changeNote}. ` : ''}Last changed by {p.updatedByName} on {formatDateTime(p.updatedAt)}.
+              </Typography>
+              {p.changes > 1 && <Button size="small" onClick={() => setShowHistory((v) => !v)}>{showHistory ? 'Hide changes' : `Changes (${p.changes})`}</Button>}
+            </Stack>
+            {showHistory && history.data && (
+              <List dense>
+                {history.data.map((h) => (
+                  <ListItem key={h.id} disableGutters>
+                    <ListItemText primary={`${h.name}, ${h.title}${h.changeNote ? ` — ${h.changeNote}` : ''}`}
+                      secondary={`${h.byName}, ${formatDateTime(h.at)} · ${h.signature ? 'signature' : 'no signature'}, ${h.stamp ? 'stamp' : 'no stamp'}`} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+

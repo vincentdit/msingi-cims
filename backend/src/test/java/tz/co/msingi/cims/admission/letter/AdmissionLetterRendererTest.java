@@ -8,6 +8,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
+import tz.co.msingi.cims.common.document.OfficialMarks;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -37,7 +38,7 @@ class AdmissionLetterRendererTest {
 
     @Test
     void rendersLetterAndJoiningInstructionsWithScannableQrCode() throws Exception {
-        byte[] pdf = AdmissionLetterRenderer.pdf(sample("Asha <b>O'Neil</b> & Mussa"));
+        byte[] pdf = AdmissionLetterRenderer.pdf(sample("Asha <b>O'Neil</b> & Mussa"), OfficialMarks.typed(null, "Dr. Amina Salum", "Principal"));
         Path out = Path.of(System.getProperty("java.io.tmpdir"), "cims-letter-sample.pdf");
         Files.write(out, pdf);
         try (PDDocument doc = PDDocument.load(pdf)) {
@@ -54,6 +55,38 @@ class AdmissionLetterRendererTest {
     }
 
     @Test
+    void signedLetterCarriesLogoSignatureAndStampWithThePrincipalsName() throws Exception {
+        OfficialMarks marks = new OfficialMarks(png(400, 400, 0x1F4E8C), "Dr. Neema Mushi", "Principal", png(600, 180, 0x111827),
+                png(300, 300, 0x1D4ED8), 7L);
+        String html = AdmissionLetterRenderer.html(sample("Asha"), marks);
+        assertThat(html).contains("alt=\"Logo\"", "alt=\"Signature\"", "alt=\"Stamp\"", "Dr. Neema Mushi").doesNotContain("class=\"badge\"");
+        byte[] pdf = AdmissionLetterRenderer.pdf(sample("Asha"), marks);
+        Files.write(Path.of(System.getProperty("java.io.tmpdir"), "cims-letter-signed.pdf"), pdf);
+        try (PDDocument doc = PDDocument.load(pdf)) {
+            assertThat(new PDFTextStripper().getText(doc)).contains("Dr. Neema Mushi", "Principal", "For: Msingi Demo Technical College");
+            int images = 0;
+            for (var name : doc.getPage(0).getResources().getXObjectNames()) {
+                if (doc.getPage(0).getResources().isImageXObject(name)) images++;
+            }
+            assertThat(images).isGreaterThanOrEqualTo(4);   // logo, signature, stamp and the QR code
+        }
+        // without a logo the initials badge is drawn, and without a signature the line is left for signing by hand
+        String plain = AdmissionLetterRenderer.html(sample("Asha"), OfficialMarks.typed(null, "Dr. Neema Mushi", null));
+        assertThat(plain).contains("class=\"badge\"", "Dr. Neema Mushi", "Principal").doesNotContain("alt=\"Signature\"");
+    }
+
+    static OfficialMarks.Image png(int w, int h, int rgb) throws java.io.IOException {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        var g = img.createGraphics();
+        g.setColor(new java.awt.Color(rgb));
+        g.fillOval(w / 8, h / 8, w * 3 / 4, h * 3 / 4);
+        g.dispose();
+        var out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", out);
+        return new OfficialMarks.Image(out.toByteArray(), "image/png", w, h);
+    }
+
+    @Test
     void unsafeColourNeverReachesTheStylesheet() {
         LetterContent c = sample("A");
         LetterContent bad = new LetterContent(c.institutionName(), c.institutionShortName(), c.institutionNactvetNo(), c.institutionPhone(),
@@ -61,7 +94,7 @@ class AdmissionLetterRendererTest {
                 c.applicantAddress(), c.applicationRef(), c.nactvetVerificationNo(), c.programmeName(), c.awardName(),
                 c.programmeNactvetCode(), c.durationSemesters(), c.academicYear(), c.intake(), c.acceptedAt(), c.joining(),
                 c.verificationCode(), c.verificationUrl());
-        assertThat(AdmissionLetterRenderer.html(bad)).doesNotContain("display:none").contains("#1F4E8C");
+        assertThat(AdmissionLetterRenderer.html(bad, OfficialMarks.none())).doesNotContain("display:none").contains("#1F4E8C");
     }
 
     @Test

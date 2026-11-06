@@ -54,6 +54,7 @@ public class IdCardService {
     private static final int MAX_BATCH = 500;
 
     private final StudentRepository students;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
     private final StudentPhotoRepository photos;
     private final IdCardRepository cards;
     private final AcademicYearRepository years;
@@ -169,7 +170,7 @@ public class IdCardService {
         IdCard c = cards.findByStudentIdAndStatus(studentId, IdCard.Status.VALID)
                 .orElseThrow(() -> new BusinessRuleException("NO_VALID_CARD", "This student has no valid ID card to print"));
         audit.record("ID_CARD_PRINTED", "Student", s.getId(), details(c, null));
-        return new Download("id-card-" + safe(c.getCardNo()) + ".pdf", IdCardRenderer.pdf(List.of(printable(c)), tenant()));
+        return new Download("id-card-" + safe(c.getCardNo()) + ".pdf", IdCardRenderer.pdf(List.of(printable(c)), tenant(), principal.marks()));
     }
 
     @Transactional(readOnly = true)
@@ -198,7 +199,7 @@ public class IdCardService {
                 "yearOfStudy", yearOfStudy == null ? "all" : yearOfStudy.toString()));
         String code = b.ready.get(0).getProgramme().getCode();
         return new Download("id-cards-" + safe(code) + (yearOfStudy == null ? "" : "-year-" + yearOfStudy) + ".pdf",
-                IdCardRenderer.pdf(printable, tenant()));
+                IdCardRenderer.pdf(printable, tenant(), principal.marks()));
     }
 
     @Transactional(readOnly = true)

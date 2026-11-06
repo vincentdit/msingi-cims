@@ -69,6 +69,7 @@ public class GraduationService {
     private static final Set<Student.Status> CURRENT = EnumSet.of(Student.Status.ACTIVE, Student.Status.COMPLETED);
 
     private final GraduationRepository graduations;
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
     private final GraduandRepository graduands;
     private final ClearanceRepository clearances;
     private final StudentRepository students;
@@ -317,6 +318,7 @@ public class GraduationService {
             gr.setVerificationCode(LetterCodes.newCode());
             gr.setCertificateIssuedAt(OffsetDateTime.now());
             gr.setCertificateIssuedBy(CurrentUser.name());
+            gr.setSignatoryId(principal.currentId());
             issued++;
         }
         audit.record("CERTIFICATES_ISSUED", "Graduation", g.getId(), Map.of("issued", issued, "alreadyIssued", already));
@@ -342,7 +344,8 @@ public class GraduationService {
             Student s = students.findById(gr.getStudentId()).orElseThrow();
             certs.add(new CertificateRenderer.Certificate(t, s.fullName(), s.getRegistrationNo(), gr.getAwardName(), s.getProgramme().getName(),
                     gr.getClassification(), gr.getCompletedSemester(), g.getCeremonyDate() != null ? g.getCeremonyDate() : LocalDate.now(ZONE),
-                    gr.getCertificateNo(), gr.getVerificationCode(), verificationUrl(t, gr.getVerificationCode()), gr.getPrintCount() > 0));
+                    gr.getCertificateNo(), gr.getVerificationCode(), verificationUrl(t, gr.getVerificationCode()), gr.getPrintCount() > 0,
+                    principal.marksFor(gr.getSignatoryId())));
             audit.record(gr.getPrintCount() > 0 ? "CERTIFICATE_REPRINTED" : "CERTIFICATE_PRINTED", "Graduand", gr.getId(),
                     Map.of("certificateNo", gr.getCertificateNo(), "student", s.getRegistrationNo(), "reason", String.valueOf(reason)));
             gr.setPrintCount(gr.getPrintCount() + 1);

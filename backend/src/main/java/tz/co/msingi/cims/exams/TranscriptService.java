@@ -57,6 +57,7 @@ public class TranscriptService {
     static final ZoneId ZONE = ZoneId.of("Africa/Dar_es_Salaam");
     static final Role[] ISSUERS = {Role.INSTITUTION_ADMIN, Role.EXAMINATIONS_OFFICER, Role.REGISTRAR};
 
+    private final tz.co.msingi.cims.platform.branding.PrincipalService principal;
     private final AcademicDocumentRepository documents;
     private final SemesterResultRepository semesterResults;
     private final ResultSheetService sheets;
@@ -146,6 +147,7 @@ public class TranscriptService {
         d.setContentSha256(sha);
         d.setIssuedAt(OffsetDateTime.now());
         d.setIssuedByName(CurrentUser.id().isPresent() ? CurrentUser.name() : "System");
+        d.setSignatoryId(principal.currentId());
         documents.saveAndFlush(d);
         audit.record("TRANSCRIPT_ISSUED", "AcademicDocument", d.getId(), Map.of("documentNo", no, "student", st.getRegistrationNo(),
                 "semesters", d.getContent().semesters().size()));
@@ -213,7 +215,7 @@ public class TranscriptService {
     // ------------------------------------------------------------------ helpers
 
     private Download download(AcademicDocument d) {
-        return new Download("statement-of-results-" + d.getDocumentNo().replaceAll("[^A-Za-z0-9]+", "-") + ".pdf", TranscriptRenderer.pdf(d.getContent()));
+        return new Download("statement-of-results-" + d.getDocumentNo().replaceAll("[^A-Za-z0-9]+", "-") + ".pdf", TranscriptRenderer.pdf(d.getContent(), principal.marksFor(d.getSignatoryId())));
     }
 
     static DocumentView view(AcademicDocument d) {

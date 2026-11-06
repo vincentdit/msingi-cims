@@ -47,4 +47,7 @@ public class Graduand extends BaseEntity {
     private int printCount;
 
     private OffsetDateTime lastPrintedAt;
+
+    /** The Principal record that signs the certificate (null on certificates issued before the Principal was recorded). */
+    private Long signatoryId;
 }

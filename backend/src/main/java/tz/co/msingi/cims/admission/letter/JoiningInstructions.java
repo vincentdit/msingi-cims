@@ -21,8 +21,9 @@ public record JoiningInstructions(
         @Size(max = 30) List<@NotBlank @Size(max = 200) String> itemsToBring,
         @Size(max = 1500) String feesNote,
         @Size(max = 10) List<@NotBlank @Size(max = 400) String> notes,
-        @NotBlank @Size(max = 120) String signatoryName,
-        @NotBlank @Size(max = 120) String signatoryTitle) {
+        /* letters are signed by the Principal recorded on the Institution page; these were typed per window before that */
+        @Size(max = 120) String signatoryName,
+        @Size(max = 120) String signatoryTitle) {
 
     public JoiningInstructions {
         documentsToBring = documentsToBring == null ? List.of() : List.copyOf(documentsToBring);

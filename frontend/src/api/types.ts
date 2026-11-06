@@ -256,8 +256,8 @@ export interface JoiningInstructions {
   itemsToBring: string[];
   feesNote?: string;
   notes: string[];
-  signatoryName: string;
-  signatoryTitle: string;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
 }
 
 export interface LetterVerification {

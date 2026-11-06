@@ -1,6 +1,7 @@
 package tz.co.msingi.cims.admission.letter;
 
 import tz.co.msingi.cims.common.document.HtmlTemplate;
+import tz.co.msingi.cims.common.document.OfficialMarks;
 import tz.co.msingi.cims.common.document.PdfRenderer;
 import tz.co.msingi.cims.common.document.QrCodes;
 
@@ -33,11 +34,11 @@ public final class AdmissionLetterRenderer {
     private AdmissionLetterRenderer() {
     }
 
-    public static byte[] pdf(LetterContent c) {
-        return PdfRenderer.render(html(c), "admission letter " + c.letterNo());
+    public static byte[] pdf(LetterContent c, OfficialMarks marks) {
+        return PdfRenderer.render(html(c, marks), "admission letter " + c.letterNo());
     }
 
-    static String html(LetterContent c) {
+    static String html(LetterContent c, OfficialMarks marks) {
         JoiningInstructions j = c.joining();
         Map<String, String> v = new HashMap<>();
         v.put("institutionName", c.institutionName());
@@ -65,12 +66,12 @@ public final class AdmissionLetterRenderer {
         v.put("reportingVenue", j.reportingVenue());
         v.put("reportingLine", DAY_DATE.format(j.reportingDate())
                 + (j.reportingTime() == null || j.reportingTime().isBlank() ? "" : " at " + j.reportingTime()) + ", " + j.reportingVenue());
-        v.put("signatoryName", j.signatoryName());
-        v.put("signatoryTitle", j.signatoryTitle());
         v.put("verificationCode", c.verificationCode());
         v.put("verificationUrlBase", urlBase(c.verificationUrl()));
 
         Map<String, String> m = new HashMap<>();
+        m.put("badge", marks.badge(v.get("institutionShortName"), 50));
+        m.put("signatureBlock", marks.signatureBlock(c.institutionName(), 1, 190));
         m.put("addressLines", lines(c.applicantAddress()));
         m.put("qrImage", "<img alt=\"QR code\" style=\"width: 76pt; height: 76pt;\" src=\"data:image/png;base64,"
                 + Base64.getEncoder().encodeToString(QrCodes.png(c.verificationUrl(), 330)) + "\" />");
