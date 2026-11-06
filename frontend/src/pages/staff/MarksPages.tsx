@@ -46,11 +46,12 @@ export function useSemesterChoice() {
     const open = semesters.data.find((s) => s.marksEntryOpens && s.marksEntryOpens <= today && (!s.marksEntryCloses || s.marksEntryCloses >= today));
     setSemesterId((open ?? semesters.data.find((s) => s.registrationOpens <= today) ?? semesters.data[0]).id);
   }, [semesters.data, semesterId]);
-  const picker = (
+  // no picker until a semester exists: an empty list would open as a blank menu
+  const picker = semesters.data?.length ? (
     <TextField select size="small" label="Semester" value={semesterId ?? ''} onChange={(e) => setSemesterId(Number(e.target.value))} sx={{ minWidth: 240 }}>
-      {(semesters.data ?? []).map((s) => <MenuItem key={s.id} value={s.id}>{s.name} · {s.academicYear}</MenuItem>)}
+      {semesters.data.map((s) => <MenuItem key={s.id} value={s.id}>{s.name} · {s.academicYear}</MenuItem>)}
     </TextField>
-  );
+  ) : null;
   return { semesterId, semesters, picker };
 }
 

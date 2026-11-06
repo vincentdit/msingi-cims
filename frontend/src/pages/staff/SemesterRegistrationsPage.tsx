@@ -54,14 +54,17 @@ export default function SemesterRegistrationsPage() {
   return (
     <Container maxWidth="lg" disableGutters>
       <PageTitle title="Semester registration" subtitle="Students choose their electives and submit in the portal; Registry checks and approves."
-        action={
+        action={!!semesters.data?.length && (
           <TextField select size="small" label="Semester" value={semesterId ?? ''} onChange={(e) => { setSemesterId(Number(e.target.value)); setResult(null); }} sx={{ minWidth: 240 }}>
-            {(semesters.data ?? []).map((x) => <MenuItem key={x.id} value={x.id}>{x.name} · {x.academicYear}</MenuItem>)}
+            {semesters.data.map((x) => <MenuItem key={x.id} value={x.id}>{x.name} · {x.academicYear}</MenuItem>)}
           </TextField>
-        } />
+        )} />
       <ErrorAlert error={semesters.error ?? summary.error ?? list.error ?? approveAll.error} />
       {semesters.data && !semesters.data.length && (
-        <Alert severity="info">No semesters yet. Set them up in the <StaffLink to="/staff/calendar">academic calendar</StaffLink>.</Alert>
+        <Alert severity="info" action={<Button color="inherit" size="small" component={StaffLink} to="/staff/calendar" sx={{ whiteSpace: 'nowrap' }}>Set up semesters</Button>}>
+          No semesters yet. Students register for a semester once its dates are set in the academic calendar (by the institution
+          administrator or the Deputy Principal (Academic)).
+        </Alert>
       )}
       {s && (
         <Grid container spacing={2} sx={{ mb: 2 }}>
