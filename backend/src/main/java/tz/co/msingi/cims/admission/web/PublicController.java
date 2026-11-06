@@ -31,6 +31,7 @@ public class PublicController {
     private final InstitutionPhotoService photos;
     private final tz.co.msingi.cims.finance.collection.PaymentChannelService payments;
     private final tz.co.msingi.cims.platform.privacy.SecuritySettingsService security;
+    private final tz.co.msingi.cims.finance.aggregator.CollectionAccountService mobileMoney;
 
     @org.springframework.beans.factory.annotation.Value("${cims.privacy.notice-version:2026-10}")
     private String privacyNoticeVersion;
@@ -56,7 +57,7 @@ public class PublicController {
         Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
         return new InstitutionView(t.getCode(), t.getName(), t.getShortName(), t.getNactvetRegNo(), t.getContactEmail(),
                 t.getContactPhone(), t.getBranding(), photos.view(InstitutionPhoto.Kind.CAMPUS).orElse(null), photos.view(InstitutionPhoto.Kind.LOGO).orElse(null),
-                payments.forPayers(), security.idle(), paymentSimulation);
+                payments.forPayers().withPhonePrompt(mobileMoney.phonePrompt()), security.idle(), paymentSimulation);
     }
 
     @Operation(summary = "The facts the applicants' privacy notice shows: version, institution, contacts and retention of applications")

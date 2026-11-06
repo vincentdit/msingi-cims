@@ -30,7 +30,7 @@ export interface Institution {
   /** The institution's logo (used on the portal header, programme pages and advert posters). */
   logo?: InstitutionPhoto;
   /** How fees are paid: GEPG (public institutions) or COLLECTION (private and faith-based: the college's own accounts). */
-  payment?: { mode: 'GEPG' | 'COLLECTION'; channels: PaymentChannel[] };
+  payment?: { mode: 'GEPG' | 'COLLECTION'; channels: PaymentChannel[]; phonePrompt?: { enabled: boolean; needsNetwork: boolean; provider?: string } };
   /** Minutes without activity before each kind of user is signed out. */
   idleMinutes?: { staff: number; student: number; applicant: number };
   /** The server lets test payments through (CIMS_ALLOW_PAYMENT_SIMULATION): the Simulate payment buttons are shown. */

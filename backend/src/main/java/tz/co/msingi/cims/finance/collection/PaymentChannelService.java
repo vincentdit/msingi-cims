@@ -44,7 +44,18 @@ public class PaymentChannelService {
     }
 
     /** What payers see in the portals. */
-    public record PublicPayment(String mode, List<ChannelView> channels) {
+    public record PublicPayment(String mode, List<ChannelView> channels, PhonePrompt phonePrompt) {
+        public PublicPayment(String mode, List<ChannelView> channels) {
+            this(mode, channels, new PhonePrompt(false, false, null));
+        }
+
+        public PublicPayment withPhonePrompt(PhonePrompt p) {
+            return new PublicPayment(mode, channels, p);
+        }
+    }
+
+    /** Whether payers can be prompted on their phone through the institution's aggregator (and must name their network). */
+    public record PhonePrompt(boolean enabled, boolean needsNetwork, String provider) {
     }
 
     @Transactional(readOnly = true)

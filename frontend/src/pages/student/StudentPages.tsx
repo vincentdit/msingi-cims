@@ -255,7 +255,8 @@ export function StudentFees() {
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary">{words.forInvoice(inv.purpose).number}</Typography>
                   <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
-                  <HowToPay reference={inv.controlNo} amount={inv.balance} gepg={words.forInvoice(inv.purpose).gepg} />
+                  <HowToPay reference={inv.controlNo} amount={inv.balance} gepg={words.forInvoice(inv.purpose).gepg}
+                    payByPhone={{ realm: 'student', invoiceId: inv.id, onPaid: () => q.refetch() }} />
                 </Box>
               ) : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.forInvoice(inv.purpose).getNumber}</Button>
             )}

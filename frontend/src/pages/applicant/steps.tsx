@@ -184,7 +184,7 @@ export function FeeStep({ app, onNext }: { app: Application; onNext: () => void 
               {f.controlNo.replace(/(\d{4})(?=\d)/g, '$1 ')}
             </Typography>
             <Typography variant="body2" color="text.secondary">{formatTzs(f.amount - f.paid)} · {t('app.expires', { date: formatDateTime(f.controlNoExpiresAt) })}</Typography>
-            <HowToPay reference={f.controlNo} amount={f.amount - f.paid} />
+            <HowToPay reference={f.controlNo} amount={f.amount - f.paid} payByPhone={f.invoiceId ? { realm: 'applicant', invoiceId: f.invoiceId, onPaid: () => fee.refetch() } : undefined} />
           </CardContent>
         </Card>
       ) : request.isSuccess ? <Alert severity="info">{t(words.gepg ? 'pay.pending' : 'pay.pendingRef')}</Alert> : (

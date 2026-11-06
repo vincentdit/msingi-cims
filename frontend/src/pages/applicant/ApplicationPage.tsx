@@ -279,7 +279,7 @@ function FeesCard() {
               <Box>
                 <Typography variant="caption" color="text.secondary">{words.number}</Typography>
                 <Typography sx={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>{inv.controlNo}</Typography>
-                <HowToPay reference={inv.controlNo} amount={inv.balance} />
+                <HowToPay reference={inv.controlNo} amount={inv.balance} payByPhone={{ realm: 'applicant', invoiceId: inv.id, onPaid: () => qc.invalidateQueries() }} />
               </Box>
             ) : asked ? <Alert severity="info">{t(words.gepg ? 'pay.pending' : 'pay.pendingRef')}</Alert>
               : <Button variant="contained" disabled={getCn.isPending} onClick={() => getCn.mutate(inv.id)}>{words.getNumber}</Button>}

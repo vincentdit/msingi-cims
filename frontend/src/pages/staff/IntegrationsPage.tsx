@@ -53,6 +53,7 @@ export default function IntegrationsPage() {
     { key: 'muse', label: 'MUSE postings', show: has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
     { key: 'tamisemi', label: 'TAMISEMI selections', show: has(roles, 'INSTITUTION_ADMIN', 'ADMISSIONS_OFFICER') },
     { key: 'nhif', label: 'NHIF', show: has(roles, 'INSTITUTION_ADMIN', 'REGISTRAR') },
+    { key: 'mobile', label: 'Mobile money', show: !gepg && has(roles, 'INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT') },
   ].filter((t) => t.show);
   const [tab, setTab] = useState(tabs[0].key);
   return (
@@ -67,6 +68,7 @@ export default function IntegrationsPage() {
       {tab === 'muse' && <MuseTab />}
       {tab === 'tamisemi' && <TamisemiTab />}
       {tab === 'nhif' && <NhifTab admin={has(roles, 'INSTITUTION_ADMIN')} />}
+      {tab === 'mobile' && <MobileMoneyTab canEdit={has(roles, 'INSTITUTION_ADMIN', 'BURSAR')} />}
     </Container>
   );
 }
@@ -514,6 +516,166 @@ function NhifTab({ admin }: { admin: boolean }) {
         <DialogActions>
           <Button onClick={() => setConfirm(false)}>Cancel</Button>
           <Button variant="contained" color="warning" disabled={make.isPending} onClick={() => make.mutate()}>Make new credentials</Button>
+        </DialogActions>
+      </Dialog>
+    </Stack>
+  );
+}
+
+interface AggregatorField { name: string; label: string; secret: boolean }
+interface AggregatorView {
+  available: boolean; provider?: string; providerLabel?: string; environment: string; active: boolean; phonePrompt: boolean;
+  fields: { name: string; label: string; secret: boolean; value?: string; set: boolean }[]; baseUrl?: string; authUrl?: string; defaultUrl?: string;
+  notifyUrl?: string; lastTestAt?: string; lastTestOk?: boolean; lastTestNote?: string; rehearsalAllowed: boolean;
+  providers: { code: string; label: string; fields: AggregatorField[]; sandboxUrl?: string; liveUrl?: string; statusQuery: boolean; needsNetwork: boolean }[];
+}
+interface PhonePaymentRow {
+  id: number; invoiceNo: string; payerName: string; status: string; phone: string; amount: number; provider: string; message?: string;
+  receiptNo?: string; requestedBy: string; createdAt: string; completedAt?: string;
+}
+const PP_COLOUR: Record<string, 'success' | 'warning' | 'error' | 'default' | 'info'> = { PAID: 'success', PENDING: 'info', FAILED: 'warning', EXPIRED: 'default' };
+
+/**
+ * Mobile money through the institution's own merchant account with an aggregator (Selcom, AzamPay, ClickPesa): payers are prompted on
+ * their phone and the payment is recorded when the aggregator confirms it. Private and faith-based institutions only.
+ */
+function MobileMoneyTab({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['collection-account'], queryFn: () => api<AggregatorView>('/api/collection-account', staff) });
+  const list = useQuery({ queryKey: ['phone-payments'], queryFn: () => api<PhonePaymentRow[]>('/api/phone-payments', staff), refetchInterval: 15000 });
+  const [f, setF] = useState({ provider: '', environment: 'SANDBOX', active: false, phonePrompt: true, baseUrl: '', authUrl: '', fields: {} as Record<string, string> });
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => {
+    if (q.data) setF({ provider: q.data.provider ?? '', environment: q.data.environment, active: q.data.active, phonePrompt: q.data.phonePrompt,
+      baseUrl: q.data.baseUrl ?? '', authUrl: q.data.authUrl ?? '', fields: Object.fromEntries(q.data.fields.filter((x) => !x.secret).map((x) => [x.name, x.value ?? ''])) });
+  }, [q.data]);
+  const done = (v: AggregatorView) => qc.setQueryData(['collection-account'], v);
+  const save = useMutation({ mutationFn: () => api<AggregatorView>('/api/collection-account', { ...staff, method: 'PUT', body: { ...f, baseUrl: f.baseUrl || null, authUrl: f.authUrl || null } }),
+    onSuccess: (v) => { done(v); setF((x) => ({ ...x, fields: Object.fromEntries(Object.entries(x.fields).filter(([k]) => !v.fields.find((y) => y.name === k)?.secret)) })); } });
+  const test = useMutation({ mutationFn: () => api<AggregatorView>('/api/collection-account/test', { ...staff, method: 'POST' }), onSuccess: done });
+  const renew = useMutation({ mutationFn: () => api<AggregatorView>('/api/collection-account/notify-address', { ...staff, method: 'POST' }), onSuccess: (v) => { done(v); setConfirm(false); } });
+  const check = useMutation({ mutationFn: (id: number) => api(`/api/phone-payments/${id}/check`, { ...staff, method: 'POST' }), onSuccess: () => list.refetch() });
+  if (q.isLoading || !q.data) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
+  const d = q.data;
+  if (!d.available) return <Alert severity="info">This institution is paid through GePG: mobile money reaches it through GePG control numbers.</Alert>;
+  const p = d.providers.find((x) => x.code === f.provider);
+  const saved = d.fields;
+  const providers = d.providers.filter((x) => x.code !== 'SIMULATED' || d.rehearsalAllowed || d.provider === 'SIMULATED');
+  return (
+    <Stack spacing={2}>
+      <Card><CardContent>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+          <Typography variant="subtitle2" sx={{ flex: 1 }}>Aggregator account</Typography>
+          {d.provider && <Chip size="small" color={d.active ? 'success' : 'default'} label={d.active ? `${d.providerLabel} on` : `${d.providerLabel} off`} />}
+          {d.provider && d.provider !== 'SIMULATED' && <Chip size="small" variant="outlined" label={d.environment === 'LIVE' ? 'Live' : 'Sandbox'} />}
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          The institution opens a merchant account with a Tanzanian payment aggregator; the money goes straight to the institution. With it switched on, applicants and students can pay any invoice by a prompt on their phone, and the payment is recorded as soon as the aggregator confirms it. Paying with the reference and importing statements carry on as before.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <TextField select fullWidth label="Aggregator" value={f.provider} disabled={!canEdit}
+              onChange={(e) => setF({ ...f, provider: e.target.value, fields: {}, baseUrl: '', authUrl: '' })}>
+              {providers.map((x) => <MenuItem key={x.code} value={x.code}>{x.label}</MenuItem>)}
+            </TextField>
+          </Grid>
+          {p && p.code !== 'SIMULATED' && (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField select fullWidth label="Environment" value={f.environment} disabled={!canEdit} onChange={(e) => setF({ ...f, environment: e.target.value })}
+                helperText="Sandbox until the aggregator gives live credentials">
+                <MenuItem value="SANDBOX">Sandbox (test)</MenuItem>
+                <MenuItem value="LIVE">Live (real money)</MenuItem>
+              </TextField>
+            </Grid>
+          )}
+          {p?.fields.map((x) => {
+            const old = saved.find((y) => y.name === x.name && d.provider === p.code);
+            return (
+              <Grid key={x.name} size={{ xs: 12, sm: 6, md: 4 }}>
+                <TextField fullWidth label={x.label} type={x.secret ? 'password' : 'text'} autoComplete={x.secret ? 'new-password' : 'off'} disabled={!canEdit}
+                  value={f.fields[x.name] ?? ''} onChange={(e) => setF({ ...f, fields: { ...f.fields, [x.name]: e.target.value } })}
+                  helperText={x.secret ? (old?.set ? 'Saved (never shown). Leave blank to keep it.' : 'Not saved yet') : undefined} />
+              </Grid>
+            );
+          })}
+          {p && p.code !== 'SIMULATED' && (
+            <>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField fullWidth label="API address (optional)" value={f.baseUrl} disabled={!canEdit} onChange={(e) => setF({ ...f, baseUrl: e.target.value })}
+                  helperText={`Leave blank for ${f.environment === 'LIVE' ? p.liveUrl : p.sandboxUrl}`} />
+              </Grid>
+              {p.code === 'AZAMPAY' && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField fullWidth label="Authenticator address (optional)" value={f.authUrl} disabled={!canEdit} onChange={(e) => setF({ ...f, authUrl: e.target.value })}
+                    helperText="Leave blank for AzamPay's own" />
+                </Grid>
+              )}
+            </>
+          )}
+          {p?.code === 'SIMULATED' && (
+            <Grid size={12}><Alert severity="warning">The rehearsal records payments without money moving: a prompt is paid a few seconds later, except to a phone ending in 9. Only for testing.</Alert></Grid>
+          )}
+        </Grid>
+        <Stack direction="row" spacing={3} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
+          <FormControlLabel control={<Switch checked={f.active} disabled={!canEdit || !f.provider} onChange={(e) => setF({ ...f, active: e.target.checked })} />} label="Switched on" />
+          <FormControlLabel control={<Switch checked={f.phonePrompt} disabled={!canEdit} onChange={(e) => setF({ ...f, phonePrompt: e.target.checked })} />} label="Offer payers a prompt on their phone" />
+        </Stack>
+        <ErrorAlert error={save.error ?? test.error} />
+        {save.isSuccess && <Alert severity="success" sx={{ mt: 1 }}>Saved.</Alert>}
+        {d.lastTestAt && (
+          <Alert severity={d.lastTestOk ? 'success' : 'error'} sx={{ mt: 1 }}>{`${d.lastTestNote ?? ''} (${formatDateTime(d.lastTestAt)})`}</Alert>
+        )}
+        {canEdit && (
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button variant="contained" disabled={save.isPending || !f.provider} onClick={() => save.mutate()}>Save</Button>
+            <Button variant="outlined" disabled={test.isPending || !d.provider} onClick={() => test.mutate()}>Test the credentials</Button>
+          </Stack>
+        )}
+      </CardContent></Card>
+
+      {d.notifyUrl && d.provider !== 'SIMULATED' && (
+        <Card><CardContent>
+          <Typography variant="subtitle2" gutterBottom>Notification address (to give the aggregator)</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {d.provider === 'SELCOM' ? 'CIMS sends this address with every payment; Selcom also signs each notification.' : 'Register this address in the aggregator\'s merchant portal as the callback (webhook) address.'}
+            {' '}It contains a secret part: share it only with the aggregator.
+          </Typography>
+          <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>{d.notifyUrl}</Typography>
+          {canEdit && <Button sx={{ mt: 1.5 }} variant="outlined" onClick={() => setConfirm(true)}>Make a new notification address</Button>}
+        </CardContent></Card>
+      )}
+
+      <Card><CardContent>
+        <Typography variant="subtitle2" gutterBottom>Phone prompts</Typography>
+        {!list.data?.length ? <Typography variant="body2" color="text.secondary">None yet.</Typography> : (
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead><TableRow><TableCell>When</TableCell><TableCell>Payer</TableCell><TableCell>Phone</TableCell><TableCell align="right">Amount</TableCell><TableCell>Outcome</TableCell><TableCell /></TableRow></TableHead>
+              <TableBody>
+                {list.data.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(r.createdAt)}</TableCell>
+                    <TableCell>{r.payerName}<Typography variant="caption" display="block" color="text.secondary">{r.invoiceNo}</Typography></TableCell>
+                    <TableCell sx={{ fontFamily: 'monospace' }}>{r.phone}</TableCell>
+                    <TableCell align="right">{formatTzs(r.amount)}</TableCell>
+                    <TableCell>
+                      <Chip size="small" color={PP_COLOUR[r.status] ?? 'default'} label={r.status === 'PAID' ? 'Paid' : r.status === 'PENDING' ? 'Waiting' : r.status === 'FAILED' ? 'Not paid' : 'No answer'} />
+                      <Typography variant="caption" display="block" color="text.secondary">{r.receiptNo ?? r.message ?? ''}</Typography>
+                    </TableCell>
+                    <TableCell align="right">{r.status === 'PENDING' && <Button size="small" disabled={check.isPending} onClick={() => check.mutate(r.id)}>Ask again</Button>}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+        )}
+      </CardContent></Card>
+
+      <Dialog open={confirm} onClose={() => setConfirm(false)} maxWidth="xs" fullWidth>
+        <DialogContent><Typography>The current address stops working at once: notifications fail until the aggregator has the new one. Make a new address?</Typography></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirm(false)}>Cancel</Button>
+          <Button variant="contained" color="warning" disabled={renew.isPending} onClick={() => renew.mutate()}>Make a new address</Button>
         </DialogActions>
       </Dialog>
     </Stack>

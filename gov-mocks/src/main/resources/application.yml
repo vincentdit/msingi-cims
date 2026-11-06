@@ -6,6 +6,9 @@ spring:
     name: gov-mocks
 
 mock:
+  aggregators:
+    # Seconds before a phone prompt is paid (or refused, for a phone ending in 9) and the institution is notified
+    complete-seconds: ${MOCK_AGGREGATORS_COMPLETE_SECONDS:5}
   # Where CIMS runs: GePG's control numbers, payments and reconciliations are posted here
   cims-url: ${MOCK_CIMS_URL:http://localhost:8085}
   gepg:

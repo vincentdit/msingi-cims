@@ -86,8 +86,11 @@ public class SecurityConfig {
      */
     private static org.springframework.security.oauth2.server.resource.web.BearerTokenResolver bearerTokens() {
         var standard = new org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver();
-        return request -> request.getRequestURI().substring(request.getContextPath().length()).startsWith("/api/integrations/nhif/")
-                ? null : standard.resolve(request);
+        // NHIF and the payment aggregators authenticate with their own tokens and signatures, never with a CIMS sign-in
+        return request -> {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            return path.startsWith("/api/integrations/nhif/") || path.startsWith("/api/integrations/collections/") ? null : standard.resolve(request);
+        };
     }
 
     /** The session guard runs inside the security chain only, after the token is read. */

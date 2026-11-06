@@ -10,6 +10,7 @@ developer's computer:
 | **NIDA** | FR-INT-06 | Checks a NIN against names and date of birth |
 | **MUSE** | FR-INT-07 | Receives summarised fee journals; refuses unbalanced ones and duplicates |
 | **TAMISEMI** | FR-INT-08 | Lists the students it selected to an institution |
+| **Payment aggregators** | FR-FIN-03/04 | Selcom (signed checkout API), AzamPay (token, MNO checkout, callback) and ClickPesa (token, USSD push, status): phone prompts paid after a few seconds, notifications to the institution |
 | **NHIF** | FR-INT-10 | Student Registration API v2: agent token, student registration, card applications with control numbers, card checks, intakes; calls CIMS back on payment and card issue |
 
 GePG and NHIF follow their specifications' message shapes and error codes (NHIF: *Student Registration API Documentation*, v2).
@@ -91,6 +92,20 @@ Answers are NHIF's `BulkOperationResult` (`succeeded`, `failed[index, identifier
 Callbacks: enter the institution's callback URL, token URL and callback credentials (CIMS › Integrations › NHIF › Callback
 credentials) on the dashboard. The mock then gets a token and calls CIMS back on each card application (control number),
 **Mark paid** (payment) and **Issue card** (card number), as NHIF does. Without them the callbacks are listed but not sent.
+
+### Payment aggregators (Selcom, AzamPay, ClickPesa)
+
+Enter the merchant credentials shown on the dashboard (tab **Aggregators**) in CIMS › Integrations › Mobile money, with the API
+addresses `http://localhost:8098/selcom/v1`, `http://localhost:8098/azampay` (authenticator `http://localhost:8098/azampay-auth`) or
+`http://localhost:8098/clickpesa`. A phone prompt is paid `MOCK_AGGREGATORS_COMPLETE_SECONDS` (5) seconds after it is sent, except to
+a phone ending in 9 ("insufficient balance"). Selcom checks every call's digest and notifies the address CIMS sends with each order
+(signed); for AzamPay and ClickPesa, paste CIMS's notification address on the dashboard.
+
+| Path | What it does |
+|---|---|
+| `POST /selcom/v1/checkout/create-order-minimal`, `/wallet-payment`; `GET /checkout/order-status` | Signed (`Authorization: SELCOM …`, `Digest`, `Signed-Fields`, `Timestamp`); order, phone prompt, status |
+| `POST /azampay-auth/AppRegistration/GenerateToken`; `POST /azampay/azampay/mno/checkout` | Token; prompt with `provider` Mpesa, Tigo, Airtel, Halopesa or Azampesa |
+| `POST /clickpesa/third-parties/generate-token`, `/payments/initiate-ussd-push-request`; `GET /payments/{orderReference}` | Token (`client-id`, `api-key`); prompt; status |
 
 The institution code is CIMS's NACTVET registration number for the institution (e.g. `REG/DEMO/001`) unless another code
 is entered under Integrations.

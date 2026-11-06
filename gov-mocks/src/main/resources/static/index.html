@@ -46,7 +46,7 @@
 <main id="main"></main>
 <div id="toast"></div>
 <script>
-const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI', 'NHIF'];
+const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI', 'NHIF', 'Aggregators'];
 let tab = location.hash.slice(1) || 'GePG';
 const $ = (s) => document.querySelector(s);
 const esc = (v) => v == null ? '' : String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -201,10 +201,27 @@ async function setCb() {
   if ($('#cbSec').value) q.set('clientSecret', $('#cbSec').value);
   await call('POST', '/mock/nhif/callback?' + q); toast('Saved'); load();
 }
+async function aggregators() {
+  const s = await call('GET', '/mock/aggregators');
+  const cr = s.credentials;
+  const creds = Object.entries(cr).map(([p, c]) => `<div><b>${p}</b> · ${Object.entries(c).map(([k, v]) => `${k} <code>${esc(v)}</code>`).join(' · ')}</div>`).join('');
+  const cb = (p) => `<input id="cb${p}" size="60" placeholder="Notification address from CIMS (Integrations › Mobile money)" value="${esc(s.callbacks[p] || '')}">
+    <button onclick="call('POST','/mock/aggregators/callback?provider=${p}&url='+encodeURIComponent($('#cb${p}').value)).then(()=>toast('Saved'))">Save ${p}</button>`;
+  return `<div class="card"><h2>Merchant credentials (enter in CIMS › Integrations › Mobile money, with the addresses shown)</h2><div class="body muted">${creds}
+    <div style="margin-top:6px">A phone prompt is paid ${s.completeSeconds} s after it is sent; a phone ending in 9 has "insufficient balance". Selcom notifies the address CIMS sends with each order; AzamPay and ClickPesa the address set below.</div></div></div>
+  <div class="card"><h2>Notification addresses</h2><div class="body bar">${cb('AZAMPAY')}</div><div class="body bar">${cb('CLICKPESA')}</div></div>
+  <div class="card"><h2>Phone prompts</h2>${table([
+    ['Aggregator', o => esc(o.provider)], ['Order', o => esc(o.orderId)], ['Phone', o => esc(o.phone)], ['Amount', o => money(o.amount)],
+    ['Status', o => `<span class="${o.status === 'PAID' ? 'ok' : o.status === 'FAILED' ? 'bad' : ''}">${esc(o.status)}</span>`], ['Transaction', o => esc(o.transId || '')], ['At', o => esc(o.createdAt)]
+  ], s.orders, 'None yet. From CIMS: a student or applicant chooses Pay with a prompt on my phone.')}</div>
+  <div class="card"><h2>Notifications sent</h2>${table([
+    ['Aggregator', c => esc(c.provider)], ['Order', c => esc(c.orderId)], ['Status', c => esc(c.status)], ['Result', c => esc(c.result)], ['At', c => esc(c.at)]
+  ], s.sent, 'None yet.')}<div class="body"><button onclick="if(confirm('Forget all prompts?')) call('POST','/mock/aggregators/reset').then(load)">Reset</button></div></div>`;
+}
 async function load() {
   try {
     outages();
-    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi, NHIF: nhif })[tab]();
+    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi, NHIF: nhif, Aggregators: aggregators })[tab]();
     $('#main').innerHTML = html;
   } catch (e) { console.error(e); }
 }
