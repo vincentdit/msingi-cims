@@ -178,7 +178,13 @@ export function PayInvoice({ id }: { id: number }) {
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{prompt ? 'Or pay to Msingi, quoting the payment reference' : 'Pay to Msingi, quoting the payment reference'}</Typography>
           <Table size="small"><TableBody>
-            {payTo.map((c) => (
+            {payTo.map((c) => c.provider === 'BILLPAY' ? (
+              <TableRow key={c.provider + c.accountNumber}>
+                <TableCell>BillPay control number<Typography variant="caption" display="block" color="text.secondary">{c.branch}</Typography></TableCell>
+                <TableCell>{c.accountName}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 15 }}>{group(c.accountNumber ?? '')}</TableCell>
+              </TableRow>
+            ) : (
               <TableRow key={c.provider + c.accountNumber}>
                 <TableCell>{PROVIDER[c.provider] ?? c.provider}{c.branch ? `, ${c.branch}` : ''}</TableCell>
                 <TableCell>{c.accountName}</TableCell>

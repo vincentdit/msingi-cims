@@ -11,6 +11,87 @@ import { CYCLE_LABEL, KIND_LABEL, day, period, providerLabel, tzs, type Account,
 import { InvoiceStatusChip, PaymentTable, StatementDialog } from '../../components/billing/BillingParts';
 import { tr } from '../../locale/ui';
 import { PayInvoice } from './BuySmsDialog';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+
+interface ServiceView { id: number; name: string; description?: string; unitLabel: string; unitPrice: number; minQuantity: number; maxQuantity: number; vatPercent: number; delivery: string; smsPerUnit?: number }
+interface OrderView { id: number; service: string; quantity: number; invoiceId: number; invoiceNo: string; total: number; status: string; requestedAt: string; deliveredAt?: string; deliveryNote?: string }
+const ORDER_LABEL: Record<string, ['default' | 'warning' | 'success', string]> = {
+  REQUESTED: ['warning', 'Waiting for payment'], PAID: ['default', 'Paid: Msingi will deliver'], DELIVERED: ['success', 'Delivered'], CANCELLED: ['default', 'Lapsed'],
+};
+
+/** Services from Msingi besides the subscription: request one, pay its invoice, and it is delivered when paid. */
+function ServicesCard({ onPay }: { onPay: (invoiceId: number) => void }) {
+  const qc = useQueryClient();
+  const services = useQuery({ queryKey: ['msingi-services'], queryFn: () => api<ServiceView[]>('/api/msingi-billing/services', staff) });
+  const orders = useQuery({ queryKey: ['msingi-service-orders'], queryFn: () => api<OrderView[]>('/api/msingi-billing/service-orders', staff) });
+  const [asking, setAsking] = useState<ServiceView | null>(null);
+  const [qty, setQty] = useState('1');
+  const [note, setNote] = useState('');
+  const request = useMutation({
+    mutationFn: () => api<{ invoice: { id: number } }>('/api/msingi-billing/service-orders', { ...staff, method: 'POST', body: { serviceId: asking?.id, quantity: Number(qty), note } }),
+    onSuccess: (v) => { setAsking(null); qc.invalidateQueries({ queryKey: ['msingi-service-orders'] }); qc.invalidateQueries({ queryKey: ['msingi-billing'] }); onPay(v.invoice.id); },
+  });
+  if (!services.data?.length && !orders.data?.length) return null;
+  const n = Number(qty) || 0;
+  return (
+    <Card>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 0.5 }}>Services</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Request a service from Msingi: the invoice is issued at once with its payment reference, and the service is delivered as soon as it is paid.
+        </Typography>
+        <Stack spacing={1}>
+          {services.data?.map((sv) => (
+            <Stack key={sv.id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }} sx={{ p: 1.25, border: 1, borderColor: 'divider', borderRadius: 1.5 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography fontWeight={600}>{sv.name}</Typography>
+                {sv.description && <Typography variant="body2" color="text.secondary">{sv.description}</Typography>}
+                <Typography variant="caption" color="text.secondary">{`TZS ${tzs(sv.unitPrice)} per ${sv.unitLabel} + VAT ${sv.vatPercent}%`}</Typography>
+              </Box>
+              <Button variant="outlined" onClick={() => { setAsking(sv); setQty(String(sv.minQuantity)); setNote(''); request.reset(); }}>Request</Button>
+            </Stack>
+          ))}
+        </Stack>
+        {!!orders.data?.length && (
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableHead><TableRow><TableCell>Requested</TableCell><TableCell>Service</TableCell><TableCell align="right">Total</TableCell><TableCell>Status</TableCell><TableCell /></TableRow></TableHead>
+            <TableBody>{orders.data.map((o) => (
+              <TableRow key={o.id}>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{day(o.requestedAt.slice(0, 10))}</TableCell>
+                <TableCell>{o.quantity} × {o.service}{o.deliveryNote && <Typography variant="caption" display="block" color="text.secondary">{o.deliveryNote}</Typography>}</TableCell>
+                <TableCell align="right">{tzs(o.total)}</TableCell>
+                <TableCell><Chip size="small" color={ORDER_LABEL[o.status]?.[0]} label={ORDER_LABEL[o.status]?.[1] ?? o.status} /></TableCell>
+                <TableCell align="right">{o.status === 'REQUESTED' && <Button size="small" variant="contained" onClick={() => onPay(o.invoiceId)}>Pay</Button>}</TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </Table>
+        )}
+      </CardContent>
+      {asking && (
+        <Dialog open onClose={() => setAsking(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>{asking.name}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {asking.minQuantity !== asking.maxQuantity && (
+                <TextField select label={`How many (${asking.unitLabel})`} value={qty} onChange={(e) => setQty(e.target.value)}>
+                  {Array.from({ length: Math.min(asking.maxQuantity - asking.minQuantity + 1, 50) }, (_, i) => asking.minQuantity + i).map((q) => <MenuItem key={q} value={String(q)}>{q}</MenuItem>)}
+                </TextField>
+              )}
+              <TextField label="Note to Msingi (optional)" multiline minRows={2} value={note} onChange={(e) => setNote(e.target.value)} inputProps={{ maxLength: 500 }} />
+              <Typography>{`Total: TZS ${tzs(Math.round(n * asking.unitPrice * (1 + asking.vatPercent / 100)))} with VAT`}</Typography>
+              <ErrorAlert error={request.error} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAsking(null)}>Cancel</Button>
+            <Button variant="contained" disabled={request.isPending} onClick={() => request.mutate()}>Get the invoice</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </Card>
+  );
+}
 
 const staff = { realm: 'staff' as const };
 
@@ -114,6 +195,7 @@ export default function MsingiSubscriptionPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}><ContractCard c={a.contract} /></Grid>
+        <Grid size={12}><ServicesCard onPay={setPaying} /></Grid>
       </Grid>
       {paying != null && (
         <Dialog open onClose={() => { setPaying(null); qc.invalidateQueries({ queryKey: ['msingi-billing'] }); }} maxWidth="sm" fullWidth>

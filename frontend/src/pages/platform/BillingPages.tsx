@@ -23,7 +23,7 @@ import {
 } from '../../components/billing/billing';
 import { tr } from '../../locale/ui';
 import { AgingBar, InvoiceStatusChip, PaymentTable, StatementDialog } from '../../components/billing/BillingParts';
-import { PayMethodsCard, SmsBundlesTab } from './BillingSmsPages';
+import { PayMethodsCard, ServicesTab, SmsBundlesTab, StatementImportDialog } from './BillingSmsPages';
 import { platform, type InstitutionRow } from './shared';
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Dar_es_Salaam' });
@@ -42,12 +42,14 @@ export function BillingPage() {
         <Tab value="payments" label="Payments" />
         <Tab value="settings" label="Invoice details" />
         <Tab value="sms" label="SMS bundles" />
+        <Tab value="services" label="Services" />
       </Tabs>
       {tab === 'overview' && <OverviewTab />}
       {tab === 'invoices' && <InvoicesTab />}
       {tab === 'payments' && <PaymentsTab />}
       {tab === 'settings' && <><SettingsTab /><PayMethodsCard /></>}
       {tab === 'sms' && <SmsBundlesTab />}
+      {tab === 'services' && <ServicesTab />}
     </>
   );
 }
@@ -505,6 +507,7 @@ function PaymentsTab() {
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [recording, setRecording] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [reversing, setReversing] = useState<PaymentRow | null>(null);
   useEffect(() => { const h = setTimeout(() => setQuery(q), 300); return () => clearTimeout(h); }, [q]);
   const list = useQuery({ queryKey: ['platform', 'billing', 'payments', query], queryFn: () => api<PaymentRow[]>(`/api/platform/billing/payments?q=${encodeURIComponent(query)}`, platform) });
@@ -514,11 +517,15 @@ function PaymentsTab() {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" sx={{ mb: 2 }}>
           <TextField size="small" placeholder="Receipt, reference or institution" value={q} onChange={(e) => setQ(e.target.value)} sx={{ minWidth: 300 }}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} inputProps={{ 'aria-label': tr('Search payments') }} />
-          <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecording(true)}>Record payment</Button></Box>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => setImporting(true)}>Import bank statement</Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecording(true)}>Record payment</Button>
+          </Stack>
         </Stack>
         <PaymentTable rows={list.data} loading={list.isLoading} realm="platform" onReverse={setReversing} showInstitution />
         <ErrorAlert error={list.error} />
       </CardContent>
+      {importing && <StatementImportDialog onClose={() => setImporting(false)} onDone={() => qc.invalidateQueries({ queryKey: ['platform', 'billing'] })} />}
       {recording && <RecordPaymentDialog onClose={() => setRecording(false)} onDone={() => { setRecording(false); qc.invalidateQueries({ queryKey: ['platform', 'billing'] }); }} />}
       {reversing && <ReasonDialog title={`Reverse ${reversing.receiptNo}?`} required action="Reverse payment"
         text="Use this for a payment recorded by mistake or a cheque that bounced. Its amount comes off the invoices it paid."

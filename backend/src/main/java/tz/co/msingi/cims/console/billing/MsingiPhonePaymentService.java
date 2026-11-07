@@ -62,7 +62,7 @@ public class MsingiPhonePaymentService {
         if (!List.of("ISSUED", "PARTLY_PAID").contains((String) i.get("status"))) {
             throw new BusinessRuleException("NOTHING_TO_PAY", "Nothing is left to pay on this invoice.");
         }
-        if (!billing.allows((String) i.get("kind"), "MOBILE")) {
+        if (!billing.allows(billing.payKind(invoiceId, (String) i.get("kind")), "MOBILE")) {
             throw new BusinessRuleException("MOBILE_NOT_ALLOWED", "This invoice is paid by bank transfer only: use the accounts shown on the invoice.");
         }
         BigDecimal balance = ((BigDecimal) i.get("total")).subtract((BigDecimal) i.get("paid_amount"));
@@ -120,10 +120,32 @@ public class MsingiPhonePaymentService {
             return new Outcome(401, e.getMessage());
         }
         List<Map<String, Object>> rows = n.orderId() == null ? List.of() : jdbc.queryForList("select * from msingi_phone_payments where order_id = ?", n.orderId());
-        if (rows.isEmpty()) return new Outcome(200, "Unknown order: ignored");
+        if (rows.isEmpty()) return new Outcome(200, billPay(provider, a, c, n));
         AggregatorClient.Result r = n.result();
         if (provider == AggregatorProvider.CLICKPESA) r = c.status(a, n.orderId(), (String) rows.get(0).get("provider_ref"));   // unsigned: ask
         return new Outcome(200, apply(rows.get(0), r, a));
+    }
+
+    /**
+     * A payment made with an invoice's BillPay control number (Msingi's BillPay-Namba followed by the payment reference), from mobile
+     * money, CRDB SimBanking or a CRDB agent: recorded against the invoice like any payment reported by the collector, once.
+     */
+    private String billPay(AggregatorProvider provider, AggregatorClient.Account a, AggregatorClient c, AggregatorClient.Notification n) {
+        String quoted = n.orderId() != null ? n.orderId() : n.reference();
+        String ref = MsingiCollectionService.referenceIn(quoted, collection.savedBillPayNamba());
+        if (!MsingiBillingService.validReference(ref)) return "Unknown order: ignored";
+        AggregatorClient.Result r = n.result();
+        if (provider == AggregatorProvider.CLICKPESA) r = c.status(a, quoted, null);   // unsigned: ask ClickPesa
+        if (r == null || r.state() != AggregatorClient.State.PAID) return "Not paid yet";
+        String tx = r.transactionId() != null ? r.transactionId() : r.providerRef() != null ? r.providerRef() : quoted;
+        if (r.amount() == null || r.amount().signum() <= 0) return "No amount: ignored";
+        String ch = r.channel() == null ? "" : r.channel().toUpperCase(Locale.ROOT);
+        String method = ch.contains("CRDB") || ch.contains("BANK") ? "BANK" : "MOBILE_MONEY";
+        var paid = billing.online(ref, provider.name(), tx, r.amount(), r.paidAt() != null ? r.paidAt() : OffsetDateTime.now(), method);
+        if (paid == null) return "Unknown reference: ignored";
+        recorder.record(paid.tenantId(), IntegrationCallRecorder.ExternalSystem.COLLECTION, "msingiBillPay " + provider.name().toLowerCase(Locale.ROOT), true,
+                live(a), IntegrationCallRecorder.Outcome.SUCCESS, null, "reference " + ref, "receipt " + paid.receiptNo());
+        return "Payment recorded.";
     }
 
     /** For the job: ask about prompts still waiting, and close those nobody answered. */

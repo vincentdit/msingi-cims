@@ -71,6 +71,7 @@ public class MsingiBillingService {
     private final tz.co.msingi.cims.notification.MessagingAdminService messaging;
     private final tz.co.msingi.cims.console.institutions.InstitutionService institutions;
     private final tz.co.msingi.cims.platform.tenancy.TenantLookupService lookup;
+    private final MsingiCollectionService collection;
 
     @Value("${cims.payments.allow-simulation:false}")
     private boolean allowSimulation;
@@ -450,7 +451,7 @@ public class MsingiBillingService {
         if (total.signum() <= 0) throw new BusinessRuleException("EMPTY_INVOICE", "There is nothing to charge on this invoice. Add a line or cancel it.");
         Long tenantId = ((Number) inv.get("tenant_id")).longValue();
         Contract c = active(tenantId);
-        int terms = "SMS".equals(inv.get("kind")) ? 7 : c == null ? 30 : c.paymentTermsDays();   // a bundle is paid within a week
+        int terms = "SMS".equals(inv.get("kind")) || "SERVICE".equals(inv.get("kind")) ? 7 : c == null ? 30 : c.paymentTermsDays();   // a bundle is paid within a week
         LocalDate today = today();
         String no = "MSG-INV-" + today.getYear() + "-" + String.format("%05d", jdbc.queryForObject("select nextval('msingi_invoice_seq')", Long.class));
         String ref = reference(tenantId);
@@ -461,12 +462,12 @@ public class MsingiBillingService {
         platformAudit.recordAs(CurrentUser.platformId().orElse(null), by, "BILLING_INVOICE_ISSUED", tenantId, "BillingInvoice", id,
                 Map.of("invoiceNo", no, "total", total.toPlainString()));
         InvoiceView v = view(id, true);
-        BillingDocuments.Pdf pdf = documents.invoice(logo(), v, settingsFor(v.invoice().kind()), tenant(tenantId), c);
+        BillingDocuments.Pdf pdf = documents.invoice(logo(), v, settingsFor(payKind(id, v.invoice().kind()), v.invoice().paymentReference()), tenant(tenantId), c);
         toInstitution(tenantId, c, "Invoice " + no + " from Msingi Technologies",
                 "Dear " + addressee(tenantId, c) + ",\n\nPlease find attached invoice " + no + " for TZS " + tzs(v.invoice().total())
                         + (v.invoice().balance().compareTo(v.invoice().total()) < 0 ? " (TZS " + tzs(v.invoice().balance()) + " still to pay after your credit)" : "")
                         + ", due on " + DAY.format(v.invoice().dueDate()) + ".\nWhen paying, quote the payment reference " + ref + "."
-                        + payLines(v.invoice().kind()) + "\n\nThe invoice and your statement are also under Administration › Msingi subscription in CIMS.",
+                        + payLines(payKind(id, v.invoice().kind()), v.invoice().paymentReference()) + "\n\nThe invoice and your statement are also under Administration › Msingi subscription in CIMS.",
                 pdf);
     }
 
@@ -608,6 +609,7 @@ public class MsingiBillingService {
                 from (select coalesce(sum(a.amount), 0) paid from billing_allocations a join billing_payments p on p.id = a.payment_id
                       where a.invoice_id = ? and p.status = 'RECEIVED') x where i.id = ?""", invoiceId, invoiceId);
         fulfil(invoiceId);
+        fulfilServices(invoiceId);
         restoreIfPaid(invoiceId);
     }
 
@@ -681,7 +683,15 @@ public class MsingiBillingService {
     }
 
     String methods(String kind) {
+        if (kind != null && kind.startsWith("SVC:")) return kind.substring(4);   // a service's own payment method
         return payMethods().getOrDefault(kind == null ? "OTHER" : kind, "BOTH");
+    }
+
+    /** The kind that decides how an invoice is paid: a service invoice carries its service's payment method. */
+    String payKind(Long invoiceId, String kind) {
+        if (!"SERVICE".equals(kind)) return kind;
+        String m = jdbc.queryForObject("select pay_methods from billing_invoices where id = ?", String.class, invoiceId);
+        return m == null ? "OTHER" : "SVC:" + m;
     }
 
     /** Whether an invoice of this kind may be paid this way (MOBILE or BANK). */
@@ -700,9 +710,27 @@ public class MsingiBillingService {
         return settings().channels().stream().filter(c -> kindOf(c).equals("OTHER") || allows(kind, kindOf(c))).toList();
     }
 
-    private Settings settingsFor(String kind) {
+    /** The accounts for one invoice: its BillPay control number first (when Msingi has a ClickPesa BillPay-Namba), then Msingi's accounts. */
+    public List<Channel> channelsFor(String kind, String reference) {
+        List<Channel> out = new ArrayList<>();
+        String bp = billPayNumber(reference);
+        if (bp != null) out.add(new Channel(BILLPAY, "Msingi Technologies Ltd", bp, BILLPAY_HOW));
+        out.addAll(channelsFor(kind));
+        return out;
+    }
+
+    public static final String BILLPAY = "BILLPAY";
+    public static final String BILLPAY_HOW = "M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB SimBanking or a CRDB agent: choose BillPay / Lipa Bili";
+
+    /** The invoice's BillPay control number: Msingi's BillPay-Namba followed by the payment reference (null without BillPay). */
+    public String billPayNumber(String reference) {
+        if (reference == null) return null;
+        return collection.billPayNamba().map(n -> n + reference).orElse(null);
+    }
+
+    private Settings settingsFor(String kind, String reference) {
         Settings s = settings();
-        return new Settings(s.companyName(), s.tin(), s.vrn(), s.address(), s.phone(), s.email(), s.website(), channelsFor(kind), s.invoiceNote(),
+        return new Settings(s.companyName(), s.tin(), s.vrn(), s.address(), s.phone(), s.email(), s.website(), channelsFor(kind, reference), s.invoiceNote(),
                 s.updatedByName(), s.updatedAt(), s.customLogo());
     }
 
@@ -718,7 +746,7 @@ public class MsingiBillingService {
         if (reason == null || !reason.startsWith("Msingi invoice ")) return;   // suspended for another reason: Msingi decides
         Integer stillLate = jdbc.queryForObject("""
                 select count(*) from billing_invoices i left join billing_contracts c on c.tenant_id = i.tenant_id and c.status = 'ACTIVE'
-                where i.tenant_id = ? and i.status in ('ISSUED', 'PARTLY_PAID') and i.kind <> 'SMS' and i.due_date is not null
+                where i.tenant_id = ? and i.status in ('ISSUED', 'PARTLY_PAID') and i.kind not in ('SMS', 'SERVICE') and i.due_date is not null
                   and i.due_date + coalesce(c.suspend_after_days, 60) <= ?""", Integer.class, tenantId, Date.valueOf(today()));
         if (stillLate != null && stillLate > 0) return;
         String no = jdbc.queryForObject("select invoice_no from billing_invoices where id = ?", String.class, invoiceId);
@@ -737,6 +765,52 @@ public class MsingiBillingService {
                 + " (invoice " + no + ") and CIMS is available again for your staff, students and applicants.", null);
         toMsingi(tenantId, "Access restored: " + tenant(tenantId).getName(), tenant(tenantId).getName() + " paid invoice " + no
                 + " and its CIMS access was restored automatically.");
+    }
+
+    // ================================================================= services requested by the institution
+
+    /** Issues the invoice for a service an institution requested (due in 7 days, paid by the service's own method). */
+    InvoiceView issueServiceInvoice(Long tenantId, String description, int quantity, BigDecimal unitPrice, BigDecimal vat, String payMethods, String by, String note) {
+        Contract c = active(tenantId);
+        Long id = newInvoice(tenantId, c, "SERVICE", null, null, vat, false);
+        writeLines(id, tenantId, List.of(new Line("SERVICE", description, BigDecimal.valueOf(quantity), money(unitPrice),
+                whole(BigDecimal.valueOf(quantity).multiply(unitPrice)))));
+        jdbc.update("update billing_invoices set pay_methods = ?, created_by_name = ?, notes = ? where id = ?", payMethods, by, note, id);
+        doIssue(id, by);
+        return view(id, false);
+    }
+
+    /**
+     * Service orders whose invoice has just been paid: an SMS pack is credited at once; any other service is handed to Msingi's
+     * staff to deliver, and the institution is told.
+     */
+    private void fulfilServices(Long invoiceId) {
+        List<Map<String, Object>> orders = jdbc.queryForList("""
+                update billing_service_orders o set status = 'PAID', paid_at = now()
+                from billing_invoices i where i.id = o.invoice_id and o.invoice_id = ? and i.status = 'PAID' and o.status = 'REQUESTED'
+                returning o.id, o.tenant_id, o.service_id, o.quantity, i.invoice_no, i.total""", invoiceId);
+        for (Map<String, Object> o : orders) {
+            Long orderId = ((Number) o.get("id")).longValue(), tenantId = ((Number) o.get("tenant_id")).longValue();
+            int qty = ((Number) o.get("quantity")).intValue();
+            Map<String, Object> svc = jdbc.queryForMap("select name, unit_label, delivery, sms_per_unit from billing_services where id = ?", o.get("service_id"));
+            String no = (String) o.get("invoice_no"), name = (String) svc.get("name");
+            Contract c = active(tenantId);
+            if ("SMS_CREDIT".equals(svc.get("delivery"))) {
+                int sms = qty * ((Number) svc.get("sms_per_unit")).intValue();
+                asInstitution(tenantId, () -> messaging.creditPaid(sms, (BigDecimal) o.get("total"), null, no, "Msingi (invoice " + no + " paid)"));
+                jdbc.update("update billing_service_orders set status = 'DELIVERED', delivered_at = now(), delivered_by_name = 'CIMS (automatic)' where id = ?", orderId);
+                toInstitution(tenantId, c, String.format(Locale.ENGLISH, "%,d SMS added to your bundle", sms), "Dear " + addressee(tenantId, c) + ",\n\n"
+                        + "Thank you: invoice " + no + " for " + name + " is paid and " + String.format(Locale.ENGLISH, "%,d", sms)
+                        + " SMS have been added to your SMS bundle in CIMS.", null);
+            } else {
+                toInstitution(tenantId, c, "Payment received: " + name, "Dear " + addressee(tenantId, c) + ",\n\n"
+                        + "Thank you: invoice " + no + " for " + name + " is paid. Msingi Technologies will contact you to deliver it; you can follow it"
+                        + " under Administration › Msingi subscription › Services.", null);
+                toMsingi(tenantId, "Paid, to deliver: " + name + " for " + tenant(tenantId).getName(), tenant(tenantId).getName() + " paid invoice " + no
+                        + " for " + qty + " × " + name + ". Deliver it and mark it delivered under Billing › Services.");
+            }
+            platformAudit.recordAs(null, "CIMS billing", "SERVICE_ORDER_PAID", tenantId, "BillingServiceOrder", orderId, Map.of("invoiceNo", no, "service", name));
+        }
     }
 
     // ================================================================= SMS bundles bought by the institution
@@ -831,10 +905,11 @@ public class MsingiBillingService {
     /** Unpaid SMS invoices are cancelled after two weeks (nothing is owed for a bundle that was never delivered). */
     int cancelStaleSmsInvoices() {
         List<Long> stale = jdbc.queryForList("""
-                select id from billing_invoices where kind = 'SMS' and status = 'ISSUED' and issue_date < ? """, Long.class, Date.valueOf(today().minusDays(14)));
+                select id from billing_invoices where kind in ('SMS', 'SERVICE') and status = 'ISSUED' and issue_date < ? """, Long.class, Date.valueOf(today().minusDays(14)));
         for (Long id : stale) {
             jdbc.update("update billing_invoices set status = 'CANCELLED', cancelled_reason = ?, updated_at = now(), version = version + 1 where id = ? and status = 'ISSUED'",
-                    "Not paid within 14 days: the SMS bundle was not delivered.", id);
+                    "Not paid within 14 days: the bundle or service was not delivered.", id);
+            jdbc.update("update billing_service_orders set status = 'CANCELLED' where invoice_id = ? and status = 'REQUESTED'", id);
             Long tenantId = jdbc.queryForObject("select tenant_id from billing_invoices where id = ?", Long.class, id);
             platformAudit.recordAs(null, "CIMS billing", "SMS_INVOICE_LAPSED", tenantId, "BillingInvoice", id, Map.of());
         }
@@ -905,7 +980,7 @@ public class MsingiBillingService {
         List<Reminder> rem = jdbc.query("select level, kind, sent_to, created_at from billing_reminders where invoice_id = ? order by created_at",
                 (rs, i) -> new Reminder(rs.getInt(1), rs.getString(2), msingi ? rs.getString(3) : null, rs.getObject(4, OffsetDateTime.class)), id);
         return new InvoiceView(r.get(0), lines, (BigDecimal) x.get("subtotal"), (BigDecimal) x.get("vat_percent"), (BigDecimal) x.get("vat_amount"),
-                (String) x.get("notes"), pays, rem, (String) x.get("cancelled_reason"), (String) x.get("created_by_name"), (String) x.get("issued_by_name"), methods(r.get(0).kind()), channelsFor(r.get(0).kind()));
+                (String) x.get("notes"), pays, rem, (String) x.get("cancelled_reason"), (String) x.get("created_by_name"), (String) x.get("issued_by_name"), methods(payKind(id, r.get(0).kind())), channelsFor(payKind(id, r.get(0).kind()), r.get(0).paymentReference()));
     }
 
     @Transactional(readOnly = true)
@@ -1028,7 +1103,7 @@ public class MsingiBillingService {
     @Transactional(readOnly = true)
     public BillingDocuments.Pdf invoicePdf(Long id, boolean msingi) {
         InvoiceView v = msingi ? view(id, true) : ownInvoice(id);
-        return documents.invoice(logo(), v, settingsFor(v.invoice().kind()), tenant(v.invoice().tenantId()), active(v.invoice().tenantId()));
+        return documents.invoice(logo(), v, settingsFor(payKind(v.invoice().id(), v.invoice().kind()), v.invoice().paymentReference()), tenant(v.invoice().tenantId()), active(v.invoice().tenantId()));
     }
 
     @Transactional(readOnly = true)
@@ -1069,9 +1144,9 @@ public class MsingiBillingService {
                     + " and is still unpaid. Please pay it now to avoid interruption of your CIMS service.";
             default -> "Invoice " + r.invoiceNo() + " (TZS " + tzs(r.balance()) + " to pay)" + (r.daysOverdue() != null && r.daysOverdue() > 0
                     ? " was due on " + DAY.format(r.dueDate()) + " and is " + r.daysOverdue() + " days overdue." : " is due on " + DAY.format(r.dueDate()) + ".");
-        } + "\nWhen paying, quote the payment reference " + r.paymentReference() + "." + payLines(r.kind())
+        } + "\nWhen paying, quote the payment reference " + r.paymentReference() + "." + payLines(payKind(r.id(), r.kind()), r.paymentReference())
                 + "\n\nIf you have already paid, please send us the payment details so we can match it.";
-        String to = toInstitution(r.tenantId(), c, subject, body, documents.invoice(logo(), v, settingsFor(r.kind()), tenant(r.tenantId()), c));
+        String to = toInstitution(r.tenantId(), c, subject, body, documents.invoice(logo(), v, settingsFor(payKind(r.id(), r.kind()), r.paymentReference()), tenant(r.tenantId()), c));
         jdbc.update("insert into billing_reminders (tenant_id, invoice_id, level, kind, sent_to) values (?, ?, ?, ?, ?)", r.tenantId(), invoiceId, level, kind, to);
         jdbc.update("update billing_invoices set last_reminded_at = now(), reminder_level = greatest(reminder_level, ?) where id = ?", level, invoiceId);
     }
@@ -1101,12 +1176,16 @@ public class MsingiBillingService {
         return c != null && c.billingContactName() != null ? c.billingContactName() : tenant(tenantId).getName();
     }
 
-    private String payLines(String kind) {
-        List<Channel> ch = channelsFor(kind);
+    private String payLines(String kind, String reference) {
+        List<Channel> ch = channelsFor(kind, reference);
         if (ch.isEmpty()) return "";
         StringBuilder b = new StringBuilder("\nPay to:");
         for (Channel c : ch) {
             PaymentProvider p = provider(c.provider());
+            if (BILLPAY.equals(c.provider())) {
+                b.append("\n  • BillPay control number ").append(c.accountNumber()).append(" (").append(c.branch()).append(")");
+                continue;
+            }
             b.append("\n  • ").append(p == null ? c.provider() : p.label()).append(" ").append(c.accountNumber())
                     .append(c.accountName() == null ? "" : " (" + c.accountName() + ")").append(c.branch() == null ? "" : ", " + c.branch());
         }

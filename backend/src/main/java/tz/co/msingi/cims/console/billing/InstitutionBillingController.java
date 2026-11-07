@@ -19,6 +19,7 @@ public class InstitutionBillingController {
     private final MsingiBillingService service;
     private final MsingiCollectionService collection;
     private final MsingiPhonePaymentService phone;
+    private final MsingiServicesService services;
 
     public record BuySms(int units) {
     }
@@ -72,6 +73,25 @@ public class InstitutionBillingController {
     public PayOptions payOptions() {
         MsingiCollectionService.Prompt p = collection.prompt();
         return new PayOptions(p.enabled(), p.needsNetwork(), p.provider(), service.simulationAllowed());
+    }
+
+    @GetMapping("/services")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public java.util.List<MsingiServicesService.ServiceView> services() {
+        return services.catalogue();
+    }
+
+    @GetMapping("/service-orders")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public java.util.List<MsingiServicesService.OrderView> serviceOrders() {
+        return services.mine();
+    }
+
+    /** Requests a service from Msingi: the invoice is issued at once; the service is delivered when it is paid. */
+    @PostMapping("/service-orders")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public InvoiceView requestService(@RequestBody MsingiServicesService.OrderRequest req) {
+        return services.request(req, tz.co.msingi.cims.platform.security.CurrentUser.name());
     }
 
     /** Buys an SMS bundle: the invoice is issued at once with its payment reference; the SMS are added as soon as it is paid. */

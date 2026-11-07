@@ -23,6 +23,8 @@ public class PlatformBillingController {
     private final MsingiBillingService service;
     private final MsingiBillingJob job;
     private final MsingiCollectionService collection;
+    private final MsingiStatementService statements;
+    private final MsingiServicesService services;
 
     public record Prepare(Long tenantId, String kind, LocalDate from, LocalDate to) {
     }
@@ -46,6 +48,42 @@ public class PlatformBillingController {
     @PutMapping("/settings")
     public Settings saveSettings(@RequestBody Settings s) {
         return service.saveSettings(s);
+    }
+
+    @PostMapping(value = "/statements", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public MsingiStatementService.ImportView importStatement(@RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+                                                             @RequestParam String provider) throws java.io.IOException {
+        return statements.importStatement(file.getOriginalFilename(), file.getBytes(), provider);
+    }
+
+    @GetMapping("/statements")
+    public List<MsingiStatementService.ImportView> statements() {
+        return statements.recent();
+    }
+
+    @GetMapping("/services")
+    public List<MsingiServicesService.ServiceView> services() {
+        return services.all();
+    }
+
+    @PostMapping("/services")
+    public MsingiServicesService.ServiceView createService(@jakarta.validation.Valid @RequestBody MsingiServicesService.ServiceInput in) {
+        return services.save(null, in);
+    }
+
+    @PutMapping("/services/{id}")
+    public MsingiServicesService.ServiceView updateService(@PathVariable Long id, @jakarta.validation.Valid @RequestBody MsingiServicesService.ServiceInput in) {
+        return services.save(id, in);
+    }
+
+    @GetMapping("/service-orders")
+    public List<MsingiServicesService.OrderView> serviceOrders(@RequestParam(defaultValue = "all") String status) {
+        return services.orders(status);
+    }
+
+    @PostMapping("/service-orders/{id}/delivered")
+    public MsingiServicesService.OrderView delivered(@PathVariable Long id, @RequestBody(required = false) MsingiServicesService.Delivered d) {
+        return services.markDelivered(id, d);
     }
 
     @GetMapping("/pay-methods")

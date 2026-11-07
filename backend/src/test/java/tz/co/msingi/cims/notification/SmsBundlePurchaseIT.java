@@ -21,10 +21,13 @@ import tz.co.msingi.cims.support.IntegrationTest;
 import tz.co.msingi.cims.support.TestData;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import org.springframework.mock.web.MockMultipartFile;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -197,5 +200,102 @@ class SmsBundlePurchaseIT {
             p(put("/api/platform/billing/pay-methods"), "{\"SMS\":\"BOTH\"}");
             p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":false}");
         }
+    }
+
+    @Test
+    void billPayAndBankStatementsRecordPaymentsWithoutAnyone() throws Exception {
+        p(put("/api/platform/billing/sms-pricing"), "{\"pricePerSms\":20,\"minUnits\":500,\"vatPercent\":18}").andExpect(status().isOk());
+        p(put("/api/platform/billing/settings"), """
+                {"companyName":"Msingi Technologies Ltd","email":"billing@msingi.co.tz",
+                 "channels":[{"provider":"CRDB","accountName":"Msingi Technologies Ltd","accountNumber":"0150123456700","branch":"Dodoma"}]}""")
+                .andExpect(status().isOk());
+        // a BillPay-Namba only with ClickPesa (or the rehearsal), 4 digits
+        p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":true,\"billPayNamba\":\"11a2\"}")
+                .andExpect(jsonPath("$.code").value("BILLPAY_NAMBA"));
+        JsonNode col = s.body(p(put("/api/platform/billing/collection"),
+                "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":true,\"billPayNamba\":\"1122\"}").andExpect(status().isOk()));
+        String path = col.get("notifyUrl").asText().substring(col.get("notifyUrl").asText().indexOf("/api/"));
+        try {
+            long before = balance();
+            JsonNode v = s.body(s.call(post("/api/msingi-billing/sms-bundles"), bursar, "{\"units\":500}").andExpect(status().isOk()));
+            String ref = v.at("/invoice/paymentReference").asText();
+            assertThat(v.at("/payTo/0/provider").asText()).isEqualTo("BILLPAY");
+            assertThat(v.at("/payTo/0/accountNumber").asText()).isEqualTo("1122" + ref);
+            // paid from a phone or CRDB with the BillPay control number: ClickPesa reports it, CIMS records it once
+            String note = "{\"orderId\":\"1122" + ref + "\",\"status\":\"PAID\",\"transactionId\":\"BP" + suffix + "\",\"amount\":11800}";
+            for (int i = 0; i < 2; i++) mvc.perform(post(path).contentType("application/json").content(note)).andExpect(status().isOk());
+            assertThat(balance()).isEqualTo(before + 500);
+            assertThat(jdbc.queryForObject("select status from billing_invoices where payment_reference = ?", String.class, ref)).isEqualTo("PAID");
+
+            // a transfer straight to Msingi's bank account, quoting the reference in the narration: the bank statement import records it
+            String ref2 = s.body(s.call(post("/api/msingi-billing/sms-bundles"), bursar, "{\"units\":500}")).at("/invoice/paymentReference").asText();
+            String grouped = ref2.replaceAll("(\\d{4})(?=\\d)", "$1 ");
+            String csv = "Value Date,Narration,Debit,Credit,Bank Reference\n"
+                    + "08/11/2026,TRANSFER FROM BAHARI REF " + grouped + ",,11800,FT26312A" + suffix + "\n"
+                    + "08/11/2026,BANK CHARGES,2500,,CHG1\n"
+                    + "08/11/2026,DEPOSIT JOHN,,50000,FT26312B" + suffix + "\n";
+            MockMultipartFile file = new MockMultipartFile("file", "crdb.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+            JsonNode imp = s.body(mvc.perform(multipart("/api/platform/billing/statements").file(file).param("provider", "CRDB")
+                    .header("Authorization", "Bearer " + platform)).andExpect(status().isOk()));
+            assertThat(imp.get("recorded").asInt()).isEqualTo(1);
+            assertThat(imp.get("unmatched").asInt()).isEqualTo(1);
+            assertThat(imp.at("/lines/0/reference").asText()).isEqualTo(ref2);
+            assertThat(balance()).isEqualTo(before + 1000);
+            // the same statement again changes nothing
+            JsonNode again = s.body(mvc.perform(multipart("/api/platform/billing/statements").file(file).param("provider", "CRDB")
+                    .header("Authorization", "Bearer " + platform)).andExpect(status().isOk()));
+            assertThat(again.get("already").asInt()).isEqualTo(1);
+            assertThat(again.get("recorded").asInt()).isZero();
+            assertThat(balance()).isEqualTo(before + 1000);
+        } finally {
+            p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":false}");
+        }
+    }
+
+    @Test
+    void servicesAreRequestedInvoicedAndDeliveredOnPayment() throws Exception {
+        p(put("/api/platform/billing/settings"), """
+                {"companyName":"Msingi Technologies Ltd","email":"billing@msingi.co.tz",
+                 "channels":[{"provider":"CRDB","accountName":"Msingi Technologies Ltd","accountNumber":"0150123456700","branch":"Dodoma"},
+                 {"provider":"MPESA","accountName":"MSINGI","accountNumber":"555111"}]}""").andExpect(status().isOk());
+        String code = "PACK" + suffix.toUpperCase();
+        p(post("/api/platform/billing/services"), "{\"code\":\"" + code + "\",\"name\":\"SMS pack 10,000\",\"unitLabel\":\"pack\",\"unitPrice\":180000,"
+                + "\"payMethods\":\"BANK\",\"delivery\":\"SMS_CREDIT\"}").andExpect(jsonPath("$.code").value("SERVICE_SMS"));
+        long pack = s.body(p(post("/api/platform/billing/services"), "{\"code\":\"" + code + "\",\"name\":\"SMS pack 10,000\",\"unitLabel\":\"pack\","
+                + "\"unitPrice\":180000,\"minQuantity\":1,\"maxQuantity\":3,\"vatPercent\":18,\"payMethods\":\"BANK\",\"delivery\":\"SMS_CREDIT\",\"smsPerUnit\":10000}")
+                .andExpect(status().isOk())).get("id").asLong();
+        long training = s.body(p(post("/api/platform/billing/services"), "{\"code\":\"TRN" + suffix.toUpperCase() + "\",\"name\":\"Training day at the college\","
+                + "\"unitLabel\":\"day\",\"unitPrice\":500000,\"minQuantity\":1,\"maxQuantity\":5,\"delivery\":\"MSINGI_DELIVERS\"}")
+                .andExpect(status().isOk())).get("id").asLong();
+
+        // the college sees the services and requests an SMS pack: invoice at once, payable by bank only
+        assertThat(s.body(s.call(get("/api/msingi-billing/services"), bursar, null)).findValuesAsText("id")).contains(String.valueOf(pack), String.valueOf(training));
+        s.call(post("/api/msingi-billing/service-orders"), bursar, "{\"serviceId\":" + pack + ",\"quantity\":4}").andExpect(jsonPath("$.code").value("SERVICE_QUANTITY"));
+        JsonNode inv = s.body(s.call(post("/api/msingi-billing/service-orders"), bursar, "{\"serviceId\":" + pack + ",\"quantity\":1}").andExpect(status().isOk()));
+        assertThat(inv.at("/invoice/kind").asText()).isEqualTo("SERVICE");
+        assertThat(inv.at("/invoice/total").decimalValue()).isEqualByComparingTo("212400");
+        assertThat(inv.get("payMethods").asText()).isEqualTo("BANK");
+        assertThat(inv.get("payTo").findValuesAsText("provider")).containsExactly("CRDB");
+        String ref = inv.at("/invoice/paymentReference").asText();
+        long before = balance();
+        String note = "{\"reference\":\"" + ref + "\",\"transactionId\":\"SV" + suffix + "\",\"provider\":\"CRDB\",\"amount\":212400}";
+        mvc.perform(post("/api/integrations/msingi-billing/payment-notification").contentType("application/json").content(note)
+                .header("X-Billing-Signature", GepgCallbackController.sign(note, "test-billing-secret"))).andExpect(status().isOk());
+        assertThat(balance()).isEqualTo(before + 10000);
+        JsonNode orders = s.body(s.call(get("/api/msingi-billing/service-orders"), bursar, null));
+        assertThat(orders.at("/0/status").asText()).isEqualTo("DELIVERED");
+
+        // a training day: paid, handed to Msingi to deliver, then marked delivered in the console
+        JsonNode t = s.body(s.call(post("/api/msingi-billing/service-orders"), admin, "{\"serviceId\":" + training + ",\"quantity\":2,\"note\":\"For the bursary staff\"}"));
+        String tref = t.at("/invoice/paymentReference").asText();
+        String tn = "{\"reference\":\"" + tref + "\",\"transactionId\":\"TR" + suffix + "\",\"provider\":\"MPESA\",\"amount\":" + t.at("/invoice/total").decimalValue().toPlainString() + "}";
+        mvc.perform(post("/api/integrations/msingi-billing/payment-notification").contentType("application/json").content(tn)
+                .header("X-Billing-Signature", GepgCallbackController.sign(tn, "test-billing-secret"))).andExpect(status().isOk());
+        JsonNode toDeliver = s.body(p(get("/api/platform/billing/service-orders?status=PAID"), null));
+        long orderId = -1;
+        for (JsonNode o : toDeliver) if (o.get("paymentReference").asText().equals(tref)) orderId = o.get("id").asLong();
+        assertThat(orderId).isPositive();
+        p(post("/api/platform/billing/service-orders/" + orderId + "/delivered"), "{\"note\":\"Held on 20 November\"}").andExpect(jsonPath("$.status").value("DELIVERED"));
+        p(post("/api/platform/billing/service-orders/" + orderId + "/delivered"), null).andExpect(jsonPath("$.code").value("NOT_PAID"));
     }
 }

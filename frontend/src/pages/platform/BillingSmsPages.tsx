@@ -1,11 +1,11 @@
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, FormControlLabel, InputAdornment, MenuItem, Stack, Switch,
-  TextField, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, InputAdornment, MenuItem, Stack, Switch,
+  Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { api, formatDateTime } from '../../api/client';
+import { api, formatDateTime, uploadForm } from '../../api/client';
 import { ErrorAlert, Loading } from '../../components/common';
 import { platform } from './shared';
 
@@ -14,7 +14,7 @@ interface Field { name: string; label: string; secret: boolean; value?: string; 
 interface ProviderView { code: string; label: string; fields: { name: string; label: string; secret: boolean }[]; sandboxUrl: string; liveUrl: string; needsNetwork: boolean }
 interface CollectionView {
   provider?: string; providerLabel?: string; environment: string; active: boolean; fields: Field[]; baseUrl?: string; authUrl?: string; notifyUrl?: string;
-  lastTestAt?: string; lastTestOk?: boolean; lastTestNote?: string; providers: ProviderView[]; rehearsalAllowed: boolean;
+  lastTestAt?: string; lastTestOk?: boolean; lastTestNote?: string; providers: ProviderView[]; rehearsalAllowed: boolean; billPayNamba?: string | null;
 }
 
 /** Console › Billing › SMS bundles: what institutions pay for SMS, and Msingi's own mobile money account for prompts on their phones. */
@@ -74,15 +74,15 @@ function CollectionCard() {
   const qc = useQueryClient();
   const key = ['platform', 'billing', 'collection'];
   const q = useQuery({ queryKey: key, queryFn: () => api<CollectionView>('/api/platform/billing/collection', platform) });
-  const [f, setF] = useState({ provider: '', environment: 'SANDBOX', active: false, baseUrl: '', authUrl: '', fields: {} as Record<string, string> });
+  const [f, setF] = useState({ provider: '', environment: 'SANDBOX', active: false, baseUrl: '', authUrl: '', billPayNamba: '', fields: {} as Record<string, string> });
   const [confirm, setConfirm] = useState(false);
   useEffect(() => {
-    if (q.data) setF({ provider: q.data.provider ?? '', environment: q.data.environment, active: q.data.active, baseUrl: q.data.baseUrl ?? '', authUrl: q.data.authUrl ?? '',
+    if (q.data) setF({ provider: q.data.provider ?? '', environment: q.data.environment, active: q.data.active, baseUrl: q.data.baseUrl ?? '', authUrl: q.data.authUrl ?? '', billPayNamba: q.data.billPayNamba ?? '',
       fields: Object.fromEntries(q.data.fields.filter((x) => !x.secret).map((x) => [x.name, x.value ?? ''])) });
   }, [q.data]);
   const done = (v: CollectionView) => qc.setQueryData(key, v);
   const save = useMutation({
-    mutationFn: () => api<CollectionView>('/api/platform/billing/collection', { ...platform, method: 'PUT', body: { ...f, baseUrl: f.baseUrl || null, authUrl: f.authUrl || null } }),
+    mutationFn: () => api<CollectionView>('/api/platform/billing/collection', { ...platform, method: 'PUT', body: { ...f, baseUrl: f.baseUrl || null, authUrl: f.authUrl || null, billPayNamba: f.billPayNamba || null } }),
     onSuccess: done,
   });
   const test = useMutation({ mutationFn: () => api<CollectionView>('/api/platform/billing/collection/test', { ...platform, method: 'POST' }), onSuccess: done });
@@ -140,6 +140,13 @@ function CollectionCard() {
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth label="Authenticator address (optional)" value={f.authUrl} onChange={(e) => setF({ ...f, authUrl: e.target.value })}
                 helperText="Leave blank for AzamPay's own" />
+            </Grid>
+          )}
+          {(p?.code === 'CLICKPESA' || p?.code === 'SIMULATED') && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth label="BillPay-Namba (optional)" value={f.billPayNamba} inputProps={{ inputMode: 'numeric', maxLength: 4 }}
+                onChange={(e) => setF({ ...f, billPayNamba: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                helperText="ClickPesa's 4-digit merchant BillPay number. With it every Msingi invoice gets a BillPay control number (the namba and its reference) that institutions pay from M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB SimBanking or a CRDB agent; ClickPesa reports each payment and CIMS records it." />
             </Grid>
           )}
           {p?.code === 'SIMULATED' && (
@@ -216,5 +223,226 @@ export function PayMethodsCard() {
         <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Save</Button>
       </Stack>
     </CardContent></Card>
+  );
+}
+
+interface StatementLine { row: number; date?: string; amount: number; text: string; transactionId: string; outcome: string; reference?: string; receiptNo?: string; invoices?: string }
+interface StatementImport { id: number; fileName: string; provider: string; total: number; recorded: number; already: number; unmatched: number; lines: StatementLine[]; importedByName?: string; importedAt: string }
+const OUTCOME: Record<string, [string, 'success' | 'default' | 'warning' | 'error']> = {
+  RECORDED: ['Recorded', 'success'], ALREADY_RECORDED: ['Already recorded', 'default'], UNMATCHED: ['No reference', 'warning'], UNKNOWN_REFERENCE: ['Unknown reference', 'error'],
+};
+const BANKS = ['CRDB', 'NMB', 'NBC', 'STANBIC', 'EXIM', 'ABSA', 'AZANIA', 'DTB', 'EQUITY', 'KCB', 'TCB', 'PBZ', 'AMANA', 'MKOMBOZI'];
+
+/**
+ * Msingi's bank statement (CSV or Excel export from the bank): every credit quoting an invoice's payment reference, or its BillPay
+ * control number, is recorded at once (and what it pays for delivered); importing the same statement again changes nothing.
+ */
+export function StatementImportDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [bank, setBank] = useState('CRDB');
+  const [file, setFile] = useState<File | null>(null);
+  const run = useMutation({
+    mutationFn: () => { const f = new FormData(); f.append('file', file as File); f.append('provider', bank);
+      return uploadForm<StatementImport>('/api/platform/billing/statements', 'platform', f, 'POST'); },
+    onSuccess: onDone,
+  });
+  const r = run.data;
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Import a bank statement</DialogTitle>
+      <DialogContent>
+        {!r ? (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Export the statement of Msingi's account from the bank (CSV or Excel, headers in the first row: a date, the narration and the credit).
+              Every credit that quotes an invoice's payment reference is recorded and receipted; the institution's SMS bundle or access follows by itself.
+              Importing the same statement again records nothing twice.
+            </Typography>
+            <TextField select label="Bank" value={bank} onChange={(e) => setBank(e.target.value)} sx={{ maxWidth: 240 }}>
+              {BANKS.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
+            </TextField>
+            <Button variant="outlined" component="label" sx={{ alignSelf: 'flex-start' }}>
+              {file ? file.name : 'Choose the statement file'}
+              <input hidden type="file" accept=".csv,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </Button>
+            <ErrorAlert error={run.error} />
+          </Stack>
+        ) : (
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip color="success" label={`Recorded: ${r.recorded}`} />
+              <Chip label={`Already recorded: ${r.already}`} />
+              <Chip color={r.unmatched ? 'warning' : 'default'} label={`Not matched: ${r.unmatched}`} />
+            </Stack>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Row</TableCell><TableCell>Date</TableCell><TableCell align="right">Amount</TableCell><TableCell>Narration</TableCell><TableCell>Outcome</TableCell></TableRow></TableHead>
+                <TableBody>
+                  {r.lines.map((l) => (
+                    <TableRow key={l.row}>
+                      <TableCell>{l.row}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{l.date ?? '—'}</TableCell>
+                      <TableCell align="right">{l.amount.toLocaleString()}</TableCell>
+                      <TableCell sx={{ maxWidth: 320 }}>{l.text}</TableCell>
+                      <TableCell>
+                        <Chip size="small" color={OUTCOME[l.outcome]?.[1] ?? 'default'} label={OUTCOME[l.outcome]?.[0] ?? l.outcome} />
+                        {l.receiptNo && <Typography variant="caption" display="block" color="text.secondary">{l.receiptNo}{l.invoices ? ` · ${l.invoices}` : ''}</Typography>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+            {r.unmatched > 0 && <Alert severity="info" icon={false}>Lines without a valid reference are not Msingi invoice payments, or the payer did not quote the reference: record those by hand with Record payment if they are.</Alert>}
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        {!r && <Button variant="contained" disabled={!file || run.isPending} onClick={() => run.mutate()}>{run.isPending ? 'Importing…' : 'Import'}</Button>}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+interface ServiceView {
+  id: number; code: string; name: string; description?: string; unitLabel: string; unitPrice: number; minQuantity: number; maxQuantity: number;
+  vatPercent: number; payMethods: string; delivery: string; smsPerUnit?: number; active: boolean; updatedByName?: string; updatedAt?: string;
+}
+interface OrderView {
+  id: number; institution: string; service: string; unitLabel: string; quantity: number; invoiceNo: string; paymentReference: string; total: number;
+  status: string; delivery: string; note?: string; requestedByName?: string; requestedAt: string; paidAt?: string; deliveredAt?: string; deliveredByName?: string; deliveryNote?: string;
+}
+const PAY_LABEL: Record<string, string> = { BOTH: 'Mobile money or bank', MOBILE: 'Mobile money only', BANK: 'Bank only' };
+const ORDER_CHIP: Record<string, ['default' | 'warning' | 'success' | 'info', string]> = {
+  REQUESTED: ['default', 'Waiting for payment'], PAID: ['warning', 'Paid: to deliver'], DELIVERED: ['success', 'Delivered'], CANCELLED: ['default', 'Lapsed'],
+};
+const tzsAmount = (n: number) => `TZS ${Math.round(n).toLocaleString()}`;
+
+/** Console › Billing › Services: what Msingi sells besides the subscription, and the paid requests to deliver. */
+export function ServicesTab() {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ['platform', 'billing', 'services'], queryFn: () => api<ServiceView[]>('/api/platform/billing/services', platform) });
+  const [view, setView] = useState('PAID');
+  const orders = useQuery({ queryKey: ['platform', 'billing', 'service-orders', view], queryFn: () => api<OrderView[]>(`/api/platform/billing/service-orders?status=${view}`, platform) });
+  const [editing, setEditing] = useState<ServiceView | 'new' | null>(null);
+  const [delivering, setDelivering] = useState<OrderView | null>(null);
+  return (
+    <Stack spacing={2.5}>
+      <Card><CardContent>
+        <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6" sx={{ flex: 1 }}>Services</Typography>
+          <Button variant="contained" onClick={() => setEditing('new')}>New service</Button>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          What institutions can request from Msingi under Administration › Msingi subscription › Services. The invoice is issued at once with its payment
+          reference and the payment method chosen here; when it is paid, an SMS pack is added to the institution's bundle by itself, and any other service
+          comes to you below to deliver.
+        </Typography>
+        {!list.data ? <Loading /> : list.data.length === 0 ? <Typography color="text.secondary">No services yet.</Typography> : (
+          <Box sx={{ overflowX: 'auto' }}><Table size="small">
+            <TableHead><TableRow><TableCell>Service</TableCell><TableCell align="right">Price</TableCell><TableCell>Quantity</TableCell><TableCell>Paid by</TableCell><TableCell>Delivery</TableCell><TableCell /></TableRow></TableHead>
+            <TableBody>{list.data.map((s) => (
+              <TableRow key={s.id} sx={{ opacity: s.active ? 1 : 0.5 }}>
+                <TableCell>{s.name}<Typography variant="caption" display="block" color="text.secondary">{s.code}{s.active ? '' : ' · not offered'}</Typography></TableCell>
+                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{tzsAmount(s.unitPrice)} / {s.unitLabel}<Typography variant="caption" display="block" color="text.secondary">+ VAT {s.vatPercent}%</Typography></TableCell>
+                <TableCell>{s.minQuantity === s.maxQuantity ? s.minQuantity : `${s.minQuantity}–${s.maxQuantity}`}</TableCell>
+                <TableCell>{PAY_LABEL[s.payMethods]}</TableCell>
+                <TableCell>{s.delivery === 'SMS_CREDIT' ? `Automatic: ${s.smsPerUnit?.toLocaleString()} SMS per ${s.unitLabel}` : 'Msingi delivers'}</TableCell>
+                <TableCell align="right"><Button size="small" onClick={() => setEditing(s)}>Edit</Button></TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </Table></Box>
+        )}
+        <ErrorAlert error={list.error} />
+      </CardContent></Card>
+      <Card><CardContent>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+          <Typography variant="h6" sx={{ flex: 1 }}>Requests</Typography>
+          <TextField select size="small" value={view} onChange={(e) => setView(e.target.value)} sx={{ minWidth: 200 }}>
+            <MenuItem value="PAID">Paid: to deliver</MenuItem><MenuItem value="REQUESTED">Waiting for payment</MenuItem>
+            <MenuItem value="DELIVERED">Delivered</MenuItem><MenuItem value="all">All</MenuItem>
+          </TextField>
+        </Stack>
+        {!orders.data ? <Loading /> : orders.data.length === 0 ? <Typography color="text.secondary">None.</Typography> : (
+          <Box sx={{ overflowX: 'auto' }}><Table size="small">
+            <TableHead><TableRow><TableCell>Institution</TableCell><TableCell>Service</TableCell><TableCell>Invoice</TableCell><TableCell align="right">Total</TableCell><TableCell>Status</TableCell><TableCell /></TableRow></TableHead>
+            <TableBody>{orders.data.map((o) => (
+              <TableRow key={o.id}>
+                <TableCell>{o.institution}<Typography variant="caption" display="block" color="text.secondary">{o.requestedByName} · {formatDateTime(o.requestedAt)}</Typography></TableCell>
+                <TableCell>{o.quantity} × {o.service}{o.note && <Typography variant="caption" display="block" color="text.secondary">“{o.note}”</Typography>}</TableCell>
+                <TableCell sx={{ fontFamily: 'monospace' }}>{o.invoiceNo}</TableCell>
+                <TableCell align="right">{tzsAmount(o.total)}</TableCell>
+                <TableCell><Chip size="small" color={ORDER_CHIP[o.status]?.[0]} label={ORDER_CHIP[o.status]?.[1] ?? o.status} />
+                  {o.deliveredAt && <Typography variant="caption" display="block" color="text.secondary">{o.deliveredByName} · {formatDateTime(o.deliveredAt)}</Typography>}</TableCell>
+                <TableCell align="right">{o.status === 'PAID' && <Button size="small" variant="contained" onClick={() => setDelivering(o)}>Mark delivered</Button>}</TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </Table></Box>
+        )}
+      </CardContent></Card>
+      {editing && <ServiceDialog s={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: ['platform', 'billing', 'services'] }); }} />}
+      {delivering && <DeliveredDialog o={delivering} onClose={() => setDelivering(null)} onDone={() => { setDelivering(null); qc.invalidateQueries({ queryKey: ['platform', 'billing', 'service-orders'] }); }} />}
+    </Stack>
+  );
+}
+
+function ServiceDialog({ s, onClose, onDone }: { s: ServiceView | null; onClose: () => void; onDone: () => void }) {
+  const [f, setF] = useState({ code: s?.code ?? '', name: s?.name ?? '', description: s?.description ?? '', unitLabel: s?.unitLabel ?? 'unit',
+    unitPrice: s ? String(s.unitPrice) : '', minQuantity: String(s?.minQuantity ?? 1), maxQuantity: String(s?.maxQuantity ?? 1), vatPercent: String(s?.vatPercent ?? 18),
+    payMethods: s?.payMethods ?? 'BOTH', delivery: s?.delivery ?? 'MSINGI_DELIVERS', smsPerUnit: s?.smsPerUnit ? String(s.smsPerUnit) : '', active: s?.active ?? true });
+  const save = useMutation({
+    mutationFn: () => api<ServiceView>(s ? `/api/platform/billing/services/${s.id}` : '/api/platform/billing/services', { ...platform, method: s ? 'PUT' : 'POST',
+      body: { ...f, unitPrice: Number(f.unitPrice), minQuantity: Number(f.minQuantity), maxQuantity: Number(f.maxQuantity), vatPercent: Number(f.vatPercent),
+        smsPerUnit: f.delivery === 'SMS_CREDIT' ? Number(f.smsPerUnit) : null } }),
+    onSuccess: onDone,
+  });
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{s ? `Edit ${s.name}` : 'New service'}</DialogTitle>
+      <DialogContent>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid size={{ xs: 12, sm: 8 }}><TextField fullWidth label="Name" value={f.name} onChange={set('name')} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Code" value={f.code} onChange={set('code')} /></Grid>
+          <Grid size={12}><TextField fullWidth multiline minRows={2} label="Description (shown to institutions)" value={f.description} onChange={set('description')} /></Grid>
+          <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth label="One is a…" value={f.unitLabel} onChange={set('unitLabel')} helperText="e.g. day, pack" /></Grid>
+          <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth label="Price of one (TZS)" type="number" value={f.unitPrice} onChange={set('unitPrice')} /></Grid>
+          <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth label="VAT %" type="number" value={f.vatPercent} onChange={set('vatPercent')} /></Grid>
+          <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth label="Least at a time" type="number" value={f.minQuantity} onChange={set('minQuantity')} /></Grid>
+          <Grid size={{ xs: 6, sm: 4 }}><TextField fullWidth label="Most at a time" type="number" value={f.maxQuantity} onChange={set('maxQuantity')} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField select fullWidth label="Paid by" value={f.payMethods} onChange={set('payMethods')}>
+              {Object.entries(PAY_LABEL).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 8 }}>
+            <TextField select fullWidth label="Delivered" value={f.delivery} onChange={set('delivery')}>
+              <MenuItem value="SMS_CREDIT">Automatically: SMS added to the bundle</MenuItem>
+              <MenuItem value="MSINGI_DELIVERS">By Msingi (staff told when paid)</MenuItem>
+            </TextField>
+          </Grid>
+          {f.delivery === 'SMS_CREDIT' && <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="SMS per one" type="number" value={f.smsPerUnit} onChange={set('smsPerUnit')} /></Grid>}
+          <Grid size={12}><FormControlLabel control={<Switch checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} />} label="Offered to institutions" /></Grid>
+        </Grid>
+        <ErrorAlert error={save.error} />
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={save.isPending || !f.name || !f.code} onClick={() => save.mutate()}>Save</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function DeliveredDialog({ o, onClose, onDone }: { o: OrderView; onClose: () => void; onDone: () => void }) {
+  const [note, setNote] = useState('');
+  const m = useMutation({ mutationFn: () => api(`/api/platform/billing/service-orders/${o.id}/delivered`, { ...platform, method: 'POST', body: { note } }), onSuccess: onDone });
+  return (
+    <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Delivered to {o.institution}?</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ mb: 2 }}>{o.quantity} × {o.service} (invoice {o.invoiceNo}).</Typography>
+        <TextField fullWidth multiline minRows={2} label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Training held on 20 November" />
+        <ErrorAlert error={m.error} />
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={m.isPending} onClick={() => m.mutate()}>Mark delivered</Button></DialogActions>
+    </Dialog>
   );
 }

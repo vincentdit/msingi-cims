@@ -151,6 +151,11 @@ public class BillingDocuments {
         StringBuilder b = new StringBuilder("<h3>How to pay</h3><table class=\"pay\">");
         for (Channel c : s.channels()) {
             PaymentProvider p = MsingiBillingService.provider(c.provider());
+            if (MsingiBillingService.BILLPAY.equals(c.provider())) {
+                b.append("<tr><td>BillPay control number</td><td><strong>").append(escape(c.accountNumber())).append("</strong></td><td>")
+                        .append(escape(c.branch())).append("</td></tr>");
+                continue;
+            }
             b.append("<tr><td>").append(escape(p == null ? c.provider() : p.label())).append("</td><td><strong>").append(escape(c.accountNumber()))
                     .append("</strong></td><td>").append(escape(Stream.of(c.accountName(), c.branch()).filter(x -> x != null).collect(Collectors.joining(", "))))
                     .append("</td></tr>");

@@ -48,11 +48,11 @@ public class MsingiCollectionService {
 
     public record View(String provider, String providerLabel, String environment, boolean active, List<FieldView> fields, String baseUrl, String authUrl,
                        String notifyUrl, OffsetDateTime lastTestAt, Boolean lastTestOk, String lastTestNote, List<ProviderView> providers,
-                       boolean rehearsalAllowed) {
+                       boolean rehearsalAllowed, String billPayNamba) {
     }
 
     public record SaveRequest(@NotNull AggregatorProvider provider, @NotNull String environment, boolean active, Map<String, String> fields,
-                              @Size(max = 200) String baseUrl, @Size(max = 200) String authUrl) {
+                              @Size(max = 200) String baseUrl, @Size(max = 200) String authUrl, String billPayNamba) {
     }
 
     /** Whether payers can be prompted on their phone, whether they must name their network, and through whom. */
@@ -85,7 +85,7 @@ public class MsingiCollectionService {
         Map<String, Object> r = row();
         String prov = (String) r.get("provider");
         if (prov == null) {
-            return new View(null, null, (String) r.get("environment"), false, List.of(), null, null, null, null, null, null, providers, allowSimulation);
+            return new View(null, null, (String) r.get("environment"), false, List.of(), null, null, null, null, null, null, providers, allowSimulation, null);
         }
         AggregatorProvider p = AggregatorProvider.valueOf(prov);
         Map<String, String> plain = json((String) r.get("settings"));
@@ -94,7 +94,7 @@ public class MsingiCollectionService {
                 f.secret() ? secrets.containsKey(f.name()) : plain.containsKey(f.name()))).toList();
         return new View(p.name(), p.label(), (String) r.get("environment"), Boolean.TRUE.equals(r.get("active")), fields, (String) r.get("base_url"),
                 (String) r.get("auth_url"), notifyUrl(p, r), time(r.get("last_test_at")), (Boolean) r.get("last_test_ok"), (String) r.get("last_test_note"),
-                providers, allowSimulation);
+                providers, allowSimulation, (String) r.get("billpay_namba"));
     }
 
     @Transactional
@@ -103,6 +103,11 @@ public class MsingiCollectionService {
             throw new BusinessRuleException("REHEARSAL_NOT_ALLOWED", "The rehearsal records payments without money: only while test payments are allowed on this server.");
         }
         String environment = "LIVE".equalsIgnoreCase(req.environment()) ? "LIVE" : "SANDBOX";
+        String namba = req.billPayNamba() == null || req.billPayNamba().isBlank() ? null : req.billPayNamba().trim();
+        if (namba != null && !namba.matches("\\d{4}")) throw new BusinessRuleException("BILLPAY_NAMBA", "The BillPay-Namba is the 4 digits ClickPesa gives Msingi.");
+        if (namba != null && req.provider() != AggregatorProvider.CLICKPESA && req.provider() != AggregatorProvider.SIMULATED) {
+            throw new BusinessRuleException("BILLPAY_NAMBA", "BillPay control numbers come with a ClickPesa account.");
+        }
         Map<String, Object> r = row();
         boolean same = req.provider().name().equals(r.get("provider"));
         Map<String, String> plain = new LinkedHashMap<>();
@@ -129,6 +134,7 @@ public class MsingiCollectionService {
                 where id = 1""",
                 req.provider().name(), environment, req.active(), toJson(plain), secrets.isEmpty() ? null : cipher.encrypt(toJson(secrets)),
                 blank(req.baseUrl()), blank(req.authUrl()), cipher.encrypt(newToken()), CurrentUser.platformName(), same, same, same);
+        jdbc.update("update platform_collection_account set billpay_namba = ? where id = 1", namba);
         audit.record("MSINGI_COLLECTION_UPDATED", null, "PlatformCollectionAccount", 1L,
                 Map.of("provider", req.provider().name(), "environment", environment, "active", req.active()));
         return view();
@@ -166,6 +172,28 @@ public class MsingiCollectionService {
         if (r.get("provider") == null || !Boolean.TRUE.equals(r.get("active"))) return Optional.empty();
         if (AggregatorProvider.SIMULATED.name().equals(r.get("provider")) && !rehearsalAllowed()) return Optional.empty();
         return Optional.of(account(r));
+    }
+
+    /**
+     * Msingi's ClickPesa BillPay-Namba while the account is switched on: every invoice is then also payable by the BillPay control
+     * number (the namba followed by its payment reference) from mobile money, CRDB SimBanking and CRDB agents.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> billPayNamba() {
+        return active().map(a -> (String) row().get("billpay_namba")).filter(n -> n != null && !n.isBlank());
+    }
+
+    /** The BillPay-Namba as saved, whether or not the account is switched on (a notification can arrive after it was switched off). */
+    @Transactional(readOnly = true)
+    public String savedBillPayNamba() {
+        return (String) row().get("billpay_namba");
+    }
+
+    /** The invoice reference inside a BillPay control number (or the reference itself). */
+    public static String referenceIn(String controlNumber, String namba) {
+        String d = controlNumber == null ? "" : controlNumber.replaceAll("\\D", "");
+        if (namba != null && d.length() == namba.length() + 12 && d.startsWith(namba)) return d.substring(namba.length());
+        return d.length() > 12 ? d.substring(d.length() - 12) : d;
     }
 
     @Transactional(readOnly = true)
