@@ -59,14 +59,16 @@ public final class TabularFile {
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(data))) {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter fmt = new DataFormatter(Locale.ENGLISH);
+            org.apache.poi.ss.usermodel.FormulaEvaluator eval = wb.getCreationHelper().createFormulaEvaluator();   // a formula gives its value, not its text
             List<List<String>> out = new ArrayList<>();
             for (Row row : sheet) {
                 List<String> cells = new ArrayList<>();
                 for (int c = 0; c < Math.max(0, row.getLastCellNum()); c++) {
                     Cell cell = row.getCell(c);
-                    if (cell == null) cells.add(null);
-                    else if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) cells.add(cell.getLocalDateTimeCellValue().toLocalDate().toString());
-                    else cells.add(fmt.formatCellValue(cell));
+                    CellType type = cell == null ? null : cell.getCellType() == CellType.FORMULA ? eval.evaluateFormulaCell(cell) : cell.getCellType();
+                    if (cell == null || type == CellType.BLANK || type == CellType.ERROR) cells.add(null);
+                    else if (type == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) cells.add(cell.getLocalDateTimeCellValue().toLocalDate().toString());
+                    else cells.add(fmt.formatCellValue(cell, eval));
                 }
                 out.add(cells);
             }

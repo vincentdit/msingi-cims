@@ -29,5 +29,5 @@ done
 
 echo "== disk"
 df -h / | tail -1
-off=$(grep -E '^BACKUP_OFFSITE_CMD=' "${CIMS_HOME:-/opt/msingi-cims}/deploy/.env" | cut -d= -f2-)
+off=$(grep -E '^BACKUP_OFFSITE_CMD=' "${CIMS_HOME:-/opt/msingi-cims}/deploy/.env" | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//')
 if [ -z "$off" ]; then echo "!! BACKUP_OFFSITE_CMD is empty: backups exist only on this server"; else echo "second location: $off"; fi

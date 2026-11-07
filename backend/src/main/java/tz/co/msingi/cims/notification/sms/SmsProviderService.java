@@ -45,7 +45,8 @@ public class SmsProviderService {
 
     public record View(String mode, String provider, String providerLabel, String environment, boolean active, List<FieldView> fields,
                        String baseUrl, String reportUrl, String defaultSender, String notifyUrl, OffsetDateTime lastTestAt, Boolean lastTestOk,
-                       String lastTestNote, String updatedByName, OffsetDateTime updatedAt, List<ProviderView> providers) {
+                       String lastTestNote, String updatedByName, OffsetDateTime updatedAt, List<ProviderView> providers, Long balance, OffsetDateTime balanceAt,
+                       Long outstandingUnits) {
     }
 
     public record SaveRequest(@NotNull SmsProvider provider, @NotNull String environment, boolean active, Map<String, String> fields,
@@ -101,7 +102,8 @@ public class SmsProviderService {
         return new View(live() ? "live" : "simulated", prov, p == null ? null : p.label(), (String) r.get("environment"), Boolean.TRUE.equals(r.get("active")),
                 fields, (String) r.get("base_url"), (String) r.get("report_url"), (String) r.get("default_sender"), p == null ? null : notifyUrl(p, r),
                 time(r.get("last_test_at")), (Boolean) r.get("last_test_ok"), (String) r.get("last_test_note"), (String) r.get("updated_by_name"),
-                time(r.get("updated_at")), providers);
+                time(r.get("updated_at")), providers, r.get("last_balance") == null ? null : ((Number) r.get("last_balance")).longValue(),
+                time(r.get("last_balance_at")), r.get("outstanding_units") == null ? null : ((Number) r.get("outstanding_units")).longValue());
     }
 
     @Transactional

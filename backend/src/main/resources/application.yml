@@ -207,8 +207,10 @@ cims:
     callback-secret: ${CIMS_SMS_CALLBACK_SECRET:change-me}   # HMAC key for delivery reports
     async: true                                  # hand messages to the gateway on a background thread after commit
     retry-cron: ${CIMS_SMS_RETRY_CRON:30 * * * * *}  # retry messages still queued; "-" disables
-    report-poll-cron: ${CIMS_SMS_REPORT_POLL_CRON:0 */5 * * * *}
-    charge-simulated: ${CIMS_SMS_CHARGE_SIMULATED:false}   # whether messages the simulated gateway "sends" use the bundle   # ask the provider about sent messages with no report; "-" disables
+    report-poll-cron: ${CIMS_SMS_REPORT_POLL_CRON:0 */5 * * * *}   # ask the provider about sent messages with no report; "-" disables
+    charge-simulated: ${CIMS_SMS_CHARGE_SIMULATED:false}   # whether messages the simulated gateway "sends" use the bundle
+    balance-cron: ${CIMS_SMS_BALANCE_CRON:0 7 */3 * * *}   # read Msingi's provider balance; "-" disables
+    low-balance-alert: ${CIMS_SMS_LOW_BALANCE_ALERT:5000}   # email Msingi staff when the provider balance falls below this many SMS
     # the platform address SMS providers post delivery reports to (the console shows the full address with its secret part)
     callback-base-url: ${CIMS_SMS_CALLBACK_BASE_URL:https://app.cims.ac.tz}
   email:

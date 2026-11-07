@@ -176,6 +176,27 @@ class SmsProviderIT {
                 .isEqualTo("No SMS provider is switched on in the Msingi console");
     }
 
+    @Autowired SmsBalanceJob balanceJob;
+
+    @Test
+    void msingisProviderBalanceIsWatched() throws Exception {
+        p(put("/api/platform/sms/provider"), account(true, "pw-secret")).andExpect(status().isOk());
+        assertThat(balanceJob.runNow()).isNull();   // simulated: nothing to watch
+        org.springframework.test.util.ReflectionTestUtils.setField((Object) org.springframework.test.util.AopTestUtils.<SmsProviderService>getTargetObject(providers), "mode", "live");
+        try {
+            provider.answers.put("/api/v2/balance", "{\"sms_balance\":\"3,200\"}");
+            assertThat(balanceJob.runNow()).isEqualTo(3200L);
+            assertThat(jdbc.queryForObject("select low_alert_at is not null from platform_sms_settings where id = 1", Boolean.class)).isTrue();
+            p(get("/api/platform/sms/provider"), null).andExpect(jsonPath("$.balance").value(3200)).andExpect(jsonPath("$.outstandingUnits").isNumber());
+            provider.answers.put("/api/v2/balance", "{\"sms_balance\":900000000}");
+            assertThat(balanceJob.runNow()).isEqualTo(900000000L);
+            assertThat(jdbc.queryForObject("select low_alert_at is null from platform_sms_settings where id = 1", Boolean.class)).isTrue();
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField((Object) org.springframework.test.util.AopTestUtils.<SmsProviderService>getTargetObject(providers), "mode", "simulated");
+            jdbc.update("update platform_sms_settings set last_balance = null, last_balance_at = null, outstanding_units = null, low_alert_at = null where id = 1");
+        }
+    }
+
     @Test
     void simulatedMessagesCostNothingOnAServerAndEmailCanBeTested() throws Exception {
         db(() -> jdbc.update("""

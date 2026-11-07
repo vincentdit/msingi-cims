@@ -16,6 +16,7 @@ interface SmsView {
   mode: 'live' | 'simulated'; provider?: string | null; providerLabel?: string | null; environment: string; active: boolean; fields: FieldView[];
   baseUrl?: string | null; reportUrl?: string | null; defaultSender: string; notifyUrl?: string | null; lastTestAt?: string | null; lastTestOk?: boolean | null;
   lastTestNote?: string | null; updatedByName?: string | null; updatedAt?: string | null; providers: ProviderView[];
+  balance?: number | null; balanceAt?: string | null; outstandingUnits?: number | null;
 }
 interface SenderName {
   id: number; tenantId: number; institution: string; institutionCode: string; senderId: string; status: string; note?: string | null;
@@ -131,6 +132,11 @@ function ProviderCard() {
         <ErrorAlert error={save.error ?? test.error ?? testSms.error} />
         {save.isSuccess && <Alert severity="success" sx={{ mt: 1 }}>Saved.</Alert>}
         {d.lastTestAt && <Alert severity={d.lastTestOk ? 'success' : 'error'} sx={{ mt: 1 }}>{`${d.lastTestNote ?? ''} (${formatDateTime(d.lastTestAt)})`}</Alert>}
+        {d.balance != null && (
+          <Alert severity={d.outstandingUnits != null && d.balance < d.outstandingUnits ? 'warning' : 'info'} icon={false} sx={{ mt: 1 }}>
+            {`Account balance: ${d.balance.toLocaleString()} SMS · Institutions' unused bundles: ${(d.outstandingUnits ?? 0).toLocaleString()} SMS (checked ${formatDateTime(d.balanceAt ?? undefined)}). Msingi's staff are emailed when the balance runs low.`}
+          </Alert>
+        )}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2, '& .MuiButton-root': { whiteSpace: 'nowrap', flexShrink: 0 } }} alignItems={{ sm: 'center' }}>
           <Button variant="contained" disabled={save.isPending || !f.provider || !senderOk} onClick={() => save.mutate()}>Save</Button>
           <Button variant="outlined" disabled={test.isPending || !d.provider} onClick={() => test.mutate()}>Test the credentials</Button>

@@ -68,6 +68,9 @@ with the domain's registrar (an A record per host, pointing at the server). Ever
 | Swap, firewall, fail2ban, security updates (once) | `scripts/harden-server.sh` |
 | Certificates renewed without stopping the proxy | `scripts/certs.sh setup` once, then `scripts/certs.sh add <host>` for each new college |
 | Backups proved: backup, restore test, counts, disk | `scripts/check-backups.sh` (quarterly, and after any backup change) |
+| Second location for the backups (Storage Box over SFTP) | `scripts/offsite-setup.sh` (once), `scripts/offsite-setup.sh check` |
+| Alerts by email: site, services, disk, backups, second location, certificate; weekly report | `scripts/cims-watch.sh install` (once; `CIMS_ALERT_EMAIL` in `.env`) |
+| Email through a mailbox (Duhosting) | `scripts/set-email.sh` |
 | Platform address opens the platform sign-in | `nginx/cims.conf` (any host starting with `app.`) |
 | NACTVET reachable when the server's DNS answer is not | `NACTE_PREFER_IP=41.93.76.6` in `.env` |
 | GePG simulated with no keys installed | leave the four `CIMS_GEPG_*` key settings empty |

@@ -23,6 +23,7 @@ cims:
     retry-cron: "-"
     callback-secret: test-sms-secret
     charge-simulated: true      # simulated messages use the bundle, so the bundle checks can be tested
+    balance-cron: "-"
   gepg:
     mode: simulated
     callback-secret: test-secret
