@@ -186,7 +186,7 @@ function BuyDialog({ price, onClose }: { price: number; onClose: () => void }) {
       f.append('body', `Please send us an invoice for an SMS bundle of ${n.toLocaleString()} SMS`
         + (price ? ` (about ${formatTzs(n * price)} at TZS ${price} per SMS)` : '') + ' and add it to our SMS balance once paid.'
         + (note.trim() ? `\n\n${note.trim()}` : ''));
-      return uploadForm<{ ticket: { ticketNo: string } }>('/api/msingi-support/tickets', 'staff', f);
+      return uploadForm<{ ticket: { ticketNo: string } }>('/api/msingi-support/tickets', 'staff', f, 'POST');
     },
   });
   return (
