@@ -11,7 +11,7 @@ developer's computer:
 | **MUSE** | FR-INT-07 | Receives summarised fee journals; refuses unbalanced ones and duplicates |
 | **TAMISEMI** | FR-INT-08 | Lists the students it selected to an institution |
 | **Payment aggregators** | FR-FIN-03/04 | Selcom (signed checkout API), AzamPay (token, MNO checkout, callback) and ClickPesa (token, USSD push, status): phone prompts paid after a few seconds, notifications to the institution |
-| **SMS providers** | FR-COM-04 | NextSMS (Basic auth, send with test twin, reports, balance) and Beem (send, delivery reports, balance): registered sender names only, delivered after a few seconds, reports posted to CIMS |
+| **SMS providers** | FR-COM-04 | NextSMS API v2 (Bearer token, send with test twin, reports, balance, webhook) and Beem (send, delivery reports, balance): registered sender names only, delivered after a few seconds, reports posted to CIMS |
 | **NHIF** | FR-INT-10 | Student Registration API v2: agent token, student registration, card applications with control numbers, card checks, intakes; calls CIMS back on payment and card issue |
 
 GePG and NHIF follow their specifications' message shapes and error codes (NHIF: *Student Registration API Documentation*, v2).
@@ -105,7 +105,7 @@ ending in 000 (unreachable); the report can be asked for and is posted to CIMS. 
 
 | Path | What it does |
 |---|---|
-| `POST /nextsms/api/sms/v1/text/single` (and `/test/text/single`); `GET /reports?messageId=`, `/balance` | NextSMS: send under a sender name, reports, balance |
+| `POST /nextsms/api/sms/v2/text/single` (and `/test/text/single`); `GET /nextsms/api/v2/reports?messageId=`, `/nextsms/api/v2/balance` | NextSMS v2: send under a sender name, reports, balance |
 | `POST /beem/v1/send`; `GET /beem/public/v1/vendors/balance`; `GET /beem-dlr/public/v1/delivery-reports` | Beem: send, balance, delivery reports |
 | `GET /mock/sms`; `POST /mock/sms/senders`, `/mock/sms/callback`, `/mock/sms/reset` | Dashboard: messages, registered names, report address |
 

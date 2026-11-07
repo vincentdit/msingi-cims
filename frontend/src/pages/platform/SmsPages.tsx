@@ -144,7 +144,8 @@ function ProviderCard() {
         <Card><CardContent>
           <Typography variant="subtitle2" gutterBottom>Delivery-report address (to give the provider)</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Enter this as the delivery report (DLR) callback address in the provider's dashboard, so CIMS hears at once whether each message
+            Enter this as the delivery report (DLR) callback address in the provider's dashboard (NextSMS: Customer Profile › Customization ›
+            Webhooks, Delivery Callback URL, with any Verify Token), so CIMS hears at once whether each message
             reached the phone. CIMS also asks the provider every few minutes about messages it has heard nothing of. It contains a secret part:
             share it only with the provider.
           </Typography>

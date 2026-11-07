@@ -94,8 +94,8 @@ class SmsProviderIT {
     }
 
     String account(boolean active, String password) {
-        return "{\"provider\":\"NEXTSMS\",\"environment\":\"SANDBOX\",\"active\":" + active + ",\"fields\":{\"username\":\"msingi\""
-                + (password == null ? "" : ",\"password\":\"" + password + "\"") + "},\"baseUrl\":\"" + provider.base + "\",\"defaultSender\":\"MSINGI\"}";
+        return "{\"provider\":\"NEXTSMS\",\"environment\":\"SANDBOX\",\"active\":" + active + ",\"fields\":{"
+                + (password == null ? "" : "\"apiToken\":\"" + password + "\"") + "},\"baseUrl\":\"" + provider.base + "\",\"defaultSender\":\"MSINGI\"}";
     }
 
     @Test
@@ -107,19 +107,19 @@ class SmsProviderIT {
         p(put("/api/platform/sms/provider"), account(true, "pw-secret").replace("\"MSINGI\"", "\"MS INGI\"")).andExpect(status().isBadRequest());
         JsonNode v = s.body(p(put("/api/platform/sms/provider"), account(true, "pw-secret")).andExpect(status().isOk()));
         assertThat(v.toString()).doesNotContain("pw-secret");
-        assertThat(v.get("fields").get(1).get("set").asBoolean()).isTrue();
+        assertThat(v.get("fields").get(0).get("set").asBoolean()).isTrue();
         String notify = v.get("notifyUrl").asText();
         assertThat(notify).startsWith("https://app.cims.ac.tz/api/integrations/sms/nextsms/");
         // saving again without retyping the password keeps it
         p(put("/api/platform/sms/provider"), account(true, null)).andExpect(status().isOk());
 
-        provider.answers.put("/api/sms/v1/balance", "{\"sms_balance\":4520}");
+        provider.answers.put("/api/v2/balance", "{\"sms_balance\":4520}");
         p(post("/api/platform/sms/provider/test"), null).andExpect(jsonPath("$.lastTestOk").value(true))
                 .andExpect(jsonPath("$.lastTestNote").value("NextSMS accepted the credentials. Balance: 4520 SMS."));
-        assertThat(provider.last()).contains("Authorization=" + SmsClientsTest.basic("msingi", "pw-secret"));
-        provider.answers.put("/api/sms/v1/test/text/single", "{\"messages\":[{\"status\":{\"groupName\":\"PENDING\"},\"messageId\":\"NX-T1\"}]}");
+        assertThat(provider.last()).contains("Authorization=Bearer pw-secret");
+        provider.answers.put("/api/sms/v2/test/text/single", "{\"messages\":[{\"status\":{\"groupName\":\"PENDING\"},\"messageId\":\"NX-T1\"}]}");
         p(post("/api/platform/sms/provider/test-sms"), "{\"phone\":\"0712 345 678\"}").andExpect(jsonPath("$.lastTestOk").value(true));
-        assertThat(provider.last()).contains("/api/sms/v1/test/text/single", "\"from\":\"MSINGI\"", "\"to\":\"255712345678\"");
+        assertThat(provider.last()).contains("/api/sms/v2/test/text/single", "\"from\":\"MSINGI\"", "\"to\":\"255712345678\"");
 
         // ---- the institution asks for its sender name; Msingi's name is used until it is approved
         s.call(put("/api/messaging/settings"), admin, "{\"defaultLanguage\":\"EN\",\"senderId\":\"BAHARI 1\",\"pricePerSms\":25,\"lowBalanceWarning\":100}")
@@ -144,7 +144,7 @@ class SmsProviderIT {
                 insert into messages (tenant_id, phone, kind, language, body, parts, encoding, status, queued_at)
                 values (cims_current_tenant(), '255712000111', 'EVENT', 'EN', 'Karibu', 1, 'GSM7', 'QUEUED', now()) returning id""", Long.class));
         ProviderSmsGateway gateway = new ProviderSmsGateway(providers, jdbc);
-        provider.answers.put("/api/sms/v1/test/text/single", "{\"messages\":[{\"status\":{\"groupName\":\"PENDING\"},\"messageId\":\"NX-" + messageId + "\"}]}");
+        provider.answers.put("/api/sms/v2/test/text/single", "{\"messages\":[{\"status\":{\"groupName\":\"PENDING\"},\"messageId\":\"NX-" + messageId + "\"}]}");
         SmsGateway.Result r = db(() -> gateway.send("255712000111", "Karibu", "BAHARI", inst.tenant().getId() + "-" + messageId));
         assertThat(r.accepted()).isTrue();
         assertThat(provider.last()).contains("\"from\":\"BAHARI\"", "\"reference\":\"" + inst.tenant().getId() + "-" + messageId + "\"");
@@ -158,7 +158,7 @@ class SmsProviderIT {
         assertThat(db(() -> jdbc.queryForObject("select status from messages where id = ?", String.class, messageId))).isEqualTo("DELIVERED");
 
         // ---- or CIMS asks: an undelivered message
-        provider.answers.put("/api/sms/v1/reports", "{\"results\":[{\"messageId\":\"NX-9\",\"status\":{\"groupName\":\"UNDELIVERABLE\",\"description\":\"Absent subscriber\"}}]}");
+        provider.answers.put("/api/v2/reports", "{\"results\":[{\"messageId\":\"NX-9\",\"status\":{\"groupName\":\"UNDELIVERABLE\",\"description\":\"Absent subscriber\"}}]}");
         assertThat(db(() -> gateway.status("NX-9", "255712000111"))).get().satisfies(rep -> {
             assertThat(rep.status()).isEqualTo("FAILED");
             assertThat(rep.error()).isEqualTo("Absent subscriber");

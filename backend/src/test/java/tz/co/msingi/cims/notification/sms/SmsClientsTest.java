@@ -31,7 +31,7 @@ class SmsClientsTest {
     }
 
     SmsProviderClient.Account nextsms(boolean live) {
-        return new SmsProviderClient.Account(SmsProvider.NEXTSMS, live, Map.of("username", "msingi"), Map.of("password", "pw-1"), p.base, null);
+        return new SmsProviderClient.Account(SmsProvider.NEXTSMS, live, Map.of(), Map.of("apiToken", "tok-1"), p.base, null);
     }
 
     SmsProviderClient.Account beem() {
@@ -41,40 +41,52 @@ class SmsClientsTest {
     @Test
     void nextSmsSendsUnderTheSenderNameAndReadsReports() {
         NextSmsClient c = new NextSmsClient();
-        p.answers.put("/api/sms/v1/test/text/single", """
+        p.answers.put("/api/sms/v2/test/text/single", """
                 {"messages":[{"to":"255712345678","status":{"groupId":18,"groupName":"PENDING","id":51,"name":"ENROUTE (SENT)"},"messageId":"NX-1001","smsCount":1}]}""");
         var sent = c.send(nextsms(false), "255712345678", "Karibu BIHAS", "BAHARI", "12-345", 345);
         assertThat(sent.accepted()).isTrue();
         assertThat(sent.providerRef()).isEqualTo("NX-1001");
-        assertThat(p.last()).startsWith("POST /api/sms/v1/test/text/single Authorization=" + basic("msingi", "pw-1"))
+        assertThat(p.last()).startsWith("POST /api/sms/v2/test/text/single Authorization=Bearer tok-1")
                 .contains("\"from\":\"BAHARI\"", "\"to\":\"255712345678\"", "\"text\":\"Karibu BIHAS\"", "\"reference\":\"12-345\"");
 
         // live: the real address; a refusal is reported with the provider's words
-        p.answers.put("/api/sms/v1/text/single", """
+        p.answers.put("/api/sms/v2/text/single", """
                 {"messages":[{"to":"255712345678","status":{"groupName":"REJECTED","description":"Sender name not registered"},"messageId":"NX-1002"}]}""");
         var refused = c.send(nextsms(true), "255712345678", "Hello", "UNKNOWN", "12-346", 346);
         assertThat(refused.accepted()).isFalse();
         assertThat(refused.error()).contains("Sender name not registered");
         // as NextSMS really answers an unregistered sender name: HTTP 200, REJECTED_SOURCE and no message id
-        p.answers.put("/api/sms/v1/text/single", """
+        p.answers.put("/api/sms/v2/text/single", """
                 {"messages":[{"to":"255677444100","status":{"groupId":19,"groupName":"REJECTED","id":56,"name":"REJECTED_SOURCE",
                 "description":"Sender ID in the request not registered on your account."}}],"sendReference":"12-348"}""");
         assertThat(c.send(nextsms(true), "255677444100", "Hello", "MSINGI", "12-348", 348).error())
                 .startsWith("Refused by NextSMS: Sender ID in the request not registered on your account.")
-                .contains("MSINGI is not");
-        p.statuses.put("/api/sms/v1/text/single", 401);
-        p.answers.put("/api/sms/v1/text/single", "{\"message\":\"Invalid credentials\"}");
-        assertThat(c.send(nextsms(true), "255712345678", "Hello", "BAHARI", "12-347", 347).error()).isEqualTo("Invalid credentials (HTTP 401)");
+                .contains("MSINGI is not", "API token acts as the NextSMS customer");
+        p.statuses.put("/api/sms/v2/text/single", 401);
+        p.answers.put("/api/sms/v2/text/single", "{\"message\":\"Invalid credentials\"}");
+        assertThat(c.send(nextsms(true), "255712345678", "Hello", "BAHARI", "12-347", 347).error()).isEqualTo("Refused by NextSMS: Invalid credentials (HTTP 401)");
 
-        p.answers.put("/api/sms/v1/reports", """
+        p.answers.put("/api/v2/reports", """
                 {"results":[{"messageId":"NX-1001","to":"255712345678","status":{"groupName":"DELIVERED","name":"DELIVERED_TO_HANDSET"}}]}""");
         assertThat(c.status(nextsms(true), "NX-1001", "255712345678")).get().satisfies(r -> assertThat(r.status()).isEqualTo("DELIVERED"));
-        assertThat(p.last()).startsWith("GET /api/sms/v1/reports?messageId=NX-1001");
-        p.answers.put("/api/sms/v1/reports", "{\"results\":[{\"messageId\":\"NX-1001\",\"status\":{\"groupName\":\"PENDING\"}}]}");
+        assertThat(p.last()).startsWith("GET /api/v2/reports?messageId=NX-1001");
+        p.answers.put("/api/v2/reports", "{\"results\":[{\"messageId\":\"NX-1001\",\"status\":{\"groupName\":\"PENDING\"}}]}");
         assertThat(c.status(nextsms(true), "NX-1001", "255712345678")).isEmpty();
 
-        p.answers.put("/api/sms/v1/balance", "{\"sms_balance\":4520}");
+        p.answers.put("/api/v2/balance", "{\"sms_balance\":4520,\"type\":\"count\"}");
         assertThat(c.balance(nextsms(true))).isEqualTo("4520 SMS");
+        p.answers.put("/api/v2/balance", "{\"sms_balance\":125000.5,\"type\":\"price\",\"display\":\"125,000.5 TZS\"}");
+        assertThat(c.balance(nextsms(true))).isEqualTo("125,000.5 TZS");
+
+        // a webhook callback (token, messageId, status, id) and a v2 report whose delivery part has come in
+        assertThat(c.parseNotification("{\"token\":\"verify-1\",\"messageId\":\"NX-7\",\"status\":\"DELIVERED\",\"id\":5}"))
+                .singleElement().satisfies(r -> assertThat(r.status()).isEqualTo("DELIVERED"));
+        assertThat(NextSmsClient.report(SmsHttp.parse("""
+                {"messageId":"NX-8","to":"255712345678","status":{"groupName":"PENDING","name":"PENDING_ENROUTE"},
+                 "delivery":{"groupName":"UNDELIVERABLE","name":"UNDELIVERABLE_NOT_DELIVERED","description":"Absent subscriber"}}""")))
+                .satisfies(r -> { assertThat(r.status()).isEqualTo("FAILED"); assertThat(r.error()).isEqualTo("Absent subscriber"); });
+        assertThat(NextSmsClient.report(SmsHttp.parse("{\"messageId\":\"NX-9\",\"status\":{\"groupName\":\"PENDING\"},\"delivery\":null}")).status())
+                .isEqualTo("PENDING");
 
         var reports = c.parseNotification("""
                 {"results":[{"messageId":"NX-1","to":"255712345678","status":{"groupName":"UNDELIVERABLE","name":"UNDELIVERABLE_NOT_DELIVERED","description":"Handset off"}}]}""");

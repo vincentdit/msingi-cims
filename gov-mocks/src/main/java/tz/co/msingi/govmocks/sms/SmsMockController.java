@@ -33,9 +33,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Two Tanzanian SMS providers in one, as CIMS's adapters call them: NextSMS (under /nextsms: /api/sms/v1/text/single and its test
- * twin, /reports, /balance) and Beem (under /beem: /v1/send, /public/v1/vendors/balance; reports under /beem-dlr). Both take Basic
- * authentication with the account below. Only the sender names listed as registered are accepted. A message is delivered a few
+ * Two Tanzanian SMS providers in one, as CIMS's adapters call them: NextSMS API v2 (under /nextsms: /api/sms/v2/text/single and its
+ * test twin, /api/v2/reports, /api/v2/balance; Bearer API token) and Beem (under /beem: /v1/send, /public/v1/vendors/balance; reports
+ * under /beem-dlr; Basic authentication). Only the sender names listed as registered are accepted. A message is delivered a few
  * seconds after it is sent (mock.sms.deliver-seconds), except to a number ending in 000 (handset unreachable); the report can be
  * asked for, and is posted to the delivery-report address set on the dashboard (the address the Msingi console shows).
  */
@@ -44,7 +44,7 @@ public class SmsMockController {
 
     private static final Logger log = LoggerFactory.getLogger(SmsMockController.class);
 
-    static final String NEXT_USER = "msingi", NEXT_PASSWORD = "mock-nextsms-password";
+    static final String NEXT_TOKEN = "mock-nextsms-token", NEXT_VERIFY = "mock-verify-token";
     static final String BEEM_KEY = "mock-beem-key", BEEM_SECRET = "mock-beem-secret";
 
     public static final class Sms {
@@ -72,10 +72,10 @@ public class SmsMockController {
 
     // ================================================================== NextSMS
 
-    @PostMapping({"/nextsms/api/sms/v1/text/single", "/nextsms/api/sms/v1/test/text/single"})
+    @PostMapping({"/nextsms/api/sms/v2/text/single", "/nextsms/api/sms/v2/test/text/single"})
     public ResponseEntity<Map<String, Object>> nextSend(@RequestHeader(value = "Authorization", required = false) String auth, @RequestBody JsonNode body,
                                                         jakarta.servlet.http.HttpServletRequest req) {
-        ResponseEntity<Map<String, Object>> no = refuse(auth, NEXT_USER, NEXT_PASSWORD);
+        ResponseEntity<Map<String, Object>> no = refuseBearer(auth);
         if (no != null) return no;
         String from = text(body, "from"), to = text(body, "to"), txt = text(body, "text");
         if (to == null || txt == null) return ResponseEntity.badRequest().body(Map.of("message", "to and text are required"));
@@ -92,8 +92,9 @@ public class SmsMockController {
             m.status = "REJECTED";
             st.put("groupId", 5);
             st.put("groupName", "REJECTED");
-            st.put("name", "REJECTED_SENDER");
-            st.put("description", "Sender name " + from + " is not registered");
+            st.put("id", 56);
+            st.put("name", "REJECTED_SOURCE");
+            st.put("description", "Sender ID in the request not registered on your account.");
         } else {
             st.put("groupId", 18);
             st.put("groupName", "PENDING");
@@ -103,13 +104,19 @@ public class SmsMockController {
             accept(m);
         }
         remember(m);
-        return ResponseEntity.ok(Map.of("messages", List.of(Map.of("to", to, "status", st, "messageId", m.id, "smsCount", 1, "message", txt))));
+        Map<String, Object> one = new LinkedHashMap<>();
+        one.put("to", to);
+        one.put("status", st);
+        if (!"REJECTED".equals(m.status)) one.put("messageId", m.id);   // NextSMS gives no id to a refused sender name
+        one.put("smsCount", 1);
+        one.put("message", txt);
+        return ResponseEntity.ok(Map.of("messages", List.of(one), "sendReference", m.reference == null ? "" : m.reference));
     }
 
-    @GetMapping("/nextsms/api/sms/v1/reports")
+    @GetMapping("/nextsms/api/v2/reports")
     public ResponseEntity<Map<String, Object>> nextReports(@RequestHeader(value = "Authorization", required = false) String auth,
                                                            @RequestParam(required = false) String messageId) {
-        ResponseEntity<Map<String, Object>> no = refuse(auth, NEXT_USER, NEXT_PASSWORD);
+        ResponseEntity<Map<String, Object>> no = refuseBearer(auth);
         if (no != null) return no;
         List<Map<String, Object>> results = new ArrayList<>();
         for (Sms m : order) {
@@ -119,10 +126,11 @@ public class SmsMockController {
         return ResponseEntity.ok(Map.of("results", results));
     }
 
-    @GetMapping("/nextsms/api/sms/v1/balance")
+    @GetMapping("/nextsms/api/v2/balance")
     public ResponseEntity<Map<String, Object>> nextBalance(@RequestHeader(value = "Authorization", required = false) String auth) {
-        ResponseEntity<Map<String, Object>> no = refuse(auth, NEXT_USER, NEXT_PASSWORD);
-        return no != null ? no : ResponseEntity.ok(Map.of("sms_balance", balance.get()));
+        ResponseEntity<Map<String, Object>> no = refuseBearer(auth);
+        return no != null ? no : ResponseEntity.ok(Map.of("sms_balance", balance.get(), "over_draft", 0, "type", "count", "default", "sms",
+                "display", balance.get() + " SMS"));
     }
 
     // ================================================================== Beem
@@ -186,7 +194,10 @@ public class SmsMockController {
             return;
         }
         try {
-            Object body = "NEXTSMS".equals(m.provider) ? Map.of("results", List.of(nextReport(m))) : beemReport(m);
+            // NextSMS's webhook: token (the Verify Token set with the address), messageId, status, id
+            Object body = "NEXTSMS".equals(m.provider)
+                    ? Map.of("token", NEXT_VERIFY, "messageId", m.id, "status", "DELIVERED".equals(m.status) ? "DELIVERED" : "UNDELIVERABLE", "id", 1)
+                    : beemReport(m);
             m.result = http.post().uri(url).contentType(MediaType.APPLICATION_JSON).body(body)
                     .exchange((req, res) -> res.getStatusCode().value() + " " + new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8));
         } catch (RuntimeException e) {
@@ -245,7 +256,7 @@ public class SmsMockController {
         java.util.Collections.reverse(recent);
         return Map.of("messages", recent, "senders", senders, "callbacks", callbacks, "balance", balance.get(), "deliverSeconds", deliverSeconds,
                 "accounts", Map.of(
-                        "NEXTSMS", Map.of("username", NEXT_USER, "password", NEXT_PASSWORD, "baseUrl", "http://localhost:8098/nextsms"),
+                        "NEXTSMS", Map.of("apiToken", NEXT_TOKEN, "baseUrl", "http://localhost:8098/nextsms"),
                         "BEEM", Map.of("apiKey", BEEM_KEY, "secretKey", BEEM_SECRET, "baseUrl", "http://localhost:8098/beem",
                                 "reportUrl", "http://localhost:8098/beem-dlr")));
     }
@@ -280,6 +291,17 @@ public class SmsMockController {
         messages.put(m.provider + ":" + m.id + ":" + m.to, m);
         order.add(m);
         if (order.size() > 300) order.remove(0);
+    }
+
+    private ResponseEntity<Map<String, Object>> refuseBearer(String auth) {
+        if (switches.down("SMS")) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("message", "SMS provider temporarily unavailable (simulated outage)"));
+        }
+        String expected = "Bearer " + NEXT_TOKEN;
+        if (auth == null || !MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), auth.trim().getBytes(StandardCharsets.UTF_8))) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthenticated."));
+        }
+        return null;
     }
 
     private ResponseEntity<Map<String, Object>> refuse(String auth, String user, String password) {

@@ -50,20 +50,20 @@ class SmsMockTest {
             String base = "http://127.0.0.1:" + cims.getAddress().getPort();
             http().post().uri("/mock/sms/reset").retrieve().toBodilessEntity();
             http().post().uri("/mock/sms/callback?provider=NEXTSMS&url=" + base + "/api/integrations/sms/nextsms/tok").retrieve().toBodilessEntity();
-            String next = basic(SmsMockController.NEXT_USER, SmsMockController.NEXT_PASSWORD);
+            String next = "Bearer " + SmsMockController.NEXT_TOKEN;
 
             // wrong password refused; an unregistered name rejected; a registered one accepted
-            int bad = http().get().uri("/nextsms/api/sms/v1/balance").header("Authorization", basic("msingi", "nope"))
+            int bad = http().get().uri("/nextsms/api/v2/balance").header("Authorization", "Bearer nope")
                     .exchange((req, res) -> res.getStatusCode().value());
             assertThat(bad).isEqualTo(401);
-            Map<String, Object> r = http().post().uri("/nextsms/api/sms/v1/text/single").header("Authorization", next).contentType(MediaType.APPLICATION_JSON)
+            Map<String, Object> r = http().post().uri("/nextsms/api/sms/v2/text/single").header("Authorization", next).contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("from", "NOBODY", "to", "255712345678", "text", "x", "reference", "1-1")).retrieve().body(Map.class);
-            assertThat(r.toString()).contains("groupName=REJECTED");
-            r = http().post().uri("/nextsms/api/sms/v1/text/single").header("Authorization", next).contentType(MediaType.APPLICATION_JSON)
+            assertThat(r.toString()).contains("groupName=REJECTED", "REJECTED_SOURCE").doesNotContain("messageId");
+            r = http().post().uri("/nextsms/api/sms/v2/text/single").header("Authorization", next).contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("from", "BAHARI", "to", "255712345678", "text", "Karibu", "reference", "1-2")).retrieve().body(Map.class);
             String id = (String) ((Map<String, Object>) ((List<?>) r.get("messages")).get(0)).get("messageId");
             Thread.sleep(2000);
-            Map<String, Object> rep = http().get().uri("/nextsms/api/sms/v1/reports?messageId=" + id).header("Authorization", next).retrieve().body(Map.class);
+            Map<String, Object> rep = http().get().uri("/nextsms/api/v2/reports?messageId=" + id).header("Authorization", next).retrieve().body(Map.class);
             assertThat(rep.toString()).contains("groupName=DELIVERED");
             assertThat(got).anyMatch(g -> g.startsWith("/api/integrations/sms/nextsms/tok") && g.contains(id) && g.contains("DELIVERED"));
 

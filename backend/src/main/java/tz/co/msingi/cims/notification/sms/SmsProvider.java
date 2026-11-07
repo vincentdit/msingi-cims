@@ -6,12 +6,12 @@ import java.util.List;
  * The Tanzanian SMS providers CIMS can send through, with the fields each one issues to an account holder and the addresses CIMS
  * uses unless others are entered in the Msingi console.
  * <p>The adapters follow each provider's published API as known when they were written (November 2026); confirm them against the
- * documents the provider gives with the account (NextSMS: the Postman documentation; Beem: the developer portal) and correct the
+ * documents the provider gives with the account (NextSMS: nextsms.co.tz/api-docs, API v2; Beem: the developer portal) and correct the
  * addresses on the console page if they differ.
  */
 public enum SmsProvider {
 
-    NEXTSMS("NextSMS", List.of(new Field("username", "Username", false), new Field("password", "Password", true)),
+    NEXTSMS("NextSMS", List.of(new Field("apiToken", "API token (Customer Profile › Customization › API Keys)", true)),
             "https://messaging-service.co.tz", null),
     BEEM("Beem Africa", List.of(new Field("apiKey", "API key", false), new Field("secretKey", "Secret key", true)),
             "https://apisms.beem.africa", "https://dlrapi.beem.africa");
