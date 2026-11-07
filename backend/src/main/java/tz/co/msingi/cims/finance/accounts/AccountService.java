@@ -59,9 +59,18 @@ public class AccountService {
     /** The signed-in applicant's own account (and their student account once handed over). */
     @Transactional(readOnly = true)
     public Statement mine() {
-        Applicant a = profiles.currentApplicant();
+        Applicant a = profiles.currentApplicantIfAny().orElse(null);
+        if (a == null) {   // a student brought in from before CIMS (Data import) has no application
+            Student s = currentStudent();
+            return statement(s.fullName(), s.getRegistrationNo(), s.getId(), null);
+        }
         Student s = students.findByApplicantId(a.getId()).orElse(null);
         return statement(a.fullName(), s == null ? null : s.getRegistrationNo(), s == null ? null : s.getId(), a.getId());
+    }
+
+    private Student currentStudent() {
+        return students.findByUserId(tz.co.msingi.cims.platform.security.CurrentUser.requireId())
+                .orElseThrow(() -> new NotFoundException("No applicant or student record for this account"));
     }
 
     /** Control number for one of the signed-in applicant's (or student's) own invoices. */
@@ -75,11 +84,12 @@ public class AccountService {
     /** Throws unless the invoice belongs to the signed-in applicant or to their student record. */
     @Transactional(readOnly = true)
     public Invoice requireMine(Long invoiceId) {
-        Applicant a = profiles.currentApplicant();
+        Applicant a = profiles.currentApplicantIfAny().orElse(null);
         Invoice inv = invoices.findById(invoiceId).orElseThrow(() -> new NotFoundException("Invoice", invoiceId));
-        boolean mine = (inv.getPayerType() == Invoice.PayerType.APPLICANT && inv.getPayerId().equals(a.getId()))
-                || (inv.getPayerType() == Invoice.PayerType.STUDENT
-                && students.findById(inv.getPayerId()).map(st -> a.getId().equals(st.getApplicantId())).orElse(false));
+        Long userId = tz.co.msingi.cims.platform.security.CurrentUser.requireId();
+        boolean mine = (a != null && inv.getPayerType() == Invoice.PayerType.APPLICANT && inv.getPayerId().equals(a.getId()))
+                || (inv.getPayerType() == Invoice.PayerType.STUDENT && students.findById(inv.getPayerId())
+                        .map(st -> (a != null && a.getId().equals(st.getApplicantId())) || userId.equals(st.getUserId())).orElse(false));
         if (!mine) throw new NotFoundException("Invoice", invoiceId);
         return inv;
     }

@@ -138,7 +138,7 @@ class MsingiBillingIT {
         LocalDate start = today.minusDays(100);
         String contract = """
                 {"reference":"MSG/CIMS/2026/007","startDate":"%s","setupFee":2000000,"annualFee":6000000,"studentFee":12000,"applicationFee":1000,
-                 "applicationPercent":5,"usageCycle":"QUARTERLY","vatPercent":18,"paymentTermsDays":30,"billingContactName":"Bursar","billingEmail":"bursar@%s.ac.tz"}"""
+                 "applicationPercent":5,"usageCycle":"QUARTERLY","vatPercent":18,"paymentTermsDays":30,"autoIssue":false,"billingContactName":"Bursar","billingEmail":"bursar@%s.ac.tz"}"""
                 .formatted(start, suffix);
         p(put("/api/platform/billing/contracts/" + tenantId), contract).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
         usageData(start);
@@ -257,6 +257,15 @@ class MsingiBillingIT {
         assertThat(jdbc.queryForObject("select status from tenants where id = ?", String.class, tenantId)).isEqualTo("SUSPENDED");
         assertThat(db(() -> jdbc.queryForList("select subject from email_messages where to_address = ?", String.class, "fin" + suffix + "@msingi.co.tz")))
                 .anyMatch(x -> x.startsWith("Suspended for non-payment"));
+
+        // the institution pays what is left (by reference, through the collector): its access comes back by itself
+        BigDecimal left = body(p(get("/api/platform/billing/invoices/" + licence), null)).at("/invoice/balance").decimalValue();
+        String settle = "{\"reference\":\"" + ref + "\",\"transactionId\":\"RX" + suffix + "\",\"provider\":\"CRDB\",\"amount\":" + left.toPlainString() + "}";
+        mvc.perform(post("/api/integrations/msingi-billing/payment-notification").contentType("application/json").content(settle)
+                .header("X-Billing-Signature", GepgCallbackController.sign(settle, "test-billing-secret"))).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select status from tenants where id = ?", String.class, tenantId)).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("select status_reason from tenants where id = ?", String.class, tenantId)).contains("restored automatically");
+        assertThat(db(() -> jdbc.queryForList("select subject from email_messages where subject = 'CIMS access restored'", String.class))).isNotEmpty();
     }
 
     @Test

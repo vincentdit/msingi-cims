@@ -23,7 +23,7 @@ import {
 } from '../../components/billing/billing';
 import { tr } from '../../locale/ui';
 import { AgingBar, InvoiceStatusChip, PaymentTable, StatementDialog } from '../../components/billing/BillingParts';
-import { SmsBundlesTab } from './BillingSmsPages';
+import { PayMethodsCard, SmsBundlesTab } from './BillingSmsPages';
 import { platform, type InstitutionRow } from './shared';
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Dar_es_Salaam' });
@@ -46,7 +46,7 @@ export function BillingPage() {
       {tab === 'overview' && <OverviewTab />}
       {tab === 'invoices' && <InvoicesTab />}
       {tab === 'payments' && <PaymentsTab />}
-      {tab === 'settings' && <SettingsTab />}
+      {tab === 'settings' && <><SettingsTab /><PayMethodsCard /></>}
       {tab === 'sms' && <SmsBundlesTab />}
     </>
   );
@@ -748,7 +748,7 @@ function ContractDialog({ tenantId, name, contract, onClose, onDone }: {
     setupFee: String(contract?.setupFee ?? 0), annualFee: String(contract?.annualFee ?? 0), studentFee: String(contract?.studentFee ?? 0),
     applicationFee: String(contract?.applicationFee ?? 0), applicationPercent: String(contract?.applicationPercent ?? 0),
     usageCycle: (contract?.usageCycle ?? 'QUARTERLY') as Cycle, vatPercent: String(contract?.vatPercent ?? 18), paymentTermsDays: String(contract?.paymentTermsDays ?? 30),
-    autoIssue: contract?.autoIssue ?? false, autoSuspend: contract?.autoSuspend ?? false, suspendAfterDays: String(contract?.suspendAfterDays ?? 60),
+    autoIssue: contract?.autoIssue ?? true, autoSuspend: contract?.autoSuspend ?? false, suspendAfterDays: String(contract?.suspendAfterDays ?? 60),
     billingContactName: contract?.billingContactName ?? '', billingEmail: contract?.billingEmail ?? '', billingPhone: contract?.billingPhone ?? '', notes: contract?.notes ?? '',
   }));
   const [ending, setEnding] = useState(false);

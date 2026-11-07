@@ -63,6 +63,17 @@ public class InstitutionBillingController {
         return service.smsOffer(p.enabled(), p.needsNetwork(), p.provider());
     }
 
+    public record PayOptions(boolean phonePrompt, boolean phoneNetwork, String phoneProvider, boolean canSimulate) {
+    }
+
+    /** Whether Msingi's invoices can be paid by a prompt on a phone now (and through whom), for the Pay window. */
+    @GetMapping("/pay-options")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")
+    public PayOptions payOptions() {
+        MsingiCollectionService.Prompt p = collection.prompt();
+        return new PayOptions(p.enabled(), p.needsNetwork(), p.provider(), service.simulationAllowed());
+    }
+
     /** Buys an SMS bundle: the invoice is issued at once with its payment reference; the SMS are added as soon as it is paid. */
     @PostMapping("/sms-bundles")
     @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','BURSAR')")

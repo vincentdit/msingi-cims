@@ -62,6 +62,9 @@ public class MsingiPhonePaymentService {
         if (!List.of("ISSUED", "PARTLY_PAID").contains((String) i.get("status"))) {
             throw new BusinessRuleException("NOTHING_TO_PAY", "Nothing is left to pay on this invoice.");
         }
+        if (!billing.allows((String) i.get("kind"), "MOBILE")) {
+            throw new BusinessRuleException("MOBILE_NOT_ALLOWED", "This invoice is paid by bank transfer only: use the accounts shown on the invoice.");
+        }
         BigDecimal balance = ((BigDecimal) i.get("total")).subtract((BigDecimal) i.get("paid_amount"));
         String phone = phone(req == null ? null : req.phone());
         String network = req == null || req.network() == null || req.network().isBlank() ? null : req.network().trim().toUpperCase(Locale.ROOT);

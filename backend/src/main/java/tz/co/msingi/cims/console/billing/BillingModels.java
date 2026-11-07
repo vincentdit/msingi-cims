@@ -53,7 +53,8 @@ public final class BillingModels {
     }
 
     public record InvoiceView(InvoiceRow invoice, List<Line> lines, BigDecimal subtotal, BigDecimal vatPercent, BigDecimal vatAmount, String notes,
-                              List<Applied> payments, List<Reminder> reminders, String cancelledReason, String createdByName, String issuedByName) {
+                              List<Applied> payments, List<Reminder> reminders, String cancelledReason, String createdByName, String issuedByName,
+                              String payMethods, List<Channel> payTo) {
     }
 
     public record InvoiceInput(List<Line> lines, String notes, BigDecimal vatPercent) {

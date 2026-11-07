@@ -178,3 +178,43 @@ function CollectionCard() {
     </>
   );
 }
+
+const PAY_KINDS: [string, string][] = [['LICENCE', 'Set-up and licence'], ['USAGE', 'Usage (students and applications)'], ['SMS', 'SMS bundles'], ['OTHER', 'Other invoices']];
+
+/** How institutions may pay each kind of Msingi invoice: mobile money, bank or both (only those accounts are shown on the invoice). */
+export function PayMethodsCard() {
+  const qc = useQueryClient();
+  const key = ['platform', 'billing', 'pay-methods'];
+  const q = useQuery({ queryKey: key, queryFn: () => api<Record<string, string>>('/api/platform/billing/pay-methods', platform) });
+  const [f, setF] = useState<Record<string, string> | null>(null);
+  useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
+  const save = useMutation({ mutationFn: () => api<Record<string, string>>('/api/platform/billing/pay-methods', { ...platform, method: 'PUT', body: f }),
+    onSuccess: (v) => { qc.setQueryData(key, v); setF(v); } });
+  if (!f) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
+  return (
+    <Card sx={{ mt: 2.5 }}><CardContent>
+      <Typography variant="h6">How institutions may pay</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Every Msingi invoice is issued with its payment reference (control number) the moment it is due or requested, and is recorded and
+        delivered automatically when the payment reaches Msingi. Choose for each kind of invoice whether it is paid by mobile money, by bank
+        or either: the invoice, its email and the Pay window show only those accounts, and a prompt on a phone only where mobile money is allowed.
+      </Typography>
+      <Grid container spacing={2}>
+        {PAY_KINDS.map(([k, label]) => (
+          <Grid key={k} size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField select fullWidth label={label} value={f[k] ?? 'BOTH'} onChange={(e) => setF({ ...f, [k]: e.target.value })}>
+              <MenuItem value="BOTH">Mobile money or bank</MenuItem>
+              <MenuItem value="MOBILE">Mobile money only</MenuItem>
+              <MenuItem value="BANK">Bank only</MenuItem>
+            </TextField>
+          </Grid>
+        ))}
+      </Grid>
+      <ErrorAlert error={save.error} />
+      {save.isSuccess && <Alert severity="success" sx={{ mt: 1.5 }}>Saved.</Alert>}
+      <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+        <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Save</Button>
+      </Stack>
+    </CardContent></Card>
+  );
+}

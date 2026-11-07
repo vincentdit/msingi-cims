@@ -106,7 +106,8 @@ class ImportIT {
         String code = s.body(s.call(post("/api/applicant-auth/forgot-password"), null, "{\"phone\":\"0712000001\"}")).get("devOtp").asText();
         s.call(post("/api/applicant-auth/reset-password"), null, "{\"phone\":\"0712000001\",\"code\":\"" + code + "\",\"newPassword\":\"Mbuyu#Kijani83\"}")
                 .andExpect(status().is2xxSuccessful());
-        s.call(post("/api/student-auth/login"), null, "{\"login\":\"OLD/19/0001\",\"password\":\"Mbuyu#Kijani83\"}").andExpect(status().isOk());
+        String studentToken = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"OLD/19/0001\",\"password\":\"Mbuyu#Kijani83\"}")
+                .andExpect(status().isOk())).get("accessToken").asText();
 
         // results from before CIMS, from an Excel file
         byte[] xlsx;
@@ -140,6 +141,13 @@ class ImportIT {
         assertThat(db(() -> jdbc.queryForObject("""
                 select sum(p.unallocated_amount) from payments p join invoices i on i.id = p.invoice_id
                 where i.payer_id = (select id from students where registration_no = 'OLD/19/0002')""", BigDecimal.class))).isEqualByComparingTo("20000");
+
+        // the migrated student (no application in CIMS) sees the portal and the opening balance, and can get its payment reference
+        s.call(get("/api/student/dashboard"), studentToken, null).andExpect(status().isOk());
+        JsonNode account = s.body(s.call(get("/api/student/account"), studentToken, null).andExpect(status().isOk()));
+        assertThat(account.get("balance").decimalValue()).isEqualByComparingTo("350000");
+        long opening = account.at("/invoices/0/id").asLong();
+        s.call(post("/api/student/invoices/" + opening + "/control-number"), studentToken, null).andExpect(status().isOk());
     }
 
     @Test

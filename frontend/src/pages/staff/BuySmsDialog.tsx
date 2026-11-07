@@ -17,7 +17,8 @@ interface Channel { provider: string; accountName?: string; accountNumber?: stri
 interface InvoiceRow {
   id: number; invoiceNo: string; status: string; total: number; paidAmount: number; balance: number; issueDate: string; dueDate: string; paymentReference: string;
 }
-interface InvoiceView { invoice: InvoiceRow; lines: { description: string; quantity: number }[] }
+interface InvoiceView { invoice: InvoiceRow & { kind?: string }; lines: { description: string; quantity: number }[]; payMethods?: string; payTo?: Channel[] }
+interface PayOptions { phonePrompt: boolean; phoneNetwork: boolean; phoneProvider?: string; canSimulate: boolean }
 interface SmsOffer {
   pricePerSms: number; minUnits: number; vatPercent: number; payTo: Channel[]; phonePrompt: boolean; phoneNetwork: boolean; phoneProvider?: string;
   waiting: InvoiceRow[]; canSimulate: boolean;
@@ -55,7 +56,7 @@ export function BuySmsDialog({ onClose }: { onClose: () => void }) {
       <DialogTitle>Buy SMS</DialogTitle>
       <DialogContent>
         {offer.isLoading ? <Loading /> : offer.error ? <ErrorAlert error={offer.error} /> : !o ? null : invoiceId != null ? (
-          <PayInvoice id={invoiceId} offer={o} />
+          <PayInvoice id={invoiceId} />
         ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary">
@@ -110,9 +111,13 @@ export function BuySmsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** The invoice to pay: its payment reference and Msingi's accounts, a prompt on a phone, and the bundle the moment it is paid. */
-function PayInvoice({ id, offer }: { id: number; offer: SmsOffer }) {
+/**
+ * A Msingi invoice to pay: its payment reference (control number), the accounts it may be paid into, a prompt on a phone where
+ * mobile money is allowed, and what was delivered the moment it is paid. Used by Buy SMS and the Msingi subscription page.
+ */
+export function PayInvoice({ id }: { id: number }) {
   const qc = useQueryClient();
+  const opts = useQuery({ queryKey: ['staff', 'msingi-pay-options'], queryFn: () => api<PayOptions>('/api/msingi-billing/pay-options', staff) });
   const inv = useQuery({
     queryKey: ['staff', 'msingi-invoice', id],
     queryFn: () => api<InvoiceView>(`/api/msingi-billing/invoices/${id}`, staff),
@@ -123,25 +128,30 @@ function PayInvoice({ id, offer }: { id: number; offer: SmsOffer }) {
     if (paid) {
       qc.invalidateQueries({ queryKey: ['staff', 'messaging', 'overview'] });
       qc.invalidateQueries({ queryKey: ['staff', 'sms-offer'] });
+      qc.invalidateQueries({ queryKey: ['msingi-billing'] });
     }
   }, [paid]); // eslint-disable-line react-hooks/exhaustive-deps
   const simulate = useMutation({
     mutationFn: () => api(`/api/msingi-billing/invoices/${id}/simulate-payment`, { ...staff, method: 'POST' }),
     onSuccess: () => inv.refetch(),
   });
-  if (inv.isLoading) return <Loading />;
+  if (inv.isLoading || opts.isLoading) return <Loading />;
   if (inv.error || !inv.data) return <ErrorAlert error={inv.error} />;
   const i = inv.data.invoice;
+  const sms = i.kind === 'SMS';
+  const payTo = inv.data.payTo ?? [];
+  const o = opts.data;
+  const prompt = !!o?.phonePrompt && inv.data.payMethods !== 'BANK';
   if (paid) {
     return (
       <Stack spacing={1.5} alignItems="center" sx={{ py: 3, textAlign: 'center' }}>
         <CheckCircleIcon color="success" sx={{ fontSize: 56 }} />
-        <Typography variant="h6">{units(inv.data).toLocaleString()} SMS added to your bundle</Typography>
-        <Typography color="text.secondary">Invoice {i.invoiceNo} is paid. Msingi's receipt has been emailed to your billing contact.</Typography>
+        <Typography variant="h6">{sms ? `${units(inv.data).toLocaleString()} SMS added to your bundle` : `Invoice ${i.invoiceNo} is paid`}</Typography>
+        <Typography color="text.secondary">{sms ? `Invoice ${i.invoiceNo} is paid. ` : ''}Msingi's receipt has been emailed to your billing contact.</Typography>
       </Stack>
     );
   }
-  if (i.status === 'CANCELLED') return <Alert severity="info" sx={{ mt: 1 }}>This invoice lapsed unpaid. Buy a new bundle instead.</Alert>;
+  if (i.status === 'CANCELLED') return <Alert severity="info" sx={{ mt: 1 }}>{sms ? 'This invoice lapsed unpaid. Buy a new bundle instead.' : 'This invoice was cancelled.'}</Alert>;
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
       <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
@@ -156,19 +166,19 @@ function PayInvoice({ id, offer }: { id: number; offer: SmsOffer }) {
           </Box>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Invoice {i.invoiceNo} · {units(inv.data).toLocaleString()} SMS · due {formatDate(i.dueDate)}
+          {sms ? `Invoice ${i.invoiceNo} · ${units(inv.data).toLocaleString()} SMS · due ${formatDate(i.dueDate)}` : `Invoice ${i.invoiceNo} · due ${formatDate(i.dueDate)}`}
         </Typography>
         <Button size="small" startIcon={<DownloadIcon />} sx={{ mt: 0.5, ml: -0.5 }}
           onClick={() => download(`/api/msingi-billing/invoices/${id}/pdf`, 'staff', `${i.invoiceNo}.pdf`)}>Invoice (PDF)</Button>
       </Box>
 
-      {offer.phonePrompt && <PhonePrompt invoiceId={id} amount={i.balance} needsNetwork={offer.phoneNetwork} provider={offer.phoneProvider} onPaid={() => inv.refetch()} />}
+      {prompt && o && <PhonePrompt invoiceId={id} amount={i.balance} needsNetwork={o.phoneNetwork} provider={o.phoneProvider} onPaid={() => inv.refetch()} />}
 
-      {offer.payTo.length > 0 && (
+      {payTo.length > 0 && (
         <Box>
-          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{offer.phonePrompt ? 'Or pay to Msingi, quoting the payment reference' : 'Pay to Msingi, quoting the payment reference'}</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{prompt ? 'Or pay to Msingi, quoting the payment reference' : 'Pay to Msingi, quoting the payment reference'}</Typography>
           <Table size="small"><TableBody>
-            {offer.payTo.map((c) => (
+            {payTo.map((c) => (
               <TableRow key={c.provider + c.accountNumber}>
                 <TableCell>{PROVIDER[c.provider] ?? c.provider}{c.branch ? `, ${c.branch}` : ''}</TableCell>
                 <TableCell>{c.accountName}</TableCell>
@@ -179,9 +189,10 @@ function PayInvoice({ id, offer }: { id: number; offer: SmsOffer }) {
         </Box>
       )}
       <Alert severity="info" icon={false}>
-        Quote the reference {group(i.paymentReference)} exactly. The SMS are added here automatically when the payment reaches Msingi: you can close this window.
+        {sms ? `Quote the reference ${group(i.paymentReference)} exactly. The SMS are added here automatically when the payment reaches Msingi: you can close this window.`
+          : `Quote the reference ${group(i.paymentReference)} exactly. The payment is recorded automatically when it reaches Msingi and your receipt comes by email: you can close this window.`}
       </Alert>
-      {offer.canSimulate && (
+      {o?.canSimulate && (
         <Box>
           <Button size="small" variant="outlined" disabled={simulate.isPending} onClick={() => simulate.mutate()}>Pay now (testing only)</Button>
           <ErrorAlert error={simulate.error} />

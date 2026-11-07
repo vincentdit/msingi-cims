@@ -163,4 +163,39 @@ class SmsBundlePurchaseIT {
         assertThat(topups.size()).isEqualTo(3);
         assertThat(topups.get(0).get("reference").asText()).startsWith("MSG-INV-");
     }
+
+    @Test
+    void msingiChoosesHowEachKindOfInvoiceIsPaid() throws Exception {
+        p(put("/api/platform/billing/settings"), """
+                {"companyName":"Msingi Technologies Ltd","email":"billing@msingi.co.tz",
+                 "channels":[{"provider":"CRDB","accountName":"Msingi Technologies Ltd","accountNumber":"0150123456700","branch":"Dodoma"}]}""")
+                .andExpect(status().isOk());
+        // mobile money only is refused while Msingi lists no mobile money number
+        p(put("/api/platform/billing/pay-methods"), "{\"SMS\":\"MOBILE\"}").andExpect(jsonPath("$.code").value("NO_MOBILE_ACCOUNT"));
+        p(put("/api/platform/billing/settings"), """
+                {"companyName":"Msingi Technologies Ltd","email":"billing@msingi.co.tz",
+                 "channels":[{"provider":"CRDB","accountName":"Msingi Technologies Ltd","accountNumber":"0150123456700","branch":"Dodoma"},
+                 {"provider":"MPESA","accountName":"MSINGI","accountNumber":"555111"}]}""").andExpect(status().isOk());
+        p(put("/api/platform/billing/pay-methods"), "{\"SMS\":\"BANK\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.SMS").value("BANK")).andExpect(jsonPath("$.LICENCE").value("BOTH"));
+        p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":true}").andExpect(status().isOk());
+        try {
+            // SMS bundles by bank only: no phone prompt, only the bank account shown, a prompt refused
+            JsonNode offer = s.body(s.call(get("/api/msingi-billing/sms-offer"), bursar, null));
+            assertThat(offer.get("phonePrompt").asBoolean()).isFalse();
+            assertThat(offer.get("payTo").findValuesAsText("provider")).containsExactly("CRDB");
+            JsonNode v = s.body(s.call(post("/api/msingi-billing/sms-bundles"), bursar, "{\"units\":500}").andExpect(status().isOk()));
+            assertThat(v.get("payMethods").asText()).isEqualTo("BANK");
+            assertThat(v.get("payTo").findValuesAsText("provider")).containsExactly("CRDB");
+            s.call(post("/api/msingi-billing/invoices/" + v.at("/invoice/id").asLong() + "/phone-payment"), bursar, "{\"phone\":\"0712345678\"}")
+                    .andExpect(jsonPath("$.code").value("MOBILE_NOT_ALLOWED"));
+            s.call(get("/api/msingi-billing/pay-options"), bursar, null).andExpect(jsonPath("$.phonePrompt").value(true));
+            // back to either: both accounts and the prompt
+            p(put("/api/platform/billing/pay-methods"), "{\"SMS\":\"BOTH\"}").andExpect(status().isOk());
+            assertThat(s.body(s.call(get("/api/msingi-billing/sms-offer"), bursar, null)).get("payTo").size()).isEqualTo(2);
+        } finally {
+            p(put("/api/platform/billing/pay-methods"), "{\"SMS\":\"BOTH\"}");
+            p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":false}");
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import DownloadIcon from '@mui/icons-material/DownloadOutlined';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, IconButton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { CYCLE_LABEL, KIND_LABEL, day, period, providerLabel, tzs, type Account, type Contract, type Statement } from '../../components/billing/billing';
 import { InvoiceStatusChip, PaymentTable, StatementDialog } from '../../components/billing/BillingParts';
 import { tr } from '../../locale/ui';
+import { PayInvoice } from './BuySmsDialog';
 
 const staff = { realm: 'staff' as const };
 
@@ -19,8 +20,7 @@ export default function MsingiSubscriptionPage() {
   const q = useQuery({ queryKey: ['msingi-billing'], queryFn: () => api<Account>('/api/msingi-billing', staff) });
   const [statement, setStatement] = useState<Statement | null>(null);
   const openStatement = useMutation({ mutationFn: () => api<Statement>('/api/msingi-billing/statement', staff), onSuccess: setStatement });
-  const pay = useMutation({ mutationFn: (id: number) => api(`/api/msingi-billing/invoices/${id}/simulate-payment`, { ...staff, method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['msingi-billing'] }) });
+  const [paying, setPaying] = useState<number | null>(null);
   if (!q.data) return q.error ? <ErrorAlert error={q.error} /> : <Loading />;
   const a = q.data;
   const unpaid = a.invoices.filter((i) => i.status === 'ISSUED' || i.status === 'PARTLY_PAID');
@@ -70,11 +70,7 @@ export default function MsingiSubscriptionPage() {
                               <DownloadIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {a.canSimulate && unpaid.includes(i) && (
-                            <Tooltip title={tr('Testing period: pays the invoice as if by mobile money')}>
-                              <span><Button size="small" disabled={pay.isPending} onClick={() => pay.mutate(i.id)}>Simulate payment</Button></span>
-                            </Tooltip>
-                          )}
+                          {unpaid.includes(i) && <Button size="small" variant="contained" sx={{ ml: 0.5 }} onClick={() => setPaying(i.id)}>Pay</Button>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -82,7 +78,7 @@ export default function MsingiSubscriptionPage() {
                   </TableBody>
                 </Table>
               </TableContainer>
-              <ErrorAlert error={pay.error ?? openStatement.error} />
+              <ErrorAlert error={openStatement.error} />
             </CardContent>
           </Card>
           <Card>
@@ -119,6 +115,13 @@ export default function MsingiSubscriptionPage() {
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}><ContractCard c={a.contract} /></Grid>
       </Grid>
+      {paying != null && (
+        <Dialog open onClose={() => { setPaying(null); qc.invalidateQueries({ queryKey: ['msingi-billing'] }); }} maxWidth="sm" fullWidth>
+          <DialogTitle>Pay Msingi</DialogTitle>
+          <DialogContent><PayInvoice id={paying} /></DialogContent>
+          <DialogActions><Button onClick={() => { setPaying(null); qc.invalidateQueries({ queryKey: ['msingi-billing'] }); }}>Close</Button></DialogActions>
+        </Dialog>
+      )}
       {statement && <StatementDialog st={statement} realm="staff" onClose={() => setStatement(null)} />}
     </>
   );

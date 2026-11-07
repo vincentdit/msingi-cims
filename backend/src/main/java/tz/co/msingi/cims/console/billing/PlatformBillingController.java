@@ -48,6 +48,16 @@ public class PlatformBillingController {
         return service.saveSettings(s);
     }
 
+    @GetMapping("/pay-methods")
+    public Map<String, String> payMethods() {
+        return service.payMethods();
+    }
+
+    @PutMapping("/pay-methods")
+    public Map<String, String> savePayMethods(@RequestBody Map<String, String> in) {
+        return service.savePayMethods(in);
+    }
+
     @GetMapping("/sms-pricing")
     public MsingiBillingService.SmsPricing smsPricing() {
         return service.smsPricing();

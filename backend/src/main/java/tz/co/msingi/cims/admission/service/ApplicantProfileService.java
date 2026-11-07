@@ -54,6 +54,12 @@ public class ApplicantProfileService {
                 .orElseThrow(() -> new NotFoundException("Applicant profile not found for this account"));
     }
 
+    /** The signed-in account's applicant record, if it has one (a student brought in by Data import has none). */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Applicant> currentApplicantIfAny() {
+        return applicants.findByUserId(CurrentUser.requireId());
+    }
+
     @Transactional(readOnly = true)
     public ProfileView myProfile() {
         return ProfileView.of(currentApplicant());
