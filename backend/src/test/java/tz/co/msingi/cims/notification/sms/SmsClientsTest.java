@@ -55,6 +55,13 @@ class SmsClientsTest {
         var refused = c.send(nextsms(true), "255712345678", "Hello", "UNKNOWN", "12-346", 346);
         assertThat(refused.accepted()).isFalse();
         assertThat(refused.error()).contains("Sender name not registered");
+        // as NextSMS really answers an unregistered sender name: HTTP 200, REJECTED_SOURCE and no message id
+        p.answers.put("/api/sms/v1/text/single", """
+                {"messages":[{"to":"255677444100","status":{"groupId":19,"groupName":"REJECTED","id":56,"name":"REJECTED_SOURCE",
+                "description":"Sender ID in the request not registered on your account."}}],"sendReference":"12-348"}""");
+        assertThat(c.send(nextsms(true), "255677444100", "Hello", "MSINGI", "12-348", 348).error())
+                .startsWith("Refused by NextSMS: Sender ID in the request not registered on your account.")
+                .contains("MSINGI is not");
         p.statuses.put("/api/sms/v1/text/single", 401);
         p.answers.put("/api/sms/v1/text/single", "{\"message\":\"Invalid credentials\"}");
         assertThat(c.send(nextsms(true), "255712345678", "Hello", "BAHARI", "12-347", 347).error()).isEqualTo("Invalid credentials (HTTP 401)");

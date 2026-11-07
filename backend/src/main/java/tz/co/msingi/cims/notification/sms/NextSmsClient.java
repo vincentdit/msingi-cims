@@ -40,11 +40,17 @@ class NextSmsClient implements SmsProviderClient {
         JsonNode m = r.body().path("messages").path(0);
         String id = SmsHttp.text(m, "messageId");
         String group = SmsHttp.text(m, "status", "groupName");
-        if (id == null) return new Sent(false, null, "NextSMS gave no message id: " + SmsHttp.why(r));
+        // a refusal comes back as HTTP 200 with the reason in the message's status (and, for an unknown sender name, no message id)
         if ("REJECTED".equalsIgnoreCase(group) || "UNDELIVERABLE".equalsIgnoreCase(group)) {
             String d = SmsHttp.text(m, "status", "description");
-            return new Sent(false, id, "Refused by NextSMS: " + (d == null ? group : d));
+            String name = SmsHttp.text(m, "status", "name");
+            String why = "Refused by NextSMS: " + (d == null ? group : d);
+            if ("REJECTED_SOURCE".equalsIgnoreCase(name) || d != null && d.toLowerCase(java.util.Locale.ROOT).contains("sender")) {
+                why += " Use a sender name already approved on the NextSMS account (" + sender + " is not), or ask NextSMS to register it.";
+            }
+            return new Sent(false, id, why);
         }
+        if (id == null) return new Sent(false, null, "NextSMS gave no message id: " + SmsHttp.why(r));
         return new Sent(true, id, null);
     }
 
