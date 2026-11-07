@@ -29,7 +29,7 @@ import java.util.Map;
 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
 public class PlatformEmailController {
 
-    public record Status(String mode, String from, String host, Integer port, boolean auth, boolean starttls, String username) {
+    public record Status(String mode, String from, String host, Integer port, boolean auth, boolean starttls, boolean ssl, String username) {
     }
 
     public record TestEmail(@NotBlank @Email String to) {
@@ -52,11 +52,13 @@ public class PlatformEmailController {
     private boolean auth;
     @Value("${spring.mail.properties.mail.smtp.starttls.enable:false}")
     private boolean starttls;
+    @Value("${spring.mail.properties.mail.smtp.ssl.enable:false}")
+    private boolean ssl;
 
     @GetMapping
     public Status status() {
         boolean smtp = "smtp".equalsIgnoreCase(props.mode());
-        return new Status(smtp ? "smtp" : "simulated", props.from(), smtp ? host : null, smtp ? port : null, auth, starttls,
+        return new Status(smtp ? "smtp" : "simulated", props.from(), smtp ? host : null, smtp ? port : null, auth, starttls, ssl,
                 smtp && username != null && !username.isBlank() ? username : null);
     }
 

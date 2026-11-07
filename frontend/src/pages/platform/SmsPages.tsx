@@ -245,7 +245,7 @@ function SenderNamesCard() {
   );
 }
 
-interface EmailStatus { mode: 'smtp' | 'simulated'; from: string; host?: string | null; port?: number | null; auth: boolean; starttls: boolean; username?: string | null }
+interface EmailStatus { mode: 'smtp' | 'simulated'; from: string; host?: string | null; port?: number | null; auth: boolean; starttls: boolean; ssl?: boolean; username?: string | null }
 
 /** How the server sends email (set in deploy/.env, password never shown) and a test message to prove it. */
 function EmailCard() {
@@ -270,7 +270,7 @@ function EmailCard() {
           <TableBody>
             <TableRow><TableCell>Sent from</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{e.from}</TableCell></TableRow>
             <TableRow><TableCell>Mail server</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{e.mode === 'smtp' ? `${e.host}:${e.port}` : 'none (written to the log)'}</TableCell></TableRow>
-            {e.mode === 'smtp' && <TableRow><TableCell>Sign-in</TableCell><TableCell>{e.auth ? `as ${e.username ?? '(no username)'}` : 'none'}{e.starttls ? ', encrypted (STARTTLS)' : ', not encrypted'}</TableCell></TableRow>}
+            {e.mode === 'smtp' && <TableRow><TableCell>Sign-in</TableCell><TableCell>{e.auth ? `as ${e.username ?? '(no username)'}` : 'none'}{e.ssl ? ', encrypted (SSL)' : e.starttls ? ', encrypted (STARTTLS)' : ', not encrypted'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}

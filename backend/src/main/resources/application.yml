@@ -9,6 +9,8 @@ spring:
     properties:
       mail.smtp.auth: ${CIMS_SMTP_AUTH:false}
       mail.smtp.starttls.enable: ${CIMS_SMTP_STARTTLS:false}
+      mail.smtp.starttls.required: ${CIMS_SMTP_STARTTLS:false}   # never fall back to sending the password unencrypted
+      mail.smtp.ssl.enable: ${CIMS_SMTP_SSL:false}               # port 465 (SSL from the start) instead of 587 with STARTTLS
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 10000
   datasource:
