@@ -24,7 +24,7 @@ public final class MessagingDtos {
 
     public record SettingsRequest(@NotNull @Pattern(regexp = "EN|SW") String defaultLanguage,
                                   @Pattern(regexp = "^$|" + tz.co.msingi.cims.notification.sms.SenderNameService.SENDER_PATTERN, message = "3 to 11 letters or digits, no spaces, e.g. BAHARI") String senderId,
-                                  @NotNull @DecimalMin("0") BigDecimal pricePerSms, @Min(0) int lowBalanceWarning) {
+                                  @DecimalMin("0") BigDecimal pricePerSms, @Min(0) int lowBalanceWarning) {
     }
 
     public record TopupRequest(@Positive @Max(10_000_000) int units, @NotNull @DecimalMin("0") BigDecimal amountPaid,

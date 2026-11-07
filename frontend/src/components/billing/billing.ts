@@ -48,9 +48,9 @@ export const STATUS_LABEL: Record<InvoiceStatus, string> = { DRAFT: 'Draft', ISS
 export const STATUS_COLOUR: Record<InvoiceStatus, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
   DRAFT: 'default', ISSUED: 'info', PARTLY_PAID: 'warning', PAID: 'success', CANCELLED: 'default',
 };
-export const KIND_LABEL: Record<string, string> = { LICENCE: 'Licence', USAGE: 'Usage', OTHER: 'Other' };
+export const KIND_LABEL: Record<string, string> = { LICENCE: 'Licence', USAGE: 'Usage', SMS: 'SMS bundle', OTHER: 'Other' };
 export const LINE_KIND: Record<string, string> = {
-  SETUP: 'Set-up', LICENCE: 'Licence', STUDENTS: 'Students', APPLICATIONS: 'Applications', APPLICATION_SHARE: 'Share of fees', OTHER: 'Other', DISCOUNT: 'Discount',
+  SETUP: 'Set-up', LICENCE: 'Licence', STUDENTS: 'Students', APPLICATIONS: 'Applications', APPLICATION_SHARE: 'Share of fees', SMS_BUNDLE: 'SMS bundle', OTHER: 'Other', DISCOUNT: 'Discount',
 };
 export const CYCLE_LABEL: Record<Cycle, string> = { MONTHLY: 'Every month', QUARTERLY: 'Every 3 months', SEMI_ANNUAL: 'Every 6 months', ANNUAL: 'Every year' };
 export const METHOD_LABEL: Record<string, string> = { BANK: 'Bank transfer', MOBILE_MONEY: 'Mobile money', CHEQUE: 'Cheque', CASH: 'Cash', OTHER: 'Other' };

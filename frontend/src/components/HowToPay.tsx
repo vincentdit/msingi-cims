@@ -92,15 +92,15 @@ function ChannelSteps({ c, reference, amount, defaultExpanded }: { c: PaymentCha
 
 interface PhonePayment { id: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED'; phone: string; amount: number; message?: string; receiptNo?: string }
 
-const NETWORKS: { code: string; label: string; prefixes: string[] }[] = [
+export const NETWORKS: { code: string; label: string; prefixes: string[] }[] = [
   { code: 'MPESA', label: 'M-Pesa', prefixes: ['074', '075', '076'] },
   { code: 'MIXX_BY_YAS', label: 'Mixx by Yas', prefixes: ['065', '067', '071', '077'] },
   { code: 'AIRTEL_MONEY', label: 'Airtel Money', prefixes: ['068', '069', '078'] },
   { code: 'HALOPESA', label: 'HaloPesa', prefixes: ['061', '062'] },
 ];
 
-const local = (p: string) => { const d = p.replace(/\D/g, ''); return d.startsWith('255') ? '0' + d.slice(3) : d; };
-const guessNetwork = (p: string) => NETWORKS.find((n) => n.prefixes.some((x) => local(p).startsWith(x)))?.code ?? '';
+export const local = (p: string) => { const d = p.replace(/\D/g, ''); return d.startsWith('255') ? '0' + d.slice(3) : d; };
+export const guessNetwork = (p: string) => NETWORKS.find((n) => n.prefixes.some((x) => local(p).startsWith(x)))?.code ?? '';
 
 /** A prompt on the payer's phone through the institution's aggregator: the payer enters their PIN, and this box follows the outcome. */
 function PhonePay({ realm, invoiceId, phone, onPaid, amount, needsNetwork, provider }: {

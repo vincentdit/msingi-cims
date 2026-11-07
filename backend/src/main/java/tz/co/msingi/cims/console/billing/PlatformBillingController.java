@@ -22,6 +22,7 @@ public class PlatformBillingController {
 
     private final MsingiBillingService service;
     private final MsingiBillingJob job;
+    private final MsingiCollectionService collection;
 
     public record Prepare(Long tenantId, String kind, LocalDate from, LocalDate to) {
     }
@@ -45,6 +46,50 @@ public class PlatformBillingController {
     @PutMapping("/settings")
     public Settings saveSettings(@RequestBody Settings s) {
         return service.saveSettings(s);
+    }
+
+    @GetMapping("/sms-pricing")
+    public MsingiBillingService.SmsPricing smsPricing() {
+        return service.smsPricing();
+    }
+
+    @PutMapping("/sms-pricing")
+    public MsingiBillingService.SmsPricing saveSmsPricing(@RequestBody MsingiBillingService.SmsPricing p) {
+        return service.saveSmsPricing(p);
+    }
+
+    public record ContractSmsPrice(java.math.BigDecimal pricePerSms) {
+    }
+
+    @GetMapping("/contracts/{tenantId}/sms-price")
+    public ContractSmsPrice contractSmsPrice(@PathVariable Long tenantId) {
+        return new ContractSmsPrice(service.contractSmsPrice(tenantId));
+    }
+
+    @PutMapping("/contracts/{tenantId}/sms-price")
+    public ContractSmsPrice setContractSmsPrice(@PathVariable Long tenantId, @RequestBody ContractSmsPrice p) {
+        service.setContractSmsPrice(tenantId, p.pricePerSms());
+        return new ContractSmsPrice(service.contractSmsPrice(tenantId));
+    }
+
+    @GetMapping("/collection")
+    public MsingiCollectionService.View collection() {
+        return collection.view();
+    }
+
+    @PutMapping("/collection")
+    public MsingiCollectionService.View saveCollection(@jakarta.validation.Valid @RequestBody MsingiCollectionService.SaveRequest req) {
+        return collection.save(req);
+    }
+
+    @PostMapping("/collection/test")
+    public MsingiCollectionService.View testCollection() {
+        return collection.test();
+    }
+
+    @PostMapping("/collection/notify-address")
+    public MsingiCollectionService.View newNotifyAddress() {
+        return collection.newNotifyAddress();
     }
 
     @GetMapping("/settings/logo")

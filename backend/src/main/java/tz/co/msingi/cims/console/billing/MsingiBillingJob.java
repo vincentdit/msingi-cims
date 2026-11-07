@@ -63,7 +63,14 @@ public class MsingiBillingJob {
                 select i.id, i.tenant_id, i.due_date, i.reminder_level, c.auto_suspend, c.suspend_after_days, t.status tenant_status
                 from billing_invoices i join tenants t on t.id = i.tenant_id
                 left join billing_contracts c on c.tenant_id = i.tenant_id and c.status = 'ACTIVE'
-                where i.status in ('ISSUED', 'PARTLY_PAID') and i.due_date is not null""");
+                where i.status in ('ISSUED', 'PARTLY_PAID') and i.due_date is not null
+                  and i.kind <> 'SMS'""");   // an SMS bundle is optional: not chased, cancelled when left unpaid
+        try {
+            Integer lapsed = tx.execute(s -> billing.cancelStaleSmsInvoices());
+            if (lapsed != null && lapsed > 0) log.info("{} unpaid SMS bundle invoice(s) cancelled", lapsed);
+        } catch (RuntimeException e) {
+            log.error("Cancelling unpaid SMS invoices failed", e);
+        }
         for (Map<String, Object> o : open) {
             Long id = ((Number) o.get("id")).longValue();
             long late = ChronoUnit.DAYS.between(((java.sql.Date) o.get("due_date")).toLocalDate(), today);

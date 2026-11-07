@@ -93,7 +93,7 @@ public class MessagingAdminService {
         s.setDefaultLanguage(req.defaultLanguage());
         s.setSenderId(req.senderId() == null || req.senderId().isBlank() ? null : req.senderId().trim());
         senderNames.request(s.getSenderId());   // a new name must be approved by TCRA and the networks before phones show it
-        s.setPricePerSms(req.pricePerSms());
+        if (req.pricePerSms() != null) s.setPricePerSms(req.pricePerSms());   // otherwise the price of the last bundle bought from Msingi
         s.setLowBalanceWarning(req.lowBalanceWarning());
         settingsRepo.save(s);
         audit.record("MESSAGING_SETTINGS_UPDATED", "MessagingSettings", s.getId(), Map.of("language", s.getDefaultLanguage(),
@@ -113,6 +113,27 @@ public class MessagingAdminService {
         topups.save(t);
         audit.record("SMS_BUNDLE_TOPPED_UP", "SmsTopup", t.getId(), Map.of("units", t.getUnits(), "amount", t.getAmountPaid(), "reference", t.getReference()));
         return overview();
+    }
+
+    /**
+     * A bundle the institution bought and paid for (a Msingi invoice), credited automatically when the payment arrives. The price per
+     * SMS used for the institution's cost figures becomes the price paid.
+     */
+    @Transactional
+    public void creditPaid(int units, java.math.BigDecimal amountPaid, java.math.BigDecimal unitPrice, String reference, String byName) {
+        SmsTopup t = new SmsTopup();
+        t.setUnits(units);
+        t.setAmountPaid(amountPaid);
+        t.setReference(reference);
+        t.setRecordedAt(OffsetDateTime.now());
+        t.setRecordedByName(byName);
+        topups.save(t);
+        if (unitPrice != null && unitPrice.signum() > 0) {
+            MessagingSettings s = settingsRepo.findFirstBy().orElseGet(MessagingSettings::new);
+            s.setPricePerSms(unitPrice);
+            settingsRepo.save(s);
+        }
+        audit.record("SMS_BUNDLE_PAID_AND_CREDITED", "SmsTopup", t.getId(), Map.of("units", units, "amount", amountPaid, "reference", reference));
     }
 
     // ------------------------------------------------------------------ templates (FR-COM-03)

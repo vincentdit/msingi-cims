@@ -68,6 +68,7 @@ public class MsingiBillingService {
     private final PlatformAuditService platformAudit;
     private final EmailService email;
     private final BillingDocuments documents;
+    private final tz.co.msingi.cims.notification.MessagingAdminService messaging;
 
     @Value("${cims.payments.allow-simulation:false}")
     private boolean allowSimulation;
@@ -447,7 +448,7 @@ public class MsingiBillingService {
         if (total.signum() <= 0) throw new BusinessRuleException("EMPTY_INVOICE", "There is nothing to charge on this invoice. Add a line or cancel it.");
         Long tenantId = ((Number) inv.get("tenant_id")).longValue();
         Contract c = active(tenantId);
-        int terms = c == null ? 30 : c.paymentTermsDays();
+        int terms = "SMS".equals(inv.get("kind")) ? 7 : c == null ? 30 : c.paymentTermsDays();   // a bundle is paid within a week
         LocalDate today = today();
         String no = "MSG-INV-" + today.getYear() + "-" + String.format("%05d", jdbc.queryForObject("select nextval('msingi_invoice_seq')", Long.class));
         String ref = reference(tenantId);
@@ -524,6 +525,12 @@ public class MsingiBillingService {
      */
     @Transactional
     public PaymentRow online(String reference, String provider, String transactionId, BigDecimal amount, OffsetDateTime paidAt) {
+        return online(reference, provider, transactionId, amount, paidAt, null);
+    }
+
+    /** As above; {@code method} names how it was paid when the provider's code does not say (a payment aggregator: mobile money). */
+    @Transactional
+    public PaymentRow online(String reference, String provider, String transactionId, BigDecimal amount, OffsetDateTime paidAt, String method) {
         String ref = reference == null ? null : reference.replaceAll("\\s", "");
         if (!validReference(ref)) return null;
         List<Map<String, Object>> inv = jdbc.queryForList("select id, tenant_id from billing_invoices where payment_reference = ?", ref);
@@ -533,8 +540,8 @@ public class MsingiBillingService {
         if (!seen.isEmpty()) return payment(seen.get(0));
         if (amount == null || amount.signum() <= 0) throw new BusinessRuleException("AMOUNT_REQUIRED", "The amount must be above zero.");
         PaymentProvider p = provider(provider);
-        String method = p == null ? "OTHER" : p.kind() == PaymentProvider.Kind.BANK ? "BANK" : "MOBILE_MONEY";
-        Long id = receive(((Number) inv.get(0).get("tenant_id")).longValue(), money(amount), paidAt == null ? OffsetDateTime.now() : paidAt, method,
+        String how = method != null ? method : p == null ? "OTHER" : p.kind() == PaymentProvider.Kind.BANK ? "BANK" : "MOBILE_MONEY";
+        Long id = receive(((Number) inv.get(0).get("tenant_id")).longValue(), money(amount), paidAt == null ? OffsetDateTime.now() : paidAt, how,
                 p == null ? trim(provider) : p.name(), transactionId.trim(), key, "ONLINE", null, ((Number) inv.get(0).get("id")).longValue(), "Payment collector");
         return payment(id);
     }
@@ -598,6 +605,132 @@ public class MsingiBillingService {
                   updated_at = now()
                 from (select coalesce(sum(a.amount), 0) paid from billing_allocations a join billing_payments p on p.id = a.payment_id
                       where a.invoice_id = ? and p.status = 'RECEIVED') x where i.id = ?""", invoiceId, invoiceId);
+        fulfil(invoiceId);
+    }
+
+    /**
+     * An SMS bundle invoice just paid in full: the bundle is credited to the institution's SMS balance (once), and the institution is
+     * told. Nobody at Msingi needs to act.
+     */
+    private void fulfil(Long invoiceId) {
+        List<Map<String, Object>> r = jdbc.queryForList("""
+                update billing_invoices set fulfilled_at = now() where id = ? and kind = 'SMS' and status = 'PAID' and fulfilled_at is null
+                  and sms_units is not null returning tenant_id, sms_units, total, subtotal, invoice_no""", invoiceId);
+        if (r.isEmpty()) return;
+        Long tenantId = ((Number) r.get(0).get("tenant_id")).longValue();
+        int units = ((Number) r.get(0).get("sms_units")).intValue();
+        BigDecimal total = (BigDecimal) r.get(0).get("total");
+        BigDecimal unitPrice = ((BigDecimal) r.get(0).get("subtotal")).divide(BigDecimal.valueOf(units), 2, RoundingMode.HALF_UP);
+        String no = (String) r.get(0).get("invoice_no");
+        asInstitution(tenantId, () -> messaging.creditPaid(units, total, unitPrice, no, "Msingi (invoice " + no + " paid)"));
+        platformAudit.recordAs(null, "CIMS billing", "SMS_BUNDLE_DELIVERED", tenantId, "BillingInvoice", invoiceId,
+                Map.of("invoiceNo", no, "units", units));
+        Contract c = active(tenantId);
+        toInstitution(tenantId, c, String.format(Locale.ENGLISH, "%,d SMS added to your bundle", units), "Dear " + addressee(tenantId, c) + ",\n\n"
+                + "Thank you: invoice " + no + " is paid and " + String.format(Locale.ENGLISH, "%,d", units) + " SMS have been added to your SMS bundle in CIMS"
+                + " (Communication › Messages).", null);
+    }
+
+    // ================================================================= SMS bundles bought by the institution
+
+    /** The price an institution pays per SMS (its contract's, or Msingi's standard price), the smallest bundle and the VAT. */
+    public record SmsOffer(BigDecimal pricePerSms, int minUnits, BigDecimal vatPercent, List<Channel> payTo, boolean phonePrompt, boolean phoneNetwork,
+                           String phoneProvider, List<InvoiceRow> waiting, boolean canSimulate) {
+    }
+
+    @Transactional(readOnly = true)
+    public SmsOffer smsOffer(boolean phonePrompt, boolean phoneNetwork, String phoneProvider) {
+        Long tenantId = TenantContext.requireTenantId();
+        Map<String, Object> st = jdbc.queryForMap("select sms_price, sms_min_units, sms_vat_percent from platform_billing_settings where id = 1");
+        Contract c = active(tenantId);
+        BigDecimal contractPrice = c == null ? null : jdbc.queryForObject("select sms_price from billing_contracts where id = ?", BigDecimal.class, c.id());
+        List<InvoiceRow> waiting = jdbc.query(INVOICE + " where i.tenant_id = ? and i.kind = 'SMS' and i.status in ('ISSUED', 'PARTLY_PAID') order by i.id desc",
+                INVOICE_ROW, tenantId);
+        return new SmsOffer(contractPrice != null ? contractPrice : (BigDecimal) st.get("sms_price"), ((Number) st.get("sms_min_units")).intValue(),
+                (BigDecimal) st.get("sms_vat_percent"), settings().channels(), phonePrompt, phoneNetwork, phoneProvider, waiting, allowSimulation);
+    }
+
+    /**
+     * The institution buys a bundle: a Msingi invoice for it is issued at once (due in 7 days) with its payment reference, and the
+     * bundle is credited as soon as the invoice is paid.
+     */
+    @Transactional
+    public InvoiceView buySms(int units, String by) {
+        Long tenantId = TenantContext.requireTenantId();
+        SmsOffer o = smsOffer(false, false, null);
+        if (units < o.minUnits()) {
+            throw new BusinessRuleException("BUNDLE_TOO_SMALL", String.format(Locale.ENGLISH, "The smallest bundle is %,d SMS.", o.minUnits()));
+        }
+        if (units > 2_000_000) throw new BusinessRuleException("BUNDLE_TOO_LARGE", "Buy at most 2,000,000 SMS at a time.");
+        Integer open = jdbc.queryForObject("select count(*) from billing_invoices where tenant_id = ? and kind = 'SMS' and status = 'ISSUED'", Integer.class, tenantId);
+        if (open != null && open >= 3) {
+            throw new BusinessRuleException("BUNDLES_WAITING", "Three SMS invoices are already waiting for payment: pay or wait for one of them first.");
+        }
+        Contract c = active(tenantId);
+        Long id = newInvoice(tenantId, c, "SMS", null, null, o.vatPercent(), false);
+        writeLines(id, tenantId, List.of(new Line("SMS_BUNDLE", String.format(Locale.ENGLISH, "SMS bundle: %,d SMS at TZS %s each", units, tzs(o.pricePerSms())),
+                BigDecimal.valueOf(units), money(o.pricePerSms()), whole(BigDecimal.valueOf(units).multiply(o.pricePerSms())))));
+        jdbc.update("update billing_invoices set sms_units = ?, created_by_name = ?, notes = ? where id = ?", units, by,
+                "The bundle is added to your SMS balance in CIMS as soon as this invoice is paid.", id);
+        doIssue(id, by);
+        return view(id, false);
+    }
+
+    /** Msingi's standard SMS price (an institution's contract can set its own), the smallest bundle and the VAT on bundles. */
+    public record SmsPricing(BigDecimal pricePerSms, Integer minUnits, BigDecimal vatPercent) {
+    }
+
+    @Transactional(readOnly = true)
+    public SmsPricing smsPricing() {
+        Map<String, Object> st = jdbc.queryForMap("select sms_price, sms_min_units, sms_vat_percent from platform_billing_settings where id = 1");
+        return new SmsPricing((BigDecimal) st.get("sms_price"), ((Number) st.get("sms_min_units")).intValue(), (BigDecimal) st.get("sms_vat_percent"));
+    }
+
+    @Transactional
+    public SmsPricing saveSmsPricing(SmsPricing p) {
+        if (p == null || p.pricePerSms() == null || p.pricePerSms().signum() <= 0 || p.pricePerSms().compareTo(BigDecimal.valueOf(1000)) > 0) {
+            throw new BusinessRuleException("SMS_PRICE", "The price per SMS must be between 0 and 1,000 shillings.");
+        }
+        if (p.minUnits() == null || p.minUnits() < 1 || p.minUnits() > 1_000_000) throw new BusinessRuleException("SMS_MIN_UNITS", "The smallest bundle must be 1 to 1,000,000 SMS.");
+        if (p.vatPercent() == null || p.vatPercent().signum() < 0 || p.vatPercent().compareTo(BigDecimal.valueOf(50)) > 0) {
+            throw new BusinessRuleException("SMS_VAT", "VAT must be between 0 and 50 per cent.");
+        }
+        jdbc.update("update platform_billing_settings set sms_price = ?, sms_min_units = ?, sms_vat_percent = ? where id = 1",
+                p.pricePerSms().setScale(2, RoundingMode.HALF_UP), p.minUnits(), p.vatPercent());
+        platformAudit.record("SMS_PRICING_UPDATED", null, "PlatformBillingSettings", 1L,
+                Map.of("price", p.pricePerSms().toPlainString(), "minUnits", p.minUnits(), "vat", p.vatPercent().toPlainString()));
+        return smsPricing();
+    }
+
+    /** An institution's own price per SMS (null: Msingi's standard price). */
+    @Transactional
+    public void setContractSmsPrice(Long tenantId, BigDecimal price) {
+        Contract c = active(tenantId);
+        if (c == null) throw new BusinessRuleException("NO_CONTRACT", "The institution has no contract.");
+        if (price != null && (price.signum() <= 0 || price.compareTo(BigDecimal.valueOf(1000)) > 0)) {
+            throw new BusinessRuleException("SMS_PRICE", "The price per SMS must be between 0 and 1,000 shillings.");
+        }
+        jdbc.update("update billing_contracts set sms_price = ? where id = ?", price == null ? null : price.setScale(2, RoundingMode.HALF_UP), c.id());
+        platformAudit.record("SMS_CONTRACT_PRICE_SET", tenantId, "BillingContract", c.id(), Map.of("price", price == null ? "standard" : price.toPlainString()));
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal contractSmsPrice(Long tenantId) {
+        Contract c = active(tenantId);
+        return c == null ? null : jdbc.queryForObject("select sms_price from billing_contracts where id = ?", BigDecimal.class, c.id());
+    }
+
+    /** Unpaid SMS invoices are cancelled after two weeks (nothing is owed for a bundle that was never delivered). */
+    int cancelStaleSmsInvoices() {
+        List<Long> stale = jdbc.queryForList("""
+                select id from billing_invoices where kind = 'SMS' and status = 'ISSUED' and issue_date < ? """, Long.class, Date.valueOf(today().minusDays(14)));
+        for (Long id : stale) {
+            jdbc.update("update billing_invoices set status = 'CANCELLED', cancelled_reason = ?, updated_at = now(), version = version + 1 where id = ? and status = 'ISSUED'",
+                    "Not paid within 14 days: the SMS bundle was not delivered.", id);
+            Long tenantId = jdbc.queryForObject("select tenant_id from billing_invoices where id = ?", Long.class, id);
+            platformAudit.recordAs(null, "CIMS billing", "SMS_INVOICE_LAPSED", tenantId, "BillingInvoice", id, Map.of());
+        }
+        return stale.size();
     }
 
     /** Reverses a payment recorded by mistake (or bounced): its amounts come off the invoices it paid. */

@@ -23,6 +23,7 @@ import {
 } from '../../components/billing/billing';
 import { tr } from '../../locale/ui';
 import { AgingBar, InvoiceStatusChip, PaymentTable, StatementDialog } from '../../components/billing/BillingParts';
+import { SmsBundlesTab } from './BillingSmsPages';
 import { platform, type InstitutionRow } from './shared';
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Dar_es_Salaam' });
@@ -40,11 +41,13 @@ export function BillingPage() {
         <Tab value="invoices" label="Invoices" />
         <Tab value="payments" label="Payments" />
         <Tab value="settings" label="Invoice details" />
+        <Tab value="sms" label="SMS bundles" />
       </Tabs>
       {tab === 'overview' && <OverviewTab />}
       {tab === 'invoices' && <InvoicesTab />}
       {tab === 'payments' && <PaymentsTab />}
       {tab === 'settings' && <SettingsTab />}
+      {tab === 'sms' && <SmsBundlesTab />}
     </>
   );
 }
