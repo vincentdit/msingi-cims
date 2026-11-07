@@ -9,6 +9,7 @@ import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import PeopleIcon from '@mui/icons-material/SupervisorAccount';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import ReceiptIcon from '@mui/icons-material/ReceiptLongOutlined';
+import SmsIcon from '@mui/icons-material/SmsOutlined';
 import {
   AppBar, Badge, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
@@ -27,6 +28,7 @@ const NAV = [
   { to: '/platform/institutions', label: 'Institutions', icon: <ApartmentIcon /> },
   { to: '/platform/nactvet', label: 'NACTVET catalogue', icon: <AccountBalanceIcon /> },
   { to: '/platform/billing', label: 'Billing', icon: <ReceiptIcon /> },
+  { to: '/platform/sms', label: 'SMS', icon: <SmsIcon /> },
   { to: '/platform/support', label: 'Support', icon: <SupportAgentIcon /> },
   { to: '/platform/integrations', label: 'Integration health', icon: <MonitorHeartIcon /> },
   { to: '/platform/users', label: 'Platform users', icon: <PeopleIcon /> },

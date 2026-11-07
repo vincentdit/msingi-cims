@@ -41,6 +41,8 @@ public class MessageDispatcher {
     private final MessagingSettingsRepository settings;
     private final TenantRepository tenants;
     private final SmsGateway gateway;
+    private final tz.co.msingi.cims.notification.sms.SenderNameService senderNames;
+    private final tz.co.msingi.cims.notification.sms.SmsProviderService providers;
     private final TransactionTemplate newTx;
     private final boolean async;
     private final ExecutorService executor = Executors.newFixedThreadPool(2, r -> {
@@ -50,7 +52,11 @@ public class MessageDispatcher {
     });
 
     public MessageDispatcher(MessageRepository messages, MessagingSettingsRepository settings, TenantRepository tenants, SmsGateway gateway,
-                             PlatformTransactionManager txManager, @Value("${cims.sms.async:true}") boolean async, JobLock jobLock) {
+                             PlatformTransactionManager txManager, @Value("${cims.sms.async:true}") boolean async, JobLock jobLock,
+                             tz.co.msingi.cims.notification.sms.SenderNameService senderNames,
+                             tz.co.msingi.cims.notification.sms.SmsProviderService providers) {
+        this.senderNames = senderNames;
+        this.providers = providers;
         this.jobLock = jobLock;
         this.messages = messages;
         this.settings = settings;
@@ -117,7 +123,8 @@ public class MessageDispatcher {
     }
 
     private SmsGateway.Result send(Message m, String body) {
-        String sender = settings.findFirstBy().map(MessagingSettings::getSenderId).orElse(null);
+        // the institution's own name once TCRA and the networks have approved it, Msingi's until then
+        String sender = senderNames.effective(settings.findFirstBy().map(MessagingSettings::getSenderId).orElse(null), providers.defaultSender());
         try {
             return gateway.send(m.getPhone(), body, sender, m.getTenantId() + "-" + m.getId());
         } catch (RuntimeException e) {
@@ -141,7 +148,7 @@ public class MessageDispatcher {
     }
 
     /** A delivery report from the aggregator (current tenant), in its own transaction. */
-    boolean applyReportInNewTx(SmsGateway.DeliveryReport report) {
+    public boolean applyReportInNewTx(SmsGateway.DeliveryReport report) {
         return Boolean.TRUE.equals(newTx.execute(s -> applyReport(report)));
     }
 
@@ -202,6 +209,35 @@ public class MessageDispatcher {
         List<Long> ids = newTx.execute(s -> messages.findTop200ByStatusAndQueuedAtBeforeOrderByIdAsc(Message.Status.QUEUED,
                 OffsetDateTime.now().minus(minAge).plusNanos(1000)).stream().map(Message::getId).toList());
         if (ids != null) ids.forEach(this::deliverSafely);
+    }
+
+    /** Asks the provider about messages sent but not reported on (a report it posted may have been missed). */
+    @Scheduled(cron = "${cims.sms.report-poll-cron:0 */5 * * * *}")
+    public void pollReports() {
+        if (!gateway.live()) return;
+        jobLock.runOnce("sms-report-poll", Duration.ofMinutes(4), Duration.ofSeconds(20), () -> {
+            for (Tenant t : tenants.findAll()) {
+                if (!"ACTIVE".equals(t.getStatus())) continue;
+                try {
+                    TenantContext.runAs(t.toInfo(), this::pollReportsHere);
+                } catch (RuntimeException e) {
+                    log.error("SMS report check failed for institution {}", t.getCode(), e);
+                }
+            }
+        });
+    }
+
+    /** This institution's messages sent between two days and three minutes ago with no report yet: asks the provider. */
+    public void pollReportsHere() {
+        OffsetDateTime now = OffsetDateTime.now();
+        List<Message> sent = newTx.execute(s -> messages.findTop100ByStatusAndSentAtBetweenOrderBySentAtAsc(Message.Status.SENT,
+                now.minusDays(2), now.minusMinutes(3)));
+        if (sent == null) return;
+        for (Message m : sent) {
+            if (m.getProviderRef() == null) continue;
+            gateway.status(m.getProviderRef(), m.getPhone()).ifPresent(r -> newTx.executeWithoutResult(s ->
+                    messages.findById(m.getId()).ifPresent(fresh -> applyReport(fresh, r))));
+        }
     }
 
     @PreDestroy

@@ -29,7 +29,7 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
 
     /** Paths that do not belong to a single institution. */
     private static final List<String> TENANTLESS_PREFIXES = List.of(
-            "/actuator", "/v3/api-docs", "/swagger-ui", "/api/integrations/gepg", "/api/integrations/collections", "/api/integrations/msingi-billing", "/error");
+            "/actuator", "/v3/api-docs", "/swagger-ui", "/api/integrations/gepg", "/api/integrations/collections", "/api/integrations/msingi-billing", "/api/integrations/sms", "/error");
 
     private final TenantLookupService lookup;
 

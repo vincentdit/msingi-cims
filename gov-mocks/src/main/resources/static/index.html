@@ -31,6 +31,7 @@
   th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
   tr:last-child td { border-bottom: 0; }
   .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; }
+  .chip { display: inline-block; padding: 2px 8px; border: 1px solid #cbd5e1; border-radius: 12px; margin-right: 4px; }
   .empty { padding: 24px 16px; text-align: center; color: var(--muted); }
   .muted { color: var(--muted); }
   code { background: #eef1f5; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
@@ -46,7 +47,7 @@
 <main id="main"></main>
 <div id="toast"></div>
 <script>
-const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI', 'NHIF', 'Aggregators'];
+const TABS = ['GePG', 'HESLB', 'NIDA', 'MUSE', 'TAMISEMI', 'NHIF', 'Aggregators', 'SMS'];
 let tab = location.hash.slice(1) || 'GePG';
 const $ = (s) => document.querySelector(s);
 const esc = (v) => v == null ? '' : String(v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -218,10 +219,27 @@ async function aggregators() {
     ['Aggregator', c => esc(c.provider)], ['Order', c => esc(c.orderId)], ['Status', c => esc(c.status)], ['Result', c => esc(c.result)], ['At', c => esc(c.at)]
   ], s.sent, 'None yet.')}<div class="body"><button onclick="if(confirm('Forget all prompts?')) call('POST','/mock/aggregators/reset').then(load)">Reset</button></div></div>`;
 }
+async function sms() {
+  const s = await call('GET', '/mock/sms');
+  const accts = Object.entries(s.accounts).map(([p, c]) => `<div><b>${p}</b> · ${Object.entries(c).map(([k, v]) => `${k} <code>${esc(v)}</code>`).join(' · ')}</div>`).join('');
+  const cb = (p) => `<input id="sms${p}" size="60" placeholder="Delivery-report address from the Msingi console (SMS)" value="${esc(s.callbacks[p] || '')}">
+    <button onclick="call('POST','/mock/sms/callback?provider=${p}&url='+encodeURIComponent($('#sms${p}').value)).then(()=>toast('Saved'))">Save ${p}</button>`;
+  return `<div class="card"><h2>Provider accounts (enter in the Msingi console › SMS, with the addresses shown)</h2><div class="body muted">${accts}
+    <div style="margin-top:6px">Balance ${s.balance} SMS. A message is delivered ${s.deliverSeconds} s after it is sent; a number ending in 000 is unreachable. Only registered sender names are accepted.</div></div></div>
+  <div class="card"><h2>Registered sender names</h2><div class="body bar">${[...s.senders].sort().map(n => `<span class="chip">${esc(n)} <a href="#" onclick="call('POST','/mock/sms/senders?registered=false&name=${encodeURIComponent(n)}').then(load);return false">×</a></span>`).join(' ')}
+    <input id="newSender" size="12" maxlength="11" placeholder="e.g. BAHARI"> <button onclick="call('POST','/mock/sms/senders?name='+encodeURIComponent($('#newSender').value)).then(load)">Register</button></div></div>
+  <div class="card"><h2>Delivery-report addresses</h2><div class="body bar">${cb('NEXTSMS')}</div><div class="body bar">${cb('BEEM')}</div></div>
+  <div class="card"><h2>Messages</h2>${table([
+    ['Provider', m => esc(m.provider) + (m.test ? ' (test)' : '')], ['Id', m => esc(m.id)], ['From', m => esc(m.from || '')], ['To', m => esc(m.to || '')],
+    ['Text', m => esc(m.text || '')], ['Status', m => `<span class="${m.status === 'DELIVERED' ? 'ok' : m.status === 'PENDING' ? '' : 'bad'}">${esc(m.status)}</span>`],
+    ['Report posted', m => esc(m.result || '')], ['At', m => esc(m.createdAt)]
+  ], s.messages, 'None yet. From CIMS: send a test SMS in the Msingi console, or any message once CIMS_SMS_MODE is live.')}
+  <div class="body"><button onclick="if(confirm('Forget all messages?')) call('POST','/mock/sms/reset').then(load)">Reset</button></div></div>`;
+}
 async function load() {
   try {
     outages();
-    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi, NHIF: nhif, Aggregators: aggregators })[tab]();
+    const html = await ({ GePG: gepg, HESLB: heslb, NIDA: nida, MUSE: muse, TAMISEMI: tamisemi, NHIF: nhif, Aggregators: aggregators, SMS: sms })[tab]();
     $('#main').innerHTML = html;
   } catch (e) { console.error(e); }
 }

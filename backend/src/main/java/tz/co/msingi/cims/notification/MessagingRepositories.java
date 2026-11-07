@@ -20,6 +20,8 @@ public final class MessagingRepositories {
 
         Optional<Message> findByProviderRef(String providerRef);
 
+        List<Message> findTop100ByStatusAndSentAtBetweenOrderBySentAtAsc(Message.Status status, OffsetDateTime from, OffsetDateTime to);
+
         List<Message> findByCampaignIdOrderByIdAsc(Long campaignId);
 
         List<Message> findByCampaignIdAndStatus(Long campaignId, Message.Status status);

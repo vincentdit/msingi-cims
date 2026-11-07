@@ -8,6 +8,16 @@ public interface SmsGateway {
 
     Result send(String phone, String text, String senderId, String reference);
 
+    /** Whether messages really go out (a provider is used), as opposed to the simulated gateway. */
+    default boolean live() {
+        return false;
+    }
+
+    /** Asks the provider what became of a sent message; empty when it cannot say (yet). */
+    default java.util.Optional<DeliveryReport> status(String providerRef, String phone) {
+        return java.util.Optional.empty();
+    }
+
     /**
      * @param accepted        the aggregator took the message
      * @param providerRef     the aggregator's message id

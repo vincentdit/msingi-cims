@@ -92,6 +92,7 @@ function OverviewTab() {
   return (
     <Stack spacing={2.5}>
       {o.gatewayMode === 'simulated' && <Alert severity="info">Development mode: messages are written to the server log instead of being sent. Numbers ending in 000 simulate an unreachable phone; 999 a number the gateway refuses.</Alert>}
+      {o.senderStatus === 'REJECTED' && <Alert severity="warning">The sender name {o.senderId} was not approved{o.senderNote ? `: ${o.senderNote}` : ''}. Choose another under Settings; messages go out as {o.effectiveSender} meanwhile.</Alert>}
       {o.lowBalance && <Alert severity="warning" icon={<WarningIcon />}>The SMS bundle is low ({o.balance.toLocaleString()} SMS left). Event messages keep going out, but bulk messages need enough balance.</Alert>}
       <Grid container spacing={1.5}>
         <Tile label="SMS bundle balance" value={o.balance.toLocaleString()} tone={o.balance <= 0 ? 'error' : o.lowBalance ? 'warning' : 'success'}
@@ -123,7 +124,14 @@ function OverviewTab() {
             </Stack>
             <Table size="small"><TableBody>
               <TableRow><TableCell>Language of event messages</TableCell><TableCell>{o.defaultLanguage === 'SW' ? 'Kiswahili' : 'English'}</TableCell></TableRow>
-              <TableRow><TableCell>Sender name</TableCell><TableCell>{o.senderId ?? 'Aggregator default'}</TableCell></TableRow>
+              <TableRow><TableCell>Sender name</TableCell><TableCell>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <span>{o.senderId ?? 'None asked for'}</span>
+                  {o.senderStatus && <Chip size="small" color={SENDER_COLOUR[o.senderStatus] ?? 'default'} label={SENDER_LABEL[o.senderStatus] ?? o.senderStatus} />}
+                </Stack>
+                {o.senderNote && <Typography variant="caption" display="block" color="text.secondary">{o.senderNote}</Typography>}
+              </TableCell></TableRow>
+              <TableRow><TableCell>Phones show the sender as</TableCell><TableCell sx={{ fontWeight: 600 }}>{o.effectiveSender}</TableCell></TableRow>
               <TableRow><TableCell>Price per SMS</TableCell><TableCell>{formatTzs(o.pricePerSms)}</TableCell></TableRow>
               <TableRow><TableCell>Warn when the bundle is below</TableCell><TableCell>{o.lowBalanceWarning.toLocaleString()} SMS</TableCell></TableRow>
               <TableRow><TableCell>Bundle: bought / used</TableCell><TableCell>{o.purchased.toLocaleString()} / {o.used.toLocaleString()}</TableCell></TableRow>
@@ -190,9 +198,17 @@ function TopupDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+const SENDER_LABEL: Record<string, string> = {
+  REQUESTED: 'Waiting for registration', SUBMITTED: 'Submitted to TCRA and the networks', APPROVED: 'Approved', REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn',
+};
+const SENDER_COLOUR: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
+  REQUESTED: 'warning', SUBMITTED: 'info', APPROVED: 'success', REJECTED: 'error', WITHDRAWN: 'default',
+};
+
 function SettingsDialog({ o, onClose }: { o: MessagingOverview; onClose: () => void }) {
   const qc = useQueryClient();
   const [f, setF] = useState({ defaultLanguage: o.defaultLanguage, senderId: o.senderId ?? '', pricePerSms: String(o.pricePerSms), lowBalanceWarning: String(o.lowBalanceWarning) });
+  const senderOk = !f.senderId || /^(?=.*[A-Za-z])[A-Za-z0-9]{3,11}$/.test(f.senderId);
   const m = useMutation({
     mutationFn: () => api<MessagingOverview>('/api/messaging/settings', { ...staff, method: 'PUT',
       body: { defaultLanguage: f.defaultLanguage, senderId: f.senderId, pricePerSms: Number(f.pricePerSms), lowBalanceWarning: Number(f.lowBalanceWarning) } }),
@@ -206,15 +222,17 @@ function SettingsDialog({ o, onClose }: { o: MessagingOverview; onClose: () => v
           <TextField select label="Language of event messages" value={f.defaultLanguage} onChange={(e) => setF({ ...f, defaultLanguage: e.target.value as 'EN' | 'SW' })}>
             <MenuItem value="EN">English</MenuItem><MenuItem value="SW">Kiswahili</MenuItem>
           </TextField>
-          <TextField label="Sender name (up to 11 characters)" value={f.senderId} onChange={(e) => setF({ ...f, senderId: e.target.value.slice(0, 11) })}
-            helperText="As registered with your SMS aggregator; leave empty for its default." />
+          <TextField label="Sender name (3 to 11 letters or digits)" value={f.senderId} onChange={(e) => setF({ ...f, senderId: e.target.value.replace(/\s/g, '').slice(0, 11) })}
+            error={!!f.senderId && !senderOk}
+            helperText={f.senderId && !senderOk ? 'Letters and digits only, at least 3, e.g. BAHARI'
+              : 'What phones show as the sender, e.g. BAHARI. A new name is registered with TCRA and the networks through Msingi (usually one to four weeks): send Msingi a request letter on your letterhead with your registration and TIN certificates. Until it is approved, messages go out under Msingi\'s name.'} />
           <TextField label="Price per SMS" type="number" value={f.pricePerSms} onChange={(e) => setF({ ...f, pricePerSms: e.target.value })}
             slotProps={{ input: { startAdornment: <InputAdornment position="start">TZS</InputAdornment> } }} />
           <TextField label="Warn when the bundle falls below (SMS)" type="number" value={f.lowBalanceWarning} onChange={(e) => setF({ ...f, lowBalanceWarning: e.target.value })} />
           <ErrorAlert error={m.error} />
         </Stack>
       </DialogContent>
-      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={m.isPending} onClick={() => m.mutate()}>Save</Button></DialogActions>
+      <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={m.isPending || !senderOk} onClick={() => m.mutate()}>Save</Button></DialogActions>
     </Dialog>
   );
 }

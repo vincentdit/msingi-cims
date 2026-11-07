@@ -201,10 +201,13 @@ cims:
   admission:
     fee-reminder-cron: ${CIMS_FEE_REMINDER_CRON:0 0 9 * * *}   # application-fee reminders each morning; "-" disables
   sms:
-    mode: ${CIMS_SMS_MODE:simulated}             # simulated = messages written to the log; live = aggregator adapter
+    mode: ${CIMS_SMS_MODE:simulated}             # simulated = messages written to the log; live = the SMS provider set in the Msingi console
     callback-secret: ${CIMS_SMS_CALLBACK_SECRET:change-me}   # HMAC key for delivery reports
     async: true                                  # hand messages to the gateway on a background thread after commit
     retry-cron: ${CIMS_SMS_RETRY_CRON:30 * * * * *}  # retry messages still queued; "-" disables
+    report-poll-cron: ${CIMS_SMS_REPORT_POLL_CRON:0 */5 * * * *}   # ask the provider about sent messages with no report; "-" disables
+    # the platform address SMS providers post delivery reports to (the console shows the full address with its secret part)
+    callback-base-url: ${CIMS_SMS_CALLBACK_BASE_URL:https://app.cims.ac.tz}
   email:
     mode: ${CIMS_EMAIL_MODE:simulated}            # simulated = written to the log and the outbox; smtp = spring.mail.* (Mailpit in development)
     from: ${CIMS_EMAIL_FROM:no-reply@cims.msingi.co.tz}

@@ -8,6 +8,7 @@ import { IntegrationsPage, OverviewPage, PlatformAuditPage, PlatformUsersPage } 
 import { CataloguePage } from '../pages/platform/CataloguePages';
 import { SupportPage, SupportTicketPage } from '../pages/platform/SupportPages';
 import { BillingInvoicePage, BillingPage } from '../pages/platform/BillingPages';
+import { SmsPage } from '../pages/platform/SmsPages';
 
 export default function PlatformApp() {
   return (
@@ -22,6 +23,7 @@ export default function PlatformApp() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="billing/invoices/:id" element={<BillingInvoicePage />} />
+        <Route path="sms" element={<SmsPage />} />
         <Route path="support" element={<SupportPage />} />
         <Route path="support/:id" element={<SupportTicketPage />} />
         <Route path="users" element={<PlatformUsersPage />} />

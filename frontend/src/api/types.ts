@@ -828,6 +828,11 @@ export interface MessagingOverview {
   balance: number; lowBalance: boolean; thisMonthByStatus: CountRow[]; thisMonthByKind: CountRow[]; thisMonthCost: number;
   deliveryRate?: number; topups: { id: number; units: number; amountPaid: number; reference: string; recordedAt: string; recordedByName: string }[];
   gatewayMode: string;
+  /** How the institution's own sender name stands with TCRA and the networks (null: none asked for) */
+  senderStatus?: 'REQUESTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | null;
+  senderNote?: string | null;
+  /** The name phones show for the institution's messages now */
+  effectiveSender: string;
 }
 
 export interface MessageTemplateView {

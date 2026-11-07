@@ -89,7 +89,8 @@ public class SecurityConfig {
         // NHIF and the payment aggregators authenticate with their own tokens and signatures, never with a CIMS sign-in
         return request -> {
             String path = request.getRequestURI().substring(request.getContextPath().length());
-            return path.startsWith("/api/integrations/nhif/") || path.startsWith("/api/integrations/collections/") ? null : standard.resolve(request);
+            return path.startsWith("/api/integrations/nhif/") || path.startsWith("/api/integrations/collections/") || path.startsWith("/api/integrations/sms/")
+                    ? null : standard.resolve(request);
         };
     }
 

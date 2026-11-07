@@ -23,7 +23,7 @@ public final class MessagingDtos {
     // ------------------------------------------------------------------ settings, bundle
 
     public record SettingsRequest(@NotNull @Pattern(regexp = "EN|SW") String defaultLanguage,
-                                  @Pattern(regexp = "^[A-Za-z0-9 ]{0,11}$", message = "up to 11 letters, digits or spaces") String senderId,
+                                  @Pattern(regexp = "^$|" + tz.co.msingi.cims.notification.sms.SenderNameService.SENDER_PATTERN, message = "3 to 11 letters or digits, no spaces, e.g. BAHARI") String senderId,
                                   @NotNull @DecimalMin("0") BigDecimal pricePerSms, @Min(0) int lowBalanceWarning) {
     }
 
@@ -39,7 +39,8 @@ public final class MessagingDtos {
 
     public record Overview(String defaultLanguage, String senderId, BigDecimal pricePerSms, int lowBalanceWarning, long purchased, long used,
                            long balance, boolean lowBalance, List<CountRow> thisMonthByStatus, List<CountRow> thisMonthByKind,
-                           BigDecimal thisMonthCost, Double deliveryRate, List<TopupView> topups, String gatewayMode) {
+                           BigDecimal thisMonthCost, Double deliveryRate, List<TopupView> topups, String gatewayMode,
+                           String senderStatus, String senderNote, String effectiveSender) {
     }
 
     // ------------------------------------------------------------------ templates

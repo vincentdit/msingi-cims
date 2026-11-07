@@ -21,6 +21,7 @@ import tz.co.msingi.cims.notification.MessagingRepositories.MessagingSettingsRep
 import tz.co.msingi.cims.notification.MessagingRepositories.SmsTopupRepository;
 import tz.co.msingi.cims.platform.audit.AuditService;
 import tz.co.msingi.cims.platform.security.CurrentUser;
+import tz.co.msingi.cims.notification.sms.SenderNameService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,6 +43,8 @@ public class MessagingAdminService {
     private final tz.co.msingi.cims.platform.tenancy.TenantRepository tenantRepo;
     private final MessageRepository messages;
     private final SmsTopupRepository topups;
+    private final SenderNameService senderNames;
+    private final tz.co.msingi.cims.notification.sms.SmsProviderService providers;
     private final AuditService audit;
     @Value("${cims.sms.mode:simulated}")
     private String gatewayMode;
@@ -67,11 +70,14 @@ public class MessagingAdminService {
         long delivered = byStatus.stream().filter(r -> r.key().equals("DELIVERED")).mapToLong(CountRow::messages).sum();
         long reported = byStatus.stream().filter(r -> r.key().equals("DELIVERED") || r.key().equals("FAILED")).mapToLong(CountRow::messages).sum();
         long purchased = topups.totalUnits(), used = messages.usedParts();
+        var sender = senderNames.current(s.getSenderId());
         return new Overview(s.getDefaultLanguage(), s.getSenderId(), s.getPricePerSms(), s.getLowBalanceWarning(), purchased, used,
                 purchased - used, purchased - used < s.getLowBalanceWarning(), byStatus, byKind,
                 s.getPricePerSms().multiply(BigDecimal.valueOf(parts)),
                 reported == 0 ? null : BigDecimal.valueOf(100.0 * delivered / reported).setScale(1, RoundingMode.HALF_UP).doubleValue(),
-                topups.findAllByOrderByRecordedAtDesc().stream().map(MessagingAdminService::topupView).toList(), gatewayMode);
+                topups.findAllByOrderByRecordedAtDesc().stream().map(MessagingAdminService::topupView).toList(), gatewayMode,
+                sender.map(SenderNameService.SenderName::status).orElse(null), sender.map(SenderNameService.SenderName::note).orElse(null),
+                senderNames.effective(s.getSenderId(), providers.defaultSender()));
     }
 
     @Transactional
@@ -79,6 +85,7 @@ public class MessagingAdminService {
         MessagingSettings s = settingsRepo.findFirstBy().orElseGet(MessagingSettings::new);
         s.setDefaultLanguage(req.defaultLanguage());
         s.setSenderId(req.senderId() == null || req.senderId().isBlank() ? null : req.senderId().trim());
+        senderNames.request(s.getSenderId());   // a new name must be approved by TCRA and the networks before phones show it
         s.setPricePerSms(req.pricePerSms());
         s.setLowBalanceWarning(req.lowBalanceWarning());
         settingsRepo.save(s);

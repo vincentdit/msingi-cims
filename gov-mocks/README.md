@@ -11,6 +11,7 @@ developer's computer:
 | **MUSE** | FR-INT-07 | Receives summarised fee journals; refuses unbalanced ones and duplicates |
 | **TAMISEMI** | FR-INT-08 | Lists the students it selected to an institution |
 | **Payment aggregators** | FR-FIN-03/04 | Selcom (signed checkout API), AzamPay (token, MNO checkout, callback) and ClickPesa (token, USSD push, status): phone prompts paid after a few seconds, notifications to the institution |
+| **SMS providers** | FR-COM-04 | NextSMS (Basic auth, send with test twin, reports, balance) and Beem (send, delivery reports, balance): registered sender names only, delivered after a few seconds, reports posted to CIMS |
 | **NHIF** | FR-INT-10 | Student Registration API v2: agent token, student registration, card applications with control numbers, card checks, intakes; calls CIMS back on payment and card issue |
 
 GePG and NHIF follow their specifications' message shapes and error codes (NHIF: *Student Registration API Documentation*, v2).
@@ -92,6 +93,21 @@ Answers are NHIF's `BulkOperationResult` (`succeeded`, `failed[index, identifier
 Callbacks: enter the institution's callback URL, token URL and callback credentials (CIMS › Integrations › NHIF › Callback
 credentials) on the dashboard. The mock then gets a token and calls CIMS back on each card application (control number),
 **Mark paid** (payment) and **Issue card** (card number), as NHIF does. Without them the callbacks are listed but not sent.
+
+### SMS providers (NextSMS, Beem)
+
+Enter the account shown on the dashboard (tab **SMS**) in the Msingi console › SMS, with the API address
+`http://localhost:8098/nextsms` (NextSMS) or `http://localhost:8098/beem` and report address `http://localhost:8098/beem-dlr` (Beem),
+and paste the console's delivery-report address on the dashboard. Only sender names registered on the dashboard are accepted (MSINGI,
+BAHARI, BIHAS and DEMO to start with). A message is delivered `MOCK_SMS_DELIVER_SECONDS` (4) seconds after it is sent, except to a number
+ending in 000 (unreachable); the report can be asked for and is posted to CIMS. To send CIMS's messages through it, run the backend with
+`CIMS_SMS_MODE=live`.
+
+| Path | What it does |
+|---|---|
+| `POST /nextsms/api/sms/v1/text/single` (and `/test/text/single`); `GET /reports?messageId=`, `/balance` | NextSMS: send under a sender name, reports, balance |
+| `POST /beem/v1/send`; `GET /beem/public/v1/vendors/balance`; `GET /beem-dlr/public/v1/delivery-reports` | Beem: send, balance, delivery reports |
+| `GET /mock/sms`; `POST /mock/sms/senders`, `/mock/sms/callback`, `/mock/sms/reset` | Dashboard: messages, registered names, report address |
 
 ### Payment aggregators (Selcom, AzamPay, ClickPesa)
 
