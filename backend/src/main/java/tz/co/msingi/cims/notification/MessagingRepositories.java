@@ -41,6 +41,13 @@ public final class MessagingRepositories {
                 from Message m""")
         long usedParts();
 
+        /** As {@link #usedParts()}, leaving out messages the simulated gateway "sent" (they cost nothing). */
+        @Query("""
+                select coalesce(sum(case when m.providerRef like 'SIM-%' then 0 else m.chargedParts end), 0)
+                     + coalesce(sum(case when m.status = tz.co.msingi.cims.notification.Message.Status.QUEUED then m.parts else 0 end), 0)
+                from Message m""")
+        long usedPartsLive();
+
         @Query("""
                 select m.status, count(m), coalesce(sum(m.parts), 0) from Message m
                 where m.queuedAt >= :from and m.queuedAt < :to group by m.status""")

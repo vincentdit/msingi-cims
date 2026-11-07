@@ -45,6 +45,7 @@ class MessagingIT {
     @Autowired Messaging messaging;
     @Autowired MessageRepository messages;
     @Autowired MessageDispatcher dispatcher;
+    @Autowired MessagingAdminService messagingAdmin;
 
     AdmissionScenario s;
     String admin, registrar, bursar, accountant, viewer, officer, chair;
@@ -145,9 +146,10 @@ class MessagingIT {
         assertThat(p.get("enoughBalance").asBoolean()).isFalse();
         s.call(post("/api/messaging/campaigns"), registrar, studentsWithBalance).andExpect(jsonPath("$.code").value("INSUFFICIENT_SMS_BALANCE"));
 
-        s.call(post("/api/messaging/topups"), accountant, "{\"units\":100,\"amountPaid\":2500,\"reference\":\"X\"}").andExpect(status().isForbidden());
-        long balance = s.body(s.call(post("/api/messaging/topups"), bursar, "{\"units\":100,\"amountPaid\":2500,\"reference\":\"INV-77\"}")
-                .andExpect(status().isOk())).get("balance").asLong();
+        // bundles are bought from Msingi and credited in the console; the institution cannot record one itself
+        s.call(post("/api/messaging/topups"), bursar, "{\"units\":100,\"amountPaid\":2500,\"reference\":\"X\"}")
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).isIn(404, 405));
+        long balance = credit(100, "INV-77");
         assertThat(balance).isLessThan(100); // event messages already used some of it
 
         s.call(post("/api/messaging/campaigns"), viewer, studentsWithBalance).andExpect(status().isForbidden());
@@ -167,7 +169,7 @@ class MessagingIT {
 
     @Test
     void failedMessagesAreReportedAndCanBeResent() throws Exception {
-        s.call(post("/api/messaging/topups"), admin, "{\"units\":50,\"amountPaid\":1250,\"reference\":\"B1\"}").andExpect(status().isOk());
+        credit(50, "B1");
         String body = campaign("Test", "Meeting at 10:00 tomorrow.", "{\"group\":\"PHONES\",\"phones\":\"0712000000, 0713 000 999\\nabc\\n0712000000;0754123456\"}");
         JsonNode p = s.body(s.call(post("/api/messaging/campaigns/preview"), admin, body));
         assertThat(p.get("recipients").asInt()).isEqualTo(3);
@@ -269,5 +271,11 @@ class MessagingIT {
     @SuppressWarnings("unused")
     private static List<String> statuses(JsonNode list) {
         return list.findValuesAsText("status");
+    }
+
+    /** A bundle credited by Msingi (as the console does), returning the balance after it. */
+    long credit(int units, String reference) {
+        return TenantContext.callAs(s.inst.info(), () -> tx.execute(x ->
+                messagingAdmin.topup(new MessagingDtos.TopupRequest(units, java.math.BigDecimal.valueOf(units * 25L), reference)).balance()));
     }
 }

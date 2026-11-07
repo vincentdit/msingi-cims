@@ -48,13 +48,20 @@ public class MessagingAdminService {
     private final AuditService audit;
     @Value("${cims.sms.mode:simulated}")
     private String gatewayMode;
+    /** Whether messages the simulated gateway "sends" use the bundle (true in tests; on a server they cost nothing). */
+    @Value("${cims.sms.charge-simulated:false}")
+    private boolean chargeSimulated;
 
     // ------------------------------------------------------------------ settings and bundle
 
     /** SMS parts left in the bundle. */
     @Transactional(readOnly = true)
     public long balance() {
-        return topups.totalUnits() - messages.usedParts();
+        return topups.totalUnits() - used();
+    }
+
+    private long used() {
+        return chargeSimulated ? messages.usedParts() : messages.usedPartsLive();
     }
 
     @Transactional(readOnly = true)
@@ -69,7 +76,7 @@ public class MessagingAdminService {
         long parts = byKind.stream().mapToLong(CountRow::parts).sum();
         long delivered = byStatus.stream().filter(r -> r.key().equals("DELIVERED")).mapToLong(CountRow::messages).sum();
         long reported = byStatus.stream().filter(r -> r.key().equals("DELIVERED") || r.key().equals("FAILED")).mapToLong(CountRow::messages).sum();
-        long purchased = topups.totalUnits(), used = messages.usedParts();
+        long purchased = topups.totalUnits(), used = used();
         var sender = senderNames.current(s.getSenderId());
         return new Overview(s.getDefaultLanguage(), s.getSenderId(), s.getPricePerSms(), s.getLowBalanceWarning(), purchased, used,
                 purchased - used, purchased - used < s.getLowBalanceWarning(), byStatus, byKind,
@@ -95,6 +102,7 @@ public class MessagingAdminService {
     }
 
     @Transactional
+    /** Recorded by Msingi when an institution buys a bundle (console › Institutions › Credit SMS): the SMS go through Msingi's account. */
     public Overview topup(TopupRequest req) {
         SmsTopup t = new SmsTopup();
         t.setUnits(req.units());

@@ -22,6 +22,7 @@ cims:
     async: false                # send in the request thread after commit, so tests see the result
     retry-cron: "-"
     callback-secret: test-sms-secret
+    charge-simulated: true      # simulated messages use the bundle, so the bundle checks can be tested
   gepg:
     mode: simulated
     callback-secret: test-secret

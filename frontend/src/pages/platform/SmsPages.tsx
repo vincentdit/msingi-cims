@@ -32,10 +32,11 @@ const SENDER = /^(?=.*[A-Za-z])[A-Za-z0-9]{3,11}$/;
 export function SmsPage() {
   return (
     <>
-      <PageTitle title="SMS" subtitle="The SMS provider Msingi sends every institution's messages through, and each institution's sender name." />
+      <PageTitle title="SMS and email" subtitle="The SMS provider Msingi sends every institution's messages through, each institution's sender name, and the mail server." />
       <Stack spacing={3}>
         <ProviderCard />
         <SenderNamesCard />
+        <EmailCard />
       </Stack>
     </>
   );
@@ -240,6 +241,45 @@ function SenderNamesCard() {
           <Button variant="contained" disabled={decide.isPending || (status === 'REJECTED' && !note.trim())} onClick={() => decide.mutate()}>Save</Button>
         </DialogActions>
       </Dialog>
+    </CardContent></Card>
+  );
+}
+
+interface EmailStatus { mode: 'smtp' | 'simulated'; from: string; host?: string | null; port?: number | null; auth: boolean; starttls: boolean; username?: string | null }
+
+/** How the server sends email (set in deploy/.env, password never shown) and a test message to prove it. */
+function EmailCard() {
+  const q = useQuery({ queryKey: ['platform', 'email'], queryFn: () => api<EmailStatus>('/api/platform/email', platform) });
+  const [to, setTo] = useState('');
+  const test = useMutation({ mutationFn: () => api<{ ok: boolean; note: string; at: string }>('/api/platform/email/test', { ...platform, method: 'POST', body: { to: to.trim() } }) });
+  const e = q.data;
+  return (
+    <Card><CardContent>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="h6" sx={{ flex: 1 }}>Email</Typography>
+        {e && <Chip size="small" variant="outlined" color={e.mode === 'smtp' ? 'success' : 'warning'} label={e.mode === 'smtp' ? 'Server sends real email' : 'Server in simulated mode'} />}
+      </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Institutions' emails (receipts, invoices, verification codes, helpdesk replies) go out from one CIMS address under the institution's
+        name, with replies going to the institution's contact email. The mail server is set on the server (deploy/.env: CIMS_EMAIL_MODE=smtp
+        and the CIMS_SMTP_ settings); its password is never shown here.
+      </Typography>
+      <ErrorAlert error={q.error} />
+      {e && (
+        <Table size="small" sx={{ mb: 2, maxWidth: 640 }}>
+          <TableBody>
+            <TableRow><TableCell>Sent from</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{e.from}</TableCell></TableRow>
+            <TableRow><TableCell>Mail server</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{e.mode === 'smtp' ? `${e.host}:${e.port}` : 'none (written to the log)'}</TableCell></TableRow>
+            {e.mode === 'smtp' && <TableRow><TableCell>Sign-in</TableCell><TableCell>{e.auth ? `as ${e.username ?? '(no username)'}` : 'none'}{e.starttls ? ', encrypted (STARTTLS)' : ', not encrypted'}</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      )}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+        <TextField size="small" label="Send a test email to" type="email" value={to} onChange={(x) => setTo(x.target.value)} sx={{ minWidth: 320 }} />
+        <Button variant="outlined" disabled={test.isPending || !to.includes('@')} onClick={() => test.mutate()} sx={{ whiteSpace: 'nowrap' }}>Send a test email</Button>
+      </Stack>
+      <ErrorAlert error={test.error} />
+      {test.data && <Alert severity={test.data.ok ? 'success' : 'error'} sx={{ mt: 1.5 }}>{test.data.note}</Alert>}
     </CardContent></Card>
   );
 }

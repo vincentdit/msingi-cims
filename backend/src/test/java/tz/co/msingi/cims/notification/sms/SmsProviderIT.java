@@ -48,6 +48,7 @@ class SmsProviderIT {
     @Autowired PlatformUserRepository platformUsers;
     @Autowired PasswordEncoder encoder;
     @Autowired SmsProviderService providers;
+    @Autowired tz.co.msingi.cims.notification.MessagingRepositories.MessageRepository messageRepo;
 
     TestData.Institution inst;
     AdmissionScenario s;
@@ -173,5 +174,20 @@ class SmsProviderIT {
         p(put("/api/platform/sms/provider"), account(false, null)).andExpect(jsonPath("$.active").value(false));
         assertThat(db(() -> gateway.send("255712000111", "x", "BIHAS", inst.tenant().getId() + "-1")).error())
                 .isEqualTo("No SMS provider is switched on in the Msingi console");
+    }
+
+    @Test
+    void simulatedMessagesCostNothingOnAServerAndEmailCanBeTested() throws Exception {
+        db(() -> jdbc.update("""
+                insert into messages (tenant_id, phone, kind, language, body, parts, encoding, status, queued_at, sent_at, provider_ref, charged_parts)
+                values (cims_current_tenant(), '255712000111', 'EVENT', 'EN', 'a', 2, 'GSM7', 'DELIVERED', now(), now(), 'SIM-abc', 2),
+                       (cims_current_tenant(), '255712000112', 'EVENT', 'EN', 'b', 1, 'GSM7', 'DELIVERED', now(), now(), 'NX-1', 1)"""));
+        assertThat(db(() -> messageRepo.usedParts())).isEqualTo(3);
+        assertThat(db(() -> messageRepo.usedPartsLive())).isEqualTo(1);   // what a server counts (cims.sms.charge-simulated=false)
+
+        p(get("/api/platform/email"), null).andExpect(jsonPath("$.mode").value("simulated")).andExpect(jsonPath("$.from").isNotEmpty());
+        p(post("/api/platform/email/test"), "{\"to\":\"not-an-email\"}").andExpect(status().isBadRequest());
+        p(post("/api/platform/email/test"), "{\"to\":\"ops@msingi.co.tz\"}").andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.note").value(org.hamcrest.Matchers.startsWith("Written to the server log only")));
     }
 }

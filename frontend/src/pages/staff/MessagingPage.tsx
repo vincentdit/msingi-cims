@@ -11,7 +11,7 @@ import {
 import Grid from '@mui/material/Grid2';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
-import { api, formatDate, formatDateTime, formatTzs } from '../../api/client';
+import { api, formatDate, formatDateTime, formatTzs, uploadForm } from '../../api/client';
 import type {
   AdmissionWindow, AudienceFilter, CampaignPreview, CampaignView, MessageTemplateView, MessageView, MessagingOverview, Page, Programme,
 } from '../../api/types';
@@ -32,7 +32,6 @@ function useRoles() {
   return {
     canSend: has('INSTITUTION_ADMIN', 'REGISTRAR', 'ADMISSIONS_OFFICER', 'BURSAR', 'DEPUTY_PRINCIPAL_ACADEMIC'),
     isAdmin: has('INSTITUTION_ADMIN'),
-    canTopUp: has('INSTITUTION_ADMIN', 'BURSAR'),
   };
 }
 
@@ -80,7 +79,7 @@ function useOverview() {
 // ============================================================ overview, bundle and settings
 
 function OverviewTab() {
-  const { isAdmin, canTopUp } = useRoles();
+  const { isAdmin } = useRoles();
   const q = useOverview();
   const [topup, setTopup] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -96,7 +95,7 @@ function OverviewTab() {
       {o.lowBalance && <Alert severity="warning" icon={<WarningIcon />}>The SMS bundle is low ({o.balance.toLocaleString()} SMS left). Event messages keep going out, but bulk messages need enough balance.</Alert>}
       <Grid container spacing={1.5}>
         <Tile label="SMS bundle balance" value={o.balance.toLocaleString()} tone={o.balance <= 0 ? 'error' : o.lowBalance ? 'warning' : 'success'}
-          action={canTopUp && <Button size="small" startIcon={<AddIcon />} onClick={() => setTopup(true)}>Record top-up</Button>} />
+          action={isAdmin && <Button size="small" startIcon={<AddIcon />} onClick={() => setTopup(true)}>Buy SMS</Button>} />
         <Tile label="Messages this month" value={monthMessages.toLocaleString()} />
         <Tile label="Cost this month" value={formatTzs(o.thisMonthCost)} />
         <Tile label="Delivered" value={o.deliveryRate != null ? `${o.deliveryRate}%` : '—'} />
@@ -140,7 +139,11 @@ function OverviewTab() {
         </Grid>
       </Grid>
       <Card><CardContent>
-        <Typography variant="h6" sx={{ mb: 1 }}>Bundle top-ups</Typography>
+        <Typography variant="h6" sx={{ mb: 0.5 }}>Bundle top-ups</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          SMS go out through Msingi's SMS account, so bundles are bought from Msingi Technologies: the administrator asks with Buy SMS, and
+          Msingi adds the bundle here once it is paid.
+        </Typography>
         {!o.topups.length ? <Typography color="text.secondary">No top-ups recorded yet.</Typography> : (
           <TableContainer><Table size="small">
             <TableHead><TableRow><TableCell>Date</TableCell><TableCell align="right">SMS</TableCell><TableCell align="right">Paid</TableCell><TableCell>Reference</TableCell><TableCell>Recorded by</TableCell></TableRow></TableHead>
@@ -151,7 +154,7 @@ function OverviewTab() {
           </Table></TableContainer>
         )}
       </CardContent></Card>
-      {topup && <TopupDialog onClose={() => setTopup(false)} />}
+      {topup && <BuyDialog price={o.pricePerSms} onClose={() => setTopup(false)} />}
       {settings && <SettingsDialog o={o} onClose={() => setSettings(false)} />}
     </Stack>
   );
@@ -169,30 +172,47 @@ function Tile({ label, value, tone, action }: { label: string; value: ReactNode;
   );
 }
 
-function TopupDialog({ onClose }: { onClose: () => void }) {
-  const qc = useQueryClient();
-  const [units, setUnits] = useState('');
-  const [amount, setAmount] = useState('');
-  const [reference, setReference] = useState('');
+/** Asks Msingi for an SMS bundle: a billing request to Msingi support, answered with an invoice; Msingi adds the bundle once paid. */
+function BuyDialog({ price, onClose }: { price: number; onClose: () => void }) {
+  const [units, setUnits] = useState('5000');
+  const [note, setNote] = useState('');
+  const n = Number(units);
   const m = useMutation({
-    mutationFn: () => api<MessagingOverview>('/api/messaging/topups', { ...staff, method: 'POST', body: { units: Number(units), amountPaid: Number(amount || 0), reference } }),
-    onSuccess: (o) => { qc.setQueryData(['staff', 'messaging', 'overview'], o); onClose(); },
+    mutationFn: () => {
+      const f = new FormData();
+      f.append('category', 'BILLING');
+      f.append('priority', 'NORMAL');
+      f.append('subject', `SMS bundle: ${n.toLocaleString()} SMS`);
+      f.append('body', `Please send us an invoice for an SMS bundle of ${n.toLocaleString()} SMS`
+        + (price ? ` (about ${formatTzs(n * price)} at TZS ${price} per SMS)` : '') + ' and add it to our SMS balance once paid.'
+        + (note.trim() ? `\n\n${note.trim()}` : ''));
+      return uploadForm<{ ticket: { ticketNo: string } }>('/api/msingi-support/tickets', 'staff', f);
+    },
   });
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Record an SMS bundle top-up</DialogTitle>
+      <DialogTitle>Buy SMS</DialogTitle>
       <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField label="SMS bought" type="number" value={units} onChange={(e) => setUnits(e.target.value)} />
-          <TextField label="Amount paid" type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start">TZS</InputAdornment> } }} />
-          <TextField label="Invoice or receipt reference" value={reference} onChange={(e) => setReference(e.target.value)} />
-          <ErrorAlert error={m.error} />
-        </Stack>
+        {m.isSuccess ? (
+          <Alert severity="success" sx={{ mt: 1 }}>
+            Request {m.data.ticket.ticketNo} sent to Msingi. Msingi replies with the invoice under Administration › Msingi support and adds the bundle here once it is paid.
+          </Alert>
+        ) : (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Your SMS go out through Msingi's SMS account, so bundles are bought from Msingi Technologies. Say how many SMS you need: Msingi
+              sends an invoice and adds the bundle once it is paid.
+            </Typography>
+            <TextField label="SMS wanted" type="number" value={units} onChange={(e) => setUnits(e.target.value)}
+              helperText={price && n > 0 ? `About ${formatTzs(n * price)} at TZS ${price} per SMS` : ' '} />
+            <TextField label="Note to Msingi (optional)" value={note} multiline minRows={2} onChange={(e) => setNote(e.target.value)} inputProps={{ maxLength: 500 }} />
+            <ErrorAlert error={m.error} />
+          </Stack>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={!Number(units) || !reference.trim() || m.isPending} onClick={() => m.mutate()}>Record</Button>
+        <Button onClick={onClose}>{m.isSuccess ? 'Close' : 'Cancel'}</Button>
+        {!m.isSuccess && <Button variant="contained" disabled={!(n > 0) || m.isPending} onClick={() => m.mutate()}>Send the request</Button>}
       </DialogActions>
     </Dialog>
   );

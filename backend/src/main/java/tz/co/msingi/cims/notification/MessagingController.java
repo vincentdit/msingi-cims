@@ -29,7 +29,6 @@ import tz.co.msingi.cims.notification.MessagingDtos.Overview;
 import tz.co.msingi.cims.notification.MessagingDtos.SettingsRequest;
 import tz.co.msingi.cims.notification.MessagingDtos.TemplateRequest;
 import tz.co.msingi.cims.notification.MessagingDtos.TemplateView;
-import tz.co.msingi.cims.notification.MessagingDtos.TopupRequest;
 import tz.co.msingi.cims.platform.tenancy.TenantContext;
 import tz.co.msingi.cims.platform.tenancy.TenantRepository;
 
@@ -48,7 +47,6 @@ public class MessagingController {
     private static final String READ = "hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','ADMISSIONS_OFFICER','BURSAR','DEPUTY_PRINCIPAL_ACADEMIC','AUDITOR','MANAGEMENT_VIEWER')";
     private static final String SEND = "hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','ADMISSIONS_OFFICER','BURSAR','DEPUTY_PRINCIPAL_ACADEMIC')";
     private static final String ADMIN = "hasRole('INSTITUTION_ADMIN')";
-    private static final String BUNDLE = "hasAnyRole('INSTITUTION_ADMIN','BURSAR')";
 
     private final MessagingAdminService admin;
     private final CampaignService campaigns;
@@ -70,12 +68,6 @@ public class MessagingController {
         return admin.updateSettings(req);
     }
 
-    @Operation(summary = "Record an SMS bundle purchase")
-    @PostMapping("/api/messaging/topups")
-    @PreAuthorize(BUNDLE)
-    public Overview topup(@Valid @RequestBody TopupRequest req) {
-        return admin.topup(req);
-    }
 
     @GetMapping("/api/messaging/templates")
     @PreAuthorize(READ)

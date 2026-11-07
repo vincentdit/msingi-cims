@@ -144,12 +144,14 @@ public class EmailService {
         EmailMessage m = emails.findById(id).orElse(null);
         if (m == null || m.getStatus() != EmailMessage.Status.QUEUED) return;
         m.setAttempts((short) (m.getAttempts() + 1));
-        String institution = tenants.findById(m.getTenantId()).map(Tenant::getName).orElse("CIMS");
+        Tenant tenant = tenants.findById(m.getTenantId()).orElse(null);
+        String institution = tenant == null ? "CIMS" : tenant.getName();
+        String replyTo = tenant == null || tenant.getContactEmail() == null || tenant.getContactEmail().isBlank() ? null : tenant.getContactEmail().trim();
         EmailGateway.Result r;
         try {
             r = gateway.send(new EmailGateway.Outgoing(props.from(), institution, m.getToAddress(), m.getRecipientName(), m.getSubject(),
                     realBody != null ? realBody : m.getBody(), m.getAttachmentName(), m.getAttachmentType(), m.getAttachment(),
-                    m.getTenantId() + "-" + m.getId()));
+                    m.getTenantId() + "-" + m.getId(), replyTo));
         } catch (RuntimeException e) {
             r = new EmailGateway.Result(false, null, "Mail server error: " + e.getMessage());
         }

@@ -26,6 +26,7 @@ public class SmtpEmailGateway implements EmailGateway {
             MimeMessageHelper h = new MimeMessageHelper(msg, m.attachment() != null, StandardCharsets.UTF_8.name());
             h.setFrom(new InternetAddress(m.from(), m.fromName(), StandardCharsets.UTF_8.name()));
             h.setTo(m.toName() == null ? new InternetAddress(m.to()) : new InternetAddress(m.to(), m.toName(), StandardCharsets.UTF_8.name()));
+            if (m.replyTo() != null) h.setReplyTo(m.replyTo());
             h.setSubject(m.subject());
             h.setText(m.text(), false);
             if (m.attachment() != null) {
