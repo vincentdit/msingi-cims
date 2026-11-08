@@ -26,9 +26,8 @@
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <zxing.version>3.5.3</zxing.version>
         <its.exclude>none</its.exclude>
-        <!-- Above the Spring Boot 3.5.12 defaults for the fixes found by the security checks of 8 November 2026 (deploy/scripts/security-scan.sh):
-             Tomcat CVE-2026-41293, CVE-2026-29129, CVE-2026-55276, CVE-2026-53404; Spring Framework CVE-2026-41842; jackson-core CVE-2026-68494,
-             CVE-2026-89407. Spring Framework CVE-2026-47884 is fixed only in 7.0.9: it needs the move to Spring Boot 4.
+        <!-- Above the Spring Boot 3.5.12 defaults for the fixes found by the security check of 8 November 2026 (deploy/scripts/security-scan.sh):
+             Tomcat CVE-2026-41293 and CVE-2026-29129, Spring Framework CVE-2026-47884 and CVE-2026-41842, jackson-core CVE-2026-68494.
              Drop each line once the Spring Boot version brings that version or newer. -->
         <tomcat.version>10.1.56</tomcat.version>
         <spring-framework.version>6.2.19</spring-framework.version>
