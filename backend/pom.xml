@@ -8,7 +8,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <!-- 3.5.x: the supported Spring Boot line (3.3 no longer receives free security fixes); 3.5.12 fixes CVE-2026-22733 -->
-        <version>3.5.12</version>
+        <version>3.5.14</version>
         <relativePath/>
     </parent>
 
@@ -26,12 +26,13 @@
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <zxing.version>3.5.3</zxing.version>
         <its.exclude>none</its.exclude>
+        <micrometer.version>1.15.12</micrometer.version>
         <!-- Above the Spring Boot 3.5.12 defaults for the fixes found by the security check of 8 November 2026 (deploy/scripts/security-scan.sh):
              Tomcat CVE-2026-41293 and CVE-2026-29129, Spring Framework CVE-2026-47884 and CVE-2026-41842, jackson-core CVE-2026-68494.
              Drop each line once the Spring Boot version brings that version or newer. -->
-        <tomcat.version>10.1.56</tomcat.version>
+        <tomcat.version>10.1.61</tomcat.version>
         <spring-framework.version>6.2.19</spring-framework.version>
-        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <jackson-bom.version>2.21.8</jackson-bom.version>
     </properties>
 
     <dependencies>
