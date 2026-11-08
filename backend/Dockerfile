@@ -8,6 +8,8 @@ RUN mvn -q -B package -DskipTests
 
 # ---- run (non-root)
 FROM eclipse-temurin:21-jre
+# the base image's Ubuntu packages to their latest security fixes (e.g. apt CVE-2026-109518) at every build
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 cims
 WORKDIR /app
 COPY --from=build /src/target/cims-backend-*.jar app.jar
