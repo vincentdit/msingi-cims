@@ -51,4 +51,18 @@ public interface AggregatorClient {
 
     /** Proves the credentials work (a token, or a harmless query); throws with the aggregator's answer when they do not. */
     void test(Account account);
+
+    /** How long after a prompt CIMS first asks for its status (the aggregator's own guidance; Selcom: 3 minutes). */
+    default int firstCheckAfterSeconds() {
+        return 0;
+    }
+
+    /** How often CIMS asks again about a prompt still waiting (Selcom: every 3 minutes). */
+    default int checkEverySeconds() {
+        return 0;
+    }
+
+    /** Withdraws an order nobody paid, so that it cannot be paid later (best effort; most aggregators simply let it lapse). */
+    default void cancel(Account account, String orderId) {
+    }
 }

@@ -80,7 +80,8 @@ public class MsingiPhonePaymentService {
         Long id = jdbc.queryForObject("""
                 insert into msingi_phone_payments (tenant_id, invoice_id, reference, provider, order_id, phone, amount, requested_by_name)
                 values (?, ?, ?, ?, ?, ?, ?, ?) returning id""", Long.class, tenantId, invoiceId, reference, a.provider().name(), orderId, phone, amount, who);
-        AggregatorClient.Push push = new AggregatorClient.Push(orderId, reference, phone, network, amount, "Msingi invoice " + i.get("invoice_no"), null, null);
+        String payer = jdbc.queryForObject("select name from tenants where id = ?", String.class, tenantId);
+        AggregatorClient.Push push = new AggregatorClient.Push(orderId, reference, phone, network, amount, "Msingi invoice " + i.get("invoice_no"), payer, null);
         AggregatorClient.Result r;
         try {
             r = clients.of(a.provider()).push(a, push);
@@ -154,14 +155,36 @@ public class MsingiPhonePaymentService {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select * from msingi_phone_payments where status = 'PENDING' and created_at < now() - interval '20 seconds' order by id limit 100""");
         rows.forEach(r -> refresh(r, 20));
-        return rows.size();
+        // a prompt given up on may still be paid late: ask again every 30 minutes for a day, and record it if it was
+        List<Map<String, Object>> late = jdbc.queryForList("""
+                select * from msingi_phone_payments where status = 'EXPIRED' and completed_at > now() - interval '24 hours'
+                  and (last_checked_at is null or last_checked_at < now() - interval '30 minutes') order by id limit 50""");
+        for (Map<String, Object> row : late) {
+            jdbc.update("update msingi_phone_payments set last_checked_at = now() where id = ?", row.get("id"));
+            AggregatorClient.Account a = collection.load().orElse(null);
+            if (a == null || !a.provider().name().equals(row.get("provider"))) continue;
+            try {
+                AggregatorClient.Result r = clients.of(a.provider()).status(a, (String) row.get("order_id"), (String) row.get("provider_ref"));
+                if (r.state() == AggregatorClient.State.PAID) apply(row, r, a);
+            } catch (RuntimeException ignored) {
+                // asked again in 30 minutes
+            }
+        }
+        return rows.size() + late.size();
     }
 
     private void refresh(Map<String, Object> row, int minSeconds) {
         if (!"PENDING".equals(row.get("status"))) return;
+        AggregatorClient.Account a = collection.load().orElse(null);
+        if (minSeconds > 0 && a != null && a.provider().name().equals(row.get("provider"))) {
+            // the aggregator's own pace (Selcom: first after 3 minutes, then every 3 minutes); its notification usually comes first
+            AggregatorClient pace = clients.of(a.provider());
+            OffsetDateTime created = time(row.get("created_at"));
+            if (created != null && created.isAfter(OffsetDateTime.now().minusSeconds(pace.firstCheckAfterSeconds()))) return;
+            minSeconds = Math.max(minSeconds, pace.checkEverySeconds());
+        }
         OffsetDateTime last = time(row.get("last_checked_at"));
         if (last != null && last.isAfter(OffsetDateTime.now().minusSeconds(minSeconds))) return;
-        AggregatorClient.Account a = collection.load().orElse(null);
         AggregatorClient.Result r;
         if (a == null || !a.provider().name().equals(row.get("provider"))) {
             r = AggregatorClient.Result.of(AggregatorClient.State.UNKNOWN, "The aggregator was changed");
@@ -200,6 +223,7 @@ public class MsingiPhonePaymentService {
             default -> {
                 OffsetDateTime created = time(row.get("created_at"));
                 if (created != null && created.isBefore(OffsetDateTime.now().minusMinutes(EXPIRE_MINUTES))) {
+                    if (a != null && a.provider().name().equals(row.get("provider"))) clients.of(a.provider()).cancel(a, (String) row.get("order_id"));
                     jdbc.update("""
                             update msingi_phone_payments set status = 'EXPIRED', message = ?, completed_at = now(), updated_at = now(), last_checked_at = now()
                             where id = ? and status = 'PENDING'""", "No confirmation within " + EXPIRE_MINUTES + " minutes.", id);

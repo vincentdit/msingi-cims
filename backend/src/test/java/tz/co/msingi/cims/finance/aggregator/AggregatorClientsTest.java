@@ -67,7 +67,8 @@ class AggregatorClientsTest {
         assertThat(r.state()).isEqualTo(AggregatorClient.State.PENDING);
         assertThat(r.providerRef()).isEqualTo("SR1");
         assertThat(received.get(0)).contains("Authorization=SELCOM a2V5LTE=").contains("Signed-Fields=vendor,order_id,buyer_email,buyer_name,buyer_phone,amount")
-                .contains("\"amount\":\"30001\"").contains("\"webhook\":\"aHR0cHM6Ly9iYWhhcmk");
+                .contains("\"amount\":30001").contains("\"buyer_name\":\"Asha Mwinyi\"").contains("\"expiry\":30")
+                .contains("\"webhook\":\"aHR0cHM6Ly9iYWhhcmk");
         assertThat(received.get(1)).contains("\"msisdn\":\"255712345678\"").contains("Signed-Fields=transid,order_id,msisdn");
         answers.put("/v1/checkout/order-status", "{\"result\":\"SUCCESS\",\"data\":[{\"order_id\":\"800100123456P1\",\"payment_status\":\"COMPLETED\",\"transid\":\"TX9\",\"amount\":\"30001\",\"channel\":\"AIRTELMONEY\"}]}");
         var s = new SelcomClient().status(a, "800100123456P1", null);
@@ -76,8 +77,53 @@ class AggregatorClientsTest {
         assertThat(s.amount()).isEqualByComparingTo("30001");
         answers.put("/v1/checkout/create-order-minimal", "{\"resultcode\":\"403\",\"result\":\"FAIL\",\"message\":\"Invalid vendor\"}");
         assertThat(new SelcomClient().push(a, push(null)).message()).contains("Invalid vendor");
+        // an unsigned webhook is not believed: CIMS asks Selcom about the order (here COMPLETED)
+        var unsigned = new SelcomClient().read(a, Map.of(), "{\"order_id\":\"800100123456P1\",\"payment_status\":\"COMPLETED\",\"amount\":\"999999\"}");
+        assertThat(unsigned.result().state()).isEqualTo(AggregatorClient.State.PAID);
+        assertThat(unsigned.result().amount()).isEqualByComparingTo("30001");
+        // without a payer name (Msingi's own invoices) Selcom still gets one
+        received.clear();
+        answers.put("/v1/checkout/create-order-minimal", "{\"resultcode\":\"000\",\"result\":\"SUCCESS\"}");
+        new SelcomClient().push(a, new AggregatorClient.Push("700100123456P1", "700100123456", "255712345678", null, new BigDecimal("11800"), "Msingi invoice", null, null));
+        assertThat(received.get(0)).contains("\"buyer_name\":\"CIMS payer\"").contains("\"buyer_email\":\"payer@cims.ac.tz\"");
+        // Selcom's INPROGRESS / AMBIGUOUS answers, or none, leave the prompt waiting to be checked, never failed
+        answers.put("/v1/checkout/wallet-payment", "{\"resultcode\":\"927\",\"result\":\"AMBIGUOUS\"}");
+        assertThat(new SelcomClient().push(a, push(null)).state()).isEqualTo(AggregatorClient.State.PENDING);
+        statuses.put("/v1/checkout/wallet-payment", 503);
+        assertThat(new SelcomClient().push(a, push(null)).state()).isEqualTo(AggregatorClient.State.PENDING);
+        statuses.remove("/v1/checkout/wallet-payment");
+        answers.put("/v1/checkout/wallet-payment", "{\"resultcode\":\"400\",\"result\":\"FAIL\",\"message\":\"Invalid msisdn\"}");
+        assertThat(new SelcomClient().push(a, push(null)).message()).contains("Invalid msisdn");
+        // 999 (spelt AMBIGOUS in Selcom's guide) is not a failure either
+        answers.put("/v1/checkout/wallet-payment", "{\"resultcode\":\"999\",\"result\":\"AMBIGOUS\"}");
+        assertThat(new SelcomClient().push(a, push(null)).state()).isEqualTo(AggregatorClient.State.PENDING);
+        // Selcom's pace: first status check after 3 minutes, then every 3 minutes
+        assertThat(new SelcomClient().firstCheckAfterSeconds()).isEqualTo(180);
+        assertThat(new SelcomClient().checkEverySeconds()).isEqualTo(180);
+        // an unpaid order is cancelled with a signed DELETE; the digest is HMAC-SHA256 of "timestamp=…&order_id=…", as in Selcom's PHP client
+        received.clear();
+        new SelcomClient().cancel(a, "800100123456P1");
+        String del = received.get(0);
+        assertThat(del).startsWith("DELETE /v1/checkout/cancel-order?order_id=800100123456P1").contains("Signed-Fields=order_id");
+        String ts = del.replaceAll(".* Timestamp=(\\S+).*", "$1");
+        String digest = del.replaceAll(".* Digest=(\\S+).*", "$1");
+        assertThat(digest).isEqualTo(hmac("timestamp=" + ts + "&order_id=800100123456P1", "secret-1"));
+        assertThat(ts).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+03:00");
+        statuses.put("/v1/checkout/cancel-order", 500);
+        new SelcomClient().cancel(a, "800100123456P1");   // a refusal is ignored: the order lapses anyway
+        statuses.remove("/v1/checkout/cancel-order");
         var missing = new AggregatorClient.Account(AggregatorProvider.SELCOM, false, Map.of("apiKey", "k"), base, null, null);
         assertThatThrownBy(() -> new SelcomClient().push(missing, push(null))).isInstanceOf(BusinessRuleException.class).hasMessageContaining("vendor");
+    }
+
+    static String hmac(String data, String secret) {
+        try {
+            javax.crypto.Mac m = javax.crypto.Mac.getInstance("HmacSHA256");
+            m.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return java.util.Base64.getEncoder().encodeToString(m.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test

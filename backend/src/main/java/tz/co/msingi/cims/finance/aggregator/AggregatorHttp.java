@@ -49,6 +49,11 @@ final class AggregatorHttp {
                 .exchange((req, res) -> new Answer(res.getStatusCode().value(), parse(res.getBody().readAllBytes())), false));
     }
 
+    static Answer delete(String system, String url, Consumer<HttpHeaders> headers) {
+        return call(system, () -> HTTP.delete().uri(url).accept(MediaType.APPLICATION_JSON).headers(headers)
+                .exchange((req, res) -> new Answer(res.getStatusCode().value(), parse(res.getBody().readAllBytes())), false));
+    }
+
     private static Answer call(String system, java.util.function.Supplier<Answer> s) {
         try {
             return s.get();

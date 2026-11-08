@@ -298,4 +298,46 @@ class SmsBundlePurchaseIT {
         p(post("/api/platform/billing/service-orders/" + orderId + "/delivered"), "{\"note\":\"Held on 20 November\"}").andExpect(jsonPath("$.status").value("DELIVERED"));
         p(post("/api/platform/billing/service-orders/" + orderId + "/delivered"), null).andExpect(jsonPath("$.code").value("NOT_PAID"));
     }
+
+    @Test
+    void selcomPayByReferenceIsLookedUpValidatedAndRecorded() throws Exception {
+        p(put("/api/platform/billing/sms-pricing"), "{\"pricePerSms\":20,\"minUnits\":500,\"vatPercent\":18}").andExpect(status().isOk());
+        String selcom = "{\"provider\":\"SELCOM\",\"environment\":\"SANDBOX\",\"active\":true,\"fields\":{\"vendor\":\"TILL60012\",\"apiKey\":\"K\",\"apiSecret\":\"S\"},"
+                + "\"billPayNamba\":\"%s\"}";
+        p(put("/api/platform/billing/collection"), selcom.formatted("12a")).andExpect(jsonPath("$.code").value("BILLPAY_NAMBA"));
+        JsonNode col = s.body(p(put("/api/platform/billing/collection"), selcom.formatted("60012345")).andExpect(status().isOk()));
+        assertThat(col.get("c2bUrl").asText()).endsWith("/api/integrations/msingi-collections/selcom-c2b");
+        String bearer = "Bearer " + col.get("c2bToken").asText();
+        try {
+            long before = balance();
+            JsonNode v = s.body(s.call(post("/api/msingi-billing/sms-bundles"), bursar, "{\"units\":500}").andExpect(status().isOk()));
+            String ref = v.at("/invoice/paymentReference").asText();
+            assertThat(v.at("/payTo/0/provider").asText()).isEqualTo("SELCOM_PAY");
+            assertThat(v.at("/payTo/0/accountName").asText()).isEqualTo("60012345");
+            assertThat(v.at("/payTo/0/accountNumber").asText()).isEqualTo(ref);
+            String typed = ref.replaceAll("(\\d{4})(?=\\d)", "$1 ");   // the payer types it in groups
+            String body = "{\"operator\":\"MPESA-TZ\",\"transid\":\"SC" + suffix + "\",\"reference\":\"R" + suffix + "\",\"utilityref\":\"" + typed
+                    + "\",\"amount\":\"11800\",\"msisdn\":\"255712345678\"}";
+            String base = "/api/integrations/msingi-collections/selcom-c2b/";
+            mvc.perform(post(base + "lookup").contentType("application/json").content(body).header("Authorization", "Bearer wrong")).andExpect(status().isUnauthorized());
+            mvc.perform(post(base + "lookup").contentType("application/json").content(body).header("Authorization", bearer))
+                    .andExpect(jsonPath("$.resultcode").value("000")).andExpect(jsonPath("$.amount").value("11800"))
+                    .andExpect(jsonPath("$.reference").value("R" + suffix));
+            mvc.perform(post(base + "lookup").contentType("application/json").content(body.replace(typed, "700000000000")).header("Authorization", bearer))
+                    .andExpect(jsonPath("$.resultcode").value("010"));
+            // an SMS bundle is paid in full: less is refused before the payer's money moves
+            mvc.perform(post(base + "validation").contentType("application/json").content(body.replace("\"11800\"", "\"5000\"")).header("Authorization", bearer))
+                    .andExpect(jsonPath("$.resultcode").value("015"));
+            mvc.perform(post(base + "validation").contentType("application/json").content(body).header("Authorization", bearer)).andExpect(jsonPath("$.resultcode").value("000"));
+            for (int i = 0; i < 2; i++) {
+                mvc.perform(post(base + "notification").contentType("application/json").content(body).header("Authorization", bearer)).andExpect(jsonPath("$.resultcode").value("000"));
+            }
+            assertThat(balance()).isEqualTo(before + 500);
+            assertThat(jdbc.queryForObject("select method from billing_payments where transaction_key = ?", String.class, "SELCOM:SC" + suffix)).isEqualTo("MOBILE_MONEY");
+            // paid now: a second lookup no longer offers it
+            mvc.perform(post(base + "lookup").contentType("application/json").content(body).header("Authorization", bearer)).andExpect(jsonPath("$.resultcode").value("010"));
+        } finally {
+            p(put("/api/platform/billing/collection"), "{\"provider\":\"SIMULATED\",\"environment\":\"SANDBOX\",\"active\":false}");
+        }
+    }
 }

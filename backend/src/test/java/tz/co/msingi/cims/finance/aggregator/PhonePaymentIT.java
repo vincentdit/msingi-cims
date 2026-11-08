@@ -160,6 +160,19 @@ class PhonePaymentIT {
         assertThat(failed.get("status").asText()).isEqualTo("FAILED");
         assertThat(failed.get("message").asText()).contains("Insufficient balance");
 
+        // a prompt given up on (expired) but paid late is still recorded by the job, without anyone
+        String[] d = applicantWithFee(s, inst, 4);
+        JsonNode lateReq = s.body(s.call(post("/api/applicant/invoices/" + d[1] + "/phone-payment"), d[0], "{\"phone\":\"0712345670\"}").andExpect(status().isOk()));
+        long lateId = lateReq.get("id").asLong();
+        TenantContext.runAs(inst.info(), () -> tx.executeWithoutResult(x -> jdbc.update(
+                "update phone_payment_requests set status = 'EXPIRED', completed_at = now(), last_checked_at = null where id = ?", lateId)));
+        Thread.sleep(SimulatedAggregatorClient.PAY_AFTER_MS + 500);
+        TenantContext.runAs(inst.info(), () -> service.sweep());
+        assertThat(s.body(s.call(get("/api/applicant/phone-payments/" + lateId), d[0], null)).get("status").asText()).isEqualTo("PAID");
+        assertThat(s.body(s.call(get("/api/applicant/applications/" + d[2] + "/fee"), d[0], null)).get("feePaid").asBoolean()).isTrue();
+        // asked once: the next sweep within 30 minutes leaves it alone
+        assertThat(TenantContext.callAs(inst.info(), () -> service.sweep())).isZero();
+
         // the bursary's list, and the integration log
         JsonNode list = s.body(s.call(get("/api/phone-payments"), accountant, null).andExpect(status().isOk()));
         assertThat(list.findValuesAsText("status")).contains("PAID", "FAILED");
