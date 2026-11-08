@@ -2044,6 +2044,15 @@ export interface Graduand {
   certificateIssuedAt?: string;
   printCount: number;
   lastPrintedAt?: string;
+  certificateStatus: 'VALID' | 'REVOKED';
+  replacementCount: number;
+  verifications: number;
+}
+
+/** A graduand's certificate, current or earlier (replaced or revoked), and how often its code was checked. */
+export interface CertificateRecord {
+  certificateNo: string; verificationCode: string; status: 'VALID' | 'REVOKED' | 'REPLACED'; issuedAt?: string; closedAt?: string; closedBy?: string;
+  reason?: string; verifications: number; lastVerifiedAt?: string;
 }
 
 export interface NotReady {
@@ -2236,6 +2245,12 @@ export interface Overview {
   intakeByYear: { key: string; label: string; value: number }[];
   collectionsByMonth: { key: string; label: string; value: number }[];
   thresholds: { lowIntake: number; lowCollection: number; lowPass: number; lowDemand: number };
+  results: { sheets: number; computed: number; recommended: number; confirmed: number; published: number; sentToNactvet: number; acceptedByNactvet: number };
+  debts: {
+    ageing: { key: string; label: string; value: number }[];
+    largest: { registrationNo: string; name: string; programmeCode: string; balance: number; daysOverdue: number }[];
+    debtors: number;
+  };
 }
 
 export interface ApprovalItem {

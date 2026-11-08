@@ -216,6 +216,15 @@ public class ReportService {
         return out;
     }
 
+    /** The institution overview as a PDF for the Governing Board and management meetings (logged like any export). */
+    public Export boardReport(OverviewService.Overview o) {
+        String institution = tenants.findById(TenantContext.requireTenantId()).map(t -> t.getName()).orElse("");
+        byte[] pdf = BoardReportRenderer.pdf(o, institution, colour(), tz.co.msingi.cims.platform.security.CurrentUser.name());
+        String year = o.year() == null ? "" : "-" + o.year().code().replaceAll("[^0-9A-Za-z]+", "-");
+        audit.record("REPORT_EXPORTED", "Report", null, Map.of("report", "INSTITUTION-OVERVIEW", "format", "pdf", "year", year.isEmpty() ? "-" : year.substring(1)));
+        return new Export(pdf, "institution-overview" + year + ".pdf", "application/pdf");
+    }
+
     private String colour() {
         Object c = tenants.findById(TenantContext.requireTenantId()).map(t -> t.getBranding().get("primaryColor")).orElse(null);
         return c instanceof String s && HEX.matcher(s).matches() ? s : "#1F4E8C";

@@ -122,10 +122,9 @@ public class MfaService {
             }
         }
         if (!ok) {
-            u.setFailedLogins(u.getFailedLogins() + 1);
+            boolean locked = u.failedSignIn(5, 15);
             audit.recordAs(u.getId(), u.getFullName(), "LOGIN_FAILED", "UserAccount", u.getId(), Map.of("reason", "wrong MFA code"));
-            if (u.getFailedLogins() >= 5) {
-                u.setStatus(UserAccount.Status.LOCKED);
+            if (locked) {
                 audit.recordAs(u.getId(), u.getFullName(), "ACCOUNT_LOCKED", "UserAccount", u.getId(), Map.of("failedLogins", u.getFailedLogins()));
             }
             throw new BusinessRuleException("MFA_CODE_WRONG", "The code is not right. Use the current code from your authenticator app.");

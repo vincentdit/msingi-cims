@@ -70,6 +70,7 @@ with the domain's registrar (an A record per host, pointing at the server). Ever
 | Backups proved: backup, restore test, counts, disk | `scripts/check-backups.sh` (quarterly, and after any backup change) |
 | Second location for the backups (Storage Box over SFTP) | `scripts/offsite-setup.sh` (once), `scripts/offsite-setup.sh check` |
 | Alerts by email: site, services, disk, backups, second location, certificate; weekly report | `scripts/cims-watch.sh install` (once; `CIMS_ALERT_EMAIL` in `.env`) |
+| Security check: image and library vulnerabilities, npm packages, TLS and headers per host, open ports, sign-in protection | `scripts/security-scan.sh --save` (monthly, and before each go-live) |
 | Email through a mailbox (Duhosting) | `scripts/set-email.sh` |
 | Platform address opens the platform sign-in | `nginx/cims.conf` (any host starting with `app.`) |
 | NACTVET reachable when the server's DNS answer is not | `NACTE_PREFER_IP=41.93.76.6` in `.env` |

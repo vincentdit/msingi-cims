@@ -45,6 +45,7 @@ public class LetterController {
     private final tz.co.msingi.cims.exams.TranscriptService transcripts;
     private final tz.co.msingi.cims.graduation.GraduationService graduations;
     private final tz.co.msingi.cims.registry.idcard.IdCardService idCards;
+    private final VerificationLog verificationLog;
     private RateLimiter verifyLimiter;
 
     @Value("${cims.documents.verify-rate-limit:30}")
@@ -115,9 +116,17 @@ public class LetterController {
         }
         // admission letters, statements of results / provisional transcripts (FR-EXM-13), award certificates (FR-GRD-03)
         Object v = service.verify(code).<Object>map(x -> x).or(() -> transcripts.verify(code)).or(() -> graduations.verify(code))
-                .or(() -> idCards.verify(code))
-                .orElseThrow(() -> new NotFoundException("No document was found with this verification code"));
+                .or(() -> idCards.verify(code)).orElse(null);
+        verificationLog.record(code, v, clientIp(request));
+        if (v == null) throw new NotFoundException("No document was found with this verification code");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(v);
+    }
+
+    @Operation(summary = "Checks made on the public verification page in the last days (default 30)")
+    @GetMapping("/api/document-verifications")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','REGISTRAR','EXAMINATIONS_OFFICER','MANAGEMENT_VIEWER')")
+    public VerificationLog.Summary verifications(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "30") int days) {
+        return verificationLog.summary(days);
     }
 
     private static ResponseEntity<byte[]> pdf(Download d) {

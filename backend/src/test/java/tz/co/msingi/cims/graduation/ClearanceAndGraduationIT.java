@@ -220,6 +220,51 @@ class ClearanceAndGraduationIT {
         assertThat(mine.at("/graduation/ceremonyDate").asText()).isEqualTo("2028-11-24");
         assertThat(s.body(s.call(get("/api/reports/GRD-01"), registrar, null)).get("rowCount").asInt()).isEqualTo(2);
         assertThat(s.body(s.call(get("/api/reports/GRD-02"), registrar, null)).get("rowCount").asInt()).isEqualTo(1);
+
+        // a lost certificate is replaced: a new number and code; the old code now says "replaced", the new one is valid
+        long grId = g.at("/graduands/0/id").asLong();
+        String oldNo = g.at("/graduands/0/certificateNo").asText();
+        String base = "/api/graduations/" + gid + "/graduands/" + grId + "/certificate";
+        s.call(post(base + "/replace"), registrar, "{\"reason\":\"\"}").andExpect(status().isBadRequest());
+        JsonNode rep = s.body(s.call(post(base + "/replace"), registrar, "{\"reason\":\"Lost in a house fire (police report 12/2029)\"}").andExpect(status().isOk()));
+        assertThat(rep.get("certificateNo").asText()).isEqualTo(oldNo + "/R1");
+        assertThat(rep.get("replacementCount").asInt()).isEqualTo(1);
+        assertThat(rep.get("printCount").asInt()).isZero();
+        String newCode = rep.get("verificationCode").asText();
+        assertThat(newCode).isNotEqualTo(code);
+        assertThat(s.body(s.call(get("/api/public/verify/" + code), null, null)).get("status").asText()).isEqualTo("SUPERSEDED");
+        JsonNode nv = s.body(s.call(get("/api/public/verify/" + newCode), null, null));
+        assertThat(nv.get("status").asText()).isEqualTo("VALID");
+        assertThat(nv.get("letterNo").asText()).isEqualTo(oldNo + "/R1");
+        s.call(get("/api/public/verify/ZZZZ-ZZZZ-ZZZZ"), null, null).andExpect(status().isNotFound());
+        // every check is logged: the registry sees how often each certificate was checked
+        JsonNode recs = s.body(s.call(get(base), registrar, null).andExpect(status().isOk()));
+        assertThat(recs).hasSize(2);
+        assertThat(recs.get(0).get("status").asText()).isEqualTo("VALID");
+        assertThat(recs.get(0).get("verifications").asLong()).isEqualTo(1);
+        assertThat(recs.get(1).get("status").asText()).isEqualTo("REPLACED");
+        assertThat(recs.get(1).get("verifications").asLong()).isEqualTo(2);   // checked before and after it was replaced
+        JsonNode log = s.body(s.call(get("/api/document-verifications?days=7"), registrar, null).andExpect(status().isOk()));
+        assertThat(log.get("checks").asLong()).isEqualTo(4);
+        assertThat(log.get("notFound").asLong()).isEqualTo(1);
+        assertThat(log.get("notValid").asLong()).isEqualTo(1);
+        s.call(get("/api/document-verifications"), f.aToken, null).andExpect(status().isForbidden());
+        // revocation is the Principal's (Institution Admin's) decision; a revoked certificate is not printed again
+        s.call(post(base + "/revoke"), registrar, "{\"reason\":\"Award withdrawn\"}").andExpect(status().isForbidden());
+        JsonNode rev = s.body(s.call(post(base + "/revoke"), admin, "{\"reason\":\"Award withdrawn by the Governing Board, minute GB/12/2029\"}").andExpect(status().isOk()));
+        assertThat(rev.get("certificateStatus").asText()).isEqualTo("REVOKED");
+        assertThat(s.body(s.call(get("/api/public/verify/" + newCode), null, null)).get("status").asText()).isEqualTo("REVOKED");
+        s.call(post(base + "/replace"), registrar, "{\"reason\":\"again\"}").andExpect(jsonPath("$.code").value("CERTIFICATE_REVOKED"));
+        s.call(post("/api/graduations/" + gid + "/certificates/print"), registrar, "{\"reason\":\"x\"}").andExpect(jsonPath("$.code").value("NO_CERTIFICATES"));
+
+        // NACTVET returns: the year's results with NACTVET and the checks before sending
+        JsonNode ret = s.body(s.call(get("/api/nactvet-returns?academicYearId=" + yearId), registrar, null).andExpect(status().isOk()));
+        assertThat(ret.at("/results/published").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(ret.get("checks").findValuesAsText("code")).contains("RESULTS_NOT_SENT");
+        byte[] problems = mvc.perform(get("/api/nactvet-returns/problems?academicYearId=" + yearId).header("Authorization", "Bearer " + registrar)
+                .header("X-Tenant", s.tenant)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(problems.length).isGreaterThan(1000);
+        s.call(get("/api/nactvet-returns"), f.aToken, null).andExpect(status().isForbidden());
     }
 
     // ------------------------------------------------------------------ scenario

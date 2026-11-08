@@ -45,6 +45,8 @@ import SecurityIcon from '@mui/icons-material/Security';
 import LetterIcon from '@mui/icons-material/HistoryEdu';
 import IntegrationIcon from '@mui/icons-material/Hub';
 import AlumniIcon from '@mui/icons-material/Diversity3';
+import ReturnsIcon from '@mui/icons-material/Outbox';
+import VerifiedIcon from '@mui/icons-material/VerifiedUser';
 import ImportIcon from '@mui/icons-material/DriveFolderUpload';
 import TimetableIcon from '@mui/icons-material/ViewWeek';
 import ExamTimetableIcon from '@mui/icons-material/EventNote';
@@ -92,6 +94,8 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'healthInsurance', to: '/staff/health-insurance', label: 'Health insurance', icon: <HealthIcon /> },
     { page: 'graduations', to: '/staff/graduations', label: 'Graduation', icon: <GraduationIcon /> },
     { page: 'alumni', to: '/staff/alumni', label: 'Alumni', icon: <AlumniIcon /> },
+    { page: 'nactvetReturns', to: '/staff/nactvet-returns', label: 'NACTVET returns', icon: <ReturnsIcon /> },
+    { page: 'verifications', to: '/staff/verifications', label: 'Document checks', icon: <VerifiedIcon /> },
   ] },
   { title: 'Teaching', items: [
     { page: 'myTeaching', to: '/staff/my-teaching', label: 'My teaching', icon: <MyTeachingIcon /> },

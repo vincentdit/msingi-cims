@@ -1,12 +1,14 @@
 import CheckIcon from '@mui/icons-material/CheckCircleOutline';
 import WarningIcon from '@mui/icons-material/WarningAmber';
+import PdfIcon from '@mui/icons-material/PictureAsPdf';
 import {
-  Box, Card, CardContent, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
+  Box, Button, Card, CardContent, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { api, formatTzs } from '../../api/client';
+import { api, download, formatTzs } from '../../api/client';
+import { StaffLink } from '../../components/StaffLink';
 import type { Overview, OverviewProgramme } from '../../api/types';
 import { ColumnChart } from '../../components/charts';
 import { ErrorAlert, Loading } from '../../components/common';
@@ -24,6 +26,8 @@ export function OverviewSection() {
   const q = useQuery({ queryKey: ['staff', 'overview', yearId], refetchInterval: 300_000,
     queryFn: () => api<Overview>(`/api/dashboard/overview${yearId ? `?academicYearId=${yearId}` : ''}`, staff) });
   const o = q.data;
+  const pdf = useMutation({ mutationFn: () => download(`/api/dashboard/overview/report${o?.year ? `?academicYearId=${o.year.id}` : ''}`, 'staff',
+    `institution-overview-${o?.year?.code.replace(/\W+/g, '-') ?? ''}.pdf`) });
   if (q.isLoading) return <Loading />;
   if (!o) return <ErrorAlert error={q.error} />;
   const t = o.totals, th = o.thresholds;
@@ -41,8 +45,10 @@ export function OverviewSection() {
             {o.years.map((y) => <MenuItem key={y.id} value={y.id}>{y.code}{y.current ? ' (current)' : ''}</MenuItem>)}
           </TextField>
         )}
+        {o.year && <Button variant="outlined" startIcon={<PdfIcon />} disabled={pdf.isPending} onClick={() => pdf.mutate()} sx={{ flexShrink: 0 }}>Board report (PDF)</Button>}
       </Stack>
       <ErrorAlert error={q.error} />
+      <ErrorAlert error={pdf.error} />
 
       <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
         <Tile label="Current students" value={t.students.toLocaleString()} hint={`${t.female.toLocaleString()} female · ${t.male.toLocaleString()} male`} />
@@ -102,6 +108,49 @@ export function OverviewSection() {
                   points={o.collectionsByMonth.map((p) => ({ ...p, tooltip: p.key }))} />
               </Grid>
             </Grid>
+          </CardContent></Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Card sx={{ height: '100%' }}><CardContent>
+            <Stack direction="row" alignItems="baseline">
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, flexGrow: 1 }}>Examination results</Typography>
+              <Button size="small" component={StaffLink} to="/staff/nactvet-returns">NACTVET returns</Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1.5 }}>The year's main result sheets by stage, and what NACTVET has received.</Typography>
+            {o.results.sheets === 0 ? <Typography variant="body2" color="text.secondary">No result sheets for this year yet.</Typography> : (
+              <Stack spacing={0.75}>
+                {([['Computed, awaiting the committee', o.results.computed], ['Recommended, awaiting confirmation', o.results.recommended],
+                  ['Confirmed, awaiting publication', o.results.confirmed], ['Published', o.results.published], ['Sent to NACTVET', o.results.sentToNactvet],
+                  ['Accepted by NACTVET', o.results.acceptedByNactvet]] as [string, number][]).map(([l, n]) => (
+                  <Stack key={l} direction="row" justifyContent="space-between"><Typography variant="body2">{l}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{n} of {o.results.sheets}</Typography></Stack>
+                ))}
+              </Stack>
+            )}
+          </CardContent></Card>
+        </Grid>
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Card sx={{ height: '100%' }}><CardContent>
+            <Stack direction="row" alignItems="baseline">
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, flexGrow: 1 }}>Fees owed</Typography>
+              <Button size="small" component={StaffLink} to="/staff/finance-overview">Finance</Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1.5 }}>
+              {o.debts.debtors ? `${o.debts.debtors.toLocaleString()} ${o.debts.debtors === 1 ? 'student owes' : 'students owe'} ${formatTzs(t.outstanding)} on the year's annual fees, by how late.`
+                : "No student owes on the year's annual fees."}
+            </Typography>
+            {o.debts.debtors > 0 && <>
+              <ColumnChart ariaLabel="Annual fees owed by how many days overdue" height={100} format={tzsShort}
+                points={o.debts.ageing.map((p) => ({ ...p, tooltip: p.label }))} />
+              <Typography variant="body2" sx={{ fontWeight: 600, mt: 1.5, mb: 0.5 }}>Largest balances</Typography>
+              {o.debts.largest.slice(0, 5).map((d) => (
+                <Stack key={d.registrationNo} direction="row" spacing={1} justifyContent="space-between">
+                  <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>{d.registrationNo} · {d.name} · {d.programmeCode}</Typography>
+                  <Typography variant="body2" sx={{ flexShrink: 0 }}>{formatTzs(d.balance)}{d.daysOverdue ? ` · ${d.daysOverdue} days` : ''}</Typography>
+                </Stack>
+              ))}
+            </>}
           </CardContent></Card>
         </Grid>
 

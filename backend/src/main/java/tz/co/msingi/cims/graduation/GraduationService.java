@@ -13,6 +13,7 @@ import tz.co.msingi.cims.common.exception.NotFoundException;
 import tz.co.msingi.cims.admission.letter.LetterCodes;
 import tz.co.msingi.cims.platform.numbering.NumberSequenceService;
 import tz.co.msingi.cims.exams.ExamAccess;
+import tz.co.msingi.cims.graduation.GraduationDtos.CertificateRecord;
 import tz.co.msingi.cims.graduation.GraduationDtos.CertificateVerification;
 import tz.co.msingi.cims.graduation.GraduationDtos.GenerateResult;
 import tz.co.msingi.cims.graduation.GraduationDtos.GraduandView;
@@ -80,6 +81,7 @@ public class GraduationService {
     private final ExamAccess access;
     private final Messaging messaging;
     private final AuditService audit;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Value("${cims.documents.verification-url:https://{host}/verify/{code}}")
     private String verificationUrlTemplate;
@@ -331,7 +333,7 @@ public class GraduationService {
         access.require("print certificates", REGISTRY);
         Graduation g = require(graduationId);
         List<Graduand> list = graduands.findByGraduationId(g.getId()).stream()
-                .filter(x -> x.getCertificateNo() != null && (graduandId == null || x.getId().equals(graduandId)))
+                .filter(x -> x.getCertificateNo() != null && !"REVOKED".equals(x.getCertificateStatus()) && (graduandId == null || x.getId().equals(graduandId)))
                 .sorted(Comparator.comparing(Graduand::getCertificateNo)).toList();
         if (list.isEmpty()) throw new BusinessRuleException("NO_CERTIFICATES", "Issue the certificates first");
         boolean reprint = list.stream().anyMatch(x -> x.getPrintCount() > 0);
@@ -359,14 +361,108 @@ public class GraduationService {
 
     @Transactional(readOnly = true)
     public Optional<CertificateVerification> verify(String code) {
-        return LetterCodes.normalise(code).flatMap(graduands::findByVerificationCode).map(gr -> {
-            Student s = students.findById(gr.getStudentId()).orElseThrow();
-            Graduation g = graduations.findById(gr.getGraduationId()).orElseThrow();
-            Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow();
-            return new CertificateVerification("AWARD_CERTIFICATE", "VALID", t.getName(), t.getNactvetRegNo(), gr.getCertificateNo(), 1,
-                    gr.getCertificateIssuedAt(), s.fullName(), s.getRegistrationNo(), s.getProgramme().getName(), gr.getAwardName(), gr.getClassification(),
-                    g.getName(), g.getCeremonyDate());
-        });
+        Optional<String> c = LetterCodes.normalise(code);
+        if (c.isEmpty()) return Optional.empty();
+        Optional<CertificateVerification> current = graduands.findByVerificationCode(c.get()).map(gr -> verification(gr,
+                "REVOKED".equals(gr.getCertificateStatus()) ? "REVOKED" : "VALID", gr.getCertificateNo(), gr.getCertificateIssuedAt()));
+        if (current.isPresent()) return current;
+        // an earlier certificate: replaced by a newer one (SUPERSEDED) or revoked
+        return jdbc.query("select graduand_id, certificate_no, issued_at, status from certificate_history where verification_code = ?", (rs, i) -> {
+            Graduand gr = graduands.findById(rs.getLong(1)).orElseThrow();
+            return verification(gr, "REVOKED".equals(rs.getString(4)) ? "REVOKED" : "SUPERSEDED", rs.getString(2), rs.getObject(3, OffsetDateTime.class));
+        }, c.get()).stream().findFirst();
+    }
+
+    private CertificateVerification verification(Graduand gr, String status, String certificateNo, OffsetDateTime issuedAt) {
+        Student s = students.findById(gr.getStudentId()).orElseThrow();
+        Graduation g = graduations.findById(gr.getGraduationId()).orElseThrow();
+        Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow();
+        return new CertificateVerification("AWARD_CERTIFICATE", status, t.getName(), t.getNactvetRegNo(), certificateNo, 1,
+                issuedAt, s.fullName(), s.getRegistrationNo(), s.getProgramme().getName(), gr.getAwardName(), gr.getClassification(),
+                g.getName(), g.getCeremonyDate());
+    }
+
+    // ------------------------------------------------------------------ revocation and replacement (FR-GRD-04)
+
+    /** Withdraws a certificate (the award withdrawn, or issued in error): its code answers "revoked" from now on. Principal-level. */
+    @Transactional
+    public GraduandView revokeCertificate(Long graduationId, Long graduandId, String reason) {
+        access.require("revoke an award certificate", BOARD);
+        Graduand gr = issuedGraduand(graduationId, graduandId);
+        if ("REVOKED".equals(gr.getCertificateStatus())) throw new BusinessRuleException("ALREADY_REVOKED", "This certificate is already revoked");
+        gr.setCertificateStatus("REVOKED");
+        gr.setCertificateRevokedAt(OffsetDateTime.now());
+        gr.setCertificateRevokedBy(CurrentUser.name());
+        gr.setCertificateRevokeReason(reason.trim());
+        audit.record("CERTIFICATE_REVOKED", "Graduand", gr.getId(), Map.of("certificateNo", gr.getCertificateNo(), "reason", reason.trim()));
+        return graduandView(gr);
+    }
+
+    /**
+     * A replacement for a lost or damaged certificate: a new number (the old one with /R1, /R2...) and a new verification code; the old
+     * code keeps answering "replaced by a newer certificate", so a lost certificate cannot pass as current. Printed as an original.
+     */
+    @Transactional
+    public GraduandView replaceCertificate(Long graduationId, Long graduandId, String reason) {
+        access.require("replace an award certificate", REGISTRY);
+        Graduand gr = issuedGraduand(graduationId, graduandId);
+        if ("REVOKED".equals(gr.getCertificateStatus())) throw new BusinessRuleException("CERTIFICATE_REVOKED", "A revoked certificate cannot be replaced");
+        jdbc.update("""
+                insert into certificate_history (tenant_id, graduand_id, certificate_no, verification_code, issued_at, status, reason, closed_by)
+                values (?, ?, ?, ?, ?, 'REPLACED', ?, ?)""", TenantContext.requireTenantId(), gr.getId(), gr.getCertificateNo(), gr.getVerificationCode(),
+                gr.getCertificateIssuedAt(), reason.trim(), CurrentUser.name());
+        String old = gr.getCertificateNo();
+        int n = gr.getReplacementCount() + 1;
+        gr.setReplacementCount(n);
+        gr.setCertificateNo(old.replaceFirst("/R\\d+$", "") + "/R" + n);
+        gr.setVerificationCode(LetterCodes.newCode());
+        gr.setCertificateIssuedAt(OffsetDateTime.now());
+        gr.setCertificateIssuedBy(CurrentUser.name());
+        gr.setSignatoryId(principal.currentId());
+        gr.setPrintCount(0);
+        gr.setLastPrintedAt(null);
+        audit.record("CERTIFICATE_REPLACED", "Graduand", gr.getId(), Map.of("old", old, "certificateNo", gr.getCertificateNo(), "reason", reason.trim()));
+        return graduandView(gr);
+    }
+
+    /** The graduand's certificates, current first, with how often each code was checked on the verification page. */
+    @Transactional(readOnly = true)
+    public List<CertificateRecord> certificateRecords(Long graduationId, Long graduandId) {
+        access.require("view certificate records", REGISTRY);
+        Graduand gr = issuedGraduand(graduationId, graduandId);
+        List<CertificateRecord> out = new ArrayList<>();
+        long[] cur = checks(gr.getVerificationCode());
+        out.add(new CertificateRecord(gr.getCertificateNo(), gr.getVerificationCode(), gr.getCertificateStatus(), gr.getCertificateIssuedAt(),
+                gr.getCertificateRevokedAt(), gr.getCertificateRevokedBy(), gr.getCertificateRevokeReason(), cur[0], cur[0] == 0 ? null : lastCheck(gr.getVerificationCode())));
+        out.addAll(jdbc.query("""
+                select certificate_no, verification_code, status, issued_at, closed_at, closed_by, reason from certificate_history
+                where graduand_id = ? order by closed_at desc""", (rs, i) -> {
+            long[] k = checks(rs.getString(2));
+            return new CertificateRecord(rs.getString(1), rs.getString(2), rs.getString(3), rs.getObject(4, OffsetDateTime.class),
+                    rs.getObject(5, OffsetDateTime.class), rs.getString(6), rs.getString(7), k[0], k[0] == 0 ? null : lastCheck(rs.getString(2)));
+        }, gr.getId()));
+        return out;
+    }
+
+    private long[] checks(String code) {
+        Long n = jdbc.queryForObject("select count(*) from document_verifications where code = ?", Long.class, code);
+        return new long[]{n == null ? 0 : n};
+    }
+
+    private OffsetDateTime lastCheck(String code) {
+        return jdbc.queryForObject("select max(verified_at) from document_verifications where code = ?", OffsetDateTime.class, code);
+    }
+
+    private Graduand issuedGraduand(Long graduationId, Long graduandId) {
+        Graduand gr = graduands.findById(graduandId).filter(x -> x.getGraduationId().equals(graduationId))
+                .orElseThrow(() -> new NotFoundException("Graduand", graduandId));
+        if (gr.getCertificateNo() == null) throw new BusinessRuleException("NO_CERTIFICATE", "No certificate has been issued to this graduand yet");
+        return gr;
+    }
+
+    private GraduandView graduandView(Graduand gr) {
+        Graduation g = require(gr.getGraduationId());
+        return graduandViews(g).stream().filter(v -> v.id().equals(gr.getId())).findFirst().orElseThrow();
     }
 
     // ------------------------------------------------------------------ helpers
@@ -399,11 +495,16 @@ public class GraduationService {
         List<Graduand> list = graduands.findByGraduationId(g.getId());
         Map<Long, Student> ss = new HashMap<>();
         students.findAllById(list.stream().map(Graduand::getStudentId).toList()).forEach(s -> ss.put(s.getId(), s));
+        Map<String, Long> verified = new HashMap<>();
+        jdbc.query("""
+                select v.code, count(*) from document_verifications v join graduands gr on gr.verification_code = v.code
+                where gr.graduation_id = ? group by v.code""", rs -> { verified.put(rs.getString(1), rs.getLong(2)); }, g.getId());
         return list.stream().map(gr -> {
             Student s = ss.get(gr.getStudentId());
             return new GraduandView(gr.getId(), s.getId(), s.getRegistrationNo(), s.fullName(), s.getSex(), s.getProgramme().getCode(), s.getProgramme().getName(),
                     gr.getAwardName(), gr.getClassification(), gr.getCgpa(), gr.getCreditsEarned(), gr.getCompletedSemester(), gr.getCertificateNo(),
-                    gr.getVerificationCode(), gr.getCertificateIssuedAt(), gr.getPrintCount(), gr.getLastPrintedAt());
+                    gr.getVerificationCode(), gr.getCertificateIssuedAt(), gr.getPrintCount(), gr.getLastPrintedAt(), gr.getCertificateStatus(),
+                    gr.getReplacementCount(), gr.getVerificationCode() == null ? 0 : verified.getOrDefault(gr.getVerificationCode(), 0L));
         }).sorted(Comparator.comparing(GraduandView::programmeCode).thenComparing(GraduandView::registrationNo)).toList();
     }
 

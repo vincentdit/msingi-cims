@@ -30,7 +30,7 @@ export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'healthInsurance' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
   | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help' | 'subscription'
-  | 'almanac' | 'organisation';
+  | 'almanac' | 'organisation' | 'nactvetReturns' | 'verifications';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
@@ -46,6 +46,8 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   semesterRegistrations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.HOD, R.MANAGEMENT],
   healthInsurance: [R.ADMIN, R.REGISTRAR, R.BURSAR, R.ACCOUNTANT, R.ACADEMIC, R.MANAGEMENT, R.AUDITOR],
   graduations: [R.ADMIN, R.REGISTRAR, R.ACADEMIC, R.MANAGEMENT],
+  nactvetReturns: [R.ADMIN, R.REGISTRAR, R.EXAMS, R.ACADEMIC, R.MANAGEMENT],
+  verifications: [R.ADMIN, R.REGISTRAR, R.EXAMS, R.MANAGEMENT],
   calendar: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.ADMISSIONS, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   curricula: [R.ADMIN, R.ACADEMIC, R.HOD, R.COORDINATOR, R.REGISTRAR, R.EXAMS, R.MANAGEMENT, R.AUDITOR],
   myTeaching: [R.LECTURER, R.ASSESSOR, R.HOD, R.COORDINATOR, R.EXAMS],
@@ -98,7 +100,7 @@ const PATH_PAGE: Record<string, PageKey> = {
   'exams-office': 'examsOffice', 'my-teaching': 'myTeaching', timetable: 'timetable', 'exam-timetable': 'examTimetable', competence: 'competence', appeals: 'appeals', teaching: 'teaching', marks: 'marks', eligibility: 'eligibility', results: 'results', amendments: 'amendments', regulations: 'regulations',
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations', helpdesk: 'helpdesk', help: 'help', 'msingi-subscription': 'subscription',
-  almanac: 'almanac', organisation: 'organisation',
+  almanac: 'almanac', organisation: 'organisation', 'nactvet-returns': 'nactvetReturns', verifications: 'verifications',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {

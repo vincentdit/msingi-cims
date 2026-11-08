@@ -151,6 +151,11 @@ public class BillingDocuments {
         StringBuilder b = new StringBuilder("<h3>How to pay</h3><table class=\"pay\">");
         for (Channel c : s.channels()) {
             PaymentProvider p = MsingiBillingService.provider(c.provider());
+            if (MsingiBillingService.SELCOM_PAY.equals(c.provider())) {
+                b.append("<tr><td>Selcom Pay (merchant ").append(escape(c.accountName())).append(")</td><td><strong>").append(escape(c.accountNumber()))
+                        .append("</strong></td><td>").append(escape(c.branch())).append("</td></tr>");
+                continue;
+            }
             if (MsingiBillingService.BILLPAY.equals(c.provider())) {
                 b.append("<tr><td>BillPay control number</td><td><strong>").append(escape(c.accountNumber())).append("</strong></td><td>")
                         .append(escape(c.branch())).append("</td></tr>");

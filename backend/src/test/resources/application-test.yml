@@ -6,6 +6,9 @@ spring:
   flyway:
     clean-disabled: false
 cims:
+  security:
+    sign-in-per-minute: 100000    # every test signs in from 127.0.0.1; SignInThrottleFilterTest checks the limit itself
+    sign-in-per-hour: 1000000
   jobs:
     hold-minimum: false       # tests call jobs back to back; production keeps each job's minimum hold
   otp:

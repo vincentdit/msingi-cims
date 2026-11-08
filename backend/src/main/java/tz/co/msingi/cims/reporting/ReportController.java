@@ -129,4 +129,16 @@ public class ReportController {
     public OverviewService.Overview overview(@org.springframework.web.bind.annotation.RequestParam(required = false) Long academicYearId) {
         return overview.overview(academicYearId);
     }
+
+    @Operation(summary = "The institution overview as a PDF for the Governing Board and management meetings")
+    @GetMapping("/api/dashboard/overview/report")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN','MANAGEMENT_VIEWER','DEPUTY_PRINCIPAL_ACADEMIC')")
+    public ResponseEntity<byte[]> overviewReport(@RequestParam(required = false) Long academicYearId) {
+        ReportService.Export e = reports.boardReport(overview.overview(academicYearId));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(e.fileName()).build().toString())
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(e.content());
+    }
 }

@@ -62,7 +62,7 @@ function Result({ v }: { v: LetterVerification }) {
   const statusLabel = v.studentStatus ? t(`verify.status_${v.studentStatus}`) : undefined;
   const text = idCard ? (notStudying ? t('verify.cardNotStudying', { status: statusLabel }) : v.status === 'VALID' ? t('verify.cardValid')
       : v.status === 'EXPIRED' ? t('verify.cardExpiredText') : v.status === 'REVOKED' ? t('verify.cardRevoked') : t('verify.cardSuperseded'))
-    : certificate ? t('verify.certificateValid') : statement
+    : certificate ? (v.status === 'VALID' ? t('verify.certificateValid') : v.status === 'REVOKED' ? t('verify.certificateRevoked') : t('verify.certificateReplaced')) : statement
     ? (v.status === 'VALID' ? t('verify.statementValid') : v.status === 'REVOKED' ? t('verify.revokedText') : t('verify.statementSuperseded'))
     : v.status === 'VALID' ? t('verify.validText') : v.status === 'REVOKED' ? t('verify.revokedText')
       : t('verify.supersededText', { n: v.currentEdition ?? '' });

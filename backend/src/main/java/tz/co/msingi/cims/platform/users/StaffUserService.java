@@ -139,6 +139,7 @@ public class StaffUserService {
         u.setPasswordHash(encoder.encode(temporary));
         u.setMustChangePassword(true);
         u.setFailedLogins(0);
+        u.setLockedUntil(null);
         if (u.getStatus() == Status.LOCKED) {
             u.setStatus(Status.ACTIVE);
         }
@@ -179,6 +180,7 @@ public class StaffUserService {
         Status was = u.getStatus();
         u.setStatus(Status.ACTIVE);
         u.setFailedLogins(0);
+        u.setLockedUntil(null);
         users.saveAndFlush(u);
         guard.evict(u.getTenantId(), u.getId());
         audit.record(was == Status.LOCKED ? "UNLOCK" : "ENABLE", "StaffUser", u.getId(), Map.of("username", u.getUsername()));

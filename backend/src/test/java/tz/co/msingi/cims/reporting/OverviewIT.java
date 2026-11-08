@@ -68,6 +68,15 @@ class OverviewIT {
         assertThat(o.get("collectionsByMonth")).hasSize(12);
         assertThat(o.at("/thresholds/lowPass").asDouble()).isEqualTo(0.6);
 
+        assertThat(o.at("/results/sheets").asLong()).isZero();
+        assertThat(o.at("/debts/ageing")).hasSize(5);
+        assertThat(o.at("/debts/debtors").asLong()).isZero();
+        // the same overview on paper for the Governing Board
+        byte[] pdf = mvc.perform(get("/api/dashboard/overview/report").header("Authorization", "Bearer " + principal).header("X-Tenant", s.tenant))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
+        s.call(get("/api/dashboard/overview/report"), registrar, null).andExpect(status().isForbidden());
+
         s.call(get("/api/dashboard/overview?academicYearId=999999"), principal, null).andExpect(status().isNotFound());
         s.call(get("/api/dashboard/overview"), registrar, null).andExpect(status().isForbidden());
         s.call(get("/api/dashboard/overview"), officer, null).andExpect(status().isOk()); // the fixture officer is also administrator

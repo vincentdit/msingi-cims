@@ -90,7 +90,15 @@ public final class GraduationDtos {
     public record GraduandView(Long id, Long studentId, String registrationNo, String studentName, String sex, String programmeCode,
                                String programmeName, String awardName, String classification, BigDecimal cgpa, BigDecimal creditsEarned,
                                String completedSemester, String certificateNo, String verificationCode, OffsetDateTime certificateIssuedAt,
-                               int printCount, OffsetDateTime lastPrintedAt) {
+                               int printCount, OffsetDateTime lastPrintedAt, String certificateStatus, int replacementCount, long verifications) {
+    }
+
+    /** An earlier certificate of a graduand (replaced or revoked), and the checks of every one of the graduand's codes. */
+    public record CertificateRecord(String certificateNo, String verificationCode, String status, OffsetDateTime issuedAt, OffsetDateTime closedAt,
+                                    String closedBy, String reason, long verifications, OffsetDateTime lastVerifiedAt) {
+    }
+
+    public record CertificateDecision(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 500) String reason) {
     }
 
     public record NotReady(Long studentId, String registrationNo, String studentName, String programmeCode, String reason) {

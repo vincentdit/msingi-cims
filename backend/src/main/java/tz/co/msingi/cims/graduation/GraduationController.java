@@ -199,6 +199,29 @@ public class GraduationController {
         return file(graduation.print(id, graduandId, req == null ? null : req.reason()), MediaType.APPLICATION_PDF);
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Revoke an award certificate (Principal / Institution Admin): its code answers 'revoked' on the verification page")
+    @PostMapping("/api/graduations/{id}/graduands/{graduandId}/certificate/revoke")
+    @PreAuthorize("hasRole('INSTITUTION_ADMIN')")
+    public GraduationDtos.GraduandView revokeCertificate(@PathVariable Long id, @PathVariable Long graduandId,
+                                                         @jakarta.validation.Valid @RequestBody GraduationDtos.CertificateDecision req) {
+        return graduation.revokeCertificate(id, graduandId, req.reason());
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Replace a lost or damaged certificate: a new number and code; the old code answers 'replaced'")
+    @PostMapping("/api/graduations/{id}/graduands/{graduandId}/certificate/replace")
+    @PreAuthorize(REGISTRY)
+    public GraduationDtos.GraduandView replaceCertificate(@PathVariable Long id, @PathVariable Long graduandId,
+                                                          @jakarta.validation.Valid @RequestBody GraduationDtos.CertificateDecision req) {
+        return graduation.replaceCertificate(id, graduandId, req.reason());
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "A graduand's certificates (current and earlier) and how often each was checked on the verification page")
+    @GetMapping("/api/graduations/{id}/graduands/{graduandId}/certificate")
+    @PreAuthorize(REGISTRY)
+    public java.util.List<GraduationDtos.CertificateRecord> certificateRecords(@PathVariable Long id, @PathVariable Long graduandId) {
+        return graduation.certificateRecords(id, graduandId);
+    }
+
     // ------------------------------------------------------------------ student portal
 
     @GetMapping("/api/student/clearance")

@@ -14,7 +14,7 @@ interface Field { name: string; label: string; secret: boolean; value?: string; 
 interface ProviderView { code: string; label: string; fields: { name: string; label: string; secret: boolean }[]; sandboxUrl: string; liveUrl: string; needsNetwork: boolean }
 interface CollectionView {
   provider?: string; providerLabel?: string; environment: string; active: boolean; fields: Field[]; baseUrl?: string; authUrl?: string; notifyUrl?: string;
-  lastTestAt?: string; lastTestOk?: boolean; lastTestNote?: string; providers: ProviderView[]; rehearsalAllowed: boolean; billPayNamba?: string | null;
+  lastTestAt?: string; lastTestOk?: boolean; lastTestNote?: string; providers: ProviderView[]; rehearsalAllowed: boolean; billPayNamba?: string | null; c2bUrl?: string | null; c2bToken?: string | null;
 }
 
 /** Console › Billing › SMS bundles: what institutions pay for SMS, and Msingi's own mobile money account for prompts on their phones. */
@@ -142,11 +142,14 @@ function CollectionCard() {
                 helperText="Leave blank for AzamPay's own" />
             </Grid>
           )}
-          {(p?.code === 'CLICKPESA' || p?.code === 'SIMULATED') && (
+          {(p?.code === 'CLICKPESA' || p?.code === 'SIMULATED' || p?.code === 'SELCOM') && (
             <Grid size={{ xs: 12, md: 6 }}>
-              <TextField fullWidth label="BillPay-Namba (optional)" value={f.billPayNamba} inputProps={{ inputMode: 'numeric', maxLength: 4 }}
-                onChange={(e) => setF({ ...f, billPayNamba: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                helperText="ClickPesa's 4-digit merchant BillPay number. With it every Msingi invoice gets a BillPay control number (the namba and its reference) that institutions pay from M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB SimBanking or a CRDB agent; ClickPesa reports each payment and CIMS records it." />
+              <TextField fullWidth label={p.code === 'SELCOM' ? 'Selcom Pay merchant number (optional)' : 'BillPay-Namba (optional)'} value={f.billPayNamba}
+                inputProps={{ inputMode: 'numeric', maxLength: p.code === 'SELCOM' ? 12 : 4 }}
+                onChange={(e) => setF({ ...f, billPayNamba: e.target.value.replace(/\D/g, '').slice(0, p.code === 'SELCOM' ? 12 : 4) })}
+                helperText={p.code === 'SELCOM'
+                  ? 'The merchant number institutions enter under Lipa kwa Selcom Pay (any mobile wallet, bank app or Selcom agent), followed by the invoice\'s payment reference. Selcom checks the reference with CIMS and reports each payment; CIMS records it.'
+                  : 'ClickPesa\'s 4-digit merchant BillPay number. With it every Msingi invoice gets a BillPay control number (the namba and its reference) that institutions pay from M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB SimBanking or a CRDB agent; ClickPesa reports each payment and CIMS records it.'} />
             </Grid>
           )}
           {p?.code === 'SIMULATED' && (
@@ -162,6 +165,19 @@ function CollectionCard() {
           <Button variant="outlined" disabled={test.isPending || !d.provider} onClick={() => test.mutate()}>Test the credentials</Button>
         </Stack>
       </CardContent></Card>
+
+      {d.c2bUrl && d.c2bToken && (
+        <Card><CardContent>
+          <Typography variant="subtitle2" gutterBottom>Selcom Pay by reference (C2B): to give Selcom</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Ask Selcom to send the lookup, validation and notification calls of Msingi's merchant number to these addresses, with the header
+            Authorization: Bearer and the secret below. Share the secret only with Selcom; Make a new notification address changes it.
+          </Typography>
+          <Box sx={{ fontFamily: 'monospace', fontSize: 14, wordBreak: 'break-all', p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+            {d.c2bUrl}/lookup<br />{d.c2bUrl}/validation<br />{d.c2bUrl}/notification<br />Authorization: Bearer {d.c2bToken}
+          </Box>
+        </CardContent></Card>
+      )}
 
       {d.notifyUrl && d.provider !== 'SIMULATED' && (
         <Card><CardContent>

@@ -24,4 +24,16 @@ public class TenancyConfig {
         reg.addUrlPatterns("/*");
         return reg;
     }
+
+    /** Sign-in attempts per client address; first of all, so a flood never reaches the database. */
+    @Bean
+    public FilterRegistrationBean<tz.co.msingi.cims.platform.security.SignInThrottleFilter> signInThrottleFilter(
+            @org.springframework.beans.factory.annotation.Value("${cims.security.sign-in-per-minute:60}") int perMinute,
+            @org.springframework.beans.factory.annotation.Value("${cims.security.sign-in-per-hour:1000}") int perHour) {
+        FilterRegistrationBean<tz.co.msingi.cims.platform.security.SignInThrottleFilter> reg = new FilterRegistrationBean<>(
+                new tz.co.msingi.cims.platform.security.SignInThrottleFilter(perMinute, perHour, java.time.Clock.systemUTC()));
+        reg.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER - 20);
+        reg.addUrlPatterns("/api/*");
+        return reg;
+    }
 }

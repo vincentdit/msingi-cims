@@ -55,8 +55,19 @@ public class OverviewService {
     public record Thresholds(double lowIntake, double lowCollection, double lowPass, double lowDemand) {
     }
 
+    /** The year's main result sheets by stage, and how many went to NACTVET. */
+    public record Results(long sheets, long computed, long recommended, long confirmed, long published, long sentToNactvet, long acceptedByNactvet) {
+    }
+
+    public record Debtor(String registrationNo, String name, String programmeCode, BigDecimal balance, long daysOverdue) {
+    }
+
+    /** What students still owe on the year's annual fees, by how late, and the largest balances. */
+    public record Debts(List<Point> ageing, List<Debtor> largest, long debtors) {
+    }
+
     public record Overview(Year year, List<Year> years, Totals totals, List<ProgrammeRow> programmes, List<Point> intakeByYear,
-                           List<Point> collectionsByMonth, Thresholds thresholds) {
+                           List<Point> collectionsByMonth, Thresholds thresholds, Results results, Debts debts) {
     }
 
     @Transactional(readOnly = true)
@@ -64,7 +75,8 @@ public class OverviewService {
         List<Year> years = jdbc.query("select id, code, is_current from academic_years order by start_date desc", Map.of(),
                 (rs, i) -> new Year(rs.getLong(1), rs.getString(2), rs.getBoolean(3)));
         if (years.isEmpty()) {
-            return new Overview(null, List.of(), emptyTotals(), List.of(), List.of(), List.of(), thresholds());
+            return new Overview(null, List.of(), emptyTotals(), List.of(), List.of(), List.of(), thresholds(), new Results(0, 0, 0, 0, 0, 0, 0),
+                    new Debts(List.of(), List.of(), 0));
         }
         Year year = academicYearId == null ? years.stream().filter(Year::current).findFirst().orElse(years.get(0))
                 : years.stream().filter(y -> y.id().equals(academicYearId)).findFirst()
@@ -169,7 +181,47 @@ public class OverviewService {
                 e.getKey().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + (e.getKey().getMonthValue() == 1 ? " " + e.getKey().getYear() : ""),
                 e.getValue())).toList();
 
-        return new Overview(year, years, totals, rows, intakeByYear, collections, thresholds());
+        return new Overview(year, years, totals, rows, intakeByYear, collections, thresholds(), results(p), debts(p));
+    }
+
+    private Results results(MapSqlParameterSource p) {
+        Map<String, Object> r = jdbc.queryForMap("""
+                select count(*) as sheets,
+                       count(*) filter (where rs.status = 'COMPUTED') as computed, count(*) filter (where rs.status = 'RECOMMENDED') as recommended,
+                       count(*) filter (where rs.status = 'CONFIRMED') as confirmed, count(*) filter (where rs.status = 'PUBLISHED') as published,
+                       count(*) filter (where exists (select 1 from nactvet_result_submissions n where n.result_sheet_id = rs.id)) as sent,
+                       count(*) filter (where exists (select 1 from nactvet_result_submissions n where n.result_sheet_id = rs.id and n.status = 'ACCEPTED')) as accepted
+                from result_sheets rs join semesters se on se.id = rs.semester_id
+                where se.academic_year_id = :y and rs.round = 'MAIN'""", p);
+        return new Results(n(r, "sheets"), n(r, "computed"), n(r, "recommended"), n(r, "confirmed"), n(r, "published"), n(r, "sent"), n(r, "accepted"));
+    }
+
+    private Debts debts(MapSqlParameterSource p) {
+        String open = """
+                from invoices i join students s on i.payer_type = 'STUDENT' and s.id = i.payer_id
+                where i.purpose = 'ANNUAL_FEES' and i.status in ('ISSUED', 'PARTIALLY_PAID') and i.academic_year_id = :y
+                  and i.total_amount > i.paid_amount""";
+        Map<String, BigDecimal> buckets = new LinkedHashMap<>();
+        for (String b : List.of("Not yet due", "1-30 days", "31-60 days", "61-90 days", "Over 90 days")) buckets.put(b, BigDecimal.ZERO);
+        jdbc.query("""
+                select case when i.due_date is null or i.due_date >= current_date then 'Not yet due'
+                            when current_date - i.due_date <= 30 then '1-30 days' when current_date - i.due_date <= 60 then '31-60 days'
+                            when current_date - i.due_date <= 90 then '61-90 days' else 'Over 90 days' end,
+                       sum(i.total_amount - i.paid_amount) """ + open + " group by 1", p,
+                rs -> { buckets.put(rs.getString(1), rs.getBigDecimal(2)); });
+        List<Point> ageing = buckets.entrySet().stream().map(e -> new Point(e.getKey(), e.getKey(), e.getValue())).toList();
+        List<Debtor> largest = jdbc.query("""
+                select s.registration_no, concat_ws(' ', s.first_name, s.middle_name, s.surname), (select code from programmes where id = s.programme_id),
+                       sum(i.total_amount - i.paid_amount) as balance, coalesce(max(greatest(current_date - i.due_date, 0)), 0) """ + open + " " + """
+                 group by s.id order by balance desc, s.registration_no limit 10""", p,
+                (rs, i) -> new Debtor(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBigDecimal(4), rs.getLong(5)));
+        Long count = jdbc.queryForObject("select count(distinct s.id) " + open, p, Long.class);
+        return new Debts(ageing, largest, count == null ? 0 : count);
+    }
+
+    private static long n(Map<String, Object> m, String k) {
+        Object o = m.get(k);
+        return o == null ? 0 : ((Number) o).longValue();
     }
 
     private static Thresholds thresholds() {

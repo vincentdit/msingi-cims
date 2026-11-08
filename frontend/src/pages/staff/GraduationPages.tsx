@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime } from '../../api/client';
-import type { Graduand, GraduandGenerateResult, GraduationDetail, GraduationStatus, GraduationSummary } from '../../api/types';
+import type { CertificateRecord, Graduand, GraduandGenerateResult, GraduationDetail, GraduationStatus, GraduationSummary } from '../../api/types';
 import { ErrorAlert, Loading, PageTitle } from '../../components/common';
 import { useRoles } from './MarksPages';
 import { StaffLink } from '../../components/StaffLink';
@@ -91,7 +91,9 @@ export function GraduationPage() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['staff', 'graduation', id], queryFn: () => api<GraduationDetail>(`/api/graduations/${id}`, staff) });
   const [result, setResult] = useState<GraduandGenerateResult | null>(null);
-  const [dialog, setDialog] = useState<'edit' | 'approve' | 'return' | 'nactvet' | 'reprint' | null>(null);
+  const [dialog, setDialog] = useState<'edit' | 'approve' | 'return' | 'nactvet' | 'reprint' | 'replace' | 'revoke' | 'records' | null>(null);
+  const [certOf, setCertOf] = useState<Graduand | null>(null);
+  const isAdmin = useRoles()(['INSTITUTION_ADMIN']);
   const [reprintOf, setReprintOf] = useState<Graduand | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ['staff', 'graduation'] });
@@ -207,18 +209,26 @@ export function GraduationPage() {
                     <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{x.completedSemester}</TableCell>
                     <TableCell>
                       {x.certificateNo ? (
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                           <Box>
                             <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{x.certificateNo}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {x.printCount ? `Printed ${x.printCount}×, last ${formatDate(x.lastPrintedAt!)}` : 'Not printed yet'}
-                            </Typography>
+                            {x.certificateStatus === 'REVOKED' ? <Chip size="small" color="error" variant="outlined" label="Revoked" /> : (
+                              <Typography variant="caption" color="text.secondary">
+                                {x.printCount ? `Printed ${x.printCount}×, last ${formatDate(x.lastPrintedAt!)}` : 'Not printed yet'}
+                                {x.verifications ? ` · checked ${x.verifications}×` : ''}
+                              </Typography>
+                            )}
                           </Box>
-                          {g.can.issue && <Tooltip title={x.printCount ? 'Reprint (needs a reason)' : 'Print'}>
+                          {g.can.issue && x.certificateStatus !== 'REVOKED' && <Tooltip title={x.printCount ? 'Reprint (needs a reason)' : 'Print'}>
                             <Button size="small" onClick={() => (x.printCount ? (setReprintOf(x), setDialog('reprint')) : print.mutate({ graduand: x }))}>
                               {x.printCount ? 'Reprint' : 'Print'}
                             </Button>
                           </Tooltip>}
+                          {g.can.issue && x.certificateStatus !== 'REVOKED' && <Tooltip title="Lost or damaged: a new number and code; the old code answers 'replaced'">
+                            <Button size="small" onClick={() => { setCertOf(x); setDialog('replace'); }}>Replace</Button>
+                          </Tooltip>}
+                          {isAdmin && x.certificateStatus !== 'REVOKED' && <Button size="small" color="error" onClick={() => { setCertOf(x); setDialog('revoke'); }}>Revoke</Button>}
+                          {g.can.issue && <Button size="small" onClick={() => { setCertOf(x); setDialog('records'); }}>History</Button>}
                         </Stack>
                       ) : <Typography variant="body2" color="text.secondary">—</Typography>}
                     </TableCell>
@@ -241,9 +251,54 @@ export function GraduationPage() {
             confirm="Print" help="Every print is logged with this reason; the reprint is marked as such." onClose={() => { setDialog(null); setReprintOf(null); }}
             send={(v) => print.mutateAsync({ graduand: reprintOf ?? undefined, reason: v })} onDone={() => undefined} />}
           {dialog === 'nactvet' && <NactvetDialog g={g} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); }} />}
+          {dialog === 'replace' && certOf && <TextDialog title={`Replace certificate ${certOf.certificateNo}`} label="Why it is replaced" max={500} minLength={5} multiline
+            confirm="Issue the replacement" help="For a lost or damaged certificate. The replacement has a new number and verification code; the old code will answer 'replaced by a newer certificate'. Print the replacement afterwards."
+            onClose={() => { setDialog(null); setCertOf(null); }}
+            send={(v) => api(`/api/graduations/${g.id}/graduands/${certOf.id}/certificate/replace`, { ...staff, method: 'POST', body: { reason: v } })}
+            onDone={() => { setDialog(null); setCertOf(null); setNotice('Replacement issued: print it from the list.'); refresh(); }} />}
+          {dialog === 'revoke' && certOf && <TextDialog title={`Revoke certificate ${certOf.certificateNo}`} label="Reason and authority (e.g. Board minute)" max={500} minLength={5} multiline
+            confirm="Revoke" help="For an award withdrawn or a certificate issued in error. Anyone checking the code will be told it is revoked. This cannot be undone."
+            onClose={() => { setDialog(null); setCertOf(null); }}
+            send={(v) => api(`/api/graduations/${g.id}/graduands/${certOf.id}/certificate/revoke`, { ...staff, method: 'POST', body: { reason: v } })}
+            onDone={() => { setDialog(null); setCertOf(null); setNotice('Certificate revoked.'); refresh(); }} />}
+          {dialog === 'records' && certOf && <RecordsDialog graduationId={g.id} graduand={certOf} onClose={() => { setDialog(null); setCertOf(null); }} />}
         </>
       )}
     </Container>
+  );
+}
+
+function RecordsDialog({ graduationId, graduand, onClose }: { graduationId: number; graduand: Graduand; onClose: () => void }) {
+  const q = useQuery({ queryKey: ['staff', 'certificate-records', graduand.id],
+    queryFn: () => api<CertificateRecord[]>(`/api/graduations/${graduationId}/graduands/${graduand.id}/certificate`, staff) });
+  const label = { VALID: 'Current', REVOKED: 'Revoked', REPLACED: 'Replaced' } as const;
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Certificates of {graduand.studentName}</DialogTitle>
+      <DialogContent>
+        <ErrorAlert error={q.error} />
+        {q.isLoading && <Loading />}
+        <Stack spacing={1.5}>
+          {q.data?.map((c) => (
+            <Box key={c.verificationCode} sx={{ p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600, flexGrow: 1 }}>{c.certificateNo}</Typography>
+                <Chip size="small" variant="outlined" label={label[c.status]} color={c.status === 'VALID' ? 'success' : c.status === 'REVOKED' ? 'error' : 'default'} />
+              </Stack>
+              <Typography variant="caption" color="text.secondary" component="p">
+                Code {c.verificationCode}{c.issuedAt ? ` · issued ${formatDate(c.issuedAt)}` : ''}
+                {c.closedAt ? ` · ${c.status === 'REVOKED' ? 'revoked' : 'replaced'} ${formatDate(c.closedAt)} by ${c.closedBy}` : ''}
+              </Typography>
+              {c.reason && <Typography variant="caption" component="p">{c.reason}</Typography>}
+              <Typography variant="caption" color="text.secondary" component="p">
+                {c.verifications ? `Checked ${c.verifications}× on the verification page, last ${formatDateTime(c.lastVerifiedAt!)}` : 'Not checked yet'}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
   );
 }
 

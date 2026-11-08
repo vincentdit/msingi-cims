@@ -713,13 +713,19 @@ public class MsingiBillingService {
     /** The accounts for one invoice: its BillPay control number first (when Msingi has a ClickPesa BillPay-Namba), then Msingi's accounts. */
     public List<Channel> channelsFor(String kind, String reference) {
         List<Channel> out = new ArrayList<>();
-        String bp = billPayNumber(reference);
-        if (bp != null) out.add(new Channel(BILLPAY, "Msingi Technologies Ltd", bp, BILLPAY_HOW));
+        var ref = reference == null ? java.util.Optional.<MsingiCollectionService.PayRef>empty() : collection.payRef();
+        if (ref.isPresent() && ref.get().provider() == tz.co.msingi.cims.finance.aggregator.AggregatorProvider.SELCOM) {
+            out.add(new Channel(SELCOM_PAY, ref.get().number(), reference, SELCOM_HOW));
+        } else if (ref.isPresent()) {
+            out.add(new Channel(BILLPAY, "Msingi Technologies Ltd", ref.get().number() + reference, BILLPAY_HOW));
+        }
         out.addAll(channelsFor(kind));
         return out;
     }
 
     public static final String BILLPAY = "BILLPAY";
+    public static final String SELCOM_PAY = "SELCOM_PAY";
+    public static final String SELCOM_HOW = "M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, T-Pesa, Ezy Pesa, a bank app or a Selcom Huduma agent: Lipa kwa Selcom Pay, enter the merchant number, then the reference";
     public static final String BILLPAY_HOW = "M-Pesa, Mixx by Yas, Airtel Money, HaloPesa, CRDB SimBanking or a CRDB agent: choose BillPay / Lipa Bili";
 
     /** The invoice's BillPay control number: Msingi's BillPay-Namba followed by the payment reference (null without BillPay). */
@@ -1184,6 +1190,11 @@ public class MsingiBillingService {
             PaymentProvider p = provider(c.provider());
             if (BILLPAY.equals(c.provider())) {
                 b.append("\n  • BillPay control number ").append(c.accountNumber()).append(" (").append(c.branch()).append(")");
+                continue;
+            }
+            if (SELCOM_PAY.equals(c.provider())) {
+                b.append("\n  • Selcom Pay: merchant number ").append(c.accountName()).append(", reference ").append(c.accountNumber())
+                        .append(" (").append(c.branch()).append(")");
                 continue;
             }
             b.append("\n  • ").append(p == null ? c.provider() : p.label()).append(" ").append(c.accountNumber())

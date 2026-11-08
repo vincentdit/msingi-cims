@@ -48,6 +48,17 @@ public class Graduand extends BaseEntity {
 
     private OffsetDateTime lastPrintedAt;
 
+    /** VALID, or REVOKED (the award withdrawn or the certificate issued in error); see certificate_history for earlier certificates. */
+    @Column(nullable = false)
+    private String certificateStatus = "VALID";
+    private OffsetDateTime certificateRevokedAt;
+    private String certificateRevokedBy;
+    private String certificateRevokeReason;
+
+    /** How many times the certificate was replaced (lost or damaged): each replacement has a new number and code. */
+    @Column(nullable = false)
+    private int replacementCount;
+
     /** The Principal record that signs the certificate (null on certificates issued before the Principal was recorded). */
     private Long signatoryId;
 }

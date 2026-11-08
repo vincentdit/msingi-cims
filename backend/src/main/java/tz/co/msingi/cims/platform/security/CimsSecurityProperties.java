@@ -21,7 +21,8 @@ public record CimsSecurityProperties(
         String publicKeyPem,
         String keycloakIssuerUri,
         int maxFailedLogins,
-        List<String> corsAllowedOrigins) {
+        List<String> corsAllowedOrigins,
+        int lockMinutes) {
 
     public CimsSecurityProperties {
         if (mode == null) mode = "local";
@@ -29,6 +30,7 @@ public record CimsSecurityProperties(
         if (accessTokenTtl == null) accessTokenTtl = Duration.ofMinutes(60);
         if (maxFailedLogins <= 0) maxFailedLogins = 5;
         if (corsAllowedOrigins == null) corsAllowedOrigins = List.of();
+        if (lockMinutes <= 0) lockMinutes = 15;
     }
 
     public boolean isLocal() {

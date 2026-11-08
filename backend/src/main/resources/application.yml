@@ -85,6 +85,11 @@ cims:
     public-key-pem: ${CIMS_JWT_PUBLIC_KEY:}
     keycloak-issuer-uri: ${CIMS_KEYCLOAK_ISSUER_URI:}
     max-failed-logins: 5
+    # a lock-out after max-failed-logins wrong passwords lasts this long; three in a row lock the account until it is unlocked
+    lock-minutes: ${CIMS_LOCK_MINUTES:15}
+    # sign-in, password-reset and code requests allowed per client address (a college lab shares one address: keep them generous)
+    sign-in-per-minute: ${CIMS_SIGN_IN_PER_MINUTE:60}
+    sign-in-per-hour: ${CIMS_SIGN_IN_PER_HOUR:1000}
     cors-allowed-origins: ${CIMS_CORS_ORIGINS:http://localhost:5173}
     # encrypts authenticator-app secrets (base64 of 32 random bytes: openssl rand -base64 32); keep it with the database backups
     data-key: ${CIMS_DATA_KEY:}

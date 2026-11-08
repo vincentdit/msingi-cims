@@ -25,6 +25,26 @@ import java.util.Map;
 public class MsingiCollectionNotificationController {
 
     private final MsingiPhonePaymentService payments;
+    private final MsingiSelcomC2bService c2b;
+
+    @Operation(summary = "Selcom C2B for Msingi invoices: lookup, validation or notification (Authorization: Bearer <Msingi's secret>)")
+    @PostMapping("/selcom-c2b/{step:lookup|validation|notification}")
+    public ResponseEntity<Map<String, Object>> selcomC2b(@PathVariable String step, @RequestBody Map<String, Object> body,
+                                                          @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!c2b.authorised(auth)) {
+            Map<String, Object> no = new HashMap<>();
+            no.put("reference", body.get("reference"));
+            no.put("resultcode", "401");
+            no.put("result", "FAIL");
+            no.put("message", "Not authorised");
+            return ResponseEntity.status(401).body(no);
+        }
+        return ResponseEntity.ok(switch (step) {
+            case "lookup" -> c2b.lookup(body);
+            case "validation" -> c2b.validation(body);
+            default -> c2b.notification(body);
+        });
+    }
 
     @Operation(summary = "Payment notification from Msingi's aggregator (Selcom, AzamPay, ClickPesa)")
     @PostMapping("/{provider:selcom|azampay|clickpesa|simulated}/{token}")

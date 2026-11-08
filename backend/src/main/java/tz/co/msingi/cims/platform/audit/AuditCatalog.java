@@ -32,7 +32,7 @@ public final class AuditCatalog {
     }
 
     /** Sign-ins, failed sign-ins, locked accounts, password changes and staff account changes. */
-    public static final Set<String> SECURITY_ACTIONS = Set.of("LOGIN", "LOGIN_FAILED", "ACCOUNT_LOCKED", "PASSWORD_CHANGED",
+    public static final Set<String> SECURITY_ACTIONS = Set.of("LOGIN", "LOGIN_FAILED", "ACCOUNT_LOCKED", "ACCOUNT_UNLOCKED", "PASSWORD_CHANGED",
             "PASSWORD_RESET", "AUDIT_EXPORTED");
 
     public static List<String> areas() {

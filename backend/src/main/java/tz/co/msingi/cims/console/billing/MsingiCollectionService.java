@@ -48,7 +48,11 @@ public class MsingiCollectionService {
 
     public record View(String provider, String providerLabel, String environment, boolean active, List<FieldView> fields, String baseUrl, String authUrl,
                        String notifyUrl, OffsetDateTime lastTestAt, Boolean lastTestOk, String lastTestNote, List<ProviderView> providers,
-                       boolean rehearsalAllowed, String billPayNamba) {
+                       boolean rehearsalAllowed, String billPayNamba, String c2bUrl, String c2bToken) {
+    }
+
+    /** Paying by reference: ClickPesa BillPay (the namba before the reference) or Selcom Pay (merchant number, then the reference). */
+    public record PayRef(AggregatorProvider provider, String number) {
     }
 
     public record SaveRequest(@NotNull AggregatorProvider provider, @NotNull String environment, boolean active, Map<String, String> fields,
@@ -85,7 +89,7 @@ public class MsingiCollectionService {
         Map<String, Object> r = row();
         String prov = (String) r.get("provider");
         if (prov == null) {
-            return new View(null, null, (String) r.get("environment"), false, List.of(), null, null, null, null, null, null, providers, allowSimulation, null);
+            return new View(null, null, (String) r.get("environment"), false, List.of(), null, null, null, null, null, null, providers, allowSimulation, null, null, null);
         }
         AggregatorProvider p = AggregatorProvider.valueOf(prov);
         Map<String, String> plain = json((String) r.get("settings"));
@@ -94,7 +98,9 @@ public class MsingiCollectionService {
                 f.secret() ? secrets.containsKey(f.name()) : plain.containsKey(f.name()))).toList();
         return new View(p.name(), p.label(), (String) r.get("environment"), Boolean.TRUE.equals(r.get("active")), fields, (String) r.get("base_url"),
                 (String) r.get("auth_url"), notifyUrl(p, r), time(r.get("last_test_at")), (Boolean) r.get("last_test_ok"), (String) r.get("last_test_note"),
-                providers, allowSimulation, (String) r.get("billpay_namba"));
+                providers, allowSimulation, (String) r.get("billpay_namba"),
+                p == AggregatorProvider.SELCOM ? platformBase.replaceAll("/+$", "") + "/api/integrations/msingi-collections/selcom-c2b" : null,
+                p == AggregatorProvider.SELCOM && r.get("notify_token_enc") != null ? cipher.decrypt((String) r.get("notify_token_enc")) : null);
     }
 
     @Transactional
@@ -104,9 +110,14 @@ public class MsingiCollectionService {
         }
         String environment = "LIVE".equalsIgnoreCase(req.environment()) ? "LIVE" : "SANDBOX";
         String namba = req.billPayNamba() == null || req.billPayNamba().isBlank() ? null : req.billPayNamba().trim();
-        if (namba != null && !namba.matches("\\d{4}")) throw new BusinessRuleException("BILLPAY_NAMBA", "The BillPay-Namba is the 4 digits ClickPesa gives Msingi.");
-        if (namba != null && req.provider() != AggregatorProvider.CLICKPESA && req.provider() != AggregatorProvider.SIMULATED) {
-            throw new BusinessRuleException("BILLPAY_NAMBA", "BillPay control numbers come with a ClickPesa account.");
+        if (namba != null && req.provider() == AggregatorProvider.SELCOM && !namba.matches("\\d{4,12}")) {
+            throw new BusinessRuleException("BILLPAY_NAMBA", "The Selcom Pay merchant number is the 4 to 12 digits Selcom gives Msingi.");
+        }
+        if (namba != null && (req.provider() == AggregatorProvider.CLICKPESA || req.provider() == AggregatorProvider.SIMULATED) && !namba.matches("\\d{4}")) {
+            throw new BusinessRuleException("BILLPAY_NAMBA", "The BillPay-Namba is the 4 digits ClickPesa gives Msingi.");
+        }
+        if (namba != null && req.provider() == AggregatorProvider.AZAMPAY) {
+            throw new BusinessRuleException("BILLPAY_NAMBA", "Paying by reference comes with Selcom (Selcom Pay) or ClickPesa (BillPay).");
         }
         Map<String, Object> r = row();
         boolean same = req.provider().name().equals(r.get("provider"));
@@ -180,7 +191,13 @@ public class MsingiCollectionService {
      */
     @Transactional(readOnly = true)
     public Optional<String> billPayNamba() {
-        return active().map(a -> (String) row().get("billpay_namba")).filter(n -> n != null && !n.isBlank());
+        return payRef().filter(x -> x.provider() != AggregatorProvider.SELCOM).map(PayRef::number);
+    }
+
+    /** How invoices can be paid by reference now: through which aggregator, with which number (empty when not set up). */
+    @Transactional(readOnly = true)
+    public Optional<PayRef> payRef() {
+        return active().map(a -> new PayRef(a.provider(), (String) row().get("billpay_namba"))).filter(x -> x.number() != null && !x.number().isBlank());
     }
 
     /** The BillPay-Namba as saved, whether or not the account is switched on (a notification can arrive after it was switched off). */

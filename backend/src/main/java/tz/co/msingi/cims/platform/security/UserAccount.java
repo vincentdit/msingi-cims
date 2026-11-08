@@ -71,6 +71,41 @@ public class UserAccount extends BaseEntity {
 
     private OffsetDateTime lastLoginAt;
 
+    /** End of a temporary lock-out; null on a LOCKED account means it stays locked until an administrator unlocks it. */
+    private OffsetDateTime lockedUntil;
+
+    /**
+     * A wrong password or sign-in code. Every {@code max}-th failure in a row locks the account for {@code lockMinutes}, so a
+     * forgotten password costs a short wait rather than a call to the institution, and a stranger guessing a username cannot keep
+     * its owner out for long; at {@code 3 × max} failures in a row it stays locked until an administrator unlocks it.
+     *
+     * @return true when this failure locked the account
+     */
+    public boolean failedSignIn(int max, int lockMinutes) {
+        failedLogins++;
+        if (failedLogins >= 3 * max || (failedLogins % max == 0 && status != Status.ACTIVE)) {
+            status = Status.LOCKED;
+            lockedUntil = null;
+            return true;
+        }
+        if (failedLogins % max == 0) {
+            status = Status.LOCKED;
+            lockedUntil = OffsetDateTime.now().plusMinutes(lockMinutes);
+            return true;
+        }
+        return false;
+    }
+
+    /** A temporary lock-out that has run out opens the account again (the failures so far still count towards the permanent lock). */
+    public boolean lockOutEnded() {
+        if (status == Status.LOCKED && lockedUntil != null && !lockedUntil.isAfter(OffsetDateTime.now())) {
+            status = Status.ACTIVE;
+            lockedUntil = null;
+            return true;
+        }
+        return false;
+    }
+
     /** Set when the administrator issues a temporary password; the user chooses their own at the next sign-in. */
     @Column(nullable = false)
     private boolean mustChangePassword;

@@ -13,6 +13,8 @@ import LetterTemplatesPage from '../pages/staff/LetterTemplatesPage';
 import ImportsPage from '../pages/staff/ImportsPage';
 import StaffIntegrationsPage from '../pages/staff/IntegrationsPage';
 import AlumniPage from '../pages/staff/AlumniPage';
+import NactvetReturnsPage from '../pages/staff/NactvetReturnsPage';
+import VerificationsPage from '../pages/staff/VerificationsPage';
 import ResultTrendsPage from '../pages/staff/ResultTrendsPage';
 import ChangePasswordPage from '../pages/staff/ChangePasswordPage';
 import { MarksPage, OfferingPage } from '../pages/staff/MarksPages';
@@ -120,6 +122,8 @@ export default function StaffApp() {
         <Route path="imports" element={<ImportsPage />} />
         <Route path="integrations" element={<StaffIntegrationsPage />} />
         <Route path="alumni" element={<AlumniPage />} />
+        <Route path="nactvet-returns" element={<NactvetReturnsPage />} />
+        <Route path="verifications" element={<VerificationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/staff" replace />} />
     </Routes>
