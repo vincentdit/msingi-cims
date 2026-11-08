@@ -26,6 +26,7 @@
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <zxing.version>3.5.3</zxing.version>
         <its.exclude>none</its.exclude>
+        <spring-data-bom.version>2025.0.13</spring-data-bom.version>
         <micrometer.version>1.15.12</micrometer.version>
         <!-- Above the Spring Boot 3.5.12 defaults for the fixes found by the security check of 8 November 2026 (deploy/scripts/security-scan.sh):
              Tomcat CVE-2026-41293 and CVE-2026-29129, Spring Framework CVE-2026-47884 and CVE-2026-41842, jackson-core CVE-2026-68494.
