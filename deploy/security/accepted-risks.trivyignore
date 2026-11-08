@@ -1,0 +1,8 @@
+# Findings Msingi has reviewed and accepted, with the reason and the date to look again. security-scan.sh passes this file to
+# Trivy and lists how many were set aside; nothing here is hidden from the report. Remove a line as soon as a fix is available.
+
+# postgres:16-alpine (database and backup): the Go standard library inside gosu, the helper that drops root once when the
+# container starts. gosu makes no network connection and parses no outside input, so neither flaw can be reached. Fixed when
+# the official image rebuilds gosu. Reviewed 2026-11-08 by Eng. Vincent J. Maro; look again 2026-12-08.
+CVE-2025-68121
+CVE-2025-61726

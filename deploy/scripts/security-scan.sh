@@ -19,11 +19,14 @@ echo "CIMS security check — $(hostname) — $(date '+%F %H:%M %Z')"
 echo
 
 echo "== 1. Known vulnerabilities in the running images (HIGH and CRITICAL with a fix available)"
+accepted=$(grep -cE '^CVE-' "$CIMS_HOME/deploy/security/accepted-risks.trivyignore" 2>/dev/null || echo 0)
+echo "   (set aside as reviewed: $accepted, with reasons in deploy/security/accepted-risks.trivyignore)"
 images=$(cims ps --format '{{.Image}}' 2>/dev/null | sort -u)
 [ -n "$images" ] || echo "   no running containers found"
 for img in $images; do
-  out=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v cims-trivy-cache:/root/.cache aquasec/trivy:0.56.2 image \
-        --quiet --severity HIGH,CRITICAL --ignore-unfixed --format table "$img" 2>&1)
+  out=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v cims-trivy-cache:/root/.cache \
+        -v "$CIMS_HOME/deploy/security/accepted-risks.trivyignore:/accepted.trivyignore:ro" aquasec/trivy:0.56.2 image \
+        --quiet --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /accepted.trivyignore --format table "$img" 2>&1)
   n=$(printf '%s\n' "$out" | grep -cE '│ (HIGH|CRITICAL) ' || true)
   high=$((high + n))
   if [ "$n" -eq 0 ]; then echo "   $img: none"; else echo "   $img: $n"; printf '%s\n' "$out" | grep -E '│ (HIGH|CRITICAL) ' | head -20 | sed 's/^/     /'; fi

@@ -56,7 +56,7 @@ services:
     restart: unless-stopped
 
   proxy:
-    build: ./nginx                               # nginx 1.28 with Alpine's security fixes applied at build time
+    build: ./nginx                               # nginx 1.29 mainline with Alpine's security fixes applied at build time
     image: ${CIMS_IMAGE_PREFIX:-msingi}/cims-proxy:${CIMS_VERSION:-latest}
     restart: unless-stopped
     depends_on: [backend, frontend]
