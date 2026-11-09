@@ -1,7 +1,10 @@
 # Reviewed and accepted findings (security-scan.sh passes this file to Trivy). Remove a line as soon as a fix is available.
 # postgres:16-alpine: Go standard library inside gosu, which only drops root at container start (no network, no outside input).
 # Reviewed 2026-11-08 by Eng. Vincent J. Maro; look again 2026-12-08.
+# Since 2026-11-09 security-scan.sh skips the gosu file itself (--skip-files), so new Go findings in it no longer need a line each;
+# the IDs below stay as a record. Check monthly that postgres:16-alpine has a rebuilt gosu, then remove the skip.
 CVE-2025-68121
 CVE-2025-61726
 CVE-2025-61729
 CVE-2026-111943
+CVE-2026-25679

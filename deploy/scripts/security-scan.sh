@@ -26,7 +26,7 @@ images=$(cims ps --format '{{.Image}}' 2>/dev/null | sort -u)
 for img in $images; do
   out=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v cims-trivy-cache:/root/.cache \
         -v "$CIMS_HOME/deploy/security/accepted-risks.trivyignore:/accepted.trivyignore:ro" aquasec/trivy:0.56.2 image \
-        --quiet --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /accepted.trivyignore --format table "$img" 2>&1)
+        --quiet --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /accepted.trivyignore --skip-files usr/local/bin/gosu --skip-files /usr/local/bin/gosu --format table "$img" 2>&1)
   n=$(printf '%s\n' "$out" | grep -cE '│ (HIGH|CRITICAL) ' || true)
   high=$((high + n))
   if [ "$n" -eq 0 ]; then echo "   $img: none"; else echo "   $img: $n"; printf '%s\n' "$out" | grep -E '│ (HIGH|CRITICAL) ' | head -20 | sed 's/^/     /'; fi
