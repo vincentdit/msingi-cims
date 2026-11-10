@@ -49,6 +49,11 @@ import { TransfersPage } from '../pages/staff/TransferPages';
 import { AppealsPage, ExamsOfficePage } from '../pages/staff/ExamsOfficePages';
 import FinancePage from '../pages/staff/FinancePages';
 import { ApplicationsPage, ProgrammesPage, StaffLoginPage, WindowDetailPage, WindowsPage } from '../pages/staff/StaffPages';
+import MaterialsPage from '../pages/staff/MaterialsPage';
+import LibraryPage from '../pages/staff/LibraryPage';
+import { HrPage, StaffMemberPage } from '../pages/staff/HrPages';
+import LeavePage from '../pages/staff/LeavePage';
+import AssetsPage from '../pages/staff/AssetsPage';
 
 export default function StaffApp() {
   return (
@@ -124,6 +129,12 @@ export default function StaffApp() {
         <Route path="alumni" element={<AlumniPage />} />
         <Route path="nactvet-returns" element={<NactvetReturnsPage />} />
         <Route path="verifications" element={<VerificationsPage />} />
+        <Route path="my-teaching/materials/:offeringId" element={<MaterialsPage />} />
+        <Route path="library" element={<LibraryPage />} />
+        <Route path="hr" element={<HrPage />} />
+        <Route path="hr/:id" element={<StaffMemberPage />} />
+        <Route path="leave" element={<LeavePage />} />
+        <Route path="assets" element={<AssetsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/staff" replace />} />
     </Routes>

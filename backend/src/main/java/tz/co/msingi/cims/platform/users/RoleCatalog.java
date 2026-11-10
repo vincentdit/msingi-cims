@@ -55,7 +55,13 @@ public final class RoleCatalog {
             info(Role.SPONSOR_OFFICER, "Sponsor Officer",
                     "Someone from a sponsor (e.g. HESLB) who sees only that sponsor's students, invoices and statements.", Scope.SPONSOR),
             info(Role.AUDITOR, "Auditor",
-                    "Reads records and the audit trail; changes nothing."));
+                    "Reads records and the audit trail; changes nothing."),
+            info(Role.LIBRARIAN, "Librarian",
+                    "Keeps the library catalogue, lends and takes back books, and charges or waives library fines."),
+            info(Role.HR_OFFICER, "Human Resources Officer",
+                    "Keeps staff records and qualifications, leave types and balances, and approves leave."),
+            info(Role.STORES_OFFICER, "Stores and Assets Officer",
+                    "Keeps the asset register and its verification, and receives and issues stores."));
 
     private static Map.Entry<Role, RoleInfo> info(Role role, String label, String description, Scope... scopes) {
         List<Scope> s = scopes.length == 0 ? List.of(Scope.INSTITUTION) : List.of(scopes);

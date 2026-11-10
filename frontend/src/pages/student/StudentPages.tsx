@@ -34,6 +34,7 @@ import { PasswordField } from '../../components/PasswordFields';
 import { InstallAppCard } from '../../components/AppInstall';
 import { savedCopyAt, startOfflineView } from '../../api/offline';
 import StudentFamilyCard from './StudentFamilyCard';
+import { StudyCard } from './StudentStudyPages';
 
 const student = { realm: 'student' as const };
 
@@ -109,6 +110,7 @@ export function StudentHome() {
   return (
     <Stack spacing={2}>
       <InstallAppCard />
+      <StudyCard />
       <Card sx={{ borderRadius: 3, bgcolor: 'primary.main', color: 'primary.contrastText', border: 0 }}>
         <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
           <Typography sx={{ opacity: 0.85 }}>{t('student.hello', { name: d.firstName })}</Typography>

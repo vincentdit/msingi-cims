@@ -50,6 +50,9 @@ const BY_ROLE: Record<string, string[]> = {
   CLEARANCE_OFFICER: ['Registry Officer', 'Librarian', 'Storekeeper'],
   SPONSOR_OFFICER: ['Loans Officer'],
   AUDITOR: ['Internal Auditor'],
+  LIBRARIAN: ['Librarian', 'Assistant Librarian', 'Library Assistant'],
+  HR_OFFICER: ['Human Resources Officer', 'Human Resources Manager', 'Administrative Officer'],
+  STORES_OFFICER: ['Supplies Officer', 'Storekeeper', 'Procurement Officer', 'Estates Officer'],
 };
 
 type Option = { title: string; group: string };

@@ -39,6 +39,10 @@ import AuditIcon from '@mui/icons-material/Policy';
 import ApprovalsIcon from '@mui/icons-material/Inbox';
 import OfficeIcon from '@mui/icons-material/FactCheck';
 import AppealIcon from '@mui/icons-material/Gavel';
+import LibraryIcon from '@mui/icons-material/LocalLibraryOutlined';
+import LeaveIcon from '@mui/icons-material/BeachAccessOutlined';
+import HrIcon from '@mui/icons-material/BadgeOutlined';
+import AssetsIcon from '@mui/icons-material/Inventory2Outlined';
 import { Badge } from '@mui/material';
 import KeyIcon from '@mui/icons-material/Key';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -119,6 +123,12 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'clearance', to: '/staff/clearance', label: 'Clearance', icon: <ClearanceIcon /> },
     { page: 'hostels', to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon /> },
     { page: 'ipt', to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon /> },
+    { page: 'library', to: '/staff/library', label: 'Library', icon: <LibraryIcon /> },
+  ] },
+  { title: 'Staff and property', items: [
+    { page: 'leave', to: '/staff/leave', label: 'Leave', icon: <LeaveIcon /> },
+    { page: 'hr', to: '/staff/hr', label: 'Human resources', icon: <HrIcon /> },
+    { page: 'assets', to: '/staff/assets', label: 'Assets and stores', icon: <AssetsIcon /> },
   ] },
   { title: 'Finance', items: [
     { page: 'financeOverview', to: '/staff/finance-overview', label: 'Finance overview', icon: <FinanceIcon /> },

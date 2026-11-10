@@ -239,6 +239,7 @@ function ModuleCard({ m, onCheckIn }: { m: MyModule; onCheckIn: () => void }) {
         <Button size="small" variant="contained" onClick={() => navigate(`/staff/teaching/${m.offeringId}`)}>Attendance</Button>
         {m.canRecord && !m.openCheckInSessionId && <Button size="small" startIcon={<QrIcon />} onClick={onCheckIn}>Self check-in</Button>}
         <Button size="small" onClick={() => navigate(`/staff/marks/${m.offeringId}`)}>Marks</Button>
+        <Button size="small" onClick={() => navigate(`/staff/my-teaching/materials/${m.offeringId}`)}>Materials</Button>
         <Box sx={{ flexGrow: 1 }} />
         <ClassListButton offeringId={m.offeringId} code={m.code} size="small" />
       </CardActions>

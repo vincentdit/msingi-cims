@@ -10,6 +10,7 @@ import StudentResultsPage from '../pages/student/StudentResultsPage';
 import CheckInPage from '../pages/student/CheckInPage';
 import StudentTimetablePage from '../pages/student/StudentTimetablePage';
 
+import { StudentLibraryPage, StudentModulePage, StudentModulesPage } from '../pages/student/StudentStudyPages';
 export default function StudentApp() {
   return (
     <Routes>
@@ -21,6 +22,9 @@ export default function StudentApp() {
         <Route path="results" element={<StudentResultsPage />} />
         <Route path="check-in" element={<CheckInPage />} />
         <Route path="fees" element={<StudentFees />} />
+        <Route path="modules" element={<StudentModulesPage />} />
+        <Route path="modules/:id" element={<StudentModulePage />} />
+        <Route path="library" element={<StudentLibraryPage />} />
         <Route path="notices" element={<StudentNotices />} />
         <Route path="almanac" element={<PublishedAlmanac realm="student" />} />
         <Route path="profile" element={<StudentProfilePage />} />

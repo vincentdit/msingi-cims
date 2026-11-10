@@ -7,7 +7,7 @@
 
 const PREFIX = 'cims.offline.';
 const VIEW_FLAG = 'cims.student.offlineView';
-const PATHS = ['/api/student/dashboard', '/api/student/account', '/api/student/results', '/api/student/timetable', '/api/student/attendance',
+const PATHS = ['/api/student/dashboard', '/api/student/account', '/api/student/results', '/api/student/timetable', '/api/student/attendance', '/api/student/modules', '/api/student/library',
   '/api/student/notices', '/api/student/profile'];
 
 interface Saved { at: number; data: unknown }

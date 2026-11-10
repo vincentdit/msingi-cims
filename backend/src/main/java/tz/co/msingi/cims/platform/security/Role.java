@@ -20,6 +20,9 @@ public enum Role {
     CLEARANCE_OFFICER,
     SPONSOR_OFFICER,
     AUDITOR,
+    LIBRARIAN,
+    HR_OFFICER,
+    STORES_OFFICER,
     APPLICANT,
     STUDENT;
 

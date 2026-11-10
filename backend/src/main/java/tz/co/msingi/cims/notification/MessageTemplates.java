@@ -139,6 +139,30 @@ public final class MessageTemplates {
                 List.of("institution", "code"), Set.of("code"),
                 "{institution}: your family portal code is {code}. It is valid for 10 minutes. Do not share it.",
                 "{institution}: namba yako ya kuingia tovuti ya wazazi ni {code}. Inatumika kwa dakika 10. Usimpe mtu.", s);
+        add("ASSIGNMENT_POSTED", "New assignment", "A lecturer posts an assignment and chooses to tell the class", "Teaching",
+                List.of("institution", "module", "title", "due"), Set.of("module", "title", "due"),
+                "{institution}: new assignment in {module}: {title}. Hand in by {due} in the student app.",
+                "{institution}: kazi mpya ya {module}: {title}. Wasilisha kabla ya {due} kupitia programu ya mwanafunzi.", s);
+        add("LIBRARY_DUE_SOON", "Library book due tomorrow", "A borrowed library item is due back tomorrow", "Library",
+                List.of("institution", "title", "due"), Set.of("title", "due"),
+                "{institution} library: {title} is due back on {due}. Return or renew it to avoid a fine.",
+                "{institution} maktaba: {title} inatakiwa kurudishwa tarehe {due}. Irudishe au iongezee muda kuepuka faini.", s);
+        add("LIBRARY_OVERDUE", "Library book overdue", "A borrowed library item was not returned on its due date", "Library",
+                List.of("institution", "title", "due", "finePerDay"), Set.of("title", "due"),
+                "{institution} library: {title} was due on {due}. Please return it; a fine of {finePerDay} a day is charged.",
+                "{institution} maktaba: {title} ilitakiwa kurudishwa tarehe {due}. Tafadhali irudishe; faini ya {finePerDay} kwa siku inatozwa.", s);
+        add("LIBRARY_FINE", "Library fine", "A library fine or the price of a lost item is added to the student's account", "Library",
+                List.of("institution", "title", "amount", "controlNo"), Set.of("title", "amount"),
+                "{institution} library: {amount} charged for {title}. Pay with number {controlNo}.",
+                "{institution} maktaba: {amount} imetozwa kwa {title}. Lipa kwa namba {controlNo}.", s);
+        add("LEAVE_APPROVED", "Leave approved", "A staff member's leave request is approved", "Staff",
+                List.of("institution", "leave", "from", "to", "days"), Set.of("leave", "from", "to"),
+                "{institution}: your {leave} from {from} to {to} ({days} working days) is approved.",
+                "{institution}: {leave} yako kuanzia {from} hadi {to} (siku {days} za kazi) imeidhinishwa.", s);
+        add("LEAVE_NOT_APPROVED", "Leave not approved", "A staff member's leave request is not approved", "Staff",
+                List.of("institution", "leave", "from", "to", "note"), Set.of("leave", "from"),
+                "{institution}: your {leave} request from {from} to {to} was not approved. {note}",
+                "{institution}: ombi lako la {leave} kuanzia {from} hadi {to} halijaidhinishwa. {note}", s);
         add("FEE_REMINDER", "Instalment reminder", "An instalment of the year's fees is due soon, due today or overdue", "Fees",
                 List.of("amount", "instalment", "when", "controlNo", "description", "institution"), Set.of("amount"),
                 "{institution}: instalment {instalment} of {description}, {amount}, {when}. Pay with number {controlNo}.",

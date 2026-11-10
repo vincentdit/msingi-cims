@@ -154,6 +154,12 @@ class ClearanceAndGraduationIT {
         assertThat(queue).hasSize(2);
         s.call(get("/api/clearance/offices/" + office.get("LIBRARY") + "/queue"), warden, null).andExpect(status().isForbidden());
         assertThat(s.body(s.call(get("/api/student/clearance"), f.aToken, null)).at("/clearance/status").asString()).isEqualTo("IN_PROGRESS");
+        // the library office cannot clear a student who still has a book on loan
+        long book = s.body(s.call(post("/api/library/items"), admin, "{\"title\":\"Workshop Technology\",\"kind\":\"BOOK\"}")).at("/item/id").asLong();
+        s.call(post("/api/library/items/" + book + "/copies"), admin, "{\"barcode\":\"WT-1\"}").andExpect(status().isOk());
+        s.call(post("/api/library/issue"), admin, "{\"barcode\":\"WT-1\",\"borrowerType\":\"STUDENT\",\"borrowerId\":" + f.aId + "}").andExpect(status().isOk());
+        s.call(put("/api/clearance/items/" + lib), librarian, "{\"status\":\"CLEARED\"}").andExpect(jsonPath("$.code").value("LIBRARY_ITEMS_OUT"));
+        s.call(post("/api/library/return"), admin, "{\"barcode\":\"WT-1\"}").andExpect(status().isOk());
         s.call(put("/api/clearance/items/" + lib), librarian, "{\"status\":\"CLEARED\",\"note\":\"Books returned\"}").andExpect(status().isOk());
         mine = s.body(s.call(get("/api/student/clearance"), f.aToken, null));
         assertThat(mine.at("/clearance/status").asString()).isEqualTo("CLEARED");

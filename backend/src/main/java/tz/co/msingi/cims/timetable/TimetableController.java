@@ -44,6 +44,9 @@ public class TimetableController {
     /** Who may look at the timetables of the institution. */
     private static final String STAFF = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','PROGRAMME_COORDINATOR',"
             + "'EXAMINATIONS_OFFICER','LECTURER','ASSESSOR','REGISTRAR','MANAGEMENT_VIEWER')";
+    /** The rooms are also where assets are kept. */
+    private static final String STAFF_OR_STORES = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','PROGRAMME_COORDINATOR',"
+            + "'EXAMINATIONS_OFFICER','LECTURER','ASSESSOR','REGISTRAR','MANAGEMENT_VIEWER','STORES_OFFICER','BURSAR','ACCOUNTANT','AUDITOR')";
     /** Who may change something (each service checks the exact office). */
     private static final String KEEPERS = "hasAnyRole('INSTITUTION_ADMIN','DEPUTY_PRINCIPAL_ACADEMIC','HEAD_OF_DEPARTMENT','EXAMINATIONS_OFFICER')";
 
@@ -55,7 +58,7 @@ public class TimetableController {
     // ------------------------------------------------------------------ venues
 
     @GetMapping("/api/timetable/venues")
-    @PreAuthorize(STAFF)
+    @PreAuthorize(STAFF_OR_STORES)
     public List<VenueView> venues() {
         return classes.venues();
     }

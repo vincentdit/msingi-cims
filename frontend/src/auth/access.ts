@@ -20,6 +20,9 @@ export const ROLES = {
   CLEARANCE: 'CLEARANCE_OFFICER',
   SPONSOR: 'SPONSOR_OFFICER',
   AUDITOR: 'AUDITOR',
+  LIBRARIAN: 'LIBRARIAN',
+  HR: 'HR_OFFICER',
+  STORES: 'STORES_OFFICER',
 } as const;
 
 const R = ROLES;
@@ -30,7 +33,7 @@ export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'healthInsurance' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
   | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help' | 'subscription'
-  | 'almanac' | 'organisation' | 'nactvetReturns' | 'verifications';
+  | 'almanac' | 'organisation' | 'nactvetReturns' | 'verifications' | 'library' | 'hr' | 'leave' | 'assets';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
@@ -89,6 +92,11 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // Deputy Principal (Academic), keep them)
   almanac: Object.values(R),
   organisation: Object.values(R),
+  library: [R.ADMIN, R.LIBRARIAN, R.MANAGEMENT, R.AUDITOR],
+  hr: [R.ADMIN, R.HR, R.MANAGEMENT, R.AUDITOR],
+  // every member of staff asks for leave here; Heads of Department and HR also decide
+  leave: Object.values(R),
+  assets: [R.ADMIN, R.STORES, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR],
 };
 
 export const can = (roles: readonly string[] | undefined, page: PageKey) => !!roles?.some((r) => PAGE_ROLES[page].includes(r));
@@ -101,6 +109,7 @@ const PATH_PAGE: Record<string, PageKey> = {
   clearance: 'clearance', hostels: 'hostels', ipt: 'ipt', 'finance-overview': 'financeOverview', sponsors: 'sponsors', waivers: 'waivers', finance: 'finance', notices: 'notices', messages: 'messages', users: 'users', audit: 'audit',
   institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations', helpdesk: 'helpdesk', help: 'help', 'msingi-subscription': 'subscription',
   almanac: 'almanac', organisation: 'organisation', 'nactvet-returns': 'nactvetReturns', verifications: 'verifications',
+  library: 'library', hr: 'hr', leave: 'leave', assets: 'assets',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {
@@ -133,4 +142,5 @@ export const ROLE_LABEL: Record<string, string> = {
   ADMISSIONS_OFFICER: 'Admissions Officer', REGISTRAR: 'Registrar', HEAD_OF_DEPARTMENT: 'Head of Department', PROGRAMME_COORDINATOR: 'Programme Coordinator',
   LECTURER: 'Lecturer', ASSESSOR: 'Assessor (NVA)', EXAMINATIONS_OFFICER: 'Examinations Officer', BURSAR: 'Bursar', ACCOUNTANT: 'Accountant',
   HOSTEL_WARDEN: 'Hostel Warden', IPT_COORDINATOR: 'IPT Coordinator', CLEARANCE_OFFICER: 'Clearance Officer', SPONSOR_OFFICER: 'Sponsor Officer', AUDITOR: 'Auditor',
+  LIBRARIAN: 'Librarian', HR_OFFICER: 'Human Resources Officer', STORES_OFFICER: 'Stores and Assets Officer',
 };

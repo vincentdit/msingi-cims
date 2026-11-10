@@ -74,6 +74,7 @@ public class ClearanceService {
     private final ExamAccess access;
     private final Messaging messaging;
     private final AuditService audit;
+    private final tz.co.msingi.cims.library.LibraryService library;
 
     // ------------------------------------------------------------------ offices
 
@@ -293,6 +294,10 @@ public class ClearanceService {
         if (status == ClearanceItem.Status.PENDING) throw new BusinessRuleException("INVALID_DECISION", "Clear or hold");
         String n = note == null || note.isBlank() ? null : note.trim();
         if (status == ClearanceItem.Status.HELD && n == null) throw new BusinessRuleException("REASON_REQUIRED", "Say why the student is held and what they must do");
+        if (status == ClearanceItem.Status.CLEARED && "LIBRARY".equals(i.getOffice().getCode())) {
+            int out = library.outstanding(s.getId());
+            if (out > 0) throw new BusinessRuleException("LIBRARY_ITEMS_OUT", "The student still has " + out + (out == 1 ? " library item" : " library items") + " on loan");
+        }
         i.setStatus(status);
         i.setNote(n);
         i.setDecidedByName(CurrentUser.name());

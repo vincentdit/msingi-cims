@@ -44,7 +44,7 @@ export default function StudentLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dash = useQuery({ queryKey: ['student', 'dashboard'], queryFn: () => api<StudentDashboard>('/api/student/dashboard', { realm: 'student' }) });
-  const current = pathname.startsWith('/student/notices') || pathname.startsWith('/student/help') || pathname.startsWith('/student/almanac') ? false
+  const current = ['/student/notices', '/student/help', '/student/almanac', '/student/modules', '/student/library'].some((p) => pathname.startsWith(p)) ? false
     : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
   const label = (key: string) => t(`student.${key}`);

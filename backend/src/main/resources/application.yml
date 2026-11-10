@@ -38,8 +38,8 @@ spring:
       fail-on-null-for-primitives: false
   servlet:
     multipart:
-      max-file-size: 6MB
-      max-request-size: 16MB    # helpdesk messages carry up to 3 files of 5 MB
+      max-file-size: 21MB
+      max-request-size: 24MB    # learning materials up to 20 MB; helpdesk messages carry up to 3 files of 5 MB
   threads:
     virtual:
       enabled: true
