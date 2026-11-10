@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.console.billing;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public class MsingiStatementService {
 
     private static final ZoneId TZ = ZoneId.of("Africa/Dar_es_Salaam");
-    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper JSON = new ObjectMapper();   // Jackson 3 reads java.time types without a module
     private static final Pattern REF = Pattern.compile("(?<!\\d)(\\d{4})?(7\\d{11})(?!\\d)");
     private static final List<DateTimeFormatter> DATES = List.of(DateTimeFormatter.ISO_LOCAL_DATE, DateTimeFormatter.ofPattern("d/M/yyyy"),
             DateTimeFormatter.ofPattern("d-M-yyyy"), DateTimeFormatter.ofPattern("d.M.yyyy"), DateTimeFormatter.ofPattern("d-MMM-yyyy", Locale.ENGLISH),
@@ -112,7 +112,7 @@ public class MsingiStatementService {
                     insert into billing_statement_imports (file_name, provider, total_lines, recorded, already, unmatched, result, imported_by_name)
                     values (?, ?, ?, ?, ?, ?, ?, ?) returning id""", Long.class, clean(fileName), bank.name(), out.size(), recorded, already, unmatched,
                     JSON.writeValueAsString(out), CurrentUser.platformName());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
         audit.record("BILLING_STATEMENT_IMPORTED", null, "BillingStatementImport", id,

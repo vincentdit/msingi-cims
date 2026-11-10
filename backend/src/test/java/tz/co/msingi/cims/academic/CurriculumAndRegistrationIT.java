@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.academic;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,7 +78,7 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/academic/intakes"), admin, intake).andExpect(status().isCreated());
         s.call(post("/api/academic/intakes"), admin, intake).andExpect(jsonPath("$.code").value("INTAKE_EXISTS"));
         JsonNode list = s.body(s.call(get("/api/academic/intakes"), officer, null).andExpect(status().isOk()));
-        assertThat(list.findValuesAsText("code")).contains("JUNE_TEST");
+        assertThat(list.findValuesAsString("code")).contains("JUNE_TEST");
     }
 
     @Test
@@ -92,7 +92,7 @@ class CurriculumAndRegistrationIT {
                 slot(e2, 1, 1, "ELECTIVE")), "")).andExpect(status().isCreated()));
         long id = c.get("id").asLong();
         assertThat(c.get("curriculumVersion").asInt()).isEqualTo(1);
-        assertThat(c.get("problems").findValuesAsText("")).isEmpty();
+        assertThat(c.get("problems").findValuesAsString("")).isEmpty();
         assertThat(texts(c.get("problems"))).containsExactly("Year 1 semester 1: say how many of the 2 electives a student takes", "Year 1 semester 2: no modules");
         s.call(post("/api/academic/curricula"), hod, curriculum(List.of(slot(m1, 3, 1, "CORE")), ""))
                 .andExpect(jsonPath("$.code").value("DRAFT_EXISTS"));
@@ -105,8 +105,8 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/academic/curricula/" + id + "/approve"), hod, null).andExpect(status().isForbidden());
         // the HOD prepared it: the Deputy Principal approves (the admin could too, but not whoever created it)
         JsonNode approved = s.body(s.call(post("/api/academic/curricula/" + id + "/approve"), dpa, null).andExpect(status().isOk()));
-        assertThat(approved.get("status").asText()).isEqualTo("APPROVED");
-        assertThat(approved.get("approvedByName").asText()).isEqualTo("Staff dpa");
+        assertThat(approved.get("status").asString()).isEqualTo("APPROVED");
+        assertThat(approved.get("approvedByName").asString()).isEqualTo("Staff dpa");
 
         s.call(put("/api/academic/curricula/" + id), hod, curriculum(List.of(slot(m1, 1, 1, "CORE")), "")).andExpect(jsonPath("$.code").value("NOT_A_DRAFT"));
         s.call(put("/api/academic/modules/" + m1), hod, moduleJson("ITU 04101", 15)).andExpect(jsonPath("$.code").value("MODULE_IN_USE"));
@@ -117,8 +117,8 @@ class CurriculumAndRegistrationIT {
         assertThat(v2.get("modules").size()).isEqualTo(4);
         s.call(post("/api/academic/curricula/" + v2.get("id").asLong() + "/approve"), dpa, null).andExpect(status().isOk()); // HOD prepared v2
         JsonNode list = s.body(s.call(get("/api/academic/curricula?programmeId=" + s.inst.programmeId()), viewer, null));
-        assertThat(list.findValuesAsText("status")).containsExactly("APPROVED", "APPROVED");
-        assertThat(s.body(s.call(get("/api/academic/modules"), viewer, null)).findValuesAsText("usedInCurricula")).contains("2");
+        assertThat(list.findValuesAsString("status")).containsExactly("APPROVED", "APPROVED");
+        assertThat(s.body(s.call(get("/api/academic/modules"), viewer, null)).findValuesAsString("usedInCurricula")).contains("2");
 
         // another institution sees none of it
         String other = "D" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -137,7 +137,7 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/academic/semesters"), registrar, semester(1, "2027-09-27", "2028-02-10", TODAY, TODAY.plusDays(10), null)).andExpect(status().isForbidden());
         JsonNode sem = s.body(s.call(post("/api/academic/semesters"), dpa, semester(1, "2027-09-27", "2028-02-10", TODAY.minusDays(1), TODAY.plusDays(10),
                 TODAY.plusDays(20))).andExpect(status().isCreated()));
-        assertThat(sem.get("window").asText()).isEqualTo("OPEN");
+        assertThat(sem.get("window").asString()).isEqualTo("OPEN");
         s.call(post("/api/academic/semesters"), dpa, semester(1, "2027-09-27", "2028-02-10", TODAY, TODAY.plusDays(10), null))
                 .andExpect(jsonPath("$.code").value("DUPLICATE_SEMESTER"));
         s.call(post("/api/academic/calendar-events"), dpa, "{\"academicYearId\":" + yearId
@@ -146,8 +146,8 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/academic/calendar-events"), dpa, "{\"academicYearId\":" + yearId + ",\"semesterId\":" + sem.get("id").asLong()
                 + ",\"kind\":\"EXAMINATIONS\",\"title\":\"Semester 1 examinations\",\"startDate\":\"2028-01-24\",\"endDate\":\"2028-02-04\"}").andExpect(status().isCreated());
         JsonNode cal = s.body(s.call(get("/api/academic/calendar?academicYearId=" + yearId), viewer, null).andExpect(status().isOk()));
-        assertThat(cal.at("/semesters/0/name").asText()).isEqualTo("Semester 1");
-        assertThat(cal.at("/events/0/semesterName").asText()).isEqualTo("Semester 1");
+        assertThat(cal.at("/semesters/0/name").asString()).isEqualTo("Semester 1");
+        assertThat(cal.at("/events/0/semesterName").asString()).isEqualTo("Semester 1");
     }
 
     @Test
@@ -167,25 +167,25 @@ class CurriculumAndRegistrationIT {
         JsonNode handover = s.body(s.call(post("/api/registry/windows/" + s.inst.windowId() + "/handover"), registrar, "{}"));
         List<Long> ids = new ArrayList<>();
         handover.get("students").forEach(x -> ids.add(x.get("studentId").asLong()));
-        String aPhone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asText();
+        String aPhone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asString();
         long aId = -1, bId = -1;
         String aReg = null, bReg = null;
         for (long id : ids) {
             JsonNode d = s.body(s.call(get("/api/registry/students/" + id), registrar, null));
-            if (d.at("/summary/phone").asText().equals(aPhone)) { aId = id; aReg = d.at("/summary/registrationNo").asText(); }
-            else { bId = id; bReg = d.at("/summary/registrationNo").asText(); }
+            if (d.at("/summary/phone").asString().equals(aPhone)) { aId = id; aReg = d.at("/summary/registrationNo").asString(); }
+            else { bId = id; bReg = d.at("/summary/registrationNo").asString(); }
         }
         String aTok = studentToken(aReg), bTok = studentToken(bReg);
 
         // not yet through first registration
-        assertThat(s.body(s.call(get("/api/student/semester-registration"), aTok, null).andExpect(status().isOk())).get("state").asText()).isEqualTo("NOT_ACTIVE");
+        assertThat(s.body(s.call(get("/api/student/semester-registration"), aTok, null).andExpect(status().isOk())).get("state").asString()).isEqualTo("NOT_ACTIVE");
         firstRegistration(aId);
         firstRegistration(bId);
 
         JsonNode page = s.body(s.call(get("/api/student/semester-registration"), aTok, null));
-        assertThat(page.get("state").asText()).isEqualTo("OPEN");
-        assertThat(page.get("core").findValuesAsText("code")).containsExactly("ITU 04101", "ITU 04102");
-        assertThat(page.get("electives").findValuesAsText("code")).containsExactly("ITU 04103", "ITU 04104");
+        assertThat(page.get("state").asString()).isEqualTo("OPEN");
+        assertThat(page.get("core").findValuesAsString("code")).containsExactly("ITU 04101", "ITU 04102");
+        assertThat(page.get("electives").findValuesAsString("code")).containsExactly("ITU 04103", "ITU 04104");
         assertThat(page.get("minElectives").asInt()).isEqualTo(1);
         assertThat(page.at("/clearance/cleared").asBoolean()).isTrue();
 
@@ -194,13 +194,13 @@ class CurriculumAndRegistrationIT {
         s.call(post(url), aTok, submit(semId, List.of(m3), true)).andExpect(jsonPath("$.code").value("NOT_AN_ELECTIVE"));
         s.call(post(url), aTok, submit(semId, List.of(e1), false)).andExpect(jsonPath("$.code").value("DETAILS_NOT_CONFIRMED"));
         JsonNode mine = s.body(s.call(post(url), aTok, submit(semId, List.of(e2), true)).andExpect(status().isOk()));
-        assertThat(mine.at("/registration/status").asText()).isEqualTo("SUBMITTED");
+        assertThat(mine.at("/registration/status").asString()).isEqualTo("SUBMITTED");
         assertThat(mine.at("/registration/totalCredits").decimalValue()).isEqualByComparingTo("30");
-        assertThat(mine.at("/registration/modules").findValuesAsText("code")).containsExactly("ITU 04101", "ITU 04102", "ITU 04104");
+        assertThat(mine.at("/registration/modules").findValuesAsString("code")).containsExactly("ITU 04101", "ITU 04102", "ITU 04104");
         assertThat(mine.at("/registration/late").asBoolean()).isFalse();
         // a change of mind before approval replaces the elective
         mine = s.body(s.call(post(url), aTok, submit(semId, List.of(e1), true)));
-        assertThat(mine.at("/registration/modules").findValuesAsText("code")).containsExactly("ITU 04101", "ITU 04102", "ITU 04103");
+        assertThat(mine.at("/registration/modules").findValuesAsString("code")).containsExactly("ITU 04101", "ITU 04102", "ITU 04103");
 
         // the second student registers after the Bursar requires the first instalment: blocked
         requireFirstInstalment();
@@ -209,12 +209,12 @@ class CurriculumAndRegistrationIT {
         // Registry approves; approval re-checks fees, so the first student must now pay as well
         long regId = mine.at("/registration/id").asLong();
         JsonNode list = s.body(s.call(get("/api/registry/semester-registrations?semesterId=" + semId), viewer, null).andExpect(status().isOk()));
-        assertThat(list.findValuesAsText("registrationNo")).containsExactly(aReg);
+        assertThat(list.findValuesAsString("registrationNo")).containsExactly(aReg);
         s.call(post("/api/registry/semester-registrations/" + regId + "/approve"), viewer, null).andExpect(status().isForbidden());
         s.call(post("/api/registry/semester-registrations/" + regId + "/approve"), registrar, null).andExpect(jsonPath("$.code").value("FINANCIAL_CLEARANCE_REQUIRED"));
         JsonNode all = s.body(s.call(post("/api/registry/semester-registrations/approve-all"), registrar, "{\"semesterId\":" + semId + "}"));
         assertThat(all.get("approved").asInt()).isZero();
-        assertThat(all.get("skipped").get(0).asText()).startsWith(aReg + ": TZS ");
+        assertThat(all.get("skipped").get(0).asString()).startsWith(aReg + ": TZS ");
         payAnnualFees(a);
         s.call(post("/api/registry/semester-registrations/" + regId + "/approve"), registrar, null)
                 .andExpect(jsonPath("$.status").value("APPROVED")).andExpect(jsonPath("$.decidedByName").value("Staff registrar"));
@@ -226,7 +226,7 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/registry/semester-registrations/" + bReg2 + "/reject"), registrar, "{\"note\":\"\"}").andExpect(status().isBadRequest());
         s.call(post("/api/registry/semester-registrations/" + bReg2 + "/reject"), registrar, "{\"note\":\"Take ITU 04103 as advised by your HOD\"}")
                 .andExpect(jsonPath("$.status").value("REJECTED"));
-        assertThat(s.body(s.call(get(url), bTok, null)).at("/registration/decisionNote").asText()).isEqualTo("Take ITU 04103 as advised by your HOD");
+        assertThat(s.body(s.call(get(url), bTok, null)).at("/registration/decisionNote").asString()).isEqualTo("Take ITU 04103 as advised by your HOD");
         s.call(post(url), bTok, submit(semId, List.of(e1), true)).andExpect(jsonPath("$.registration.status").value("SUBMITTED"));
         assertThat(s.body(s.call(post("/api/registry/semester-registrations/approve-all"), registrar, "{\"semesterId\":" + semId + "}")).get("approved").asInt()).isEqualTo(1);
 
@@ -240,7 +240,7 @@ class CurriculumAndRegistrationIT {
         assertThat(st.at("/rows/0/4").asInt()).isEqualTo(2);
         JsonNode cl = s.body(s.call(get("/api/reports/REG-07?semesterId=" + semId + "&moduleId=" + e1), registrar, null));
         assertThat(cl.get("rowCount").asInt()).isEqualTo(2);
-        assertThat(cl.at("/rows/0/6").asText()).isEqualTo("Elective");
+        assertThat(cl.at("/rows/0/6").asString()).isEqualTo("Elective");
         assertThat(s.body(s.call(get("/api/reports/REG-07?semesterId=" + semId + "&moduleId=" + e2), registrar, null)).get("rowCount").asInt()).isZero();
     }
 
@@ -256,11 +256,11 @@ class CurriculumAndRegistrationIT {
         Applicant a = s.apply("S0101/0001");
         s.admit(officer, dpa, a);
         long id = s.body(s.call(post("/api/registry/windows/" + s.inst.windowId() + "/handover"), registrar, "{}")).at("/students/0/studentId").asLong();
-        String reg = s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/registrationNo").asText();
+        String reg = s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/registrationNo").asString();
         firstRegistration(id);
         String tok = studentToken(reg);
         JsonNode page = s.body(s.call(get("/api/student/semester-registration"), tok, null));
-        assertThat(page.get("state").asText()).isEqualTo("NOT_OPEN"); // the next semester to open is shown
+        assertThat(page.get("state").asString()).isEqualTo("NOT_OPEN"); // the next semester to open is shown
         assertThat(page.at("/semester/id").asLong()).isEqualTo(future);
         s.call(post("/api/student/semester-registration"), tok, submit(future, List.of(), true)).andExpect(jsonPath("$.code").value("REGISTRATION_NOT_OPEN"));
         s.call(post("/api/student/semester-registration"), tok, submit(closed, List.of(), true)).andExpect(jsonPath("$.code").value("REGISTRATION_CLOSED"));
@@ -277,7 +277,7 @@ class CurriculumAndRegistrationIT {
         JsonNode sem = s.body(s.call(post("/api/academic/semesters"), dpa, semester(1, "2027-09-27", "2028-02-10", TODAY.minusDays(20), TODAY.minusDays(5),
                 TODAY.plusDays(5), 20000)).andExpect(status().isCreated()));
         assertThat(sem.get("lateRegistrationFee").decimalValue()).isEqualByComparingTo("20000");
-        assertThat(sem.get("window").asText()).isEqualTo("LATE");
+        assertThat(sem.get("window").asString()).isEqualTo("LATE");
         long semId = sem.get("id").asLong();
 
         Applicant a = s.apply("S0101/0001");
@@ -290,19 +290,19 @@ class CurriculumAndRegistrationIT {
         s.call(post("/api/finance/fee-structures/" + st + "/approve"), bursar, null).andExpect(status().isOk());
         s.call(post("/api/finance/billing-runs"), accountant, "{\"academicYearId\":" + yearId + "}").andExpect(status().isOk());
         long id = s.body(s.call(post("/api/registry/windows/" + s.inst.windowId() + "/handover"), registrar, "{}")).at("/students/0/studentId").asLong();
-        String regNo = s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/registrationNo").asText();
+        String regNo = s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/registrationNo").asString();
         firstRegistration(id);
         String tok = studentToken(regNo);
 
         JsonNode page = s.body(s.call(get("/api/student/semester-registration"), tok, null));
-        assertThat(page.get("state").asText()).isEqualTo("LATE");
-        assertThat(page.get("message").asText()).contains("TZS 20,000");
+        assertThat(page.get("state").asString()).isEqualTo("LATE");
+        assertThat(page.get("message").asString()).contains("TZS 20,000");
         String url = "/api/student/semester-registration";
         JsonNode r1 = s.body(s.call(post(url), tok, submit(semId, List.of(), true)).andExpect(status().isOk())).get("registration");
         assertThat(r1.get("late").asBoolean()).isTrue();
         assertThat(r1.at("/lateFee/amount").decimalValue()).isEqualByComparingTo("20000");
-        assertThat(r1.at("/lateFee/status").asText()).isEqualTo("ISSUED");
-        assertThat(r1.at("/lateFee/controlNo").asText()).isNotBlank();
+        assertThat(r1.at("/lateFee/status").asString()).isEqualTo("ISSUED");
+        assertThat(r1.at("/lateFee/controlNo").asString()).isNotBlank();
         long firstInvoice = r1.at("/lateFee/invoiceId").asLong();
         // cancelling the registration cancels the unpaid late fee; registering again bills it again, once
         s.call(post(url + "/" + r1.get("id").asLong() + "/cancel"), tok, null).andExpect(status().isOk());
@@ -311,8 +311,8 @@ class CurriculumAndRegistrationIT {
         assertThat(secondInvoice).isNotEqualTo(firstInvoice);
         assertThat(s.body(s.call(post(url), tok, submit(semId, List.of(), true))).at("/registration/lateFee/invoiceId").asLong()).isEqualTo(secondInvoice);
         JsonNode account = s.body(s.call(get("/api/student/account"), tok, null));
-        assertThat(account.get("invoices").findParents("purpose").stream().filter(i -> i.get("purpose").asText().equals("LATE_REGISTRATION"))
-                .map(i -> i.get("status").asText()).toList()).containsExactlyInAnyOrder("CANCELLED", "ISSUED");
+        assertThat(account.get("invoices").findParents("purpose").stream().filter(i -> i.get("purpose").asString().equals("LATE_REGISTRATION"))
+                .map(i -> i.get("status").asString()).toList()).containsExactlyInAnyOrder("CANCELLED", "ISSUED");
         assertThat(s.body(s.call(get("/api/registry/semester-registrations/" + r2.get("id").asLong()), registrar, null)).at("/lateFee/balance").decimalValue())
                 .isEqualByComparingTo("20000");
 
@@ -321,13 +321,13 @@ class CurriculumAndRegistrationIT {
                 "{\"type\":\"WITHDRAWAL\",\"reason\":\"Moved abroad with family\",\"reference\":\"WD/3/2027\",\"effectiveDate\":\"" + TODAY + "\"}")).get("id").asLong();
         s.call(post("/api/registry/status-changes/" + change + "/decision"), dpa, "{\"approve\":true}").andExpect(jsonPath("$.state").value("APPLIED"));
         JsonNode list = s.body(s.call(get("/api/finance/adjustments"), bursar, null));
-        List<JsonNode> raised = list.findParents("origin").stream().filter(x -> "STATUS_CHANGE".equals(x.get("origin").asText())).toList();
+        List<JsonNode> raised = list.findParents("origin").stream().filter(x -> "STATUS_CHANGE".equals(x.get("origin").asString())).toList();
         assertThat(raised).hasSize(2);
         assertThat(raised.stream().map(x -> x.get("amount").decimalValue().intValue()).toList()).containsExactlyInAnyOrder(50000, 20000);
-        assertThat(raised.get(0).get("kind").asText()).isEqualTo("WAIVER");
-        assertThat(raised.get(0).get("status").asText()).isEqualTo("PENDING");
-        assertThat(raised.get(0).get("evidenceRef").asText()).isEqualTo("WD/3/2027");
-        assertThat(raised.get(0).get("reason").asText()).contains("withdrew");
+        assertThat(raised.get(0).get("kind").asString()).isEqualTo("WAIVER");
+        assertThat(raised.get(0).get("status").asString()).isEqualTo("PENDING");
+        assertThat(raised.get(0).get("evidenceRef").asString()).isEqualTo("WD/3/2027");
+        assertThat(raised.get(0).get("reason").asString()).contains("withdrew");
         long lateWaiver = raised.stream().filter(x -> x.get("amount").decimalValue().intValue() == 20000).findFirst().orElseThrow().get("id").asLong();
         s.call(post("/api/finance/adjustments/" + lateWaiver + "/approve"), bursar, "{}").andExpect(jsonPath("$.status").value("APPROVED"));
         assertThat(s.body(s.call(get("/api/registry/semester-registrations/" + r2.get("id").asLong()), registrar, null)).at("/lateFee/balance").decimalValue())
@@ -376,7 +376,7 @@ class CurriculumAndRegistrationIT {
 
     private String studentToken(String regNo) throws Exception {
         return s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Kifaru#Mto47\"}").andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
     }
 
     private void requireFirstInstalment() throws Exception {
@@ -392,7 +392,7 @@ class CurriculumAndRegistrationIT {
 
     private void payAnnualFees(Applicant a) throws Exception {
         for (JsonNode inv : s.body(s.call(get("/api/applicant/account"), a.token(), null)).get("invoices")) {
-            if (inv.get("purpose").asText().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
+            if (inv.get("purpose").asString().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
                 s.call(post("/api/applicant/invoices/" + inv.get("id").asLong() + "/simulate-payment"), a.token(), "{}").andExpect(status().isOk());
             }
         }
@@ -400,7 +400,7 @@ class CurriculumAndRegistrationIT {
 
     private static List<String> texts(JsonNode arr) {
         List<String> out = new ArrayList<>();
-        arr.forEach(x -> out.add(x.asText()));
+        arr.forEach(x -> out.add(x.asString()));
         return out;
     }
 }

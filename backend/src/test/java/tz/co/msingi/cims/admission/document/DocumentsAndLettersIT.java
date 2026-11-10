@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission.document;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
@@ -130,7 +130,7 @@ class DocumentsAndLettersIT {
         assertThat(list).hasSize(5);
         assertThat(list.get(0).get("customised").asBoolean()).isFalse();
         // the payment notice follows how this institution collects fees (the test institution is public: GePG)
-        assertThat(list.get(2).get("body").asText()).contains("GePG");
+        assertThat(list.get(2).get("body").asString()).contains("GePG");
 
         s.call(put("/api/letter-templates/ADMISSION_LETTER_INTRO"), admin, "{\"body\":\"Hello {studentName}\"}")
                 .andExpect(jsonPath("$.code").value("UNKNOWN_PLACEHOLDER"));

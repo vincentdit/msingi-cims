@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +55,7 @@ class AmendAfterSubmissionIT {
     @Test
     void detailsChoicesAndQualificationsCanChangeWhileTheWindowIsOpen() throws Exception {
         JsonNode before = s.body(s.call(get(app), a.token(), null));
-        assertThat(before.get("status").asText()).isEqualTo("SUBMITTED");
+        assertThat(before.get("status").asString()).isEqualTo("SUBMITTED");
         assertThat(before.get("amendable").asBoolean()).isTrue();
         assertThat(before.path("amendedAt").isMissingNode() || before.get("amendedAt").isNull()).isTrue();
 
@@ -77,9 +77,9 @@ class AmendAfterSubmissionIT {
         s.call(put(app + "/choices"), a.token(), "{\"windowProgrammeIds\":[]}").andExpect(status().isBadRequest());
         JsonNode after = s.body(s.call(put(app + "/choices"), a.token(), "{\"windowProgrammeIds\":[" + s.inst.windowProgrammeId() + "]}")
                 .andExpect(status().isOk()));
-        assertThat(after.get("status").asText()).isEqualTo("SUBMITTED");
-        assertThat(after.get("referenceNo").asText()).isEqualTo(before.get("referenceNo").asText());
-        assertThat(after.get("amendedAt").asText()).isNotBlank();
+        assertThat(after.get("status").asString()).isEqualTo("SUBMITTED");
+        assertThat(after.get("referenceNo").asString()).isEqualTo(before.get("referenceNo").asString());
+        assertThat(after.get("amendedAt").asString()).isNotBlank();
 
         // the office sees when it was last changed
         s.call(get("/api/admission/applications/" + a.applicationId()), s.staffToken("officer"), null)
@@ -133,7 +133,7 @@ class AmendAfterSubmissionIT {
                 .andExpect(status().isCreated())).get("id").asLong();
         elig = s.body(s.call(get("/api/applicant/eligibility?windowId=" + s.inst.windowId()), token, null));
         assertThat(elig.get(0).get("eligible").asBoolean()).isFalse();
-        assertThat(elig.get(0).at("/eligibility/summary").asText()).isEqualTo(
+        assertThat(elig.get(0).at("/eligibility/summary").asString()).isEqualTo(
                 "Not at your entry level: with your NTA Level 4 award you can apply for NTA Level 5 programmes");
         s.call(put("/api/applicant/profile"), token, PROFILE.formatted("Arusha")).andExpect(status().isOk());
         long id = s.body(s.call(post("/api/applicant/applications"), token, "{\"windowId\":" + s.inst.windowId() + "}")).get("id").asLong();
@@ -147,6 +147,6 @@ class AmendAfterSubmissionIT {
         s.call(post("/api/applicant/applications/" + id + "/submit"), token, null).andExpect(jsonPath("$.status").value("SUBMITTED"));
         s.call(post("/api/applicant/qualifications/nta"), token, "{\"registrationNumber\":\"NS4111/0001/2020\",\"graduationYear\":2022}")
                 .andExpect(jsonPath("$.code").value("NEEDED_FOR_CHOICES"));
-        assertThat(s.body(s.call(get("/api/applicant/qualifications"), token, null)).findValuesAsText("type")).containsExactly("CSEE");
+        assertThat(s.body(s.call(get("/api/applicant/qualifications"), token, null)).findValuesAsString("type")).containsExactly("CSEE");
     }
 }

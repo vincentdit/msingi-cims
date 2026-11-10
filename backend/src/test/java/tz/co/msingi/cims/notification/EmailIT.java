@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.notification;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,9 +68,9 @@ class EmailIT {
 
     private void verify(String token, String address) throws Exception {
         JsonNode r = s.body(s.call(post("/api/account/email"), token, "{\"email\":\"" + address + "\"}").andExpect(status().isOk()));
-        assertThat(r.get("pending").asText()).isEqualTo(address);
+        assertThat(r.get("pending").asString()).isEqualTo(address);
         s.call(post("/api/account/email/verify"), token, "{\"code\":\"000000x\"}").andExpect(jsonPath("$.code").value("CODE_INVALID"));
-        s.call(post("/api/account/email/verify"), token, "{\"code\":\"" + r.get("devCode").asText() + "\"}")
+        s.call(post("/api/account/email/verify"), token, "{\"code\":\"" + r.get("devCode").asString() + "\"}")
                 .andExpect(jsonPath("$.verified").value(true)).andExpect(jsonPath("$.email").value(address));
     }
 
@@ -101,7 +101,7 @@ class EmailIT {
         s.call(put("/api/messaging/emails/switch"), bursar, "{\"enabled\":false}").andExpect(status().isForbidden());
         s.call(put("/api/messaging/emails/switch"), admin, "{\"enabled\":false}").andExpect(jsonPath("$.enabled").value(false));
         JsonNode outbox = s.body(s.call(get("/api/messaging/emails"), admin, null).andExpect(status().isOk()));
-        assertThat(outbox.get("rows").get(0).get("to").asText()).startsWith("a***@");
+        assertThat(outbox.get("rows").get(0).get("to").asString()).startsWith("a***@");
     }
 
     @Test
@@ -114,7 +114,7 @@ class EmailIT {
         assertThat(sc.get("mine").asBoolean()).isTrue();
         s.call(post("/api/reports/schedules/" + sc.get("id").asLong() + "/send"), admin, null).andExpect(status().isOk());   // the administrator may
         JsonNode after = s.body(s.call(get("/api/reports/schedules"), bursar, null)).get(0);
-        assertThat(after.get("lastStatus").asText()).startsWith("Sent to 1 recipient");
+        assertThat(after.get("lastStatus").asString()).startsWith("Sent to 1 recipient");
         Map<String, Object> report = emails().stream().filter(e -> "REPORT".equals(e.get("kind"))).findFirst().orElseThrow();
         assertThat((String) report.get("attachment_name")).startsWith("FIN-01").endsWith(".xlsx");
 

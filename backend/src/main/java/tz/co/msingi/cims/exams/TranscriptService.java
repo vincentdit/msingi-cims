@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.exams;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -232,7 +232,7 @@ public class TranscriptService {
         try {
             byte[] d = MessageDigest.getInstance("SHA-256").digest(json.writeValueAsString(c).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(d);
-        } catch (NoSuchAlgorithmException | JsonProcessingException e) {
+        } catch (NoSuchAlgorithmException | JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

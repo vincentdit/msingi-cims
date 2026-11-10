@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.nhif;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,7 +58,7 @@ public class LiveNhifClient implements NhifClient {
                           @Value("${cims.nhif.api-path:/api/v2}") String apiPath) {
         JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
         f.setReadTimeout(Duration.ofSeconds(90));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(f).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(f).build();
         this.tokenPath = tokenPath;
         this.api = apiPath.endsWith("/") ? apiPath.substring(0, apiPath.length() - 1) : apiPath;
         log.info("NHIF Student Registration API: live at {}{}", baseUrl, this.api);
@@ -272,7 +272,7 @@ public class LiveNhifClient implements NhifClient {
 
     static String text(JsonNode n, String key) {
         JsonNode v = n == null ? null : n.get(key);
-        return v == null || v.isNull() || v.asText().isBlank() ? null : v.asText().trim();
+        return v == null || v.isNull() || v.asString().isBlank() ? null : v.asString().trim();
     }
 
     private static LocalDate date(String s) {
@@ -282,7 +282,7 @@ public class LiveNhifClient implements NhifClient {
     private static BigDecimal decimal(JsonNode n) {
         if (n == null || n.isNull()) return null;
         try {
-            return new BigDecimal(n.asText().trim());
+            return new BigDecimal(n.asString().trim());
         } catch (NumberFormatException e) {
             return null;
         }

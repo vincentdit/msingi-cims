@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission.selection;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,7 +80,7 @@ class SelectionIT {
                 "{\"applicationId\":" + apps.get(0) + ",\"reason\":\"Certificate under investigation\"}").andExpect(status().isOk()));
         assertThat(round.at("/totals/excluded").asInt()).isEqualTo(1);
         assertThat(round.at("/totals/selected").asInt()).isEqualTo(2);
-        assertThat(round.at("/programmes/0/selected").findValuesAsText("applicationId")).contains(String.valueOf(waiting));
+        assertThat(round.at("/programmes/0/selected").findValuesAsString("applicationId")).contains(String.valueOf(waiting));
 
         // and reinstates them again
         round = body(call(delete("/api/admission/selection-rounds/" + roundId + "/exclusions/" + apps.get(0)), officer, null));
@@ -145,9 +145,9 @@ class SelectionIT {
             int passes = 0;
             boolean maths = false;
             for (JsonNode sub : c.get("subjects")) {
-                boolean pass = "ABCD".contains(sub.get("grade").asText());
+                boolean pass = "ABCD".contains(sub.get("grade").asString());
                 if (pass) passes++;
-                if (pass && sub.get("name").asText().equals("BASIC MATHEMATICS")) maths = true;
+                if (pass && sub.get("name").asString().equals("BASIC MATHEMATICS")) maths = true;
             }
             if (passes >= 4 && maths) {
                 return apply(index);
@@ -173,16 +173,16 @@ class SelectionIT {
                 "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Kifaru#Mto47\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
         return body(call(post("/api/applicant-auth/verify"), null,
-                "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")).get("accessToken").asText();
+                "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asString() + "\"}")).get("accessToken").asString();
     }
 
     private String staffToken(String username) throws Exception {
         return body(call(post("/api/auth/login"), null,
                 "{\"username\":\"" + username + "\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}").andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
     }
 
-    private ResultActions call(MockHttpServletRequestBuilder req, String token, String body) throws Exception {
+    private ResultActions call(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String token, String body) throws Exception {
         req.header("X-Tenant", tenant);
         if (token != null) req.header("Authorization", "Bearer " + token);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);

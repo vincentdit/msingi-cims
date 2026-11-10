@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,10 +63,10 @@ class MfaAndSecurityIT {
     /** Sets up the authenticator for the user and returns its secret and recovery codes. */
     private JsonNode[] enrol(String token) throws Exception {
         JsonNode setup = s.body(s.call(post("/api/auth/mfa/setup"), token, null).andExpect(status().isOk()));
-        assertThat(setup.get("otpauthUri").asText()).startsWith("otpauth://totp/").contains("secret=" + setup.get("secret").asText());
-        assertThat(setup.get("qrPng").asText()).startsWith("data:image/png;base64,");
+        assertThat(setup.get("otpauthUri").asString()).startsWith("otpauth://totp/").contains("secret=" + setup.get("secret").asString());
+        assertThat(setup.get("qrPng").asString()).startsWith("data:image/png;base64,");
         s.call(post("/api/auth/mfa/enable"), token, "{\"code\":\"000000\"}").andExpect(jsonPath("$.code").value("MFA_CODE_WRONG"));
-        JsonNode on = s.body(s.call(post("/api/auth/mfa/enable"), token, "{\"code\":\"" + now(setup.get("secret").asText()) + "\"}")
+        JsonNode on = s.body(s.call(post("/api/auth/mfa/enable"), token, "{\"code\":\"" + now(setup.get("secret").asString()) + "\"}")
                 .andExpect(status().isOk()));
         assertThat(on.get("recoveryCodes")).hasSize(10);
         return new JsonNode[]{setup, on};
@@ -85,28 +85,28 @@ class MfaAndSecurityIT {
         String admin = s.staffToken("admin");
         s.call(get("/api/auth/mfa"), admin, null).andExpect(jsonPath("$.enabled").value(false)).andExpect(jsonPath("$.policy").value("OPTIONAL"));
         JsonNode[] e = enrol(admin);
-        String secret = e[0].get("secret").asText();
-        String recovery = e[1].get("recoveryCodes").get(0).asText();
+        String secret = e[0].get("secret").asString();
+        String recovery = e[1].get("recoveryCodes").get(0).asString();
 
         // the password alone no longer signs in
         JsonNode first = login("admin");
         assertThat(first.path("accessToken").isMissingNode() || first.get("accessToken").isNull()).isTrue();
-        String challenge = first.get("mfa").get("challenge").asText();
+        String challenge = first.get("mfa").get("challenge").asString();
         assertThat(first.get("mfa").get("smsAvailable").asBoolean()).isTrue();
         s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + challenge + "\",\"code\":\"111111\"}")
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("MFA_CODE_WRONG"));
         s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + challenge + "x\",\"code\":\"" + now(secret) + "\"}")
                 .andExpect(jsonPath("$.code").value("MFA_CHALLENGE_EXPIRED"));
         String token = s.body(s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + challenge + "\",\"code\":\"" + now(secret) + "\"}")
-                .andExpect(status().isOk())).get("accessToken").asText();
+                .andExpect(status().isOk())).get("accessToken").asString();
         s.call(get("/api/security-settings"), token, null).andExpect(status().isOk());
-        s.call(post("/api/auth/mfa/sms"), null, "{\"challenge\":\"" + login("admin").get("mfa").get("challenge").asText() + "\"}")
+        s.call(post("/api/auth/mfa/sms"), null, "{\"challenge\":\"" + login("admin").get("mfa").get("challenge").asString() + "\"}")
                 .andExpect(jsonPath("$.status").value("SENT"));
 
         // a recovery code works once
-        String c2 = login("admin").get("mfa").get("challenge").asText();
+        String c2 = login("admin").get("mfa").get("challenge").asString();
         s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + c2 + "\",\"code\":\"" + recovery + "\"}").andExpect(status().isOk());
-        String c3 = login("admin").get("mfa").get("challenge").asText();
+        String c3 = login("admin").get("mfa").get("challenge").asString();
         s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + c3 + "\",\"code\":\"" + recovery + "\"}")
                 .andExpect(jsonPath("$.code").value("MFA_CODE_WRONG"));
         s.call(get("/api/auth/mfa"), token, null).andExpect(jsonPath("$.recoveryCodesLeft").value(9));
@@ -121,9 +121,9 @@ class MfaAndSecurityIT {
         // whoever makes it compulsory must use it already
         s.call(put("/api/security-settings"), admin2, settings).andExpect(jsonPath("$.code").value("MFA_SETUP_FIRST"));
         String admin = s.staffToken("admin");
-        String secret = enrol(admin)[0].get("secret").asText();
-        String c = login("admin").get("mfa").get("challenge").asText();
-        admin = s.body(s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + c + "\",\"code\":\"" + now(secret) + "\"}")).get("accessToken").asText();
+        String secret = enrol(admin)[0].get("secret").asString();
+        String c = login("admin").get("mfa").get("challenge").asString();
+        admin = s.body(s.call(post("/api/auth/mfa/verify"), null, "{\"challenge\":\"" + c + "\",\"code\":\"" + now(secret) + "\"}")).get("accessToken").asString();
         s.call(put("/api/security-settings"), admin, settings).andExpect(status().isOk()).andExpect(jsonPath("$.staffIdleMinutes").value(20));
         s.call(get("/api/public/institution"), null, null).andExpect(jsonPath("$.idleMinutes.staff").value(20))
                 .andExpect(jsonPath("$.idleMinutes.student").value(45));
@@ -135,11 +135,11 @@ class MfaAndSecurityIT {
         // the bursar must set it up before doing anything else; a lecturer need not
         JsonNode b = login("bursar");
         assertThat(b.get("user").get("mfaSetupRequired").asBoolean()).isTrue();
-        String bursar = b.get("accessToken").asText();
+        String bursar = b.get("accessToken").asString();
         s.call(get("/api/finance/fee-schemes"), bursar, null).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("MFA_SETUP_REQUIRED"));
         assertThat(login("lecturer").get("user").get("mfaSetupRequired").asBoolean()).isFalse();
         JsonNode[] e = enrol(bursar);
-        String fresh = e[1].get("token").get("accessToken").asText();
+        String fresh = e[1].get("token").get("accessToken").asString();
         s.call(get("/api/finance/fee-schemes"), fresh, null).andExpect(status().isOk());
         s.call(post("/api/auth/mfa/disable"), fresh, "{\"password\":\"" + TestData.STAFF_PASSWORD + "\"}").andExpect(jsonPath("$.code").value("MFA_REQUIRED"));
 

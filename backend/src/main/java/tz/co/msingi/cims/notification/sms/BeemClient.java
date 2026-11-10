@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.notification.sms;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;

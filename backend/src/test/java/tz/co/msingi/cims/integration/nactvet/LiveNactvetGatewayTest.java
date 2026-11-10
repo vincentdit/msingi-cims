@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.integration.nactvet;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,25 +90,25 @@ class LiveNactvetGatewayTest {
         assertThat(sent.isArray()).isTrue();
         assertThat(sent).hasSize(1);
         JsonNode h = sent.get(0).path("heading");
-        assertThat(h.path("authorization").asText()).isEqualTo("token");
-        assertThat(h.path("intake").asText()).isEqualTo("SEPTEMBER");
-        assertThat(h.path("programme_id").asText()).isEqualTo("4501");
-        assertThat(h.path("application_year").asText()).isEqualTo("2026");
-        assertThat(h.path("level").asText()).isEqualTo("6");
-        assertThat(h.path("payment_reference_number").asText()).isEqualTo("991100223344");
+        assertThat(h.path("authorization").asString()).isEqualTo("token");
+        assertThat(h.path("intake").asString()).isEqualTo("SEPTEMBER");
+        assertThat(h.path("programme_id").asString()).isEqualTo("4501");
+        assertThat(h.path("application_year").asString()).isEqualTo("2026");
+        assertThat(h.path("level").asString()).isEqualTo("6");
+        assertThat(h.path("payment_reference_number").asString()).isEqualTo("991100223344");
         JsonNode p = sent.get(0).path("students").get(0).path("particulars");
-        assertThat(p.path("firstname").asText()).isEqualTo("Asha");
-        assertThat(p.path("secondname").asText()).isEqualTo("Juma");
-        assertThat(p.path("DOB").asText()).isEqualTo("4-03-2006");
-        assertThat(p.path("gender").asText()).isEqualTo("Female");
-        assertThat(p.path("impairement").asText()).isEqualTo("None");
-        assertThat(p.path("form_four_indexnumber").asText()).isEqualTo("S0101/0001");
-        assertThat(p.path("form_four_year").asText()).isEqualTo("2024");
-        assertThat(p.path("form_six_indexnumber").asText()).isEqualTo("S0101/0501");
-        assertThat(p.path("NTA4_reg").asText()).isEqualTo("NS0001/0002/2023");
-        assertThat(p.path("NTA5_reg").asText()).isEmpty();
-        assertThat(p.path("mobile_number").asText()).isEqualTo("0754000111");
-        assertThat(p.path("next_kin_relation").asText()).isEqualTo("Father");
+        assertThat(p.path("firstname").asString()).isEqualTo("Asha");
+        assertThat(p.path("secondname").asString()).isEqualTo("Juma");
+        assertThat(p.path("DOB").asString()).isEqualTo("4-03-2006");
+        assertThat(p.path("gender").asString()).isEqualTo("Female");
+        assertThat(p.path("impairement").asString()).isEqualTo("None");
+        assertThat(p.path("form_four_indexnumber").asString()).isEqualTo("S0101/0001");
+        assertThat(p.path("form_four_year").asString()).isEqualTo("2024");
+        assertThat(p.path("form_six_indexnumber").asString()).isEqualTo("S0101/0501");
+        assertThat(p.path("NTA4_reg").asString()).isEqualTo("NS0001/0002/2023");
+        assertThat(p.path("NTA5_reg").asString()).isEmpty();
+        assertThat(p.path("mobile_number").asString()).isEqualTo("0754000111");
+        assertThat(p.path("next_kin_relation").asString()).isEqualTo("Father");
         assertThat(p.has("next_kin_email_address")).isTrue();   // every field is sent, empty when unknown
 
         answers.put(UPLOAD, "Success");   // not JSON: accepted as it is, as NOAS does
@@ -177,10 +177,10 @@ class LiveNactvetGatewayTest {
         assertThat(by.get("APP-6").verificationNo()).isNull();
 
         JsonNode asked = received.get(FEEDBACK + "#1");
-        assertThat(asked.path("authorization").asText()).isEqualTo("token");
-        assertThat(asked.path("api_code").asText()).isEqualTo("API-1");
-        assertThat(asked.path("year").asText()).isEqualTo("2026");
-        assertThat(asked.path("intake").asText()).isEqualTo("SEPTEMBER");
+        assertThat(asked.path("authorization").asString()).isEqualTo("token");
+        assertThat(asked.path("api_code").asString()).isEqualTo("API-1");
+        assertThat(asked.path("year").asString()).isEqualTo("2026");
+        assertThat(asked.path("intake").asString()).isEqualTo("SEPTEMBER");
         assertThat(asked.path("page_size").asInt()).isEqualTo(3);
         assertThat(received).containsKeys(FEEDBACK + "#2", FEEDBACK + "#3");
     }
@@ -217,7 +217,7 @@ class LiveNactvetGatewayTest {
     void confirmsAdmissionAndExplainsAConfirmationElsewhere() {
         answers.put(CONFIRM, "{\"code\":200,\"params\":{\"confirmed\":1}}");
         assertThat(gateway.confirmAdmission("REG/DEMO/001", "S0101/0003", " 123456 ")).isTrue();
-        assertThat(received.get(CONFIRM).path("confirmation_code").asText()).isEqualTo("123456");
+        assertThat(received.get(CONFIRM).path("confirmation_code").asString()).isEqualTo("123456");
 
         answers.put(CONFIRM, "{\"code\":200,\"params\":{\"confirmed\":0,\"reason\":\"WRONG_CODE\"}}");
         assertThat(gateway.confirmAdmission("REG/DEMO/001", "S0101/0003", "000000")).isFalse();

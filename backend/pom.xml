@@ -7,8 +7,8 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- 3.5.x: the supported Spring Boot line (3.3 no longer receives free security fixes); 3.5.12 fixes CVE-2026-22733 -->
-        <version>3.5.14</version>
+        <!-- Spring Boot 4.0 (Spring Framework 7, Jakarta EE 11, Jackson 3): the line with free security fixes; 4.0.9 brings Spring Framework 7.0.10 (CVE-2026-47884) -->
+        <version>4.0.9</version>
         <relativePath/>
     </parent>
 
@@ -22,21 +22,18 @@
         <java.version>21</java.version>
         <!-- PostgreSQL JDBC driver at least 42.7.12 (CVE-2025-49146, CVE-2026-42198, CVE-2026-54291), above older Spring Boot defaults -->
         <postgresql.version>42.7.12</postgresql.version>
-        <springdoc.version>2.8.9</springdoc.version>
+        <springdoc.version>3.0.3</springdoc.version>
         <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
         <zxing.version>3.5.3</zxing.version>
         <its.exclude>none</its.exclude>
-        <spring-data-bom.version>2025.0.13</spring-data-bom.version>
-        <micrometer.version>1.15.12</micrometer.version>
-        <!-- Above the Spring Boot 3.5.12 defaults for the fixes found by the security check of 8 November 2026 (deploy/scripts/security-scan.sh):
-             Tomcat CVE-2026-41293 and CVE-2026-29129, Spring Framework CVE-2026-47884 and CVE-2026-41842, jackson-core CVE-2026-68494.
-             Drop each line once the Spring Boot version brings that version or newer. -->
-        <tomcat.version>10.1.61</tomcat.version>
-        <spring-framework.version>6.2.19</spring-framework.version>
-        <jackson-bom.version>2.21.8</jackson-bom.version>
     </properties>
 
     <dependencies>
+        <!-- Spring Boot 4 splits auto-configuration into modules; the classic starters bring them all, as 3.x did -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-classic</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -115,7 +112,12 @@
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <artifactId>spring-boot-starter-test-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

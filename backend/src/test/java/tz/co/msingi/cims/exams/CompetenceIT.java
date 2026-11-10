@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.exams;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +86,7 @@ class CompetenceIT {
         assertThat(s.body(s.call(post("/api/competence/semesters/" + c.semesterId + "/setup"), exams, null)).get("created").asInt()).isZero();
         s.call(post("/api/competence/semesters/" + c.semesterId + "/setup"), assessor, null).andExpect(status().isForbidden());
         Map<String, Long> unit = new HashMap<>();
-        s.body(s.call(get("/api/competence/units?semesterId=" + c.semesterId), exams, null)).forEach(u -> unit.put(u.get("code").asText(), u.get("id").asLong()));
+        s.body(s.call(get("/api/competence/units?semesterId=" + c.semesterId), exams, null)).forEach(u -> unit.put(u.get("code").asString(), u.get("id").asLong()));
         long u1 = unit.get("ELE 01101");
         s.call(get("/api/competence/units/" + u1), assessor, null).andExpect(status().isForbidden());
 
@@ -103,7 +103,7 @@ class CompetenceIT {
         assertThat(v.at("/can/record").asBoolean()).isTrue();
         assertThat(v.at("/can/submit").asBoolean()).isFalse();
         Map<String, Long> reg = new HashMap<>();
-        v.get("rows").forEach(r -> reg.put(r.get("registrationNo").asText(), r.get("moduleRegistrationId").asLong()));
+        v.get("rows").forEach(r -> reg.put(r.get("registrationNo").asString(), r.get("moduleRegistrationId").asLong()));
 
         // outcomes with evidence: a competent in both, b not yet competent in the practical, c assessed on the practical only
         s.call(put("/api/competence/units/" + u1 + "/assessments"), assessor2, entries(entry(reg.get(c.a), practical, "COMPETENT", TODAY, false)))
@@ -117,11 +117,11 @@ class CompetenceIT {
                 entry(reg.get(c.b), practical, "NOT_YET_COMPETENT", TODAY, false), entry(reg.get(c.b), theory, "COMPETENT", TODAY, false),
                 entry(reg.get(c.c), practical, "COMPETENT", TODAY, false))).andExpect(status().isOk()));
         Map<String, JsonNode> rows = byRegNo(v.get("rows"));
-        assertThat(rows.get(c.a).get("outcome").asText()).isEqualTo("COMPETENT");
-        assertThat(rows.get(c.b).get("outcome").asText()).isEqualTo("NOT_YET_COMPETENT");
-        assertThat(rows.get(c.c).get("outcome").asText()).isEqualTo("INCOMPLETE");
-        assertThat(rows.get(c.a).at("/tasks/" + practical + "/evidenceRef").asText()).isEqualTo("Checklist 7");
-        assertThat(rows.get(c.a).at("/tasks/" + practical + "/assessorName").asText()).isEqualTo("Staff assessor");
+        assertThat(rows.get(c.a).get("outcome").asString()).isEqualTo("COMPETENT");
+        assertThat(rows.get(c.b).get("outcome").asString()).isEqualTo("NOT_YET_COMPETENT");
+        assertThat(rows.get(c.c).get("outcome").asString()).isEqualTo("INCOMPLETE");
+        assertThat(rows.get(c.a).at("/tasks/" + practical + "/evidenceRef").asString()).isEqualTo("Checklist 7");
+        assertThat(rows.get(c.a).at("/tasks/" + practical + "/assessorName").asString()).isEqualTo("Staff assessor");
         s.call(post("/api/competence/units/" + u1 + "/submit"), assessor, null).andExpect(jsonPath("$.code").value("INCOMPLETE"));
 
         // c's theory, and a correction to b in place (still the first attempt)
@@ -135,18 +135,18 @@ class CompetenceIT {
 
         // the Head of Department sees it in Approvals, returns it once, then verifies it
         JsonNode inbox = s.body(s.call(get("/api/approvals"), hod, null));
-        assertThat(inbox.get("items").findValuesAsText("kind")).contains("COMPETENCE_VERIFY");
+        assertThat(inbox.get("items").findValuesAsString("kind")).contains("COMPETENCE_VERIFY");
         s.call(post("/api/competence/units/" + u1 + "/verify"), assessor, null).andExpect(status().isForbidden());
         s.call(post("/api/competence/units/" + u1 + "/return"), hod, "{\"note\":\"Attach the checklist numbers for every trainee\"}")
                 .andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.returnedNote").value("Attach the checklist numbers for every trainee"));
         s.call(post("/api/competence/units/" + u1 + "/submit"), assessor, null).andExpect(status().isOk());
         v = s.body(s.call(post("/api/competence/units/" + u1 + "/verify"), hod, null).andExpect(status().isOk()));
-        assertThat(v.get("status").asText()).isEqualTo("VERIFIED");
+        assertThat(v.get("status").asString()).isEqualTo("VERIFIED");
         assertThat(v.get("competent").asInt()).isEqualTo(2);
         assertThat(v.get("notYetCompetent").asInt()).isEqualTo(1);
         assertThat(v.has("returnedNote")).isFalse();
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findValuesAsText("templateCode").stream().filter("COMPETENCE_NYC"::equals).count()).isEqualTo(1);
+        assertThat(sms.findValuesAsString("templateCode").stream().filter("COMPETENCE_NYC"::equals).count()).isEqualTo(1);
 
         // the award cannot be confirmed while other units are not verified
         JsonNode classes = s.body(s.call(get("/api/competence/awards?semesterId=" + c.semesterId), exams, null));
@@ -184,7 +184,7 @@ class CompetenceIT {
         s.call(post("/api/competence/awards/confirm"), hod, confirm).andExpect(status().isForbidden());
         list = s.body(s.call(post("/api/competence/awards/confirm"), exams, confirm).andExpect(status().isOk()));
         assertThat(list.has("listId")).isTrue();
-        assertThat(list.get("confirmedByName").asText()).isEqualTo("Staff exams");
+        assertThat(list.get("confirmedByName").asString()).isEqualTo("Staff exams");
         var xlsx = s.call(get("/api/competence/awards/list.xlsx?semesterId=" + c.semesterId + "&programmeId=" + inst.programmeId() + "&yearOfStudy=1"), exams, null)
                 .andExpect(status().isOk()).andReturn().getResponse();
         assertThat(new String(xlsx.getContentAsByteArray(), 0, 2)).isEqualTo("PK");
@@ -192,8 +192,8 @@ class CompetenceIT {
         // the trainee sees verified outcomes, task by task
         JsonNode mine = s.body(s.call(get("/api/student/competence"), c.bToken, null));
         assertThat(mine).hasSize(3);
-        JsonNode m1 = mine.findParents("code").stream().filter(x -> x.get("code").asText().equals("ELE 01101")).findFirst().orElseThrow();
-        assertThat(m1.get("outcome").asText()).isEqualTo("COMPETENT");
+        JsonNode m1 = mine.findParents("code").stream().filter(x -> x.get("code").asString().equals("ELE 01101")).findFirst().orElseThrow();
+        assertThat(m1.get("outcome").asString()).isEqualTo("COMPETENT");
         assertThat(m1.at("/tasks/0/attempt").asInt()).isEqualTo(2);
 
         // the assessor's My teaching lists their units
@@ -224,7 +224,7 @@ class CompetenceIT {
 
     private long staffId(String name) throws Exception {
         return s.body(s.call(get("/api/exams/staff"), exams, null)).findParents("fullName").stream()
-                .filter(x -> x.get("fullName").asText().equals(name)).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("fullName").asString().equals(name)).findFirst().orElseThrow().get("id").asLong();
     }
 
     record Setup(long semesterId, String a, String b, String c, String aToken, String bToken, String cToken) {
@@ -258,15 +258,15 @@ class CompetenceIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(d.at("/summary/phone").asText(), d.at("/summary/registrationNo").asText());
+            byPhone.put(d.at("/summary/phone").asString(), d.at("/summary/registrationNo").asString());
         }
         String[] regNos = new String[3];
         String[] tokens = new String[3];
         Applicant[] apps = {a, b, c};
         for (int i = 0; i < 3; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asString();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }
@@ -285,7 +285,7 @@ class CompetenceIT {
 
     private static Map<String, JsonNode> byRegNo(JsonNode arr) {
         Map<String, JsonNode> m = new HashMap<>();
-        arr.forEach(x -> m.put(x.get("registrationNo").asText(), x));
+        arr.forEach(x -> m.put(x.get("registrationNo").asString(), x));
         return m;
     }
 }

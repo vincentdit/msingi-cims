@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +50,7 @@ class PlatformConsoleIT {
     void setUp() throws Exception {
         suffix = UUID.randomUUID().toString().substring(0, 6).toLowerCase();
         platformUser("ops" + suffix, "Ops@2026x", false);
-        platform = login("ops" + suffix, "Ops@2026x").get("accessToken").asText();
+        platform = login("ops" + suffix, "Ops@2026x").get("accessToken").asString();
     }
 
     void platformUser(String username, String password, boolean mustChange) {
@@ -69,7 +69,7 @@ class PlatformConsoleIT {
                 "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}").andExpect(status().isOk()));
     }
 
-    ResultActions call(MockHttpServletRequestBuilder req, String token, String tenant, String body) throws Exception {
+    ResultActions call(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String token, String tenant, String body) throws Exception {
         if (tenant != null) req.header("X-Tenant", tenant);
         if (token != null) req.header("Authorization", "Bearer " + token);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);
@@ -105,10 +105,10 @@ class PlatformConsoleIT {
         // wrong password, and a temporary password allows only the password change
         call(post("/api/platform/auth/login"), null, null, "{\"username\":\"ops" + suffix + "\",\"password\":\"nope\"}").andExpect(status().isUnauthorized());
         platformUser("new" + suffix, "Temp@2026x", true);
-        String temp = login("new" + suffix, "Temp@2026x").get("accessToken").asText();
+        String temp = login("new" + suffix, "Temp@2026x").get("accessToken").asString();
         call(get("/api/platform/institutions"), temp, null, null).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
         String fresh = body(call(post("/api/platform/auth/password"), temp, null,
-                "{\"currentPassword\":\"Temp@2026x\",\"newPassword\":\"Mine@2026x\"}").andExpect(status().isOk())).get("accessToken").asText();
+                "{\"currentPassword\":\"Temp@2026x\",\"newPassword\":\"Mine@2026x\"}").andExpect(status().isOk())).get("accessToken").asString();
         call(get("/api/platform/institutions"), fresh, null, null).andExpect(status().isOk());
         call(get("/api/platform/institutions"), temp, null, null).andExpect(jsonPath("$.code").value("SESSION_ENDED"));
     }
@@ -119,28 +119,28 @@ class PlatformConsoleIT {
         String host = "apply." + suffix + ".example.ac.tz";
         JsonNode issued = body(call(post("/api/platform/institutions"), platform, null, onboardBody(code, host, "grace")).andExpect(status().isCreated()));
         long id = issued.at("/institution/id").asLong();
-        String temporary = issued.get("temporaryPassword").asText();
-        assertThat(issued.get("username").asText()).isEqualTo("grace");
-        assertThat(issued.at("/institution/status").asText()).isEqualTo("ACTIVE");
-        assertThat(issued.at("/institution/domains/0/host").asText()).isEqualTo(host);
+        String temporary = issued.get("temporaryPassword").asString();
+        assertThat(issued.get("username").asString()).isEqualTo("grace");
+        assertThat(issued.at("/institution/status").asString()).isEqualTo("ACTIVE");
+        assertThat(issued.at("/institution/domains/0/host").asString()).isEqualTo(host);
         assertThat(issued.at("/institution/administrators/0/mustChangePassword").asBoolean()).isTrue();
-        assertThat(issued.at("/institution/primaryColor").asText()).isEqualTo("#0B6E4F");
+        assertThat(issued.at("/institution/primaryColor").asString()).isEqualTo("#0B6E4F");
         assertThat(issued.at("/institution/setup").size()).isEqualTo(10);   // private: also "Payment accounts"
-        assertThat(issued.get("signInUrl").asText()).contains(host);
+        assertThat(issued.get("signInUrl").asString()).contains(host);
 
         // the same code or address cannot be used twice; addresses must be bare host names
         call(post("/api/platform/institutions"), platform, null, onboardBody(code, "other." + host, "x1x")).andExpect(jsonPath("$.code").value("CODE_TAKEN"));
         call(post("/api/platform/institutions"), platform, null, onboardBody("X" + code, host, "x1x")).andExpect(jsonPath("$.code").value("DOMAIN_TAKEN"));
         call(post("/api/platform/institutions"), platform, null, onboardBody("Y" + code, "bad host/path", "x1x")).andExpect(jsonPath("$.code").value("INVALID_DOMAIN"));
-        assertThat(body(call(get("/api/platform/institutions"), platform, null, null)).findValuesAsText("code")).contains(code).doesNotContain("X" + code, "Y" + code);
+        assertThat(body(call(get("/api/platform/institutions"), platform, null, null)).findValuesAsString("code")).contains(code).doesNotContain("X" + code, "Y" + code);
 
         // the address now reaches the institution, and its administrator signs in with the temporary password
         JsonNode inst = body(mvc.perform(get("/api/public/institution").with(r -> { r.setServerName(host); return r; })).andExpect(status().isOk()));
         assertThat(inst.toString()).contains(code + " Polytechnic College");
         JsonNode adminLogin = body(call(post("/api/auth/login"), null, code, "{\"username\":\"grace\",\"password\":\"" + temporary + "\"}").andExpect(status().isOk()));
         assertThat(adminLogin.at("/user/mustChangePassword").asBoolean()).isTrue();
-        String adminToken = body(call(post("/api/auth/password"), adminLogin.get("accessToken").asText(), code,
-                "{\"currentPassword\":\"" + temporary + "\",\"newPassword\":\"Grace@2026x\"}").andExpect(status().isOk())).get("accessToken").asText();
+        String adminToken = body(call(post("/api/auth/password"), adminLogin.get("accessToken").asString(), code,
+                "{\"currentPassword\":\"" + temporary + "\",\"newPassword\":\"Grace@2026x\"}").andExpect(status().isOk())).get("accessToken").asString();
 
         // the institution's own audit trail shows what Msingi did
         JsonNode trail = body(call(get("/api/audit/logs?action=INSTITUTION_ONBOARDED"), adminToken, code, null).andExpect(status().isOk()));
@@ -163,7 +163,7 @@ class PlatformConsoleIT {
                 .andExpect(status().isOk()));
         call(get("/api/registry/students"), adminToken, code, null).andExpect(jsonPath("$.code").value("SESSION_ENDED"));
         call(post("/api/auth/login"), null, code, "{\"username\":\"grace\",\"password\":\"Grace@2026x\"}").andExpect(status().isUnauthorized());
-        call(post("/api/auth/login"), null, code, "{\"username\":\"grace\",\"password\":\"" + reset.get("temporaryPassword").asText() + "\"}")
+        call(post("/api/auth/login"), null, code, "{\"username\":\"grace\",\"password\":\"" + reset.get("temporaryPassword").asString() + "\"}")
                 .andExpect(status().isOk());
         JsonNode second = body(call(post("/api/platform/institutions/" + id + "/administrators"), platform, null,
                 "{\"username\":\"juma\",\"fullName\":\"Juma Ally\"}").andExpect(status().isOk()));
@@ -188,9 +188,9 @@ class PlatformConsoleIT {
 
         // the platform's own audit trail has every step, newest first
         JsonNode audit = body(call(get("/api/platform/audit?tenantId=" + id), platform, null, null).andExpect(status().isOk()));
-        assertThat(audit.findValuesAsText("action")).contains("INSTITUTION_ONBOARDED", "INSTITUTION_SUSPENDED", "INSTITUTION_REACTIVATED",
+        assertThat(audit.findValuesAsString("action")).contains("INSTITUTION_ONBOARDED", "INSTITUTION_SUSPENDED", "INSTITUTION_REACTIVATED",
                 "INSTITUTION_ADMIN_PASSWORD_RESET", "DOMAIN_ADDED", "DOMAIN_REMOVED", "SMS_BUNDLE_CREDITED", "INSTITUTION_UPDATED");
-        assertThat(audit.at("/content/0/actorName").asText()).isEqualTo("Platform ops" + suffix);
+        assertThat(audit.at("/content/0/actorName").asString()).isEqualTo("Platform ops" + suffix);
         call(get("/api/platform/overview"), platform, null, null).andExpect(status().isOk()).andExpect(jsonPath("$.health.length()").value(13));
     }
 
@@ -208,21 +208,21 @@ class PlatformConsoleIT {
         // each institution's auditor sees only its own calls
         JsonNode mine = sa.body(sa.call(get("/api/audit/integrations?system=NECTA"), sa.staffToken("auditor"), null).andExpect(status().isOk()));
         assertThat(mine.get("totalElements").asLong()).isEqualTo(2);
-        assertThat(mine.at("/content/0/mode").asText()).isEqualTo("SIMULATED");
-        assertThat(mine.at("/content/0/outcome").asText()).isEqualTo("SUCCESS");
+        assertThat(mine.at("/content/0/mode").asString()).isEqualTo("SIMULATED");
+        assertThat(mine.at("/content/0/outcome").asString()).isEqualTo("SUCCESS");
         assertThat(mine.toString()).contains("S0101/0002").doesNotContain("S0101/0003");
         JsonNode health = sb.body(sb.call(get("/api/audit/integrations/health"), sb.staffToken("auditor"), null));
         // every outside system has a name (none shows as a blank row)
-        for (JsonNode h : health) assertThat(h.path("label").asText()).as(h.get("system").asText()).isNotBlank();
+        for (JsonNode h : health) assertThat(h.path("label").asString()).as(h.get("system").asString()).isNotBlank();
         JsonNode necta = null;
-        for (JsonNode h : health) if (h.get("system").asText().equals("NECTA")) necta = h;
+        for (JsonNode h : health) if (h.get("system").asString().equals("NECTA")) necta = h;
         assertThat(necta.get("calls").asLong()).isEqualTo(1);
-        assertThat(necta.get("status").asText()).isEqualTo("OK");
+        assertThat(necta.get("status").asString()).isEqualTo("OK");
         sa.call(get("/api/audit/integrations"), sa.staffToken("officer"), null).andExpect(status().isOk()); // the administrator too
 
         // the platform sees every institution's calls, with the institution named
         JsonNode all = body(call(get("/api/platform/integrations/calls?system=NECTA&size=200"), platform, null, null).andExpect(status().isOk()));
-        assertThat(all.findValuesAsText("tenantCode")).contains(a, b);
+        assertThat(all.findValuesAsString("tenantCode")).contains(a, b);
         call(get("/api/platform/integrations/health?hours=1"), platform, null, null).andExpect(status().isOk());
 
         // a GePG notification with a bad signature is logged as a failed inbound call belonging to no institution
@@ -240,16 +240,16 @@ class PlatformConsoleIT {
         JsonNode created = body(call(post("/api/platform/users"), platform, null,
                 "{\"username\":\"Neema" + suffix + "\",\"fullName\":\"Neema Support\",\"email\":\"neema@msingi.co.tz\"}").andExpect(status().isOk()));
         long id = created.at("/user/id").asLong();
-        assertThat(created.at("/user/username").asText()).isEqualTo("neema" + suffix);
-        assertThat(created.get("temporaryPassword").asText()).hasSize(12);
+        assertThat(created.at("/user/username").asString()).isEqualTo("neema" + suffix);
+        assertThat(created.get("temporaryPassword").asString()).hasSize(12);
         call(post("/api/platform/users"), platform, null, "{\"username\":\"neema" + suffix + "\",\"fullName\":\"x\"}").andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
         long me = body(call(get("/api/platform/auth/me"), platform, null, null)).get("id").asLong();
         call(post("/api/platform/users/" + me + "/disable"), platform, null, null).andExpect(jsonPath("$.code").value("OWN_ACCOUNT"));
         call(post("/api/platform/users/" + id + "/disable"), platform, null, null).andExpect(jsonPath("$.status").value("DISABLED"));
-        call(post("/api/platform/auth/login"), null, null, "{\"username\":\"neema" + suffix + "\",\"password\":\"" + created.get("temporaryPassword").asText() + "\"}")
+        call(post("/api/platform/auth/login"), null, null, "{\"username\":\"neema" + suffix + "\",\"password\":\"" + created.get("temporaryPassword").asString() + "\"}")
                 .andExpect(status().isUnauthorized());
         call(post("/api/platform/users/" + id + "/enable"), platform, null, null).andExpect(jsonPath("$.status").value("ACTIVE"));
         JsonNode reset = body(call(post("/api/platform/users/" + id + "/reset-password"), platform, null, null).andExpect(status().isOk()));
-        login("neema" + suffix, reset.get("temporaryPassword").asText());
+        login("neema" + suffix, reset.get("temporaryPassword").asString());
     }
 }

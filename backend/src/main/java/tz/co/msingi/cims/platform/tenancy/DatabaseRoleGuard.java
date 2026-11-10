@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform.tenancy;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomizer;
+import org.springframework.boot.flyway.autoconfigure.FlywayConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,8 +56,8 @@ class ApiClientIT {
     void aClientGetsATokenAndReadsOnlyWhatItsScopesAllow() throws Exception {
         JsonNode issued = s.body(s.call(post("/api/api-clients"), admin, "{\"name\":\"Moodle LMS\",\"scopes\":[\"students:read\",\"programmes:read\"]}")
                 .andExpect(status().isCreated()));
-        String id = issued.get("client").get("clientId").asText();
-        String secret = issued.get("clientSecret").asText();
+        String id = issued.get("client").get("clientId").asString();
+        String secret = issued.get("clientSecret").asString();
         assertThat(id).startsWith(tenant.toLowerCase() + "-");
         s.call(post("/api/api-clients"), admin, "{\"name\":\"X\",\"scopes\":[\"everything\"]}").andExpect(jsonPath("$.code").value("UNKNOWN_SCOPE"));
 
@@ -68,12 +68,12 @@ class ApiClientIT {
         token(tenant, "grant_type=client_credentials&scope=results:read", id + ":" + secret).andExpect(jsonPath("$.error").value("invalid_scope"));
 
         JsonNode t = s.body(token(tenant, "grant_type=client_credentials&client_id=" + id + "&client_secret=" + secret, null).andExpect(status().isOk()));
-        assertThat(t.get("token_type").asText()).isEqualTo("Bearer");
-        assertThat(t.get("scope").asText()).isEqualTo("students:read programmes:read");
-        String api = t.get("access_token").asText();
+        assertThat(t.get("token_type").asString()).isEqualTo("Bearer");
+        assertThat(t.get("scope").asString()).isEqualTo("students:read programmes:read");
+        String api = t.get("access_token").asString();
         // HTTP Basic works too, and a narrower scope can be asked for
         String narrow = s.body(token(tenant, "grant_type=client_credentials&scope=programmes:read", id + ":" + secret).andExpect(status().isOk()))
-                .get("access_token").asText();
+                .get("access_token").asString();
 
         s.call(get("/api/integration/v1/programmes"), api, null).andExpect(status().isOk()).andExpect(jsonPath("$[0].code").exists());
         s.call(get("/api/integration/v1/students?size=10"), api, null).andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
@@ -85,7 +85,7 @@ class ApiClientIT {
         s.call(get("/api/api-clients"), admin, null).andExpect(jsonPath("$[0].lastUsedAt").isNotEmpty());
 
         // a new secret retires the old one; switching the client off stops its tokens
-        String secret2 = s.body(s.call(post("/api/api-clients/" + issued.get("client").get("id").asLong() + "/secret"), admin, null)).get("clientSecret").asText();
+        String secret2 = s.body(s.call(post("/api/api-clients/" + issued.get("client").get("id").asLong() + "/secret"), admin, null)).get("clientSecret").asString();
         token(tenant, "grant_type=client_credentials", id + ":" + secret).andExpect(status().isUnauthorized());
         token(tenant, "grant_type=client_credentials", id + ":" + secret2).andExpect(status().isOk());
         s.call(put("/api/api-clients/" + issued.get("client").get("id").asLong() + "?active=false"), admin,

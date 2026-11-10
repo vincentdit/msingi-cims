@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.teaching;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,9 +95,9 @@ class AttendanceAndEligibilityIT {
 
         JsonNode register = s.body(s.call(get("/api/teaching/offerings/" + m1 + "/register"), lecturer, null));
         assertThat(register).hasSize(3);
-        assertThat(register.findValuesAsText("status")).containsOnly("PRESENT");
+        assertThat(register.findValuesAsString("status")).containsOnly("PRESENT");
         Map<String, Long> reg = new HashMap<>();
-        register.forEach(x -> reg.put(x.get("registrationNo").asText(), x.get("moduleRegistrationId").asLong()));
+        register.forEach(x -> reg.put(x.get("registrationNo").asString(), x.get("moduleRegistrationId").asLong()));
 
         // a: always there; b: absent twice of four (50%); c: late, excused, present, absent (2 of 3 counted = 66.7%)
         String[][] plan = {{"PRESENT", "ABSENT", "LATE"}, {"PRESENT", "ABSENT", "EXCUSED"}, {"PRESENT", "PRESENT", "PRESENT"}, {"PRESENT", "PRESENT", "ABSENT"}};
@@ -132,11 +132,11 @@ class AttendanceAndEligibilityIT {
         assertThat(missing(st.get(c.a), "alertedAt")).isTrue();
         assertThat(v.get("sessionList").get(0).get("absent").asInt()).isEqualTo(1);
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findValuesAsText("templateCode").stream().filter("ATTENDANCE_LOW"::equals).count()).isEqualTo(2);
+        assertThat(sms.findValuesAsString("templateCode").stream().filter("ATTENDANCE_LOW"::equals).count()).isEqualTo(2);
 
         // a correction: b was there at the first session after all (3 of 4 = 75%, no longer below); warnings are not repeated
         JsonNode one = s.body(s.call(get("/api/teaching/sessions/" + s1), lecturer, null));
-        assertThat(one.get("register").findValuesAsText("status")).containsExactlyInAnyOrder("PRESENT", "ABSENT", "LATE");
+        assertThat(one.get("register").findValuesAsString("status")).containsExactlyInAnyOrder("PRESENT", "ABSENT", "LATE");
         s.call(put("/api/teaching/sessions/" + s1), lecturer, session(first, TODAY.minusDays(10), "08:00", reg, c, new String[]{"PRESENT", "PRESENT", "LATE"}))
                 .andExpect(status().isOk());
         st = byRegNo(s.body(s.call(get("/api/teaching/offerings/" + m1 + "/attendance"), hod, null)).get("students"));
@@ -148,7 +148,7 @@ class AttendanceAndEligibilityIT {
         // summaries: the lecturer's own modules, every module for the Head of Department, none for another department's head
         JsonNode mine = s.body(s.call(get("/api/teaching/attendance?semesterId=" + c.semesterId + "&mine=true"), lecturer, null));
         assertThat(mine).hasSize(3);
-        JsonNode m1Summary = mine.findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        JsonNode m1Summary = mine.findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(m1Summary.get("sessions").asInt()).isEqualTo(4);
         assertThat(m1Summary.get("below").asInt()).isEqualTo(1);
         assertThat(s.body(s.call(get("/api/teaching/attendance?semesterId=" + c.semesterId), hod, null))).hasSize(3);
@@ -159,7 +159,7 @@ class AttendanceAndEligibilityIT {
         s.call(get("/api/teaching/workload?semesterId=" + c.semesterId), lecturer, null).andExpect(status().isForbidden());
         JsonNode w = s.body(s.call(get("/api/teaching/workload?semesterId=" + c.semesterId), hod, null));
         assertThat(w.get("staff")).hasSize(1);
-        assertThat(w.at("/staff/0/fullName").asText()).isEqualTo("Staff lecturer");
+        assertThat(w.at("/staff/0/fullName").asString()).isEqualTo("Staff lecturer");
         assertThat(w.at("/staff/0/modules").asInt()).isEqualTo(3);
         assertThat(w.at("/staff/0/credits").decimalValue()).isEqualByComparingTo("30");
         assertThat(w.at("/staff/0/hoursTaught").decimalValue()).isEqualByComparingTo("8");
@@ -168,7 +168,7 @@ class AttendanceAndEligibilityIT {
         // the student sees their own attendance
         JsonNode my = s.body(s.call(get("/api/student/attendance"), c.cToken, null));
         assertThat(my.get("threshold").decimalValue()).isEqualByComparingTo("75");
-        JsonNode mod = my.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        JsonNode mod = my.get("modules").findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(mod.get("percent").decimalValue()).isEqualByComparingTo("66.7");
         assertThat(mod.get("below").asBoolean()).isTrue();
         assertThat(missing(mod, "eligible")).isTrue();
@@ -200,7 +200,7 @@ class AttendanceAndEligibilityIT {
         JsonNode v = s.body(s.call(get("/api/exams/offerings/" + m1), lecturer, null));
         long ca = v.get("components").get(0).get("id").asLong(), se = v.get("components").get(1).get("id").asLong();
         Map<String, Long> reg = new HashMap<>();
-        v.get("rows").forEach(x -> reg.put(x.get("registrationNo").asText(), x.get("moduleRegistrationId").asLong()));
+        v.get("rows").forEach(x -> reg.put(x.get("registrationNo").asString(), x.get("moduleRegistrationId").asLong()));
         s.call(put("/api/exams/offerings/" + m1 + "/scores"), lecturer, "{\"entries\":[" + entry(reg.get(c.a), ca, "80") + "," + entry(reg.get(c.b), ca, "60") + "]}")
                 .andExpect(status().isOk());
         s.call(post("/api/teaching/offerings/" + m1 + "/sessions"), lecturer, session(UUID.randomUUID(), TODAY.minusDays(3), "10:00", reg, c,
@@ -225,17 +225,17 @@ class AttendanceAndEligibilityIT {
         assertThat(texts(e.get(c.c).get("reasons"))).anyMatch(r -> r.equals("Continuous assessment incomplete: Coursework"));
         JsonNode overview = s.body(s.call(get("/api/exams/eligibility?semesterId=" + c.semesterId), hod, null));
         assertThat(overview.get("canGenerate").asBoolean()).isFalse();
-        JsonNode o1 = overview.get("offerings").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        JsonNode o1 = overview.get("offerings").findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(o1.get("eligible").asInt()).isEqualTo(1);
         assertThat(o1.get("notEligible").asInt()).isEqualTo(2);
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findValuesAsText("templateCode").stream().filter("EXAM_NOT_ELIGIBLE"::equals).count()).isEqualTo(8);   // a (no CA yet in two modules), b and c in all three
+        assertThat(sms.findValuesAsString("templateCode").stream().filter("EXAM_NOT_ELIGIBLE"::equals).count()).isEqualTo(8);   // a (no CA yet in two modules), b and c in all three
 
         // marks: an ineligible student gets no examination mark (absent is fine)
         s.call(put("/api/exams/offerings/" + m1 + "/scores"), lecturer, scores(reg.get(c.b), se, "70")).andExpect(jsonPath("$.code").value("NOT_ELIGIBLE_FOR_EXAM"));
         JsonNode rows = s.body(s.call(put("/api/exams/offerings/" + m1 + "/scores"), lecturer, scores(reg.get(c.a), se, "70")).andExpect(status().isOk()));
         assertThat(byRegNo(rows.get("rows")).get(c.b).get("examEligible").asBoolean()).isFalse();
-        assertThat(byRegNo(rows.get("rows")).get(c.b).get("failReason").asText()).isEqualTo("Not eligible to sit the examination");
+        assertThat(byRegNo(rows.get("rows")).get(c.b).get("failReason").asString()).isEqualTo("Not eligible to sit the examination");
 
         // exemptions: asked for with a reason by the Head of Department; decided by someone else
         s.call(post("/api/exams/offerings/" + m1 + "/exemptions"), lecturer, exemption(reg.get(c.b), "Hospitalised for two weeks")).andExpect(status().isForbidden());
@@ -263,9 +263,9 @@ class AttendanceAndEligibilityIT {
         e = byRegNo(s.body(s.call(get("/api/exams/offerings/" + m1 + "/eligibility"), lecturer, null)).get("students"));
         assertThat(e.get(c.b).get("eligible").asBoolean()).isTrue();
         assertThat(e.get(c.b).get("exempted").asBoolean()).isTrue();
-        assertThat(e.get(c.b).at("/exemption/decidedByName").asText()).isEqualTo("Staff dpa");
+        assertThat(e.get(c.b).at("/exemption/decidedByName").asString()).isEqualTo("Staff dpa");
         assertThat(e.get(c.c).get("eligible").asBoolean()).isFalse();
-        assertThat(e.get(c.c).at("/exemption/status").asText()).isEqualTo("REJECTED");
+        assertThat(e.get(c.c).at("/exemption/status").asString()).isEqualTo("REJECTED");
 
         // reports
         JsonNode rep = s.body(s.call(get("/api/reports/EXM-04?semesterId=" + c.semesterId + "&moduleId=" + c.moduleIds.get("ITU 04101")), exams, null)
@@ -277,11 +277,11 @@ class AttendanceAndEligibilityIT {
         // the students see it
         JsonNode myB = s.body(s.call(get("/api/student/attendance"), c.bToken, null));
         assertThat(myB.get("listPublished").asBoolean()).isTrue();
-        JsonNode b1 = myB.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        JsonNode b1 = myB.get("modules").findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(b1.get("eligible").asBoolean()).isTrue();
         assertThat(b1.get("exempted").asBoolean()).isTrue();
         JsonNode cc = s.body(s.call(get("/api/student/attendance"), c.cToken, null)).get("modules").findParents("code").stream()
-                .filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+                .filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(cc.get("eligible").asBoolean()).isFalse();
         assertThat(texts(cc.get("reasons"))).isNotEmpty();
     }
@@ -303,7 +303,7 @@ class AttendanceAndEligibilityIT {
         assertThat(cs.at("/checkIn/open").asBoolean()).isTrue();
         assertThat(cs.at("/checkIn/classSize").asInt()).isEqualTo(3);
         assertThat(cs.get("editable").asBoolean()).isFalse();
-        assertThat(cs.get("register").findValuesAsText("registrationNo")).hasSize(3);
+        assertThat(cs.get("register").findValuesAsString("registrationNo")).hasSize(3);
         assertThat(cs.get("register").findValues("status")).isEmpty();
         s.call(post("/api/teaching/offerings/" + m1 + "/check-in"), lecturer, open).andExpect(jsonPath("$.code").value("CHECKIN_ALREADY_OPEN"));
 
@@ -311,16 +311,16 @@ class AttendanceAndEligibilityIT {
         s.call(get("/api/teaching/sessions/" + sid + "/check-in"), lecturer2, null).andExpect(status().isForbidden());
         s.call(get("/api/teaching/sessions/" + sid + "/check-in"), hod, null).andExpect(status().isForbidden());
         JsonNode screen = s.body(s.call(get("/api/teaching/sessions/" + sid + "/check-in?base=http://college.localhost:5173"), lecturer, null));
-        String code = screen.get("code").asText();
+        String code = screen.get("code").asString();
         assertThat(code).matches("\\d{6}");
-        assertThat(screen.get("checkInUrl").asText()).isEqualTo("http://college.localhost:5173/student/check-in?code=" + code);
-        assertThat(screen.get("qrPng").asText()).startsWith("data:image/png;base64,");
+        assertThat(screen.get("checkInUrl").asString()).isEqualTo("http://college.localhost:5173/student/check-in?code=" + code);
+        assertThat(screen.get("qrPng").asString()).startsWith("data:image/png;base64,");
         assertThat(s.body(s.call(get("/api/teaching/sessions/" + sid + "/check-in?base=javascript:alert(1)"), lecturer, null)).has("qrPng")).isFalse();
 
         // a and b check in from the same phone; a twice
         JsonNode done = s.body(s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}").andExpect(status().isOk()));
-        assertThat(done.get("moduleCode").asText()).isEqualTo("ITU 04101");
-        assertThat(done.get("status").asText()).isEqualTo("PRESENT");
+        assertThat(done.get("moduleCode").asString()).isEqualTo("ITU 04101");
+        assertThat(done.get("status").asString()).isEqualTo("PRESENT");
         assertThat(done.get("already").asBoolean()).isFalse();
         assertThat(s.body(s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}")).get("already").asBoolean()).isTrue();
         s.call(post("/api/student/check-in"), c.bToken, "{\"code\":\"" + code + "\",\"deviceId\":\"phone-1\"}").andExpect(jsonPath("$.status").value("PRESENT"));
@@ -340,8 +340,8 @@ class AttendanceAndEligibilityIT {
 
         // the register cannot be edited while check-in is open; closing records c absent
         Map<String, Long> reg = new HashMap<>();
-        cs.get("register").forEach(x -> reg.put(x.get("registrationNo").asText(), x.get("moduleRegistrationId").asLong()));
-        String time = cs.get("startTime").asText().substring(0, 5);
+        cs.get("register").forEach(x -> reg.put(x.get("registrationNo").asString(), x.get("moduleRegistrationId").asLong()));
+        String time = cs.get("startTime").asString().substring(0, 5);
         s.call(put("/api/teaching/sessions/" + sid), lecturer, session(UUID.randomUUID(), TODAY, time, reg, c, new String[]{"PRESENT", "ABSENT", "ABSENT"}))
                 .andExpect(jsonPath("$.code").value("CHECKIN_OPEN"));
         s.call(post("/api/teaching/sessions/" + sid + "/check-in/close"), lecturer2, null).andExpect(status().isForbidden());
@@ -349,16 +349,16 @@ class AttendanceAndEligibilityIT {
         assertThat(closed.at("/checkIn/open").asBoolean()).isFalse();
         assertThat(closed.get("editable").asBoolean()).isTrue();
         Map<String, JsonNode> lines = byRegNo(closed.get("register"));
-        assertThat(lines.get(c.a).get("source").asText()).isEqualTo("SELF");
+        assertThat(lines.get(c.a).get("source").asString()).isEqualTo("SELF");
         assertThat(lines.get(c.a).get("sharedDevice").asBoolean()).isTrue();
-        assertThat(lines.get(c.c).get("status").asText()).isEqualTo("ABSENT");
-        assertThat(lines.get(c.c).get("source").asText()).isEqualTo("REGISTER");
+        assertThat(lines.get(c.c).get("status").asString()).isEqualTo("ABSENT");
+        assertThat(lines.get(c.c).get("source").asString()).isEqualTo("REGISTER");
         s.call(post("/api/student/check-in"), c.aToken, "{\"code\":\"" + code + "\"}").andExpect(jsonPath("$.code").value("CHECKIN_CODE_INVALID"));
 
         // the lecturer corrects b (the shared phone): b becomes absent and the line no longer counts as a self check-in
         JsonNode fixed = s.body(s.call(put("/api/teaching/sessions/" + sid), lecturer,
                 session(UUID.randomUUID(), TODAY, time, reg, c, new String[]{"PRESENT", "ABSENT", "ABSENT"})).andExpect(status().isOk()));
-        assertThat(byRegNo(fixed.get("register")).get(c.b).get("source").asText()).isEqualTo("REGISTER");
+        assertThat(byRegNo(fixed.get("register")).get(c.b).get("source").asString()).isEqualTo("REGISTER");
         JsonNode view = s.body(s.call(get("/api/teaching/offerings/" + m1 + "/attendance"), lecturer, null));
         assertThat(view.at("/sessionList/0/selfCheckIns").asInt()).isEqualTo(2);
         assertThat(view.at("/sessionList/0/present").asInt()).isEqualTo(1);
@@ -371,7 +371,7 @@ class AttendanceAndEligibilityIT {
         assertThat(tenantWork.call(inst.tenant(), () -> checkIns.closeExpired())).isEqualTo(1);
         JsonNode s2 = s.body(s.call(get("/api/teaching/sessions/" + sid2), lecturer, null));
         assertThat(s2.at("/checkIn/open").asBoolean()).isFalse();
-        assertThat(s2.get("register").findValuesAsText("status")).containsOnly("ABSENT");
+        assertThat(s2.get("register").findValuesAsString("status")).containsOnly("ABSENT");
     }
 
     @Test
@@ -380,39 +380,39 @@ class AttendanceAndEligibilityIT {
         long m1 = c.offerings.get("ITU 04101");
         JsonNode none = s.body(s.call(get("/api/teaching/mine"), lecturer2, null));
         assertThat(none.get("modules")).isEmpty();
-        assertThat(none.at("/next/0/text").asText()).contains("No modules are allocated to you");
+        assertThat(none.at("/next/0/text").asString()).contains("No modules are allocated to you");
 
         JsonNode b = s.body(s.call(get("/api/teaching/mine"), lecturer, null).andExpect(status().isOk()));
         assertThat(b.at("/semester/id").asLong()).isEqualTo(c.semesterId);
-        assertThat(b.get("marksWindow").asText()).isEqualTo("OPEN");
+        assertThat(b.get("marksWindow").asString()).isEqualTo("OPEN");
         assertThat(b.get("daysToClose").asInt()).isEqualTo(30);
         assertThat(b.get("modules")).hasSize(3);
         assertThat(b.get("students").asInt()).isEqualTo(9);
-        JsonNode mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        JsonNode mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(mod.get("students").asInt()).isEqualTo(3);
         assertThat(mod.get("planSet").asBoolean()).isTrue();
         assertThat(mod.get("caPercent").decimalValue()).isEqualByComparingTo("0");
-        assertThat(mod.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(mod.get("status").asString()).isEqualTo("DRAFT");
         assertThat(mod.get("canRecord").asBoolean()).isTrue();
 
         // a session with b absent, a CA mark for a, then the board shows them
         Map<String, Long> reg = new HashMap<>();
-        s.body(s.call(get("/api/teaching/offerings/" + m1 + "/register"), lecturer, null)).forEach(x -> reg.put(x.get("registrationNo").asText(),
+        s.body(s.call(get("/api/teaching/offerings/" + m1 + "/register"), lecturer, null)).forEach(x -> reg.put(x.get("registrationNo").asString(),
                 x.get("moduleRegistrationId").asLong()));
         s.call(post("/api/teaching/offerings/" + m1 + "/sessions"), lecturer, session(UUID.randomUUID(), TODAY.minusDays(1), "08:00", reg, c,
                 new String[]{"PRESENT", "ABSENT", "PRESENT"})).andExpect(status().isOk());
         JsonNode o = s.body(s.call(get("/api/exams/offerings/" + m1), lecturer, null));
-        long ca = o.get("components").findParents("category").stream().filter(x -> x.get("category").asText().equals("CA")).findFirst().orElseThrow()
+        long ca = o.get("components").findParents("category").stream().filter(x -> x.get("category").asString().equals("CA")).findFirst().orElseThrow()
                 .get("id").asLong();
         s.call(put("/api/exams/offerings/" + m1 + "/scores"), lecturer, scores(reg.get(c.a), ca, "12")).andExpect(status().isOk());
         b = s.body(s.call(get("/api/teaching/mine?semesterId=" + c.semesterId), lecturer, null));
-        mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asText().equals("ITU 04101")).findFirst().orElseThrow();
+        mod = b.get("modules").findParents("code").stream().filter(x -> x.get("code").asString().equals("ITU 04101")).findFirst().orElseThrow();
         assertThat(mod.get("sessions").asInt()).isEqualTo(1);
         assertThat(mod.get("below").asInt()).isEqualTo(1);
         assertThat(mod.get("caPercent").decimalValue()).isPositive();
         assertThat(b.get("atRisk")).hasSize(1);
-        assertThat(b.at("/atRisk/0/registrationNo").asText()).isEqualTo(c.b);
-        assertThat(b.get("next").findValuesAsText("text")).anyMatch(t -> t.contains("below the attendance threshold in ITU 04101"));
+        assertThat(b.at("/atRisk/0/registrationNo").asString()).isEqualTo(c.b);
+        assertThat(b.get("next").findValuesAsString("text")).anyMatch(t -> t.contains("below the attendance threshold in ITU 04101"));
 
         // the class list: PDF register and Excel, for the module's lecturers and those who oversee it
         var pdf = s.call(get("/api/teaching/offerings/" + m1 + "/class-list"), lecturer, null).andExpect(status().isOk()).andReturn().getResponse();
@@ -447,24 +447,24 @@ class AttendanceAndEligibilityIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(d.at("/summary/phone").asText(), d.at("/summary/registrationNo").asText());
+            byPhone.put(d.at("/summary/phone").asString(), d.at("/summary/registrationNo").asString());
         }
         String[] regNos = new String[3];
         String[] tokens = new String[3];
         Applicant[] apps = {a, b, c};
         for (int i = 0; i < 3; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asString();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }
         s.call(post("/api/registry/semester-registrations/approve-all"), registrar, "{\"semesterId\":" + semId + "}").andExpect(jsonPath("$.approved").value(3));
         s.call(post("/api/exams/offerings/setup"), exams, "{\"semesterId\":" + semId + "}").andExpect(status().isOk());
         Map<String, Long> off = new HashMap<>();
-        s.body(s.call(get("/api/exams/offerings?semesterId=" + semId), exams, null)).forEach(o -> off.put(o.get("code").asText(), o.get("id").asLong()));
+        s.body(s.call(get("/api/exams/offerings?semesterId=" + semId), exams, null)).forEach(o -> off.put(o.get("code").asString(), o.get("id").asLong()));
         long lecturerId = s.body(s.call(get("/api/exams/staff"), exams, null)).findParents("fullName").stream()
-                .filter(x -> x.get("fullName").asText().equals("Staff lecturer")).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("fullName").asString().equals("Staff lecturer")).findFirst().orElseThrow().get("id").asLong();
         for (Long id : off.values()) s.call(put("/api/exams/offerings/" + id + "/staff"), hod, "{\"userIds\":[" + lecturerId + "]}").andExpect(status().isOk());
         return new Setup(semId, regNos[0], regNos[1], regNos[2], tokens[0], tokens[1], tokens[2], a, off, Map.of("ITU 04101", m1, "ITU 04102", m2, "ITU 04103", m3));
     }
@@ -501,7 +501,7 @@ class AttendanceAndEligibilityIT {
 
     private static Map<String, JsonNode> byRegNo(JsonNode arr) {
         Map<String, JsonNode> m = new HashMap<>();
-        arr.forEach(x -> m.put(x.get("registrationNo").asText(), x));
+        arr.forEach(x -> m.put(x.get("registrationNo").asString(), x));
         return m;
     }
 
@@ -511,13 +511,13 @@ class AttendanceAndEligibilityIT {
 
     private static List<String> texts(JsonNode arr) {
         List<String> out = new ArrayList<>();
-        arr.forEach(x -> out.add(x.asText()));
+        arr.forEach(x -> out.add(x.asString()));
         return out;
     }
 
     private void payAnnualFees(Applicant a) throws Exception {
         for (JsonNode inv : s.body(s.call(get("/api/applicant/account"), a.token(), null)).get("invoices")) {
-            if (inv.get("purpose").asText().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
+            if (inv.get("purpose").asString().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
                 s.call(post("/api/applicant/invoices/" + inv.get("id").asLong() + "/simulate-payment"), a.token(), "{}").andExpect(status().isOk());
             }
         }

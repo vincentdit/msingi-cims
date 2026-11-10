@@ -2,7 +2,7 @@ package tz.co.msingi.cims.reporting;
 
 import tz.co.msingi.cims.platform.jobs.JobLock;
 import java.time.Duration;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

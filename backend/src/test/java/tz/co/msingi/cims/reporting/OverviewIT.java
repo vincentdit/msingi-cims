@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.reporting;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
@@ -49,7 +49,7 @@ class OverviewIT {
         s.call(post("/api/registry/windows/" + inst.windowId() + "/handover"), registrar, "{}").andExpect(status().isOk());
 
         JsonNode o = s.body(s.call(get("/api/dashboard/overview"), principal, null).andExpect(status().isOk()));
-        assertThat(o.at("/year/code").asText()).isEqualTo("2027/2028");
+        assertThat(o.at("/year/code").asString()).isEqualTo("2027/2028");
         JsonNode t = o.get("totals");
         assertThat(t.get("students").asLong()).isEqualTo(2);
         assertThat(t.get("newStudents").asLong()).isEqualTo(2);
@@ -61,7 +61,7 @@ class OverviewIT {
         assertThat(t.has("passRate")).isFalse();       // no results published yet
 
         JsonNode row = o.get("programmes").get(0);
-        assertThat(row.get("code").asText()).isEqualTo("BTCIT");
+        assertThat(row.get("code").asString()).isEqualTo("BTCIT");
         assertThat(row.get("female").asLong() + row.get("male").asLong()).isEqualTo(2);
         assertThat(row.get("attention").toString()).contains("Intake below 50% of places").contains("Fewer applicants than places");
         assertThat(o.get("intakeByYear").get(0).get("value").asLong()).isEqualTo(2);

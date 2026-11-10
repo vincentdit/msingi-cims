@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.notification.sms;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ class SmsProviderIT {
             platformUsers.save(u);
         });
         platform = s.body(mvc.perform(post("/api/platform/auth/login").contentType("application/json")
-                .content("{\"username\":\"ops" + suffix + "\",\"password\":\"Ops@2026x\"}"))).get("accessToken").asText();
+                .content("{\"username\":\"ops" + suffix + "\",\"password\":\"Ops@2026x\"}"))).get("accessToken").asString();
     }
 
     @AfterEach
@@ -84,7 +84,7 @@ class SmsProviderIT {
                 + " default_sender = 'MSINGI' where id = 1");
     }
 
-    ResultActions p(MockHttpServletRequestBuilder req, String body) throws Exception {
+    ResultActions p(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String body) throws Exception {
         req.header("Authorization", "Bearer " + platform);
         if (body != null) req.contentType("application/json").content(body);
         return mvc.perform(req);
@@ -109,7 +109,7 @@ class SmsProviderIT {
         JsonNode v = s.body(p(put("/api/platform/sms/provider"), account(true, "pw-secret")).andExpect(status().isOk()));
         assertThat(v.toString()).doesNotContain("pw-secret");
         assertThat(v.get("fields").get(0).get("set").asBoolean()).isTrue();
-        String notify = v.get("notifyUrl").asText();
+        String notify = v.get("notifyUrl").asString();
         assertThat(notify).startsWith("https://app.cims.ac.tz/api/integrations/sms/nextsms/");
         // saving again without retyping the password keeps it
         p(put("/api/platform/sms/provider"), account(true, null)).andExpect(status().isOk());
@@ -131,7 +131,7 @@ class SmsProviderIT {
         JsonNode mine = null;
         for (JsonNode n : names) if (n.get("tenantId").asLong() == inst.tenant().getId()) mine = n;
         assertThat(mine).isNotNull();
-        assertThat(mine.get("senderId").asText()).isEqualTo("BAHARI");
+        assertThat(mine.get("senderId").asString()).isEqualTo("BAHARI");
         long id = mine.get("id").asLong();
         p(put("/api/platform/sms/sender-names/" + id), "{\"status\":\"REJECTED\"}").andExpect(jsonPath("$.code").value("SENDER_NAME_REASON"));
         p(put("/api/platform/sms/sender-names/" + id), "{\"status\":\"SUBMITTED\",\"note\":\"Sent to NextSMS with the letter\"}")

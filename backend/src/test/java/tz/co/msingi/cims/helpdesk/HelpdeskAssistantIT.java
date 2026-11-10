@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.helpdesk;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,7 +68,7 @@ class HelpdeskAssistantIT {
     }
 
     long category(String token, String name) throws Exception {
-        for (JsonNode c : s.body(s.call(get("/api/help/categories"), token, null))) if (c.get("name").asText().equals(name)) return c.get("id").asLong();
+        for (JsonNode c : s.body(s.call(get("/api/help/categories"), token, null))) if (c.get("name").asString().equals(name)) return c.get("id").asLong();
         throw new AssertionError(name);
     }
 
@@ -78,9 +78,9 @@ class HelpdeskAssistantIT {
         // in Kiswahili, against answers written in English; the category is guessed among the applicant's
         JsonNode sug = s.body(s.call(post("/api/help/suggest"), applicant, "{\"subject\":\"Nimesahau nenosiri langu\",\"body\":\"Siwezi kuingia kwenye akaunti\"}")
                 .andExpect(status().isOk()));
-        assertThat(sug.at("/answers/0/title").asText()).isEqualTo("I forgot my password");
+        assertThat(sug.at("/answers/0/title").asString()).isEqualTo("I forgot my password");
         assertThat(sug.at("/answers/0/confidence").asDouble()).isGreaterThan(0.5);
-        assertThat(sug.at("/category/name").asText()).isEqualTo("Signing in and my account");
+        assertThat(sug.at("/category/name").asString()).isEqualTo("Signing in and my account");
         // something no answer covers: no suggestion
         JsonNode none = s.body(s.call(post("/api/help/suggest"), applicant, "{\"subject\":\"Lecturer absent\",\"body\":\"The lecturer for ITU 05102 did not come on Monday\"}"));
         assertThat(none.get("answers").size()).isZero();
@@ -88,7 +88,7 @@ class HelpdeskAssistantIT {
         // without an account: the suggestion solved it, so no request was raised
         JsonNode pub = s.body(s.call(post("/api/public/help/suggest"), null, "{\"subject\":\"I paid but the payment is not showing\",\"body\":\"\"}"));
         long paid = pub.at("/answers/0/id").asLong();
-        assertThat(pub.at("/answers/0/title").asText()).isEqualTo("I paid but the payment does not show");
+        assertThat(pub.at("/answers/0/title").asString()).isEqualTo("I paid but the payment does not show");
         s.call(post("/api/public/help/suggest/solved"), null, "{\"articleId\":" + paid + "}").andExpect(status().isNoContent());
 
         // a confident match is given on the request at once; the requester says it did not solve it
@@ -96,21 +96,21 @@ class HelpdeskAssistantIT {
         JsonNode t = s.body(send(multipart("/api/help/tickets"), applicant, Map.of("categoryId", "" + signIn,
                 "subject", "Sikupokea nambari ya siri kwa SMS", "body", "Nimejaribu mara tatu lakini ujumbe haufiki")).andExpect(status().isCreated()));
         long id = t.at("/ticket/id").asLong();
-        assertThat(t.get("suggestionOutcome").asText()).isEqualTo("INSTANT");
-        assertThat(t.at("/messages/1/authorType").asText()).isEqualTo("ASSISTANT");
-        assertThat(t.at("/messages/1/body").asText()).startsWith("I did not receive the SMS code");
+        assertThat(t.get("suggestionOutcome").asString()).isEqualTo("INSTANT");
+        assertThat(t.at("/messages/1/authorType").asString()).isEqualTo("ASSISTANT");
+        assertThat(t.at("/messages/1/body").asString()).startsWith("I did not receive the SMS code");
         assertThat(t.at("/ticket/firstResponseAt").isMissingNode() || t.at("/ticket/firstResponseAt").isNull()).isTrue();   // the office still owes a reply
         s.call(post("/api/help/tickets/" + id + "/assistant"), applicant, "{\"helpful\":false}").andExpect(jsonPath("$.suggestionOutcome").value("REJECTED"))
                 .andExpect(jsonPath("$.ticket.status").value("OPEN"));
         s.call(post("/api/help/tickets/" + id + "/assistant"), applicant, "{\"helpful\":true}").andExpect(jsonPath("$.code").value("NO_SUGGESTION"));
         // the office is not offered the answer the requester turned down
         JsonNode forOffice = s.body(s.call(get("/api/helpdesk/tickets/" + id + "/suggestions"), admin, null));
-        assertThat(forOffice.get("replies").findValuesAsText("title")).doesNotContain("I did not receive the SMS code");
+        assertThat(forOffice.get("replies").findValuesAsString("title")).doesNotContain("I did not receive the SMS code");
 
         // another one it solves: closed as helped
         JsonNode t2 = s.body(send(multipart("/api/help/tickets"), applicant, Map.of("categoryId", "" + signIn,
                 "subject", "I forgot my password", "body", "I forgot my password and cannot sign in to my account")));
-        assertThat(t2.get("suggestionOutcome").asText()).isEqualTo("INSTANT");
+        assertThat(t2.get("suggestionOutcome").asString()).isEqualTo("INSTANT");
         s.call(post("/api/help/tickets/" + t2.at("/ticket/id").asLong() + "/assistant"), applicant, "{\"helpful\":true}")
                 .andExpect(jsonPath("$.ticket.status").value("CLOSED")).andExpect(jsonPath("$.ticket.satisfied").value(true));
 
@@ -143,14 +143,14 @@ class HelpdeskAssistantIT {
         long second = s.body(send(multipart("/api/help/tickets"), student, Map.of("categoryId", "" + records,
                 "subject", "Uhamisho wa programu", "body", "Nataka kuhamia programu nyingine muhula huu"))).at("/ticket/id").asLong();
         JsonNode sug = s.body(s.call(get("/api/helpdesk/tickets/" + second + "/suggestions"), registrar, null).andExpect(status().isOk()));
-        assertThat(sug.get("replies").findValuesAsText("text")).contains(reply);
+        assertThat(sug.get("replies").findValuesAsString("text")).contains(reply);
         JsonNode past = null;
-        for (JsonNode r : sug.get("replies")) if (r.get("text").asText().equals(reply)) past = r;
-        assertThat(past.get("source").asText()).isEqualTo("PAST_REPLY");
+        for (JsonNode r : sug.get("replies")) if (r.get("text").asString().equals(reply)) past = r;
+        assertThat(past.get("source").asString()).isEqualTo("PAST_REPLY");
         assertThat(past.get("confirmed").asBoolean()).isTrue();
         s.call(post("/api/helpdesk/suggestions/" + past.get("sourceId").asLong() + "/used"), registrar, null).andExpect(status().isNoContent());
         // the guess knows where this belongs, and a requester cannot see staff suggestions
-        assertThat(sug.at("/category/name").asText()).isEqualTo("Registration and student records");
+        assertThat(sug.at("/category/name").asString()).isEqualTo("Registration and student records");
         s.call(get("/api/helpdesk/tickets/" + second + "/suggestions"), student, null).andExpect(status().isForbidden());
 
         // a reply the requester said did not help is not learned
@@ -170,7 +170,7 @@ class HelpdeskAssistantIT {
         for (JsonNode g : gaps) if (g.get("examples").toString().contains("gown")) gown = g;
         assertThat(gown).as(gaps.toString()).isNotNull();
         assertThat(gown.get("requests").asInt()).isEqualTo(3);
-        assertThat(gown.get("categoryName").asText()).isEqualTo("Something else");
+        assertThat(gown.get("categoryName").asString()).isEqualTo("Something else");
         // each office sees the gaps in its own categories: Admissions does not get Registry's
         data.staff(inst.tenant(), "admissions", Role.ADMISSIONS_OFFICER);
         JsonNode admissionsGaps = s.body(s.call(get("/api/helpdesk/gaps?days=30"), s.staffToken("admissions"), null));

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform.tenancy;
 
 import jakarta.persistence.EntityManagerFactory;
-import org.springframework.boot.autoconfigure.security.SecurityProperties;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +20,7 @@ public class TenancyConfig {
     @Bean
     public FilterRegistrationBean<TenantResolutionFilter> tenantResolutionFilter(TenantLookupService lookup) {
         FilterRegistrationBean<TenantResolutionFilter> reg = new FilterRegistrationBean<>(new TenantResolutionFilter(lookup));
-        reg.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER - 10);
+        reg.setOrder(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 10);
         reg.addUrlPatterns("/*");
         return reg;
     }
@@ -32,7 +32,7 @@ public class TenancyConfig {
             @org.springframework.beans.factory.annotation.Value("${cims.security.sign-in-per-hour:1000}") int perHour) {
         FilterRegistrationBean<tz.co.msingi.cims.platform.security.SignInThrottleFilter> reg = new FilterRegistrationBean<>(
                 new tz.co.msingi.cims.platform.security.SignInThrottleFilter(perMinute, perHour, java.time.Clock.systemUTC()));
-        reg.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER - 20);
+        reg.setOrder(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 20);
         reg.addUrlPatterns("/api/*");
         return reg;
     }

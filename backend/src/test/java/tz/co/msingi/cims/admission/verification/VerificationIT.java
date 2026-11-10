@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission.verification;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +73,7 @@ class VerificationIT {
         assertThat(overview.at("/counts/SELECTED").asInt()).isEqualTo(4);
         assertThat(overview.get("ready")).hasSize(4);
         assertThat(overview.at("/ready/0/issues")).isEmpty();
-        assertThat(overview.get("institutionNactvetNo").asText()).isEqualTo("REG/" + s.tenant + "/001");
+        assertThat(overview.get("institutionNactvetNo").asString()).isEqualTo("REG/" + s.tenant + "/001");
 
         // submit by API: NACTVET needs the payment reference of the verification fee with every upload
         submit("API", null).andExpect(jsonPath("$.code").value("PAYMENT_REFERENCE_REQUIRED"));
@@ -82,8 +82,8 @@ class VerificationIT {
         assertThat(batch.get("batchNo").asInt()).isEqualTo(1);
         assertThat(batch.get("pending").asInt()).isEqualTo(4);
         // outcomes come from NACTVET's feedback for the intake's application year and intake (as NOAS pulls them)
-        assertThat(batch.get("externalRef").asText()).matches("\\d{4}/(SEPTEMBER|MARCH)");
-        assertThat(batch.get("paymentReference").asText()).isEqualTo("991100223344");
+        assertThat(batch.get("externalRef").asString()).matches("\\d{4}/(SEPTEMBER|MARCH)");
+        assertThat(batch.get("paymentReference").asString()).isEqualTo("991100223344");
         submit("API").andExpect(jsonPath("$.code").value("NOTHING_TO_SUBMIT"));
         assertThat(statusOf(single)).isEqualTo("PENDING_VERIFICATION");
 
@@ -93,18 +93,18 @@ class VerificationIT {
         assertThat(result.get("verified").asInt()).isEqualTo(2);
         assertThat(result.get("queried").asInt()).isEqualTo(1);
         assertThat(result.get("rejected").asInt()).isEqualTo(1);
-        assertThat(result.at("/submission/status").asText()).isEqualTo("COMPLETED");
+        assertThat(result.at("/submission/status").asString()).isEqualTo("COMPLETED");
         s.call(post("/api/admission/nactvet-submissions/" + batchId + "/fetch-outcomes"), officer, null)
                 .andExpect(jsonPath("$.code").value("SUBMISSION_COMPLETE"));
 
         JsonNode singleApp = app(single);
-        assertThat(singleApp.get("status").asText()).isEqualTo("OFFERED");
-        assertThat(singleApp.at("/offer/verificationNo").asText()).startsWith("NV/");
+        assertThat(singleApp.get("status").asString()).isEqualTo("OFFERED");
+        assertThat(singleApp.at("/offer/verificationNo").asString()).startsWith("NV/");
         assertThat(singleApp.at("/offer/open").asBoolean()).isTrue();
         assertThat(singleApp.at("/offer/multipleAdmission").asBoolean()).isFalse();
-        assertThat(app(rejected).get("status").asText()).isEqualTo("NACTVET_REJECTED");
-        assertThat(app(rejected).at("/offer/rejectionReason").asText()).contains("minimum entry requirements");
-        assertThat(app(queried).get("status").asText()).isEqualTo("QUERIED");
+        assertThat(app(rejected).get("status").asString()).isEqualTo("NACTVET_REJECTED");
+        assertThat(app(rejected).at("/offer/rejectionReason").asString()).contains("minimum entry requirements");
+        assertThat(app(queried).get("status").asString()).isEqualTo("QUERIED");
         assertThat(app(queried).hasNonNull("offer")).isFalse(); // queries are handled by the office, not shown to the applicant
 
         // resolve the query and resubmit: NACTVET verifies the corrected record
@@ -125,7 +125,7 @@ class VerificationIT {
         accept(multiple, "000000x").andExpect(jsonPath("$.code").value("INVALID_CONFIRMATION_CODE"));
         JsonNode multi = app(multiple);
         assertThat(multi.at("/offer/confirmationAttemptsLeft").asInt()).isEqualTo(4); // wrong attempt was recorded
-        String code = multi.at("/offer/devConfirmationCode").asText();
+        String code = multi.at("/offer/devConfirmationCode").asString();
         assertThat(code).hasSize(6);
         accept(multiple, code).andExpect(jsonPath("$.status").value("ACCEPTED"));
 
@@ -151,8 +151,8 @@ class VerificationIT {
         Applicant a = s.apply("S0101/0001");
         Applicant b = s.applyEligibleEndingIn(5, 200);
         s.selectAndApprove(officer, chair);
-        String refA = app(a).get("referenceNo").asText();
-        String refB = app(b).get("referenceNo").asText();
+        String refA = app(a).get("referenceNo").asString();
+        String refB = app(b).get("referenceNo").asString();
 
         JsonNode batch = s.body(submit("FILE").andExpect(status().isOk()));
         long id = batch.get("id").asLong();
@@ -181,13 +181,13 @@ class VerificationIT {
         s.call(post("/api/admission/nactvet-submissions/" + id + "/outcomes"), officer, csvBody(partial))
                 .andExpect(jsonPath("$.applied").value(1))
                 .andExpect(jsonPath("$.submission.status").value("SUBMITTED"));
-        assertThat(app(a).at("/offer/verificationNo").asText()).isEqualTo("NV/2026/123456");
+        assertThat(app(a).at("/offer/verificationNo").asString()).isEqualTo("NV/2026/123456");
 
         s.call(post("/api/admission/nactvet-submissions/" + id + "/outcomes"), officer,
                         csvBody("reference,outcome,reason\n\"" + refB + "\",rejected,\"Age, below minimum\"\n"))
                 .andExpect(jsonPath("$.rejected").value(1))
                 .andExpect(jsonPath("$.submission.status").value("COMPLETED"));
-        assertThat(app(b).at("/offer/rejectionReason").asText()).isEqualTo("Age, below minimum");
+        assertThat(app(b).at("/offer/rejectionReason").asString()).isEqualTo("Age, below minimum");
     }
 
     @Test
@@ -214,7 +214,7 @@ class VerificationIT {
         s.selectAndApprove(officer, chair);
         long id = s.body(submit("API")).get("id").asLong();
         s.call(post("/api/admission/nactvet-submissions/" + id + "/fetch-outcomes"), officer, null);
-        String code = app(a).at("/offer/devConfirmationCode").asText();
+        String code = app(a).at("/offer/devConfirmationCode").asString();
 
         for (int i = 0; i < OfferService.MAX_CONFIRMATION_ATTEMPTS; i++) {
             accept(a, "999999".equals(code) ? "111111" : "999999").andExpect(jsonPath("$.code").value("INVALID_CONFIRMATION_CODE"));
@@ -230,7 +230,7 @@ class VerificationIT {
         TenantContext.runAs(s.inst.info(), () -> tx.executeWithoutResult(t ->
                 programmes.findById(s.inst.programmeId()).orElseThrow().setNactvetCode(null)));
 
-        assertThat(overview().at("/ready/0/issues/0").asText()).contains("has no NACTVET programme code");
+        assertThat(overview().at("/ready/0/issues/0").asString()).contains("has no NACTVET programme code");
         submit("API").andExpect(jsonPath("$.code").value("NOTHING_TO_SUBMIT"));
     }
 
@@ -285,7 +285,7 @@ class VerificationIT {
     }
 
     private String statusOf(Applicant a) throws Exception {
-        return app(a).get("status").asText();
+        return app(a).get("status").asString();
     }
 
     private String csvBody(String csv) throws Exception {

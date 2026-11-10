@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.helpdesk;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,7 +88,7 @@ class HelpdeskIT {
 
     long category(String token, String name) throws Exception {
         for (JsonNode c : s.body(s.call(get("/api/help/categories"), token, null).andExpect(status().isOk()))) {
-            if (c.get("name").asText().equals(name)) return c.get("id").asLong();
+            if (c.get("name").asString().equals(name)) return c.get("id").asLong();
         }
         throw new AssertionError("no category " + name);
     }
@@ -116,7 +116,7 @@ class HelpdeskIT {
         String applicant = s.applicantToken();
         String other = s.applicantToken();
         // applicants see the categories meant for them only
-        List<String> names = s.body(s.call(get("/api/help/categories"), applicant, null)).findValuesAsText("name");
+        List<String> names = s.body(s.call(get("/api/help/categories"), applicant, null)).findValuesAsString("name");
         assertThat(names).contains("Applying for admission", "Signing in and my account").doesNotContain("Fees and invoices", "ICT and system support");
 
         long admission = category(applicant, "Applying for admission");
@@ -127,9 +127,9 @@ class HelpdeskIT {
                 "subject", "My CSEE results are not found", "body", "The portal says my index number is not found."), PDF)
                 .andExpect(status().isCreated()));
         long id = t.at("/ticket/id").asLong();
-        assertThat(t.at("/ticket/ticketNo").asText()).isEqualTo("HD-" + Year.now().getValue() + "-00001");
-        assertThat(t.at("/ticket/status").asText()).isEqualTo("OPEN");
-        assertThat(t.at("/messages/0/attachments/0/fileName").asText()).isEqualTo("file1.pdf");
+        assertThat(t.at("/ticket/ticketNo").asString()).isEqualTo("HD-" + Year.now().getValue() + "-00001");
+        assertThat(t.at("/ticket/status").asString()).isEqualTo("OPEN");
+        assertThat(t.at("/messages/0/attachments/0/fileName").asString()).isEqualTo("file1.pdf");
         long attachment = t.at("/messages/0/attachments/0/id").asLong();
         assertThat(sms("HELPDESK_RECEIVED")).hasSize(1);
         assertThat(emailsTo("admissions", "HELPDESK_NEW")).hasSize(1);
@@ -152,17 +152,17 @@ class HelpdeskIT {
                 .andExpect(status().isOk());
         JsonNode r = s.body(send(multipart("/api/helpdesk/tickets/" + id + "/messages"), admissions,
                 Map.of("body", "Please send a photo of your result slip.", "statusAfter", "WAITING")).andExpect(status().isOk()));
-        assertThat(r.at("/ticket/status").asText()).isEqualTo("WAITING");
-        assertThat(r.at("/ticket/assigneeName").asText()).isEqualTo("Staff admissions");
-        assertThat(r.at("/ticket/firstResponseAt").asText()).isNotEmpty();
+        assertThat(r.at("/ticket/status").asString()).isEqualTo("WAITING");
+        assertThat(r.at("/ticket/assigneeName").asString()).isEqualTo("Staff admissions");
+        assertThat(r.at("/ticket/firstResponseAt").asString()).isNotEmpty();
         assertThat(sms("HELPDESK_REPLY")).hasSize(1);
         JsonNode mine = s.body(s.call(get("/api/help/tickets/" + id), applicant, null));
-        assertThat(mine.get("messages").findValuesAsText("body")).contains("Please send a photo of your result slip.")
+        assertThat(mine.get("messages").findValuesAsString("body")).contains("Please send a photo of your result slip.")
                 .doesNotContain("Checked NECTA: index has a typo");
 
         // the applicant answers: back in progress, the assignee is told
         JsonNode back = s.body(send(multipart("/api/help/tickets/" + id + "/messages"), applicant, Map.of("body", "Here it is"), PDF).andExpect(status().isOk()));
-        assertThat(back.at("/ticket/status").asText()).isEqualTo("IN_PROGRESS");
+        assertThat(back.at("/ticket/status").asString()).isEqualTo("IN_PROGRESS");
         assertThat(emailsTo("admissions", "HELPDESK_REQUESTER_REPLY")).hasSize(1);
 
         // moved to the Bursar: the Admissions Office no longer has it
@@ -170,9 +170,9 @@ class HelpdeskIT {
         s.call(post("/api/helpdesk/tickets/" + id + "/route"), admissions, "{\"categoryId\":" + payments + "}").andExpect(status().isNoContent());
         s.call(get("/api/helpdesk/tickets/" + id), admissions, null).andExpect(status().isForbidden());
         JsonNode moved = s.body(s.call(get("/api/helpdesk/tickets/" + id), bursar, null).andExpect(status().isOk()));
-        assertThat(moved.at("/ticket/officeRole").asText()).isEqualTo("BURSAR");
+        assertThat(moved.at("/ticket/officeRole").asString()).isEqualTo("BURSAR");
         assertThat(moved.at("/ticket/assigneeUserId").isMissingNode() || moved.at("/ticket/assigneeUserId").isNull()).isTrue();
-        assertThat(moved.get("messages").findValuesAsText("body")).anyMatch(b -> b.startsWith("Moved from Applying for admission to Payments"));
+        assertThat(moved.get("messages").findValuesAsString("body")).anyMatch(b -> b.startsWith("Moved from Applying for admission to Payments"));
 
         // the Auditor reads everything but changes nothing
         s.call(get("/api/helpdesk/tickets/" + id), auditor, null).andExpect(status().isOk());
@@ -190,11 +190,11 @@ class HelpdeskIT {
             Long requester = jdbc.queryForObject("select requester_user_id from helpdesk_tickets where id = ?", Long.class, id);
             return jdbc.update("insert into user_roles (user_id, role) select id, 'STUDENT' from user_accounts where user_type = 'APPLICANT' and id <> ?", requester);
         });
-        assertThat(s.body(s.call(get("/api/help/categories"), other, null)).findValuesAsText("name")).contains("Fees and invoices", "Results and examinations")
+        assertThat(s.body(s.call(get("/api/help/categories"), other, null)).findValuesAsString("name")).contains("Fees and invoices", "Results and examinations")
                 .doesNotContain("Applying for admission");
 
         // staff ask their own ICT office
-        List<String> staffCategories = s.body(s.call(get("/api/help/categories"), lecturer, null)).findValuesAsText("name");
+        List<String> staffCategories = s.body(s.call(get("/api/help/categories"), lecturer, null)).findValuesAsString("name");
         assertThat(staffCategories).contains("ICT and system support").doesNotContain("Applying for admission");
         long ict = category(lecturer, "ICT and system support");
         long lt = s.body(send(multipart("/api/help/tickets"), lecturer, Map.of("categoryId", "" + ict, "subject", "Projector login", "body", "Cannot sign in"))
@@ -206,7 +206,7 @@ class HelpdeskIT {
 
         // assignment: someone from the office (or an administrator), nobody else
         JsonNode agents = s.body(s.call(get("/api/helpdesk/tickets/" + lt + "/agents"), admin, null));
-        assertThat(agents.findValuesAsText("name")).contains("Staff admin").doesNotContain("Staff bursar");
+        assertThat(agents.findValuesAsString("name")).contains("Staff admin").doesNotContain("Staff bursar");
         long bursarId = db(() -> jdbc.queryForObject("select id from user_accounts where username = 'bursar'", Long.class));
         s.call(post("/api/helpdesk/tickets/" + lt + "/assign"), admin, "{\"userId\":" + bursarId + "}").andExpect(jsonPath("$.code").value("NOT_AN_AGENT"));
     }
@@ -214,16 +214,16 @@ class HelpdeskIT {
     @Test
     void peopleWithoutAnAccountAskAndFollowWithTheirCode() throws Exception {
         JsonNode cats = s.body(s.call(get("/api/public/help/categories"), null, null).andExpect(status().isOk()));
-        assertThat(cats.findValuesAsText("name")).contains("Signing in and my account", "Applying for admission").doesNotContain("Fees and invoices");
+        assertThat(cats.findValuesAsString("name")).contains("Signing in and my account", "Applying for admission").doesNotContain("Fees and invoices");
         long signIn = 0;
-        for (JsonNode c : cats) if (c.get("name").asText().equals("Signing in and my account")) signIn = c.get("id").asLong();
+        for (JsonNode c : cats) if (c.get("name").asString().equals("Signing in and my account")) signIn = c.get("id").asLong();
         send(multipart("/api/public/help/tickets"), null, Map.of("name", "Asha", "phone", "123", "categoryId", "" + signIn, "subject", "Code", "body", "x"))
                 .andExpect(jsonPath("$.code").value("INVALID_PHONE"));
         JsonNode g = s.body(send(multipart("/api/public/help/tickets"), null, Map.of("name", "Asha Juma", "phone", "0716 555 111",
                 "email", "asha@example.com", "categoryId", "" + signIn, "subject", "The SMS code does not arrive", "body", "I tried three times."))
                 .andExpect(status().isCreated()));
-        String no = g.get("ticketNo").asText();
-        String code = g.get("code").asText();
+        String no = g.get("ticketNo").asString();
+        String code = g.get("code").asString();
         assertThat(code).hasSize(8);
         // the code is sent, but never kept readable in the message log or the email outbox
         assertThat(sms("HELPDESK_RECEIVED_GUEST")).singleElement().satisfies(b -> assertThat(b).contains(no).doesNotContain(code));
@@ -311,7 +311,7 @@ class HelpdeskIT {
         s.call(post("/api/helpdesk/categories"), admin, category.formatted("STUDENT", 8)).andExpect(jsonPath("$.code").value("INVALID_OFFICE"));
         s.call(post("/api/helpdesk/categories"), admin, category.formatted("REGISTRAR", 72)).andExpect(jsonPath("$.code").value("INVALID_TIMES"));
         s.call(post("/api/helpdesk/categories"), admin, category.formatted("REGISTRAR", 8)).andExpect(status().isCreated());
-        assertThat(s.body(s.call(get("/api/help/categories"), lecturer, null)).findValuesAsText("name")).contains("Library");
+        assertThat(s.body(s.call(get("/api/help/categories"), lecturer, null)).findValuesAsString("name")).contains("Library");
     }
 
     @Test
@@ -327,27 +327,27 @@ class HelpdeskIT {
             platformUsers.save(u);
         });
         String platform = s.body(mvc.perform(post("/api/platform/auth/login").contentType("application/json")
-                .content("{\"username\":\"sup" + suffix + "\",\"password\":\"Sup@2026x\"}"))).get("accessToken").asText();
+                .content("{\"username\":\"sup" + suffix + "\",\"password\":\"Sup@2026x\"}"))).get("accessToken").asString();
 
         // only administrators raise tickets to Msingi
         send(multipart("/api/msingi-support/tickets"), bursar, Map.of("category", "PROBLEM", "subject", "x", "body", "y")).andExpect(status().isForbidden());
         JsonNode t = s.body(send(multipart("/api/msingi-support/tickets"), admin, Map.of("category", "INTEGRATION", "priority", "URGENT",
                 "subject", "GePG callbacks not arriving", "body", "Payments since 9:00 are not showing."), PDF).andExpect(status().isCreated()));
         long id = t.at("/ticket/id").asLong();
-        assertThat(t.at("/ticket/ticketNo").asText()).startsWith("MS-");
+        assertThat(t.at("/ticket/ticketNo").asString()).startsWith("MS-");
         assertThat(db(() -> jdbc.queryForList("select subject from email_messages where to_address = ?", String.class, "sup" + suffix + "@msingi.co.tz")))
                 .anyMatch(x -> x.startsWith("New support ticket"));
 
         // Msingi sees it with the institution, adds a note the institution never sees, and answers
         JsonNode list = s.body(mvc.perform(get("/api/platform/support/tickets?view=open").header("Authorization", "Bearer " + platform)).andExpect(status().isOk()));
-        assertThat(list.get("rows").findValuesAsText("ticketNo")).contains(t.at("/ticket/ticketNo").asText());
+        assertThat(list.get("rows").findValuesAsString("ticketNo")).contains(t.at("/ticket/ticketNo").asString());
         mvc.perform(multipart("/api/platform/support/tickets/" + id + "/messages").param("body", "Bank side outage, checking").param("internal", "true")
                 .header("Authorization", "Bearer " + platform)).andExpect(status().isOk());
         mvc.perform(multipart("/api/platform/support/tickets/" + id + "/messages").param("body", "Fixed: the callbacks are flowing again.")
                 .param("statusAfter", "RESOLVED").header("Authorization", "Bearer " + platform)).andExpect(jsonPath("$.ticket.status").value("RESOLVED"))
                 .andExpect(jsonPath("$.ticket.assigneeName").value("Support " + suffix));
         JsonNode mine = s.body(s.call(get("/api/msingi-support/tickets/" + id), admin, null));
-        assertThat(mine.get("messages").findValuesAsText("body")).contains("Fixed: the callbacks are flowing again.").doesNotContain("Bank side outage, checking");
+        assertThat(mine.get("messages").findValuesAsString("body")).contains("Fixed: the callbacks are flowing again.").doesNotContain("Bank side outage, checking");
         assertThat(emailsTo("admin", "MSINGI_SUPPORT")).anyMatch(x -> x.startsWith("Resolved: MS-"));
 
         // another institution's administrator cannot see it
@@ -362,8 +362,8 @@ class HelpdeskIT {
                 .at("/ticket/id").asLong();
         JsonNode esc = s.body(s.call(post("/api/msingi-support/escalate/" + hd), admin, "{\"category\":\"PROBLEM\",\"priority\":\"HIGH\",\"note\":\"Please look\"}")
                 .andExpect(status().isCreated()));
-        assertThat(esc.at("/ticket/helpdeskTicketNo").asText()).startsWith("HD-");
-        s.call(get("/api/helpdesk/tickets/" + hd), admin, null).andExpect(jsonPath("$.msingiTicketNo").value(esc.at("/ticket/ticketNo").asText()));
+        assertThat(esc.at("/ticket/helpdeskTicketNo").asString()).startsWith("HD-");
+        s.call(get("/api/helpdesk/tickets/" + hd), admin, null).andExpect(jsonPath("$.msingiTicketNo").value(esc.at("/ticket/ticketNo").asString()));
         s.call(post("/api/msingi-support/escalate/" + hd), admin, "{\"category\":\"PROBLEM\"}").andExpect(jsonPath("$.code").value("ALREADY_ESCALATED"));
 
         // an urgent ticket with no reply in time is escalated to Msingi staff

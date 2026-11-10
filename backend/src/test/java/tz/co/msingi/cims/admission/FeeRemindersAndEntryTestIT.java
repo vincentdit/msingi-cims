@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,13 +59,13 @@ class FeeRemindersAndEntryTestIT {
         assertThat(run(now)).isEqualTo(new ApplicationFeeReminders.RunResult(0, 0));           // just asked for the control number
         assertThat(run(now.plusDays(3))).isEqualTo(new ApplicationFeeReminders.RunResult(1, 0));
         assertThat(run(now.plusDays(4))).isEqualTo(new ApplicationFeeReminders.RunResult(0, 0)); // once only
-        OffsetDateTime closes = OffsetDateTime.parse(s.body(s.call(get("/api/admission/windows/" + inst.windowId()), officer, null)).get("closesAt").asText());
+        OffsetDateTime closes = OffsetDateTime.parse(s.body(s.call(get("/api/admission/windows/" + inst.windowId()), officer, null)).get("closesAt").asString());
         assertThat(run(closes.minusDays(1))).isEqualTo(new ApplicationFeeReminders.RunResult(0, 1));
         assertThat(run(closes.minusHours(2))).isEqualTo(new ApplicationFeeReminders.RunResult(0, 0));
         assertThat(run(closes.plusHours(1))).isEqualTo(new ApplicationFeeReminders.RunResult(0, 0));   // closed
 
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findParents("templateCode").stream().filter(m -> m.get("templateCode").asText().equals("APPLICATION_FEE_REMINDER")).count()).isEqualTo(2);
+        assertThat(sms.findParents("templateCode").stream().filter(m -> m.get("templateCode").asString().equals("APPLICATION_FEE_REMINDER")).count()).isEqualTo(2);
         assertThat(unpaid).isNotBlank();
     }
 
@@ -76,16 +76,16 @@ class FeeRemindersAndEntryTestIT {
                 + subj("BIOLOGY", "D") + "," + subj("PHYSICS", "C") + "]}]}";
         s.call(post(url), lecturer, four).andExpect(status().isForbidden());
         JsonNode r = s.body(s.call(post(url), officer, four).andExpect(status().isOk()));
-        assertThat(r.get("entryLevel").asText()).isEqualTo("NVA Levels 1–3 and NTA Level 4");
+        assertThat(r.get("entryLevel").asString()).isEqualTo("NVA Levels 1–3 and NTA Level 4");
         assertThat(r.get("eligibleCount").asInt()).isEqualTo(1);
         assertThat(r.at("/programmes/0/eligible").asBoolean()).isTrue();
-        assertThat(r.at("/programmes/0/detail/matchedPathway").asText()).isEqualTo("CSEE");
+        assertThat(r.at("/programmes/0/detail/matchedPathway").asString()).isEqualTo("CSEE");
 
         String three = "{\"qualifications\":[{\"type\":\"CSEE\",\"subjects\":[" + subj("BASIC MATHEMATICS", "C") + "," + subj("ENGLISH", "D") + ","
                 + subj("BIOLOGY", "F") + "," + subj("PHYSICS", "C") + "]}]";
         JsonNode no = s.body(s.call(post(url), officer, three + "}"));
         assertThat(no.at("/programmes/0/eligible").asBoolean()).isFalse();
-        assertThat(no.at("/programmes/0/detail/pathways/0/conditions/0/found").asText()).isEqualTo("3 pass(es)");
+        assertThat(no.at("/programmes/0/detail/pathways/0/conditions/0/found").asString()).isEqualTo("3 pass(es)");
         // the same results against requirements not yet saved: three passes
         String rules = ",\"windowProgrammeId\":" + inst.windowProgrammeId() + ",\"rules\":{\"summary\":\"Three passes\",\"pathways\":[{\"label\":\"CSEE\","
                 + "\"conditions\":[{\"type\":\"CSEE_MIN_PASSES\",\"count\":3,\"minGrade\":\"D\"}]}]}}";
@@ -94,7 +94,7 @@ class FeeRemindersAndEntryTestIT {
         assertThat(tried.at("/programmes/0/triedChangedRules").asBoolean()).isTrue();
         // an NTA Level 5 holder is not at this programme's entry level; bad grades are refused
         JsonNode nta = s.body(s.call(post(url), officer, "{\"qualifications\":[{\"type\":\"NTA\",\"awardLevel\":5}]}"));
-        assertThat(nta.get("entryLevel").asText()).isEqualTo("NTA Level 6");
+        assertThat(nta.get("entryLevel").asString()).isEqualTo("NTA Level 6");
         assertThat(nta.at("/programmes/0/atEntryLevel").asBoolean()).isFalse();
         s.call(post(url), officer, "{\"qualifications\":[{\"type\":\"CSEE\",\"subjects\":[" + subj("ENGLISH", "S") + "]}]}")
                 .andExpect(jsonPath("$.code").value("INVALID_GRADE"));
@@ -116,9 +116,9 @@ class FeeRemindersAndEntryTestIT {
             int passes = 0;
             boolean maths = false;
             for (JsonNode sub : subjects) {
-                boolean pass = "ABCD".contains(sub.get("grade").asText());
+                boolean pass = "ABCD".contains(sub.get("grade").asString());
                 if (pass) passes++;
-                if (pass && sub.get("name").asText().equals("BASIC MATHEMATICS")) maths = true;
+                if (pass && sub.get("name").asString().equals("BASIC MATHEMATICS")) maths = true;
             }
             if (passes >= 4 && maths) {
                 next = i + 1;

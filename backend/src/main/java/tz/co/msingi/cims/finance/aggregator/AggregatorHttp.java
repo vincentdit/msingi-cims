@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance.aggregator;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -26,7 +26,7 @@ final class AggregatorHttp {
     static {
         JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
         f.setReadTimeout(Duration.ofSeconds(45));
-        HTTP = RestClient.builder().requestFactory(f).build();
+        HTTP = tz.co.msingi.cims.common.web.Json2Http.builder().requestFactory(f).build();
     }
 
     record Answer(int status, JsonNode body) {
@@ -66,7 +66,7 @@ final class AggregatorHttp {
         try {
             return bytes.length == 0 ? JSON.nullNode() : JSON.readTree(bytes);
         } catch (Exception e) {
-            return JSON.getNodeFactory().textNode(new String(bytes, StandardCharsets.UTF_8));
+            return JSON.getNodeFactory().stringNode(new String(bytes, StandardCharsets.UTF_8));
         }
     }
 
@@ -80,7 +80,7 @@ final class AggregatorHttp {
             if (v == null) return null;
             v = v.get(p);
         }
-        return v == null || v.isNull() || v.isMissingNode() || v.asText().isBlank() ? null : v.asText().trim();
+        return v == null || v.isNull() || v.isMissingNode() || v.asString().isBlank() ? null : v.asString().trim();
     }
 
     static BigDecimal amount(JsonNode n, String... path) {

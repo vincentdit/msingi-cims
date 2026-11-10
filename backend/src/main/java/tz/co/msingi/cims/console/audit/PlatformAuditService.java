@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.console.audit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,7 +44,7 @@ public class PlatformAuditService {
         String d;
         try {
             d = details == null || details.isEmpty() ? null : json.writeValueAsString(details);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             d = null;
         }
         jdbc.update("insert into platform_audit_logs (actor_id, actor_name, action, tenant_id, entity, entity_id, details, ip_address)"
@@ -76,7 +76,7 @@ public class PlatformAuditService {
             if (raw != null) {
                 try {
                     details = json.readValue(raw, Map.class);
-                } catch (JsonProcessingException e) {
+                } catch (JacksonException e) {
                     details = Map.of("raw", raw);
                 }
             }

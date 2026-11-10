@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.console.billing;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -647,7 +647,7 @@ public class MsingiBillingService {
         Map<String, String> stored;
         try {
             stored = json.readValue(jdbc.queryForObject("select pay_methods from platform_billing_settings where id = 1", String.class),
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() { });
+                    new tools.jackson.core.type.TypeReference<Map<String, String>>() { });
         } catch (Exception e) {
             stored = Map.of();
         }
@@ -671,7 +671,7 @@ public class MsingiBillingService {
         }
         try {
             jdbc.update("update platform_billing_settings set pay_methods = ?, updated_at = now(), updated_by_name = ? where id = 1", json.writeValueAsString(out), CurrentUser.platformName());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
         platformAudit.record("BILLING_PAY_METHODS_CHANGED", null, "BillingSettings", 1L, new LinkedHashMap<>(out));

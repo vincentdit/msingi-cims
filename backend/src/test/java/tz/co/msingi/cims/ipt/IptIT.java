@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.ipt;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,9 +101,9 @@ class IptIT {
         s.call(post("/api/student/ipt/placements"), c.bToken, "{\"periodId\":" + pid + ",\"newOrganisationName\":\"Vodacom Tanzania\",\"newOrganisationRegion\":\"Dodoma\"}")
                 .andExpect(status().isOk());
         Map<String, JsonNode> pl = byRegNo(s.body(s.call(get("/api/ipt/periods/" + pid + "/placements"), coordinator, null)));
-        assertThat(pl.get(c.b).get("organisation").asText()).isEqualTo("Vodacom Tanzania");
+        assertThat(pl.get(c.b).get("organisation").asString()).isEqualTo("Vodacom Tanzania");
         assertThat(s.body(s.call(get("/api/ipt/organisations"), coordinator, null)).findParents("name").stream()
-                .filter(x -> x.get("name").asText().equals("Vodacom Tanzania")).findFirst().orElseThrow().get("proposedByStudent").asBoolean()).isTrue();
+                .filter(x -> x.get("name").asString().equals("Vodacom Tanzania")).findFirst().orElseThrow().get("proposedByStudent").asBoolean()).isTrue();
 
         // the coordinator confirms a with an institution supervisor, declines b with a reason, places c directly
         long lecturerId = staffId("Staff lecturer");
@@ -113,8 +113,8 @@ class IptIT {
                 .andExpect(jsonPath("$.summary.status").value("DECLINED"));
         JsonNode aView = s.body(s.call(post("/api/ipt/placements/" + aPl + "/decision"), coordinator, "{\"confirm\":true,\"institutionSupervisorId\":" + lecturerId + "}")
                 .andExpect(jsonPath("$.summary.status").value("CONFIRMED")));
-        assertThat(aView.at("/summary/letterNo").asText()).contains("/IPT/");
-        assertThat(aView.at("/summary/institutionSupervisorName").asText()).isEqualTo("Staff lecturer");
+        assertThat(aView.at("/summary/letterNo").asString()).contains("/IPT/");
+        assertThat(aView.at("/summary/institutionSupervisorName").asString()).isEqualTo("Staff lecturer");
         s.call(post("/api/ipt/placements"), coordinator, "{\"periodId\":" + pid + ",\"studentId\":" + c.cId + ",\"organisationId\":" + tpa + "}")
                 .andExpect(jsonPath("$.code").value("ORGANISATION_FULL"));
         long cPl = s.body(s.call(post("/api/ipt/placements"), coordinator, "{\"periodId\":" + pid + ",\"studentId\":" + c.cId + ",\"organisationId\":" + tcra
@@ -122,7 +122,7 @@ class IptIT {
         byte[] letter = mvc.perform(get("/api/student/ipt/letter").header("Authorization", "Bearer " + c.aToken).header("X-Tenant", s.tenant))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(letter, 0, 4)).isEqualTo("%PDF");
-        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode");
+        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode");
         assertThat(sms).contains("IPT_PLACEMENT_CONFIRMED", "IPT_PLACEMENT_DECLINED");
 
         // logbook: draft, submit, returned, corrected, approved
@@ -148,7 +148,7 @@ class IptIT {
                 .andExpect(status().isOk());
         s.call(put("/api/ipt/placements/" + aPl + "/assessments"), lecturer, "{\"kind\":\"INSTITUTION\",\"score\":70}").andExpect(status().isOk());
         JsonNode done = s.body(s.call(put("/api/ipt/placements/" + aPl + "/assessments"), lecturer, "{\"kind\":\"LOGBOOK\",\"score\":60}").andExpect(status().isOk()));
-        assertThat(done.at("/summary/status").asText()).isEqualTo("COMPLETED");
+        assertThat(done.at("/summary/status").asString()).isEqualTo("COMPLETED");
         assertThat(done.at("/summary/totalMark").decimalValue()).isEqualByComparingTo("71");     // 80×40% + 70×30% + 60×30%
         s.call(put("/api/ipt/placements/" + cPl + "/assessments"), lecturer, "{\"kind\":\"LOGBOOK\",\"score\":60}").andExpect(jsonPath("$.code").value("LOGBOOK_INCOMPLETE"));
 
@@ -156,11 +156,11 @@ class IptIT {
         s.call(post("/api/ipt/periods/" + pid + "/transfer"), lecturer, null).andExpect(status().isForbidden());
         JsonNode tr = s.body(s.call(post("/api/ipt/periods/" + pid + "/transfer"), coordinator, null).andExpect(status().isOk()));
         assertThat(tr.get("transferred").asInt()).isEqualTo(1);
-        assertThat(tr.get("notReady").get(0).asText()).contains("3 mark(s) missing");
+        assertThat(tr.get("notReady").get(0).asString()).contains("3 mark(s) missing");
         JsonNode off = s.body(s.call(get("/api/exams/offerings/" + c.iptOffering), exams, null));
-        JsonNode row = off.get("rows").findParents("registrationNo").stream().filter(x -> x.get("registrationNo").asText().equals(c.a)).findFirst().orElseThrow();
+        JsonNode row = off.get("rows").findParents("registrationNo").stream().filter(x -> x.get("registrationNo").asString().equals(c.a)).findFirst().orElseThrow();
         assertThat(row.get("total").decimalValue()).isEqualByComparingTo("71");
-        assertThat(row.get("grade").asText()).isEqualTo("B");
+        assertThat(row.get("grade").asString()).isEqualTo("B");
 
         // views and reports
         JsonNode myView = s.body(s.call(get("/api/student/ipt"), c.aToken, null));
@@ -185,10 +185,10 @@ class IptIT {
                 + ",\"institutionSupervisorId\":" + lecturerId + "}").andExpect(status().isOk())).at("/summary/id").asLong();
         s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer2, "{\"phone\":\"0754999888\"}").andExpect(status().isForbidden());
         s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer, "{}").andExpect(jsonPath("$.code").value("NO_CONTACT"));
-        String first = s.body(s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer, "{\"phone\":\"0754999888\"}").andExpect(status().isOk())).get("url").asText();
+        String first = s.body(s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer, "{\"phone\":\"0754999888\"}").andExpect(status().isOk())).get("url").asString();
         JsonNode sent = s.body(s.call(post("/api/ipt/placements/" + pl + "/workplace-link"), lecturer,
                 "{\"phone\":\"0754999888\",\"email\":\"supervisor@tcra.go.tz\"}").andExpect(status().isOk()));
-        String token = sent.get("url").asText().replaceAll(".*/ipt-assessment/", "");
+        String token = sent.get("url").asString().replaceAll(".*/ipt-assessment/", "");
         // a new link replaces the old one; the message log never shows the link
         s.call(get("/api/public/ipt-assessment/" + first.replaceAll(".*/ipt-assessment/", "")), null, null).andExpect(status().isNotFound());
         List<String> bodies = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForList(
@@ -196,7 +196,7 @@ class IptIT {
         assertThat(bodies).isNotEmpty().allMatch(b -> b.contains("[personal link]") && !b.contains(token));
 
         JsonNode form = s.body(s.call(get("/api/public/ipt-assessment/" + token), null, null).andExpect(status().isOk()));
-        assertThat(form.get("organisation").asText()).isEqualTo("TCRA");
+        assertThat(form.get("organisation").asString()).isEqualTo("TCRA");
         assertThat(form.get("criteria").size()).isEqualTo(5);
         s.call(post("/api/public/ipt-assessment/" + token), null, "{\"ratings\":{\"ATTENDANCE\":5},\"supervisorName\":\"Eng. Baraka Said\"}")
                 .andExpect(jsonPath("$.code").value("RATINGS_INCOMPLETE"));
@@ -254,23 +254,23 @@ class IptIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(d.at("/summary/phone").asText(), d.at("/summary/registrationNo").asText());
-            ids.put(d.at("/summary/registrationNo").asText(), id);
+            byPhone.put(d.at("/summary/phone").asString(), d.at("/summary/registrationNo").asString());
+            ids.put(d.at("/summary/registrationNo").asString(), id);
         }
         Applicant[] apps = {a, b, c};
         String[] regNos = new String[3];
         String[] tokens = new String[3];
         for (int i = 0; i < 3; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asString();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }
         s.call(post("/api/registry/semester-registrations/approve-all"), registrar, "{\"semesterId\":" + semId + "}").andExpect(jsonPath("$.approved").value(3));
         s.call(post("/api/exams/offerings/setup"), exams, "{\"semesterId\":" + semId + "}").andExpect(status().isOk());
         long iptOffering = s.body(s.call(get("/api/exams/offerings?semesterId=" + semId), exams, null)).findParents("code").stream()
-                .filter(x -> x.get("code").asText().equals("ITU 04199")).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("code").asString().equals("ITU 04199")).findFirst().orElseThrow().get("id").asLong();
         return new Setup(semId, ipt, iptOffering, regNos[0], regNos[1], ids.get(regNos[2]), tokens[0], tokens[1]);
     }
 
@@ -295,12 +295,12 @@ class IptIT {
 
     private long staffId(String name) throws Exception {
         return s.body(s.call(get("/api/ipt/staff"), coordinator, null)).findParents("fullName").stream()
-                .filter(x -> x.get("fullName").asText().equals(name)).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("fullName").asString().equals(name)).findFirst().orElseThrow().get("id").asLong();
     }
 
     private static Map<String, JsonNode> byRegNo(JsonNode arr) {
         Map<String, JsonNode> m = new HashMap<>();
-        arr.forEach(x -> m.put(x.get("registrationNo").asText(), x));
+        arr.forEach(x -> m.put(x.get("registrationNo").asString(), x));
         return m;
     }
 }

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.registry;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,24 +78,24 @@ class RegistryIT {
         JsonNode ov = overview();
         assertThat(ov.get("accepted").asInt()).isEqualTo(2);
         assertThat(ov.get("pending").asInt()).isEqualTo(2);
-        assertThat(ov.get("registrationNoPattern").asText()).isEqualTo(RegistrationNumberPattern.DEFAULT);
-        assertThat(ov.get("rows").findValuesAsText("applicationId")).doesNotContain(String.valueOf(c.applicationId()));
+        assertThat(ov.get("registrationNoPattern").asString()).isEqualTo(RegistrationNumberPattern.DEFAULT);
+        assertThat(ov.get("rows").findValuesAsString("applicationId")).doesNotContain(String.valueOf(c.applicationId()));
 
         s.call(post(handoverUrl()), s.staffToken("viewer"), "{}").andExpect(status().isForbidden());
         s.call(get(handoverUrl()), a.token(), null).andExpect(status().isForbidden());
 
         JsonNode result = s.body(s.call(post(handoverUrl()), registrar, "{}").andExpect(status().isOk()));
         assertThat(result.get("created").asInt()).isEqualTo(2);
-        assertThat(result.get("students").findValuesAsText("registrationNo"))
+        assertThat(result.get("students").findValuesAsString("registrationNo"))
                 .containsExactlyInAnyOrder(s.tenant + "/NTA4/27/0001", s.tenant + "/NTA4/27/0002");
         s.call(post(handoverUrl()), registrar, "{}").andExpect(jsonPath("$.code").value("NOTHING_TO_HAND_OVER"));
         s.call(post(handoverUrl()), registrar, "{\"applicationIds\":[" + c.applicationId() + "]}").andExpect(jsonPath("$.code").value("NOT_ACCEPTED"));
 
         // the applicant sees the registration number; the applicant account becomes the student's sign-in
         JsonNode app = s.body(s.call(get("/api/applicant/applications/" + a.applicationId()), a.token(), null));
-        String regNo = app.at("/student/registrationNo").asText();
+        String regNo = app.at("/student/registrationNo").asString();
         assertThat(regNo).startsWith(s.tenant + "/NTA4/27/");
-        assertThat(app.at("/student/status").asText()).isEqualTo("ADMITTED");
+        assertThat(app.at("/student/status").asString()).isEqualTo("ADMITTED");
         Boolean isStudent = TenantContext.callAs(s.inst.info(), () -> tx.execute(t -> students.findAll().stream()
                 .filter(st -> st.getRegistrationNo().equals(regNo)).findFirst()
                 .flatMap(st -> users.findById(st.getUserId())).orElseThrow().hasRole(Role.STUDENT)));
@@ -104,12 +104,12 @@ class RegistryIT {
         // student record copied from the application, with the checklist from the joining instructions
         long studentId = s.body(s.call(get("/api/registry/students?q=" + regNo), registrar, null)).at("/content/0/id").asLong();
         JsonNode st = student(studentId);
-        assertThat(st.get("dateOfBirth").asText()).isEqualTo("2006-01-01");
-        assertThat(st.get("nationality").asText()).isEqualTo("Tanzanian");
-        assertThat(st.get("nactvetVerificationNo").asText()).startsWith("NV/");
-        assertThat(st.get("admissionLetterNo").asText()).isEqualTo(s.tenant + "/ADM/2027/000001");
-        assertThat(st.at("/firstRegistration/status").asText()).isEqualTo("PENDING");
-        assertThat(st.at("/firstRegistration/documents").findValuesAsText("item")).containsExactly("Original CSEE certificate", "Birth certificate");
+        assertThat(st.get("dateOfBirth").asString()).isEqualTo("2006-01-01");
+        assertThat(st.get("nationality").asString()).isEqualTo("Tanzanian");
+        assertThat(st.get("nactvetVerificationNo").asString()).startsWith("NV/");
+        assertThat(st.get("admissionLetterNo").asString()).isEqualTo(s.tenant + "/ADM/2027/000001");
+        assertThat(st.at("/firstRegistration/status").asString()).isEqualTo("PENDING");
+        assertThat(st.at("/firstRegistration/documents").findValuesAsString("item")).containsExactly("Original CSEE certificate", "Birth certificate");
 
         // first registration: originals checked, then approved
         s.call(post("/api/registry/students/" + studentId + "/first-registration/approve"), registrar, null)
@@ -172,7 +172,7 @@ class RegistryIT {
         Applicant a = s.apply("S0101/0001");
         s.admit(officer, chair, a);
         JsonNode result = s.body(s.call(post(handoverUrl()), registrar, "{\"applicationIds\":[" + a.applicationId() + "]}"));
-        assertThat(result.at("/students/0/registrationNo").asText()).isEqualTo(s.tenant + "270002");
+        assertThat(result.at("/students/0/registrationNo").asString()).isEqualTo(s.tenant + "270002");
 
         // the database refuses to change a registration number or delete a student (BRU-06)
         assertThatThrownBy(() -> TenantContext.runAs(s.inst.info(), () -> tx.executeWithoutResult(t ->

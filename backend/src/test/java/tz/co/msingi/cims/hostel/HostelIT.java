@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.hostel;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,8 +85,8 @@ class HostelIT {
         s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "1", "DOUBLE", "MALE", std, false, "AVAILABLE", 2)).andExpect(jsonPath("$.code").value("GENDER_CLASH"));
         s.call(post("/api/hostel/rooms"), warden, room(miku, "", "1", "SINGLE", null, std, false, "AVAILABLE", 1)).andExpect(jsonPath("$.code").value("GENDER_REQUIRED"));
         JsonNode a1 = s.body(s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "1", "DOUBLE", null, std, false, "AVAILABLE", 2)).andExpect(status().isCreated()));
-        assertThat(a1.get("gender").asText()).isEqualTo("FEMALE");
-        assertThat(a1.get("beds").findValuesAsText("label")).containsExactly("A", "B");
+        assertThat(a1.get("gender").asString()).isEqualTo("FEMALE");
+        assertThat(a1.get("beds").findValuesAsString("label")).containsExactly("A", "B");
         long a2 = s.body(s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "2", "SINGLE", null, std, true, "MAINTENANCE", 1))).get("id").asLong();
         s.call(post("/api/hostel/rooms"), warden, room(kili, "A", "2", "SINGLE", null, std, true, "AVAILABLE", 1)).andExpect(jsonPath("$.code").value("DUPLICATE_ROOM"));
         JsonNode s1 = s.body(s.call(post("/api/hostel/rooms"), warden, room(sere, "", "1", "DOUBLE", null, std, false, "AVAILABLE", 2)));
@@ -97,7 +97,7 @@ class HostelIT {
                 + TODAY.minusDays(1) + "\",\"closesOn\":\"" + TODAY.plusDays(10) + "\",\"paymentDays\":7}").andExpect(status().isCreated())).get("id").asLong();
         JsonNode mine = s.body(s.call(get("/api/student/hostel"), st.dToken, null));
         assertThat(mine.get("openWindows")).hasSize(1);
-        assertThat(mine.get("hostels").findValuesAsText("name")).containsExactlyInAnyOrder("Serengeti", "Mikumi");
+        assertThat(mine.get("hostels").findValuesAsString("name")).containsExactlyInAnyOrder("Serengeti", "Mikumi");
         s.call(post("/api/student/hostel/applications"), st.dToken, apply(win, kili, false)).andExpect(jsonPath("$.code").value("WRONG_HOSTEL"));
         s.call(post("/api/student/hostel/applications"), st.aToken, apply(win, kili, false)).andExpect(jsonPath("$.application.status").value("SUBMITTED"));
         s.call(post("/api/student/hostel/applications"), st.bToken, apply(win, kili, false)).andExpect(status().isOk());
@@ -112,15 +112,15 @@ class HostelIT {
         assertThat(run.get("allocated").asInt()).isEqualTo(3);
         assertThat(run.get("waitlisted").asInt()).isEqualTo(1);
         apps = byRegNo(s.body(s.call(get("/api/hostel/windows/" + win + "/applications"), warden, null)));
-        assertThat(apps.get(st.c).get("status").asText()).isEqualTo("ALLOCATED");
-        assertThat(apps.get(st.a).get("status").asText()).isEqualTo("ALLOCATED");
-        assertThat(apps.get(st.b).get("status").asText()).isEqualTo("WAITLISTED");
-        assertThat(apps.get(st.d).at("/allocation/hostel").asText()).isEqualTo("Serengeti");
+        assertThat(apps.get(st.c).get("status").asString()).isEqualTo("ALLOCATED");
+        assertThat(apps.get(st.a).get("status").asString()).isEqualTo("ALLOCATED");
+        assertThat(apps.get(st.b).get("status").asString()).isEqualTo("WAITLISTED");
+        assertThat(apps.get(st.d).at("/allocation/hostel").asString()).isEqualTo("Serengeti");
         JsonNode aAlloc = apps.get(st.a).get("allocation");
         assertThat(aAlloc.get("fee").decimalValue()).isEqualByComparingTo("300000");
-        assertThat(aAlloc.get("controlNo").asText()).isNotBlank();
-        assertThat(aAlloc.get("payBy").asText()).isEqualTo(TODAY.plusDays(7).toString());
-        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode");
+        assertThat(aAlloc.get("controlNo").asString()).isNotBlank();
+        assertThat(aAlloc.get("payBy").asString()).isEqualTo(TODAY.plusDays(7).toString());
+        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode");
         assertThat(sms.stream().filter("HOSTEL_ALLOCATED"::equals).count()).isEqualTo(3);
         assertThat(sms).contains("HOSTEL_WAITLISTED");
 
@@ -150,8 +150,8 @@ class HostelIT {
         s.call(post("/api/hostel/allocations/" + aId + "/check-out"), warden, "{\"damageCharge\":20000}").andExpect(jsonPath("$.code").value("DAMAGES_REQUIRED"));
         JsonNode out = s.body(s.call(post("/api/hostel/allocations/" + aId + "/check-out"), warden,
                 "{\"condition\":\"Clean\",\"damages\":\"Broken chair\",\"damageCharge\":20000}").andExpect(status().isOk()));
-        assertThat(out.get("status").asText()).isEqualTo("CHECKED_OUT");
-        assertThat(out.get("damageInvoiceNo").asText()).isNotBlank();
+        assertThat(out.get("status").asString()).isEqualTo("CHECKED_OUT");
+        assertThat(out.get("damageInvoiceNo").asString()).isNotBlank();
 
         // unpaid allocations are released after the payment date; the invoice is cancelled
         long dId = apps.get(st.d).at("/allocation/id").asLong();
@@ -160,9 +160,9 @@ class HostelIT {
         JsonNode rel = s.body(s.call(post("/api/hostel/allocations/release-unpaid"), warden, null));
         assertThat(rel.get("released").asInt()).isEqualTo(1);
         JsonNode dAlloc = byRegNo(s.body(s.call(get("/api/hostel/windows/" + win + "/applications"), warden, null))).get(st.d);
-        assertThat(dAlloc.get("status").asText()).isEqualTo("RELEASED");
-        assertThat(dAlloc.at("/allocation/invoiceStatus").asText()).isEqualTo("CANCELLED");
-        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode")).contains("HOSTEL_RELEASED");
+        assertThat(dAlloc.get("status").asString()).isEqualTo("RELEASED");
+        assertThat(dAlloc.at("/allocation/invoiceStatus").asString()).isEqualTo("CANCELLED");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode")).contains("HOSTEL_RELEASED");
 
         // a warden can cancel an unpaid allocation with a reason
         long cId = apps.get(st.c).at("/allocation/id").asLong();
@@ -170,13 +170,13 @@ class HostelIT {
 
         // the inventory and the student's own view
         JsonNode hostels = s.body(s.call(get("/api/hostel/hostels"), viewer, null));
-        JsonNode k = hostels.findParents("code").stream().filter(x -> x.get("code").asText().equals("KILI")).findFirst().orElseThrow();
+        JsonNode k = hostels.findParents("code").stream().filter(x -> x.get("code").asString().equals("KILI")).findFirst().orElseThrow();
         assertThat(k.get("beds").asInt()).isEqualTo(3);
         assertThat(k.get("allocatedUnpaid").asInt()).isEqualTo(1);       // b in A-2
         assertThat(k.get("available").asInt()).isEqualTo(2);
         mine = s.body(s.call(get("/api/student/hostel"), st.aToken, null));
-        assertThat(mine.at("/application/status").asText()).isEqualTo("ALLOCATED");
-        assertThat(mine.get("history").findValuesAsText("status")).contains("CHECKED_OUT");
+        assertThat(mine.at("/application/status").asString()).isEqualTo("ALLOCATED");
+        assertThat(mine.get("history").findValuesAsString("status")).contains("CHECKED_OUT");
         assertThat(s.body(s.call(get("/api/reports/HST-01"), viewer, null)).get("rowCount").asInt()).isEqualTo(3);
         assertThat(s.body(s.call(get("/api/reports/HST-02?academicYearId=" + yearId), warden, null)).get("rowCount").asInt()).isEqualTo(4);
     }
@@ -195,32 +195,32 @@ class HostelIT {
                 + TODAY.minusDays(1) + "\",\"closesOn\":\"" + TODAY.plusDays(10) + "\",\"paymentDays\":7}")).get("id").asLong();
         // b has not applied yet: the portal says so
         JsonNode next = s.body(s.call(get("/api/student/dashboard"), st.bToken, null)).get("next");
-        assertThat(next.findValuesAsText("kind")).contains("HOSTEL_APPLY");
+        assertThat(next.findValuesAsString("kind")).contains("HOSTEL_APPLY");
         s.call(post("/api/student/hostel/applications"), st.aToken, apply(win, kili, false)).andExpect(status().isOk());
         s.call(post("/api/student/hostel/applications"), st.dToken, apply(win, sere, false)).andExpect(status().isOk());
         s.call(post("/api/hostel/windows/" + win + "/allocate"), warden, null).andExpect(jsonPath("$.allocated").value(2));
-        assertThat(s.body(s.call(get("/api/student/dashboard"), st.aToken, null)).get("next").findValuesAsText("kind")).contains("HOSTEL_PAY");
+        assertThat(s.body(s.call(get("/api/student/dashboard"), st.aToken, null)).get("next").findValuesAsString("kind")).contains("HOSTEL_PAY");
 
         // the administrator assigns the second warden to Serengeti
         long w2 = userId("warden2"), lect = userId("lecturer");
         s.call(put("/api/hostel/hostels/" + sere + "/wardens"), warden, "{\"userIds\":[" + w2 + "]}").andExpect(status().isForbidden());
         s.call(put("/api/hostel/hostels/" + sere + "/wardens"), admin, "{\"userIds\":[" + lect + "]}").andExpect(jsonPath("$.code").value("NOT_A_WARDEN"));
         JsonNode d = s.body(s.call(put("/api/hostel/hostels/" + sere + "/wardens"), admin, "{\"userIds\":[" + w2 + "]}").andExpect(status().isOk()));
-        assertThat(d.get("wardens").findValuesAsText("fullName")).containsExactly("Staff warden2");
+        assertThat(d.get("wardens").findValuesAsString("fullName")).containsExactly("Staff warden2");
 
         // the assigned warden sees and runs only Serengeti; window-wide work is for wardens of every hostel
-        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden2, null)).findValuesAsText("code")).containsExactly("SERE");
+        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden2, null)).findValuesAsString("code")).containsExactly("SERE");
         s.call(get("/api/hostel/hostels/" + kili), warden2, null).andExpect(status().isForbidden());
         s.call(post("/api/hostel/rooms"), warden2, room(kili, "B", "1", "SINGLE", null, std, false, "AVAILABLE", 1)).andExpect(status().isForbidden());
         s.call(post("/api/hostel/windows/" + win + "/allocate"), warden2, null).andExpect(status().isForbidden());
         s.call(post("/api/hostel/windows"), warden2, "{\"academicYearId\":" + yearId + ",\"name\":\"Again\",\"opensOn\":\"" + TODAY + "\",\"closesOn\":\""
                 + TODAY.plusDays(5) + "\",\"paymentDays\":7}").andExpect(status().isForbidden());
         JsonNode allocs = s.body(s.call(get("/api/hostel/windows/" + win + "/allocations"), warden2, null));
-        assertThat(allocs.findValuesAsText("registrationNo")).containsExactly(st.d);
+        assertThat(allocs.findValuesAsString("registrationNo")).containsExactly(st.d);
         long aAlloc = s.body(s.call(get("/api/hostel/windows/" + win + "/allocations"), warden, null)).findParents("registrationNo").stream()
-                .filter(x -> x.get("registrationNo").asText().equals(st.a)).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("registrationNo").asString().equals(st.a)).findFirst().orElseThrow().get("id").asLong();
         s.call(post("/api/hostel/allocations/" + aAlloc + "/cancel"), warden2, "{\"reason\":\"Not my hostel at all\"}").andExpect(status().isForbidden());
-        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden, null)).findValuesAsText("code")).containsExactlyInAnyOrder("KILI", "SERE");
+        assertThat(s.body(s.call(get("/api/hostel/hostels"), warden, null)).findValuesAsString("code")).containsExactlyInAnyOrder("KILI", "SERE");
 
         // repairs: a reports one from the portal; b has no room; the Kilimanjaro side handles it, the Serengeti warden does not see it
         s.call(post("/api/student/hostel/repairs"), st.bToken, "{\"category\":\"ELECTRICAL\",\"description\":\"The light does not work\"}")
@@ -231,13 +231,13 @@ class HostelIT {
         s.call(post("/api/hostel/repairs/" + rep + "/status"), warden2, "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
         JsonNode list = s.body(s.call(get("/api/hostel/repairs?open=true"), warden, null));
         assertThat(list).hasSize(1);
-        assertThat(list.at("/0/room").asText()).isEqualTo("A · Room 1");
+        assertThat(list.at("/0/room").asString()).isEqualTo("A · Room 1");
         assertThat(list.at("/0/canUpdate").asBoolean()).isTrue();
         s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"IN_PROGRESS\",\"note\":\"Electrician booked\"}").andExpect(status().isOk());
         s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"DONE\"}").andExpect(jsonPath("$.code").value("NOTE_REQUIRED"));
         s.call(post("/api/hostel/repairs/" + rep + "/status"), warden, "{\"status\":\"DONE\",\"note\":\"Socket replaced\"}").andExpect(jsonPath("$.status").value("DONE"));
-        assertThat(s.body(s.call(get("/api/student/hostel/repairs"), st.aToken, null)).at("/0/status").asText()).isEqualTo("DONE");
-        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode")
+        assertThat(s.body(s.call(get("/api/student/hostel/repairs"), st.aToken, null)).at("/0/status").asString()).isEqualTo("DONE");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode")
                 .stream().filter("HOSTEL_REPAIR_UPDATED"::equals).count()).isEqualTo(2);
         // a warden logs one for a room without a student
         s.call(post("/api/hostel/repairs"), warden2, "{\"hostelId\":" + sere + ",\"roomId\":" + sereRoom + ",\"category\":\"PLUMBING\",\"description\":\"Shower leaks\"}")
@@ -273,27 +273,27 @@ class HostelIT {
         s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedS1 + ",\"reason\":\"Wrong hostel here\"}").andExpect(jsonPath("$.code").value("GENDER_MISMATCH"));
         JsonNode moved = s.body(s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedA2 + ",\"reason\":\"Asked for a single room\"}")
                 .andExpect(status().isOk()));
-        assertThat(moved.get("room").asText()).isEqualTo("A · Room 2");
+        assertThat(moved.get("room").asString()).isEqualTo("A · Room 2");
         assertThat(moved.get("bedChanges").asInt()).isEqualTo(1);
         assertThat(moved.get("fee").decimalValue()).isEqualByComparingTo("408000");
         JsonNode changes = s.body(s.call(get("/api/hostel/allocations/" + aAlloc + "/changes"), warden, null));
         assertThat(changes.at("/0/difference").decimalValue()).isEqualByComparingTo("108000");
-        assertThat(changes.at("/0/invoiceNo").asText()).isNotBlank();
-        assertThat(changes.at("/0/fromBed").asText()).isEqualTo("Kilimanjaro, A · Room 1, bed A");
-        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode")).contains("HOSTEL_BED_CHANGED");
+        assertThat(changes.at("/0/invoiceNo").asString()).isNotBlank();
+        assertThat(changes.at("/0/fromBed").asString()).isEqualTo("Kilimanjaro, A · Room 1, bed A");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode")).contains("HOSTEL_BED_CHANGED");
 
         // and back to a standard room: the paid fee is now too high, so a refund of 108,000 waits for the bursary
         s.call(post("/api/hostel/allocations/" + aAlloc + "/move"), warden, "{\"bedId\":" + bedA3 + ",\"reason\":\"Prefers to share costs\"}").andExpect(status().isOk());
         JsonNode back = s.body(s.call(get("/api/hostel/allocations/" + aAlloc + "/changes"), warden, null)).get(0);
         assertThat(back.get("difference").decimalValue()).isEqualByComparingTo("-108000");
-        assertThat(back.get("adjustmentKind").asText()).isEqualTo("REFUND");
-        assertThat(back.get("adjustmentStatus").asText()).isEqualTo("PENDING");
+        assertThat(back.get("adjustmentKind").asString()).isEqualTo("REFUND");
+        assertThat(back.get("adjustmentStatus").asString()).isEqualTo("PENDING");
         long refundId = s.body(s.call(get("/api/finance/adjustments"), bursar, null)).findParents("adjustmentNo").stream()
-                .filter(x -> x.get("adjustmentNo").asText().equals(back.get("adjustmentNo").asText())).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("adjustmentNo").asString().equals(back.get("adjustmentNo").asString())).findFirst().orElseThrow().get("id").asLong();
         long hostelInvoice = allocation(win, st.a).get("invoiceId").asLong();
         JsonNode done = s.body(s.call(post("/api/finance/adjustments/" + refundId + "/approve"), bursar, "{}").andExpect(status().isOk()));
-        assertThat(done.get("status").asText()).isEqualTo("APPROVED");
-        assertThat(done.get("documentNo").asText()).contains("RFV");
+        assertThat(done.get("status").asString()).isEqualTo("APPROVED");
+        assertThat(done.get("documentNo").asString()).contains("RFV");
         assertThat(invoiceTotals(hostelInvoice)).containsExactly(new BigDecimal("192000.00"), new BigDecimal("192000.00"));
 
         // checked in, then out a day later with the unused part refunded (89 of 100 days of what was paid)
@@ -301,14 +301,14 @@ class HostelIT {
         JsonNode out = s.body(s.call(post("/api/hostel/allocations/" + aAlloc + "/check-out"), warden, "{\"condition\":\"Clean\",\"refundUnused\":true}")
                 .andExpect(status().isOk()));
         assertThat(out.at("/refund/amount").decimalValue()).isEqualByComparingTo("170880");
-        assertThat(out.at("/refund/status").asText()).isEqualTo("PENDING");
+        assertThat(out.at("/refund/status").asString()).isEqualTo("PENDING");
 
         // b paid and is cancelled before check-in: everything paid is offered back
         long bAlloc = s.body(s.call(post("/api/hostel/allocations"), warden, "{\"applicationId\":" + apps.get(st.b).get("id").asLong() + ",\"bedId\":" + bedA1 + "}"))
                 .get("id").asLong();
         s.call(post("/api/student/invoices/" + allocation(win, st.b).get("invoiceId").asLong() + "/simulate-payment"), st.bToken, "{}").andExpect(status().isOk());
         JsonNode cancelled = s.body(s.call(post("/api/hostel/allocations/" + bAlloc + "/cancel"), warden, "{\"reason\":\"Moving to family in town\"}").andExpect(status().isOk()));
-        assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(cancelled.get("status").asString()).isEqualTo("CANCELLED");
         assertThat(cancelled.at("/refund/amount").decimalValue()).isEqualByComparingTo("300000");
 
         // c has an unpaid bed and withdraws: the bed is released and its invoice cancelled
@@ -320,13 +320,13 @@ class HostelIT {
         s.call(post("/api/registry/status-changes/" + change + "/decision"), dpa, "{\"approve\":true}").andExpect(jsonPath("$.state").value("APPLIED"));
         JsonNode cView = allocation(win, st.c);
         assertThat(cView.get("id").asLong()).isEqualTo(cAlloc);
-        assertThat(cView.get("status").asText()).isEqualTo("RELEASED");
-        assertThat(cView.get("invoiceStatus").asText()).isEqualTo("CANCELLED");
+        assertThat(cView.get("status").asString()).isEqualTo("RELEASED");
+        assertThat(cView.get("invoiceStatus").asString()).isEqualTo("CANCELLED");
     }
 
     private JsonNode allocation(long window, String regNo) throws Exception {
         return s.body(s.call(get("/api/hostel/windows/" + window + "/allocations"), warden, null)).findParents("registrationNo").stream()
-                .filter(x -> x.get("registrationNo").asText().equals(regNo)).findFirst().orElseThrow();
+                .filter(x -> x.get("registrationNo").asString().equals(regNo)).findFirst().orElseThrow();
     }
 
     private List<BigDecimal> invoiceTotals(long invoiceId) {
@@ -359,16 +359,16 @@ class HostelIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(det.at("/summary/phone").asText(), det.at("/summary/registrationNo").asText());
-            ids.put(det.at("/summary/registrationNo").asText(), id);
+            byPhone.put(det.at("/summary/phone").asString(), det.at("/summary/registrationNo").asString());
+            ids.put(det.at("/summary/registrationNo").asString(), id);
         }
         Applicant[] apps = {a, b, c, d};
         String[] regNos = new String[4];
         String[] tokens = new String[4];
         for (int i = 0; i < 4; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asString();
         }
         long dId = ids.get(regNos[3]);
         TenantContext.runAs(inst.info(), () -> tx.executeWithoutResult(t -> studentRepo.findById(dId).orElseThrow().setSex("M")));
@@ -393,7 +393,7 @@ class HostelIT {
 
     private static Map<String, JsonNode> byRegNo(JsonNode arr) {
         Map<String, JsonNode> m = new HashMap<>();
-        arr.forEach(x -> m.put(x.get("registrationNo").asText(), x));
+        arr.forEach(x -> m.put(x.get("registrationNo").asString(), x));
         return m;
     }
 }

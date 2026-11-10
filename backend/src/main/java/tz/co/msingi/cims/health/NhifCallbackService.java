@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.health;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
@@ -107,7 +107,7 @@ public class NhifCallbackService {
         Long id = inBatch(batchNo, text(b, "formFourIndexNo"), text(b, "identificationNo"));
         if (id == null) return new Outcome("UNMATCHED", batchNo, "Unrecognized BatchNo or student");
         if (controlNo == null) return new Outcome("UNMATCHED", batchNo, "No controlNo");
-        BigDecimal amount = b.hasNonNull("invoiceAmount") ? new BigDecimal(b.get("invoiceAmount").asText()) : null;
+        BigDecimal amount = b.hasNonNull("invoiceAmount") ? new BigDecimal(b.get("invoiceAmount").asString()) : null;
         boolean applied = covers.controlNumber(id, controlNo, null, amount);
         return new Outcome(applied ? "APPLIED" : "IGNORED", controlNo, applied ? "Control number received." : "Control number already known.");
     }
@@ -195,7 +195,7 @@ public class NhifCallbackService {
     static String text(JsonNode b, String key) {
         JsonNode v = b.get(key);
         if (v == null) {
-            var it = b.fieldNames();
+            var it = b.propertyNames().iterator();
             while (it.hasNext()) {
                 String f = it.next();
                 if (f.trim().equalsIgnoreCase(key)) {
@@ -204,7 +204,7 @@ public class NhifCallbackService {
                 }
             }
         }
-        return v == null || v.isNull() || v.asText().isBlank() ? null : v.asText().trim();
+        return v == null || v.isNull() || v.asString().isBlank() ? null : v.asString().trim();
     }
 
     private static String cut(String s, int max) {

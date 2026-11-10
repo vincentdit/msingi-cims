@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.notification.sms;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
@@ -107,7 +107,7 @@ class NextSmsClient implements SmsProviderClient {
             name = SmsHttp.text(st, "name");
             desc = SmsHttp.text(st, "description");
         } else if (st != null && !st.isNull()) {
-            group = st.asText();
+            group = st.asString();
         }
         String outcome = SmsHttp.outcome(group != null ? group : name);
         if ("PENDING".equals(outcome) && name != null) outcome = SmsHttp.outcome(name);

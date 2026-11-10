@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform.imports;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -103,11 +103,11 @@ class ImportIT {
         assertThat(b3.get("errors").toString()).contains("Already in CIMS");
 
         // a migrated student sets a password with the phone and signs in to the student portal by registration number
-        String code = s.body(s.call(post("/api/applicant-auth/forgot-password"), null, "{\"phone\":\"0712000001\"}")).get("devOtp").asText();
+        String code = s.body(s.call(post("/api/applicant-auth/forgot-password"), null, "{\"phone\":\"0712000001\"}")).get("devOtp").asString();
         s.call(post("/api/applicant-auth/reset-password"), null, "{\"phone\":\"0712000001\",\"code\":\"" + code + "\",\"newPassword\":\"Mbuyu#Kijani83\"}")
                 .andExpect(status().is2xxSuccessful());
         String studentToken = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"OLD/19/0001\",\"password\":\"Mbuyu#Kijani83\"}")
-                .andExpect(status().isOk())).get("accessToken").asText();
+                .andExpect(status().isOk())).get("accessToken").asString();
 
         // results from before CIMS, from an Excel file
         byte[] xlsx;
@@ -181,8 +181,8 @@ class ImportIT {
         JsonNode reg = s.body(s.call(post("/api/applicant-auth/register"), null,
                 "{\"indexNumber\":\"S0101/0001\",\"examYear\":2025,\"phone\":\"0713111001\",\"password\":\"Kifaru#Mto47\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
-        String token = s.body(s.call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0713111001\",\"code\":\"" + reg.get("devOtp").asText() + "\"}"))
-                .get("accessToken").asText();
+        String token = s.body(s.call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0713111001\",\"code\":\"" + reg.get("devOtp").asString() + "\"}"))
+                .get("accessToken").asString();
         s.call(get("/api/applicant/applications"), token, null).andExpect(jsonPath("$[0].status").value("OFFERED"));
 
         // a second import of the same student is refused

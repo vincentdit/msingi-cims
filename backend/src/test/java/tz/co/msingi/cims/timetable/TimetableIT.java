@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.timetable;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,7 +93,7 @@ class TimetableIT {
         s.call(post("/api/exams/offerings/from-curricula"), exams, "{\"semesterId\":" + semId + "}").andExpect(jsonPath("$.created").value(3));
         s.call(post("/api/exams/offerings/from-curricula"), exams, "{\"semesterId\":" + semId + "}").andExpect(jsonPath("$.created").value(0));
         s.call(post("/api/exams/offerings/from-curricula"), exams, "{\"semesterId\":" + sem2Id + "}").andExpect(jsonPath("$.created").value(1));
-        s.body(s.call(get("/api/exams/offerings?semesterId=" + semId), exams, null)).forEach(o -> off.put(o.get("code").asText(), o.get("id").asLong()));
+        s.body(s.call(get("/api/exams/offerings?semesterId=" + semId), exams, null)).forEach(o -> off.put(o.get("code").asString(), o.get("id").asLong()));
         JsonNode staff = s.body(s.call(get("/api/exams/staff"), exams, null));
         lecturerId = staffId(staff, "Staff lecturer");
         lecturer2Id = staffId(staff, "Staff lecturer2");
@@ -107,7 +107,7 @@ class TimetableIT {
         cr1 = s.body(s.call(post("/api/timetable/venues"), exams, venue("CR1", 50, null)).andExpect(status().isCreated())).get("id").asLong();
         s.call(post("/api/timetable/venues"), dpa, venue("LH1", 10, null)).andExpect(jsonPath("$.code").value("VENUE_CODE_TAKEN"));
         JsonNode vs = s.body(s.call(get("/api/timetable/venues"), lecturer, null));
-        assertThat(vs.findValuesAsText("code")).containsExactly("CR1", "LH1");
+        assertThat(vs.findValuesAsString("code")).containsExactly("CR1", "LH1");
         assertThat(vs.get(0).get("examSeats").asInt()).isEqualTo(50);
     }
 
@@ -145,7 +145,7 @@ class TimetableIT {
         String[] students = registerThree();
         t = s.body(s.call(get("/api/timetable/semesters/" + semId), dpa, null));
         assertThat(kinds(t)).contains("STUDENT_CLASH", "OVER_CAPACITY").doesNotContain("COHORT_CLASH");
-        assertThat(t.get("warnings").findValuesAsText("message")).anyMatch(m -> m.startsWith("3 registered students take ITU 04101 and ITU 04103"));
+        assertThat(t.get("warnings").findValuesAsString("message")).anyMatch(m -> m.startsWith("3 registered students take ITU 04101 and ITU 04103"));
 
         // nothing for students until it is published
         JsonNode mine = s.body(s.call(get("/api/student/timetable"), students[0], null));
@@ -155,11 +155,11 @@ class TimetableIT {
         s.call(post("/api/timetable/semesters/" + semId + "/publish"), hod, "{\"kind\":\"CLASS\",\"sendSms\":true}").andExpect(status().isForbidden());
         s.call(post("/api/timetable/semesters/" + semId + "/publish"), dpa, "{\"kind\":\"CLASS\",\"sendSms\":true}").andExpect(jsonPath("$.notified").value(3));
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findValuesAsText("templateCode").stream().filter("TIMETABLE_PUBLISHED"::equals).count()).isEqualTo(3);
+        assertThat(sms.findValuesAsString("templateCode").stream().filter("TIMETABLE_PUBLISHED"::equals).count()).isEqualTo(3);
         mine = s.body(s.call(get("/api/student/timetable"), students[0], null));
         assertThat(mine.get("classPublished").asBoolean()).isTrue();
         assertThat(mine.get("slots")).hasSize(5);
-        assertThat(mine.get("slots").findValuesAsText("changedSincePublished")).containsOnly("false");
+        assertThat(mine.get("slots").findValuesAsString("changedSincePublished")).containsOnly("false");
 
         // a change after publishing is marked for students
         s.call(put("/api/timetable/slots/" + c), dpa, slotReq("ITU 04103", "TUTORIAL", 4, "09:00", "11:00", cr1, null, null)).andExpect(status().isOk());
@@ -170,8 +170,8 @@ class TimetableIT {
 
         // lecturers see their own classes: lecturer2 takes ITU 04103 and the Group B practical, not the classes named for the other lecturer
         JsonNode l2 = s.body(s.call(get("/api/timetable/mine"), lecturer2, null));
-        assertThat(l2.get("slots").findValuesAsText("moduleCode")).containsExactlyInAnyOrder("ITU 04101", "ITU 04103");
-        assertThat(l2.get("slots").findValuesAsText("groupLabel")).contains("Group B").doesNotContain("Group A");
+        assertThat(l2.get("slots").findValuesAsString("moduleCode")).containsExactlyInAnyOrder("ITU 04101", "ITU 04103");
+        assertThat(l2.get("slots").findValuesAsString("groupLabel")).contains("Group B").doesNotContain("Group A");
         assertThat(l2.get("classPublished").asBoolean()).isTrue();
 
         s.call(get("/api/timetable/semesters/" + semId + "/export?kind=CLASS"), viewer, null).andExpect(status().isOk())
@@ -221,12 +221,12 @@ class TimetableIT {
         s.call(post("/api/timetable/semesters/" + semId + "/publish"), exams, "{\"kind\":\"EXAM\",\"sendSms\":false}").andExpect(jsonPath("$.notified").value(0));
         JsonNode mine = s.body(s.call(get("/api/student/timetable"), students[1], null));
         assertThat(mine.get("examPublished").asBoolean()).isTrue();
-        assertThat(mine.get("exams").findValuesAsText("moduleCode")).containsExactly("ITU 04101", "ITU 04102", "ITU 04103");
+        assertThat(mine.get("exams").findValuesAsString("moduleCode")).containsExactly("ITU 04101", "ITU 04102", "ITU 04103");
         assertThat(mine.get("exams").get(2).get("venues")).hasSize(2);
         assertThat(mine.get("exams").get(0).get("invigilators")).isEmpty();
         JsonNode lec = s.body(s.call(get("/api/timetable/mine"), lecturer, null));
         assertThat(lec.get("exams")).hasSize(2);   // the papers of their modules (04101, 04102), invigilating both
-        assertThat(lec.get("exams").findValuesAsText("invigilating").stream().filter("true"::equals).count()).isEqualTo(2);
+        assertThat(lec.get("exams").findValuesAsString("invigilating").stream().filter("true"::equals).count()).isEqualTo(2);
 
         // a clash that crept in (e.g. a late registration) stops the timetable being published again
         tenantWork.run(inst.tenant(), () -> jdbc.update("""
@@ -257,14 +257,14 @@ class TimetableIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(d.at("/summary/phone").asText(), d.at("/summary/registrationNo").asText());
+            byPhone.put(d.at("/summary/phone").asString(), d.at("/summary/registrationNo").asString());
         }
         String[] tokens = new String[3];
         Applicant[] apps = {a, b, c};
         for (int i = 0; i < 3; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + byPhone.get(phone) + "\",\"password\":\"Kifaru#Mto47\"}"))
-                    .get("accessToken").asText();
+                    .get("accessToken").asString();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }
@@ -308,17 +308,17 @@ class TimetableIT {
     }
 
     private static long staffId(JsonNode staff, String name) {
-        return staff.findParents("fullName").stream().filter(x -> x.get("fullName").asText().equals(name)).findFirst().orElseThrow().get("id").asLong();
+        return staff.findParents("fullName").stream().filter(x -> x.get("fullName").asString().equals(name)).findFirst().orElseThrow().get("id").asLong();
     }
 
     private static List<String> kinds(JsonNode t) {
         List<String> out = new ArrayList<>();
-        t.get("warnings").forEach(w -> out.add(w.get("kind").asText()));
+        t.get("warnings").forEach(w -> out.add(w.get("kind").asString()));
         return out;
     }
 
     private static JsonNode row(JsonNode t, String code) {
-        for (JsonNode o : t.get("offerings")) if (o.get("code").asText().equals(code)) return o;
+        for (JsonNode o : t.get("offerings")) if (o.get("code").asString().equals(code)) return o;
         throw new AssertionError(code);
     }
 

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,13 +64,13 @@ class PrivacyIT {
     void anApplicantDownloadsTheirDataAndIsErasedOnRequest() throws Exception {
         String applicant = s.applicantToken();
         JsonNode export = s.body(s.call(get("/api/account/privacy/export"), applicant, null).andExpect(status().isOk()));
-        assertThat(export.get("account").get("user_type").asText()).isEqualTo("APPLICANT");
-        assertThat(export.get("applicant").get("surname").asText()).isNotBlank();
+        assertThat(export.get("account").get("user_type").asString()).isEqualTo("APPLICANT");
+        assertThat(export.get("applicant").get("surname").asString()).isNotBlank();
         assertThat(export.has("invoices")).isTrue();
 
         JsonNode req = s.body(s.call(post("/api/account/privacy/requests"), applicant,
                 "{\"kind\":\"ERASURE\",\"details\":\"I joined another college; please delete my details.\"}").andExpect(status().isCreated()));
-        assertThat(req.get("requestNo").asText()).matches("DSR-\\d{4}-0001");
+        assertThat(req.get("requestNo").asString()).matches("DSR-\\d{4}-0001");
         assertThat(req.get("erasable").asBoolean()).isTrue();
         s.call(post("/api/account/privacy/requests"), applicant, "{\"kind\":\"ERASURE\",\"details\":\"again\"}").andExpect(jsonPath("$.code").value("DSR_OPEN"));
         s.call(get("/api/privacy/requests?status=OPEN"), registrar, null).andExpect(jsonPath("$[0].kind").value("ERASURE"));

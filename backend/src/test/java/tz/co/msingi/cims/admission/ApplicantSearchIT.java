@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,13 +60,13 @@ class ApplicantSearchIT {
         assertThat(all.get("totalElements").asLong()).isEqualTo(2);
         JsonNode row = search("?q=S0101/0001").get("content");
         assertThat(row).hasSize(1);
-        assertThat(row.get(0).get("indexNumber").asText()).isEqualTo("S0101/0001/2025");
-        assertThat(row.get(0).get("firstChoice").asText()).isEqualTo("BTCIT");
-        assertThat(row.get(0).get("status").asText()).isEqualTo("SUBMITTED");
+        assertThat(row.get(0).get("indexNumber").asString()).isEqualTo("S0101/0001/2025");
+        assertThat(row.get(0).get("firstChoice").asString()).isEqualTo("BTCIT");
+        assertThat(row.get(0).get("status").asString()).isEqualTo("SUBMITTED");
 
         assertThat(search("?programmeId=" + inst.programmeId() + "&firstChoice=true").get("totalElements").asLong()).isEqualTo(2);
         assertThat(search("?programmeId=999999").get("totalElements").asLong()).isZero();
-        assertThat(search("?checksPending=true").get("content").findValuesAsText("id")).containsExactly(String.valueOf(b.applicationId()));
+        assertThat(search("?checksPending=true").get("content").findValuesAsString("id")).containsExactly(String.valueOf(b.applicationId()));
         assertThat(search("?checksPending=true").get("content").get(0).get("checksPending").asLong()).isEqualTo(1);
         assertThat(search("?status=SUBMITTED&feePaid=true").get("totalElements").asLong()).isEqualTo(2);
         assertThat(search("?sex=F").get("totalElements").asLong()).isEqualTo(2); // the scenario's applicants are female
@@ -88,7 +88,7 @@ class ApplicantSearchIT {
         assertThat(new String(pdf, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
 
         JsonNode history = s.body(s.call(get("/api/admission/applications/" + a.applicationId()), admissions, null)).get("history");
-        assertThat(history.findValuesAsText("action")).contains("REGISTER", "SUBMIT", "APPLICATION_FILE_PRINTED");
-        assertThat(history.findValuesAsText("label")).contains("Application submitted", "Application file printed");
+        assertThat(history.findValuesAsString("action")).contains("REGISTER", "SUBMIT", "APPLICATION_FILE_PRINTED");
+        assertThat(history.findValuesAsString("label")).contains("Application submitted", "Application file printed");
     }
 }

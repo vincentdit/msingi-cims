@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,7 +76,7 @@ class InstitutionPhotoIT {
                 .andExpect(jsonPath("$.width").value(1200))
                 .andExpect(jsonPath("$.caption").value("Main campus, Dodoma"));
 
-        String url = s.body(s.call(get("/api/public/institution"), null, null)).get("campusPhoto").get("url").asText();
+        String url = s.body(s.call(get("/api/public/institution"), null, null)).get("campusPhoto").get("url").asString();
         assertThat(url).startsWith("/api/public/institution/photos/campus?v=");
         s.call(get("/api/public/institution/photos/campus"), null, null).andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "image/png"))
@@ -86,7 +86,7 @@ class InstitutionPhotoIT {
         // a new caption and a replaced photo change the address, so browsers fetch the new one
         s.call(patch("/api/admin/institution/photos/campus"), admin, "{\"caption\":\"Kikuyu campus\"}").andExpect(jsonPath("$.caption").value("Kikuyu campus"));
         s.call(upload(png(1600, 900), "new.png", null), admin, null).andExpect(status().isOk()).andExpect(jsonPath("$.width").value(1600));
-        assertThat(s.body(s.call(get("/api/public/institution"), null, null)).get("campusPhoto").get("url").asText()).isNotEqualTo(url);
+        assertThat(s.body(s.call(get("/api/public/institution"), null, null)).get("campusPhoto").get("url").asString()).isNotEqualTo(url);
 
         // another institution does not see it
         other.call(get("/api/public/institution/photos/campus"), null, null).andExpect(status().isNotFound());

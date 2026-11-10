@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,11 +76,11 @@ class AdmissionWindowsIT {
     }
 
     List<String> publicWindows(String path) throws Exception {
-        return s.body(s.call(get(path), null, null)).findValuesAsText("name");
+        return s.body(s.call(get(path), null, null)).findValuesAsString("name");
     }
 
     List<String> actions(long id) throws Exception {
-        return s.body(s.call(get("/api/admission/windows/" + id + "/events"), viewer, null).andExpect(status().isOk())).findValuesAsText("action");
+        return s.body(s.call(get("/api/admission/windows/" + id + "/events"), viewer, null).andExpect(status().isOk())).findValuesAsString("action");
     }
 
     @Test
@@ -99,19 +99,19 @@ class AdmissionWindowsIT {
         // the Admissions Office opens it now
         s.call(post("/api/admission/windows/" + id + "/open"), registrar, null).andExpect(status().isForbidden());
         JsonNode opened = s.body(s.call(post("/api/admission/windows/" + id + "/open"), admissions, null).andExpect(status().isOk()));
-        assertThat(opened.get("state").asText()).isEqualTo("OPEN");
-        assertThat(OffsetDateTime.parse(opened.get("opensAt").asText())).isBefore(OffsetDateTime.now().plusSeconds(1));
+        assertThat(opened.get("state").asString()).isEqualTo("OPEN");
+        assertThat(OffsetDateTime.parse(opened.get("opensAt").asString())).isBefore(OffsetDateTime.now().plusSeconds(1));
         assertThat(publicWindows("/api/public/windows")).contains("March intake 2027");
         s.call(post("/api/admission/windows/" + id + "/open"), admissions, null).andExpect(jsonPath("$.code").value("ALREADY_OPEN"));
 
         // an open window keeps its opening date; closing dates must stay in the future
         s.call(put("/api/admission/windows/" + id), admissions, windowJson("March intake 2027", now.plusDays(2), now.plusDays(40)))
                 .andExpect(jsonPath("$.code").value("ALREADY_OPEN"));
-        s.call(put("/api/admission/windows/" + id), admissions, windowJson("March intake 2027", OffsetDateTime.parse(opened.get("opensAt").asText()), OffsetDateTime.parse(opened.get("opensAt").asText()).plusNanos(1_000_000)))
+        s.call(put("/api/admission/windows/" + id), admissions, windowJson("March intake 2027", OffsetDateTime.parse(opened.get("opensAt").asString()), OffsetDateTime.parse(opened.get("opensAt").asString()).plusNanos(1_000_000)))
                 .andExpect(jsonPath("$.code").value("CLOSING_DATE_PAST"));
 
         // extend it
-        s.call(put("/api/admission/windows/" + id), admissions, windowJson("March intake 2027", OffsetDateTime.parse(opened.get("opensAt").asText()), now.plusDays(50)))
+        s.call(put("/api/admission/windows/" + id), admissions, windowJson("March intake 2027", OffsetDateTime.parse(opened.get("opensAt").asString()), now.plusDays(50)))
                 .andExpect(status().isOk());
 
         // an applicant starts but does not submit
@@ -123,8 +123,8 @@ class AdmissionWindowsIT {
         s.call(post("/api/admission/windows/" + id + "/close"), admissions, "{\"reason\":\"\"}").andExpect(status().isBadRequest());
         JsonNode closed = s.body(s.call(post("/api/admission/windows/" + id + "/close"), admissions,
                 "{\"reason\":\"All places are expected to be filled.\"}").andExpect(status().isOk()));
-        assertThat(closed.get("state").asText()).isEqualTo("CLOSED");
-        assertThat(OffsetDateTime.parse(closed.get("closesAt").asText())).isBefore(OffsetDateTime.now().plusSeconds(1));
+        assertThat(closed.get("state").asString()).isEqualTo("CLOSED");
+        assertThat(OffsetDateTime.parse(closed.get("closesAt").asString())).isBefore(OffsetDateTime.now().plusSeconds(1));
         assertThat(publicWindows("/api/public/windows")).doesNotContain("March intake 2027");
         s.call(post("/api/applicant/applications"), s.applicantToken(), "{\"windowId\":" + id + "}").andExpect(jsonPath("$.code").value("WINDOW_NOT_OPEN"));
         s.call(post("/api/admission/windows/" + id + "/close"), admissions, "{\"reason\":\"again\"}").andExpect(jsonPath("$.code").value("WINDOW_CLOSED"));
@@ -142,13 +142,13 @@ class AdmissionWindowsIT {
 
         // the record of changes, newest first, with who did it and how many applicants were told
         JsonNode events = s.body(s.call(get("/api/admission/windows/" + id + "/events"), viewer, null));
-        assertThat(events.findValuesAsText("action")).containsExactly("REOPENED", "CLOSED", "EXTENDED", "OPENED", "PUBLISHED", "CREATED");
-        assertThat(events.get(0).get("reason").asText()).isEqualTo("NACTVET approved 20 more places");
+        assertThat(events.findValuesAsString("action")).containsExactly("REOPENED", "CLOSED", "EXTENDED", "OPENED", "PUBLISHED", "CREATED");
+        assertThat(events.get(0).get("reason").asString()).isEqualTo("NACTVET approved 20 more places");
         assertThat(events.get(0).get("applicantsNotified").asInt()).isEqualTo(1);
-        assertThat(events.get(0).get("byName").asText()).isEqualTo("Staff admin");
+        assertThat(events.get(0).get("byName").asString()).isEqualTo("Staff admin");
         assertThat(events.get(1).get("applicantsNotified").asInt()).isEqualTo(1);
-        assertThat(events.get(1).get("byName").asText()).isEqualTo("Staff admissions");
-        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode");
+        assertThat(events.get(1).get("byName").asString()).isEqualTo("Staff admissions");
+        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode");
         assertThat(sms).contains("ADMISSION_WINDOW_CLOSED", "ADMISSION_WINDOW_REOPENED");
 
         // windows close by themselves when the closing date passes
@@ -160,7 +160,7 @@ class AdmissionWindowsIT {
         int n = TenantContext.callAs(inst.tenant().toInfo(), windowService::closeExpired);
         assertThat(n).isEqualTo(1);
         JsonNode auto = s.body(s.call(get("/api/admission/windows/" + id + "/events"), viewer, null)).get(0);
-        assertThat(auto.get("action").asText()).isEqualTo("CLOSED");
+        assertThat(auto.get("action").asString()).isEqualTo("CLOSED");
         assertThat(auto.get("automatic").asBoolean()).isTrue();
         s.call(get("/api/admission/windows/" + id), admissions, null).andExpect(jsonPath("$.status").value("CLOSED"));
     }

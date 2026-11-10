@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.nactvet;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,7 +47,7 @@ public class LiveNactvetSubmissionClient implements NactvetSubmissionClient {
         }
         JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
         f.setReadTimeout(Duration.ofSeconds(90));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(f).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(f).build();
         this.registrationPath = registrationPath;
         this.registrationStatusPath = registrationStatusPath;
         this.resultsPath = resultsPath;
@@ -140,7 +140,7 @@ public class LiveNactvetSubmissionClient implements NactvetSubmissionClient {
         }
         int code = root == null ? 0 : root.path("code").asInt(0);
         if (code < 200 || code > 299) {
-            String msg = root == null ? "no answer" : root.path("message").asText("refused");
+            String msg = root == null ? "no answer" : root.path("message").asString("refused");
             throw new NactvetUnavailableException("NACTVET did not accept the " + what + " (" + code + " " + msg + ")", null);
         }
         return root;
@@ -155,6 +155,6 @@ public class LiveNactvetSubmissionClient implements NactvetSubmissionClient {
 
     private static String text(JsonNode n, String k) {
         JsonNode v = n == null ? null : n.get(k);
-        return v == null || v.isNull() || v.asText().isBlank() ? null : v.asText().trim();
+        return v == null || v.isNull() || v.asString().isBlank() ? null : v.asString().trim();
     }
 }

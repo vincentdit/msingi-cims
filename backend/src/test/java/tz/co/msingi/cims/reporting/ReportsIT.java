@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.reporting;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.CellType;
@@ -93,8 +93,8 @@ class ReportsIT {
         JsonNode p = s.body(s.call(get("/api/reports/ADM-01?windowId=" + s.inst.windowId()), viewer, null).andExpect(status().isOk()));
         List<Object> row = row(p, 0);
         assertThat(row.subList(3, 12)).containsExactly(50, 2, 2, 0, 2, 2, 2, 2, 0.04);
-        assertThat(p.get("filterLines").get(0).asText()).startsWith("Admission window: Test window ");
-        assertThat(p.at("/totals/0").asText()).isEqualTo("Total");
+        assertThat(p.get("filterLines").get(0).asString()).startsWith("Admission window: Test window ");
+        assertThat(p.at("/totals/0").asString()).isEqualTo("Total");
 
         JsonNode st = s.body(s.call(get("/api/reports/ADM-04"), admin, null));
         assertThat(texts(st, 0)).containsExactly("Accepted");
@@ -106,8 +106,8 @@ class ReportsIT {
         JsonNode acc = s.body(s.call(get("/api/reports/ADM-06"), admin, null));
         assertThat(row(acc, 0).subList(2, 8)).containsExactly(2, 2, 0, 0, 0, 1.0);
         assertThat(row(s.body(s.call(get("/api/reports/ADM-05"), admin, null)), 0).get(7)).isEqualTo(2);
-        assertThat(s.body(s.call(get("/api/reports/ADM-03"), admin, null)).at("/rows/0/0").asText()).isEqualTo("CSEE (Form IV)");
-        assertThat(s.body(s.call(get("/api/reports/ADM-02"), admin, null)).at("/rows/0/0").asText()).isEqualTo("Dodoma");
+        assertThat(s.body(s.call(get("/api/reports/ADM-03"), admin, null)).at("/rows/0/0").asString()).isEqualTo("CSEE (Form IV)");
+        assertThat(s.body(s.call(get("/api/reports/ADM-02"), admin, null)).at("/rows/0/0").asString()).isEqualTo("Dodoma");
         assertThat(s.body(s.call(get("/api/reports/ADM-08?status=ACCEPTED"), admin, null)).get("rowCount").asInt()).isEqualTo(2);
         assertThat(s.body(s.call(get("/api/reports/ADM-08?status=SUBMITTED"), admin, null)).get("rowCount").asInt()).isZero();
 
@@ -116,7 +116,7 @@ class ReportsIT {
         assertThat(row(enrol, 0).subList(2, 9)).containsExactly(1, 2, 0, 0, 2, 0, 2);
         JsonNode roll = s.body(s.call(get("/api/reports/REG-02"), registrar, null));
         assertThat(roll.get("rowCount").asInt()).isEqualTo(2);
-        assertThat(roll.at("/rows/0/0").asText()).startsWith(s.tenant + "/");
+        assertThat(roll.at("/rows/0/0").asString()).startsWith(s.tenant + "/");
         JsonNode ages = s.body(s.call(get("/api/reports/REG-03"), registrar, null));
         assertThat(texts(ages, 0)).containsExactly("Under 18", "18–20", "21–24", "25–29", "30–39", "40 and over");
         assertThat(ages.at("/totals/3").asInt()).isEqualTo(2);
@@ -124,7 +124,7 @@ class ReportsIT {
 
         // dashboards: sections by role
         JsonNode d = s.body(s.call(get("/api/dashboard"), admin, null).andExpect(status().isOk()));
-        assertThat(d.at("/admissions/funnel").findValuesAsText("value")).containsExactly("2", "2", "2", "2", "2", "2");
+        assertThat(d.at("/admissions/funnel").findValuesAsString("value")).containsExactly("2", "2", "2", "2", "2", "2");
         assertThat(d.at("/admissions/female").asInt()).isEqualTo(2);
         assertThat(d.at("/registry/current").asInt()).isEqualTo(2);
         assertThat(d.at("/registry/awaitingRegistration").asInt()).isEqualTo(2);
@@ -152,13 +152,13 @@ class ReportsIT {
         approvedStructure();
         s.admit(officer, chair, a);
         for (JsonNode inv : s.body(s.call(get("/api/applicant/account"), a.token(), null)).get("invoices")) {
-            if (inv.get("purpose").asText().equals("ANNUAL_FEES")) invoiceId = inv.get("id").asLong();
+            if (inv.get("purpose").asString().equals("ANNUAL_FEES")) invoiceId = inv.get("id").asLong();
         }
         s.call(post("/api/applicant/invoices/" + invoiceId + "/simulate-payment"), a.token(), "{\"amount\":150000}").andExpect(status().isOk());
 
         JsonNode items = s.body(s.call(get("/api/reports/FIN-01"), accountant, null).andExpect(status().isOk()));
         assertThat(items.at("/totals/2").decimalValue()).isEqualByComparingTo("150000");
-        assertThat(items.get("filterLines").get(0).asText()).startsWith("Period: ");
+        assertThat(items.get("filterLines").get(0).asString()).startsWith("Period: ");
         JsonNode debtors = s.body(s.call(get("/api/reports/FIN-05?academicYearId=" + yearId), bursar, null));
         assertThat(debtors.at("/rows/0/6").decimalValue()).isEqualByComparingTo("470000");
         s.call(get("/api/reports/FIN-01?from=2026-10-10&to=2026-10-01"), accountant, null).andExpect(jsonPath("$.code").value("INVALID_PERIOD"));
@@ -207,18 +207,18 @@ class ReportsIT {
     }
 
     private List<String> codes(String token) throws Exception {
-        return s.body(s.call(get("/api/reports"), token, null).andExpect(status().isOk())).findValuesAsText("code");
+        return s.body(s.call(get("/api/reports"), token, null).andExpect(status().isOk())).findValuesAsString("code");
     }
 
     private List<Object> row(JsonNode report, int i) {
         List<Object> out = new ArrayList<>();
-        for (JsonNode v : report.get("rows").get(i)) out.add(v.isIntegralNumber() ? (Object) v.asInt() : v.isNumber() ? (Object) v.asDouble() : v.asText());
+        for (JsonNode v : report.get("rows").get(i)) out.add(v.isIntegralNumber() ? (Object) v.asInt() : v.isNumber() ? (Object) v.asDouble() : v.asString());
         return out;
     }
 
     private static List<String> texts(JsonNode report, int column) {
         List<String> out = new ArrayList<>();
-        for (JsonNode r : report.get("rows")) out.add(r.get(column).asText());
+        for (JsonNode r : report.get("rows")) out.add(r.get(column).asString());
         return out;
     }
 }

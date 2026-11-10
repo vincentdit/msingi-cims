@@ -28,7 +28,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail businessRule(BusinessRuleException ex) {
-        return problem(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage());
+        return problem(HttpStatus.UNPROCESSABLE_CONTENT, ex.getCode(), ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -43,8 +43,8 @@ public class GlobalExceptionHandler {
     /** A body that cannot be read, e.g. a value that is not one of the allowed choices. */
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public ProblemDetail unreadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
-        String detail = ex.getCause() instanceof com.fasterxml.jackson.databind.exc.InvalidFormatException f && !f.getPath().isEmpty()
-                ? "Invalid value for " + f.getPath().get(f.getPath().size() - 1).getFieldName() : "The request could not be read";
+        String detail = ex.getCause() instanceof tools.jackson.databind.exc.InvalidFormatException f && !f.getPath().isEmpty()
+                ? "Invalid value for " + f.getPath().get(f.getPath().size() - 1).getPropertyName() : "The request could not be read";
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", detail);
     }
 
@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ProblemDetail tooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
-        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", "The file is too large. Save it smaller and try again.");
+        return problem(HttpStatus.CONTENT_TOO_LARGE, "FILE_TOO_LARGE", "The file is too large. Save it smaller and try again.");
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)

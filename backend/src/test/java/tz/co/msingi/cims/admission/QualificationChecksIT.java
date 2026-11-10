@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,9 +58,9 @@ class QualificationChecksIT {
         String url = "/api/admission/windows/" + s.inst.windowId() + "/qualification-checks";
         JsonNode pending = s.body(s.call(get(url), registrar, null).andExpect(status().isOk()));
         assertThat(pending.size()).isEqualTo(2);
-        assertThat(pending.findValuesAsText("applicationStatus")).containsOnly("DRAFT");
+        assertThat(pending.findValuesAsString("applicationStatus")).containsOnly("DRAFT");
         assertThat(pending.get(0).get("applicationId").asLong()).isEqualTo(appId);
-        assertThat(pending.get(0).at("/qualification/checkStatus").asText()).isEqualTo("PENDING");
+        assertThat(pending.get(0).at("/qualification/checkStatus").asString()).isEqualTo("PENDING");
 
         // only the Admissions Office decides; a reason is needed to turn one down; NECTA results are not checked here
         s.call(post("/api/admission/qualifications/" + nva + "/check"), registrar, "{\"verified\":true}").andExpect(status().isForbidden());
@@ -80,17 +80,17 @@ class QualificationChecksIT {
 
         assertThat(s.body(s.call(get(url), viewer, null)).size()).isZero();
         assertThat(s.body(s.call(get(url + "?status=VERIFIED"), viewer, null)).size()).isEqualTo(1);
-        assertThat(s.body(s.call(get(url + "?status=REJECTED"), viewer, null)).at("/0/qualification/checkNote").asText())
+        assertThat(s.body(s.call(get(url + "?status=REJECTED"), viewer, null)).at("/0/qualification/checkNote").asString())
                 .isEqualTo("The certificate number does not match VETA's records");
 
         // the applicant sees the outcome and is told by SMS
         JsonNode mine = s.body(s.call(get("/api/applicant/qualifications"), token, null));
-        assertThat(mine.findValuesAsText("checkStatus")).containsExactly("VERIFIED", "VERIFIED", "REJECTED");
-        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=50"), viewer, null)).get("content").findValuesAsText("templateCode");
+        assertThat(mine.findValuesAsString("checkStatus")).containsExactly("VERIFIED", "VERIFIED", "REJECTED");
+        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=50"), viewer, null)).get("content").findValuesAsString("templateCode");
         assertThat(sms).contains("QUALIFICATION_NOT_ACCEPTED");
 
         // the application detail carries the same states for the office
         JsonNode detail = s.body(s.call(get("/api/admission/applications/" + appId), officer, null));
-        assertThat(detail.get("qualifications").findValuesAsText("checkStatus")).containsExactly("VERIFIED", "VERIFIED", "REJECTED");
+        assertThat(detail.get("qualifications").findValuesAsString("checkStatus")).containsExactly("VERIFIED", "VERIFIED", "REJECTED");
     }
 }

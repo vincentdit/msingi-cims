@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.notification;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,18 +73,18 @@ class MessagingIT {
     @Test
     void eventMessagesUseTheInstitutionsWordingAndAreLogged() throws Exception {
         Applicant a = s.apply("S0101/0001");
-        String phone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asText();
+        String phone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asString();
 
         JsonNode log = s.body(s.call(get("/api/messaging/messages?phone=" + phone), viewer, null).andExpect(status().isOk())).get("content");
         assertThat(s.body(s.call(get("/api/messaging/messages"), viewer, null).andExpect(status().isOk())).get("totalElements").asInt()).isGreaterThan(1);
         assertThat(s.body(s.call(get("/api/messaging/messages?status=DELIVERED&kind=EVENT"), viewer, null).andExpect(status().isOk()))
-                .get("content").findValuesAsText("kind")).containsOnly("EVENT");
+                .get("content").findValuesAsString("kind")).containsOnly("EVENT");
         JsonNode otp = byTemplate(log, "OTP_CODE");
-        assertThat(otp.get("kind").asText()).isEqualTo("SECURITY");
-        assertThat(otp.get("body").asText()).contains("******").doesNotContainPattern("^\\d{6}"); // the code is never stored
+        assertThat(otp.get("kind").asString()).isEqualTo("SECURITY");
+        assertThat(otp.get("body").asString()).contains("******").doesNotContainPattern("^\\d{6}"); // the code is never stored
         JsonNode received = byTemplate(log, "APPLICATION_RECEIVED");
-        assertThat(received.get("status").asText()).isEqualTo("DELIVERED");
-        assertThat(received.get("body").asText()).startsWith("Your application " + s.tenant + "/APP/");
+        assertThat(received.get("status").asString()).isEqualTo("DELIVERED");
+        assertThat(received.get("body").asString()).startsWith("Your application " + s.tenant + "/APP/");
         assertThat(received.get("parts").asInt()).isEqualTo(1);
 
         // the institution rewords the message and switches to Kiswahili
@@ -97,21 +97,21 @@ class MessagingIT {
         JsonNode t = s.body(s.call(put("/api/messaging/templates/APPLICATION_RECEIVED"), admin,
                 template("Application {referenceNo} received by {institution}.", "Maombi {referenceNo} yamepokelewa na {institution}.", true)).andExpect(status().isOk()));
         assertThat(t.get("customised").asBoolean()).isTrue();
-        assertThat(t.get("sampleSw").asText()).isEqualTo("Maombi DEMO/APP/2027/000123 yamepokelewa na Msingi Demo Technical College.");
+        assertThat(t.get("sampleSw").asString()).isEqualTo("Maombi DEMO/APP/2027/000123 yamepokelewa na Msingi Demo Technical College.");
         s.call(put("/api/messaging/settings"), admin, "{\"defaultLanguage\":\"SW\",\"senderId\":\"MSINGI\",\"pricePerSms\":22,\"lowBalanceWarning\":100}")
                 .andExpect(jsonPath("$.defaultLanguage").value("SW"));
 
         Applicant b = s.applyEligibleEndingIn(5, 400);
-        String bPhone = s.body(s.call(get("/api/applicant/profile"), b.token(), null)).get("phone").asText();
+        String bPhone = s.body(s.call(get("/api/applicant/profile"), b.token(), null)).get("phone").asString();
         JsonNode bLog = s.body(s.call(get("/api/messaging/messages?phone=" + bPhone), viewer, null)).get("content");
-        assertThat(byTemplate(bLog, "APPLICATION_RECEIVED").get("body").asText()).startsWith("Maombi " + s.tenant + "/APP/").endsWith("yamepokelewa na " + s.tenant + " Technical College.");
-        assertThat(byTemplate(bLog, "APPLICATION_RECEIVED").get("language").asText()).isEqualTo("SW");
+        assertThat(byTemplate(bLog, "APPLICATION_RECEIVED").get("body").asString()).startsWith("Maombi " + s.tenant + "/APP/").endsWith("yamepokelewa na " + s.tenant + " Technical College.");
+        assertThat(byTemplate(bLog, "APPLICATION_RECEIVED").get("language").asString()).isEqualTo("SW");
 
         // switched off: nothing is sent; reset brings back the built-in wording
         s.call(put("/api/messaging/templates/APPLICATION_RECEIVED"), admin, template("{referenceNo}", "{referenceNo}", false)).andExpect(status().isOk());
         Applicant c = s.applyEligibleEndingIn(5, 800);
-        String cPhone = s.body(s.call(get("/api/applicant/profile"), c.token(), null)).get("phone").asText();
-        assertThat(s.body(s.call(get("/api/messaging/messages?phone=" + cPhone), viewer, null)).get("content").findValuesAsText("templateCode"))
+        String cPhone = s.body(s.call(get("/api/applicant/profile"), c.token(), null)).get("phone").asString();
+        assertThat(s.body(s.call(get("/api/messaging/messages?phone=" + cPhone), viewer, null)).get("content").findValuesAsString("templateCode"))
                 .doesNotContain("APPLICATION_RECEIVED");
         s.call(delete("/api/messaging/templates/APPLICATION_RECEIVED"), admin, null)
                 .andExpect(jsonPath("$.customised").value(false)).andExpect(jsonPath("$.enabled").value(true));
@@ -141,8 +141,8 @@ class MessagingIT {
         JsonNode p = s.body(s.call(post("/api/messaging/campaigns/preview"), registrar, studentsWithBalance).andExpect(status().isOk()));
         assertThat(p.get("recipients").asInt()).isEqualTo(1);
         JsonNode asha = s.lookup("S0101/0001"); // the student who has not paid; names come from (simulated) NECTA
-        assertThat(p.at("/samples/0/text").asText()).isEqualTo("Dear " + asha.get("firstName").asText() + ", your fee balance is TZS 620,000. Please pay before 30 October.");
-        assertThat(p.get("audienceLabel").asText()).isEqualTo("Students (admitted, registered), with a fee balance");
+        assertThat(p.at("/samples/0/text").asString()).isEqualTo("Dear " + asha.get("firstName").asString() + ", your fee balance is TZS 620,000. Please pay before 30 October.");
+        assertThat(p.get("audienceLabel").asString()).isEqualTo("Students (admitted, registered), with a fee balance");
         assertThat(p.get("enoughBalance").asBoolean()).isFalse();
         s.call(post("/api/messaging/campaigns"), registrar, studentsWithBalance).andExpect(jsonPath("$.code").value("INSUFFICIENT_SMS_BALANCE"));
 
@@ -156,7 +156,7 @@ class MessagingIT {
         JsonNode c = s.body(s.call(post("/api/messaging/campaigns"), registrar, studentsWithBalance).andExpect(status().isOk()));
         JsonNode detail = s.body(s.call(get("/api/messaging/campaigns/" + c.get("id").asLong()), viewer, null));
         assertThat(detail.at("/campaign/byStatus/DELIVERED").asInt()).isEqualTo(1);
-        assertThat(detail.at("/messages/0/recipientName").asText()).isEqualTo(asha.get("fullName").asText());
+        assertThat(detail.at("/messages/0/recipientName").asString()).isEqualTo(asha.get("fullName").asString());
         assertThat(s.body(s.call(get("/api/messaging/overview"), viewer, null)).get("balance").asLong()).isEqualTo(balance - 1);
 
         // all current students; placeholders must suit the group
@@ -174,7 +174,7 @@ class MessagingIT {
         JsonNode p = s.body(s.call(post("/api/messaging/campaigns/preview"), admin, body));
         assertThat(p.get("recipients").asInt()).isEqualTo(3);
         assertThat(p.get("skippedDuplicates").asInt()).isEqualTo(1);
-        assertThat(p.get("invalidPhones").get(0).asText()).isEqualTo("abc");
+        assertThat(p.get("invalidPhones").get(0).asString()).isEqualTo("abc");
         long id = s.body(s.call(post("/api/messaging/campaigns"), admin, body)).get("id").asLong();
 
         // the gateway refused one (retried up to three times), one handset was unreachable, one was delivered
@@ -187,13 +187,13 @@ class MessagingIT {
         assertThat(d.at("/campaign/byStatus/FAILED").asInt()).isEqualTo(2);
         JsonNode refused = byPhone(d.get("messages"), "255713000999");
         assertThat(refused.get("attempts").asInt()).isEqualTo(3);
-        assertThat(refused.get("error").asText()).isEqualTo("Number rejected by the gateway");
-        assertThat(byPhone(d.get("messages"), "255712000000").get("error").asText()).isEqualTo("Handset unreachable");
+        assertThat(refused.get("error").asString()).isEqualTo("Number rejected by the gateway");
+        assertThat(byPhone(d.get("messages"), "255712000000").get("error").asString()).isEqualTo("Handset unreachable");
 
         long before = s.body(s.call(get("/api/messaging/overview"), admin, null)).get("balance").asLong();
         s.call(post("/api/messaging/campaigns/" + id + "/resend-failed"), admin, null).andExpect(status().isOk());
         d = s.body(s.call(get("/api/messaging/campaigns/" + id), admin, null));
-        assertThat(byPhone(d.get("messages"), "255712000000").get("status").asText()).isEqualTo("FAILED");
+        assertThat(byPhone(d.get("messages"), "255712000000").get("status").asString()).isEqualTo("FAILED");
         // the unreachable handset was charged again; the refused number holds one part while it waits for a retry...
         assertThat(s.body(s.call(get("/api/messaging/overview"), admin, null)).get("balance").asLong()).isEqualTo(before - 2);
         TenantContext.runAs(s.inst.info(), () -> {
@@ -213,8 +213,8 @@ class MessagingIT {
         s.call(post("/api/integrations/sms/delivery-reports").header("X-Sms-Signature", GepgCallbackController.sign(unknown, "test-sms-secret")), null, unknown)
                 .andExpect(status().isBadRequest());
         JsonNode m = byPhone(s.body(s.call(get("/api/messaging/campaigns/" + id), admin, null)).get("messages"), "255754123456");
-        assertThat(m.get("status").asText()).isEqualTo("FAILED");
-        assertThat(m.get("error").asText()).isEqualTo("Phone switched off");
+        assertThat(m.get("status").asString()).isEqualTo("FAILED");
+        assertThat(m.get("error").asString()).isEqualTo("Phone switched off");
 
         // another institution sees nothing of it
         String other = "N" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -243,7 +243,7 @@ class MessagingIT {
         Applicant b = s.applyEligibleEndingIn(5, 400);
         s.admit(officer, chair, a, b);
         for (JsonNode inv : s.body(s.call(get("/api/applicant/account"), b.token(), null)).get("invoices")) {
-            if (inv.get("purpose").asText().equals("ANNUAL_FEES")) {
+            if (inv.get("purpose").asString().equals("ANNUAL_FEES")) {
                 s.call(post("/api/applicant/invoices/" + inv.get("id").asLong() + "/simulate-payment"), b.token(), "{}").andExpect(status().isOk());
             }
         }
@@ -259,18 +259,18 @@ class MessagingIT {
     }
 
     private static JsonNode byTemplate(JsonNode list, String code) {
-        for (JsonNode m : list) if (code.equals(m.path("templateCode").asText())) return m;
+        for (JsonNode m : list) if (code.equals(m.path("templateCode").asString())) return m;
         throw new AssertionError("no " + code + " in " + list);
     }
 
     private static JsonNode byPhone(JsonNode list, String phone) {
-        for (JsonNode m : list) if (phone.equals(m.get("phone").asText())) return m;
+        for (JsonNode m : list) if (phone.equals(m.get("phone").asString())) return m;
         throw new AssertionError("no " + phone + " in " + list);
     }
 
     @SuppressWarnings("unused")
     private static List<String> statuses(JsonNode list) {
-        return list.findValuesAsText("status");
+        return list.findValuesAsString("status");
     }
 
     /** A bundle credited by Msingi (as the console does), returning the balance after it. */

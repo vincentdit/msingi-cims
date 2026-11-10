@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.nactvet;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,7 +58,7 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
         ReachableIpRequestFactory factory = new ReachableIpRequestFactory(host, preferIp == null || preferIp.isBlank() ? null : preferIp);
         factory.setConnectTimeout(Duration.ofSeconds(8));
         factory.setReadTimeout(Duration.ofSeconds(90));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.path = path;
         this.authorization = authorization;
         this.apiCode = apiCode;
@@ -135,7 +135,7 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
         JsonNode code = root.get("code");
         if (code != null && code.asInt(0) == 403) return true;
         JsonNode msg = root.get("message");
-        return msg != null && msg.asText("").toLowerCase().contains("forbidden");
+        return msg != null && msg.asString("").toLowerCase().contains("forbidden");
     }
 
     private static int totalPages(JsonNode root) {
@@ -176,7 +176,7 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
             JsonNode n = root.get(key);
             if (n != null && n.isArray()) return n;
         }
-        var it = root.fields();
+        var it = root.properties().iterator();
         while (it.hasNext()) {
             var e = it.next();
             if (e.getValue().isArray()) return e.getValue();
@@ -187,7 +187,7 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
     private static String first(JsonNode node, String... names) {
         for (String n : names) {
             JsonNode v = node.get(n);
-            if (v != null && !v.isNull() && !v.isContainerNode() && !v.asText().isBlank()) return v.asText().trim();
+            if (v != null && !v.isNull() && !v.isContainer() && !v.asString().isBlank()) return v.asString().trim();
         }
         return null;
     }
@@ -196,7 +196,7 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
         for (String n : names) {
             JsonNode v = node.get(n);
             if (v != null && v.isNumber()) return v.asInt();
-            if (v != null && v.isTextual() && v.asText().trim().matches("\\d+")) return Integer.parseInt(v.asText().trim());
+            if (v != null && v.isString() && v.asString().trim().matches("\\d+")) return Integer.parseInt(v.asString().trim());
         }
         return null;
     }
@@ -214,8 +214,8 @@ public class LiveNactvetCatalogueClient implements NactvetCatalogueClient {
         if (arr == null || arr.isEmpty()) return null;
         List<String> parts = new ArrayList<>();
         for (JsonNode el : arr) {
-            if (el.isTextual() && !el.asText().isBlank()) {
-                parts.add(el.asText().trim());
+            if (el.isString() && !el.asString().isBlank()) {
+                parts.add(el.asString().trim());
             } else if (el.isObject()) {
                 String label = first(el, "subject_name", "name", "subject", "programme_dip_name");
                 if (label == null) label = first(el, "subject_code", "code", "programme_dip_code", "abbreviation");

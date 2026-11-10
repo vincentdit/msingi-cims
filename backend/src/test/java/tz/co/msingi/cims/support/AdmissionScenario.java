@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.support;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -62,9 +62,9 @@ public class AdmissionScenario {
         int passes = 0;
         boolean maths = false;
         for (JsonNode sub : lookup(index).get("subjects")) {
-            boolean pass = "ABCD".contains(sub.get("grade").asText());
+            boolean pass = "ABCD".contains(sub.get("grade").asString());
             if (pass) passes++;
-            if (pass && sub.get("name").asText().equals("BASIC MATHEMATICS")) maths = true;
+            if (pass && sub.get("name").asString().equals("BASIC MATHEMATICS")) maths = true;
         }
         return passes >= 4 && maths;
     }
@@ -113,16 +113,16 @@ public class AdmissionScenario {
                 "{\"indexNumber\":\"" + index + "\",\"examYear\":2025,\"phone\":\"" + phone + "\",\"password\":\"Kifaru#Mto47\",\"acceptPrivacyNotice\":true}")
                 .andExpect(status().isCreated()));
         return body(call(post("/api/applicant-auth/verify"), null,
-                "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")).get("accessToken").asText();
+                "{\"phone\":\"" + phone + "\",\"code\":\"" + reg.get("devOtp").asString() + "\"}")).get("accessToken").asString();
     }
 
     public String staffToken(String username) throws Exception {
         return body(call(post("/api/auth/login"), null,
                 "{\"username\":\"" + username + "\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}").andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
     }
 
-    public ResultActions call(MockHttpServletRequestBuilder req, String token, String body) throws Exception {
+    public ResultActions call(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String token, String body) throws Exception {
         req.header("X-Tenant", tenant);
         if (token != null) req.header("Authorization", "Bearer " + token);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);

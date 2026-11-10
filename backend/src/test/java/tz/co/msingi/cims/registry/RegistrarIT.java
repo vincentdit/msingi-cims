@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.registry;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,7 +90,7 @@ class RegistrarIT {
     }
 
     String studentStatus(long id) throws Exception {
-        return s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/status").asText();
+        return s.body(s.call(get("/api/registry/students/" + id), registrar, null)).at("/summary/status").asString();
     }
 
     long sms(String code) {
@@ -114,14 +114,14 @@ class RegistrarIT {
                 "{\"type\":\"WITHDRAWAL\",\"reason\":\"x\",\"effectiveDate\":\"" + TODAY.minusDays(200) + "\"}").andExpect(jsonPath("$.code").value("EFFECTIVE_DATE_TOO_EARLY"));
         JsonNode req = s.body(s.call(post("/api/registry/students/" + studentA + "/status-changes"), registrar, suspend).andExpect(status().isOk()));
         long id = req.get("id").asLong();
-        assertThat(req.get("state").asText()).isEqualTo("REQUESTED");
-        assertThat(req.get("toStatus").asText()).isEqualTo("SUSPENDED");
+        assertThat(req.get("state").asString()).isEqualTo("REQUESTED");
+        assertThat(req.get("toStatus").asString()).isEqualTo("SUSPENDED");
         s.call(post("/api/registry/students/" + studentA + "/status-changes"), registrar, suspend).andExpect(jsonPath("$.code").value("OPEN_REQUEST"));
 
         // the Head of the student's department recommends; another department's Head cannot see it
         JsonNode inbox = s.body(s.call(get("/api/approvals"), hodIct, null));
-        assertThat(inbox.findValuesAsText("kind")).contains("STATUS_RECOMMEND");
-        assertThat(s.body(s.call(get("/api/approvals"), hodOther, null)).findValuesAsText("kind")).doesNotContain("STATUS_RECOMMEND");
+        assertThat(inbox.findValuesAsString("kind")).contains("STATUS_RECOMMEND");
+        assertThat(s.body(s.call(get("/api/approvals"), hodOther, null)).findValuesAsString("kind")).doesNotContain("STATUS_RECOMMEND");
         s.call(post("/api/registry/status-changes/" + id + "/recommend"), hodOther, "{}").andExpect(status().isForbidden());
         assertThat(s.body(s.call(get("/api/registry/status-changes"), hodOther, null)).size()).isZero();
         s.call(post("/api/registry/status-changes/" + id + "/recommend"), hodIct, "{\"note\":\"Supported\"}")
@@ -129,7 +129,7 @@ class RegistrarIT {
 
         // the Deputy Principal decides; a rejection needs a reason; approval with today's date applies it now
         JsonNode decision = null;
-        for (JsonNode i : s.body(s.call(get("/api/approvals"), chair, null)).get("items")) if (i.get("kind").asText().equals("STATUS_DECISION")) decision = i;
+        for (JsonNode i : s.body(s.call(get("/api/approvals"), chair, null)).get("items")) if (i.get("kind").asString().equals("STATUS_DECISION")) decision = i;
         assertThat(decision).isNotNull();
         assertThat(decision.get("canAct").asBoolean()).isTrue();
         s.call(post("/api/registry/status-changes/" + id + "/decision"), registrar, "{\"approve\":true}").andExpect(status().isForbidden());
@@ -176,9 +176,9 @@ class RegistrarIT {
 
         JsonNode card = s.body(s.call(get("/api/registry/students/" + studentB + "/id-card"), registrar, null));
         assertThat(card.has("current") && !card.get("current").isNull()).isFalse();
-        assertThat(card.at("/history/0/status").asText()).isEqualTo("REVOKED");
-        assertThat(card.at("/history/0/endedReason").asText()).contains("Withdrawal");
-        s.call(get("/api/public/verify/" + card.at("/history/0/verificationCode").asText()), null, null)
+        assertThat(card.at("/history/0/status").asString()).isEqualTo("REVOKED");
+        assertThat(card.at("/history/0/endedReason").asString()).contains("Withdrawal");
+        s.call(get("/api/public/verify/" + card.at("/history/0/verificationCode").asString()), null, null)
                 .andExpect(jsonPath("$.documentType").value("STUDENT_ID_CARD")).andExpect(jsonPath("$.status").value("REVOKED"))
                 .andExpect(jsonPath("$.studentStatus").value("WITHDRAWN"));
     }
@@ -199,22 +199,22 @@ class RegistrarIT {
 
         // issue, print, then reissue (reason required): the old card is superseded
         JsonNode first = s.body(s.call(post("/api/registry/students/" + studentA + "/id-card"), registrar, null)).get("current");
-        assertThat(first.get("cardNo").asText()).startsWith("ID" + TODAY.getYear() + "-");
-        assertThat(LocalDate.parse(first.get("validUntil").asText())).isAfter(TODAY);
+        assertThat(first.get("cardNo").asString()).startsWith("ID" + TODAY.getYear() + "-");
+        assertThat(LocalDate.parse(first.get("validUntil").asString())).isAfter(TODAY);
         byte[] pdf = s.call(get("/api/registry/students/" + studentA + "/id-card.pdf"), registrar, null)
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(pdf, 0, 5)).isEqualTo("%PDF-");
         s.call(post("/api/registry/students/" + studentA + "/id-card"), registrar, null).andExpect(jsonPath("$.code").value("REASON_REQUIRED"));
         JsonNode again = s.body(s.call(post("/api/registry/students/" + studentA + "/id-card"), registrar, "{\"reason\":\"Lost\"}"));
-        assertThat(again.at("/current/cardNo").asText()).isNotEqualTo(first.get("cardNo").asText());
+        assertThat(again.at("/current/cardNo").asString()).isNotEqualTo(first.get("cardNo").asString());
         assertThat(again.get("history").size()).isEqualTo(2);
-        assertThat(again.at("/history/1/status").asText()).isEqualTo("REPLACED");
+        assertThat(again.at("/history/1/status").asString()).isEqualTo("REPLACED");
 
-        String code = again.at("/current/verificationCode").asText();
+        String code = again.at("/current/verificationCode").asString();
         s.call(get("/api/public/verify/" + code), null, null)
                 .andExpect(jsonPath("$.documentType").value("STUDENT_ID_CARD")).andExpect(jsonPath("$.status").value("VALID"))
                 .andExpect(jsonPath("$.registrationNo").isNotEmpty()).andExpect(jsonPath("$.studentStatus").value("ACTIVE"));
-        s.call(get("/api/public/verify/" + first.get("verificationCode").asText()), null, null)
+        s.call(get("/api/public/verify/" + first.get("verificationCode").asString()), null, null)
                 .andExpect(jsonPath("$.status").value("SUPERSEDED"));
 
         // batch: the other active student needs a photo first, then gets a card in the batch PDF

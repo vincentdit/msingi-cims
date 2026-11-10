@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.integration.nactvet;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -78,7 +78,7 @@ public class LiveNactvetGateway implements NactvetGateway {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(connectTimeout)).build());
         factory.setReadTimeout(Duration.ofSeconds(readTimeout));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.uploadPath = uploadPath;
         this.feedbackPath = feedbackPath;
         this.confirmPath = confirmPath;
@@ -350,7 +350,7 @@ public class LiveNactvetGateway implements NactvetGateway {
     private static Integer code(JsonNode root) {
         for (String k : new String[]{"code", "status_code", "statusCode"}) {
             JsonNode v = root.get(k);
-            if (v != null && !v.isNull() && v.asText().trim().matches("\\d+")) return Integer.parseInt(v.asText().trim());
+            if (v != null && !v.isNull() && v.asString().trim().matches("\\d+")) return Integer.parseInt(v.asString().trim());
         }
         return null;
     }
@@ -374,14 +374,14 @@ public class LiveNactvetGateway implements NactvetGateway {
 
     private static boolean flag(JsonNode v) {
         if (v == null || v.isNull()) return false;
-        String s = v.asText().trim();
+        String s = v.asString().trim();
         return s.equals("1") || s.equalsIgnoreCase("true") || s.equalsIgnoreCase("yes");
     }
 
     private static String text(JsonNode n, String... keys) {
         for (String k : keys) {
             JsonNode v = n.get(k);
-            if (v != null && !v.isNull() && !v.asText().isBlank()) return v.asText().trim();
+            if (v != null && !v.isNull() && !v.asString().isBlank()) return v.asString().trim();
         }
         return null;
     }

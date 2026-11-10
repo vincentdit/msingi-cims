@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.integration.necta;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,10 +63,10 @@ class LiveNectaClientTest {
     @Test
     void sendsTheIndexInDashFormAndMapsTheCandidate() {
         NectaClient.NectaResult r = client().fetchResults(NectaClient.ExamType.CSEE, "s0101/0001", 2023).orElseThrow();
-        assertThat(request.get().get("index_number").asText()).isEqualTo("S0101-0001");
+        assertThat(request.get().get("index_number").asString()).isEqualTo("S0101-0001");
         assertThat(request.get().get("exam_year").asInt()).isEqualTo(2023);
-        assertThat(request.get().get("exam_id").asText()).isEqualTo("1");
-        assertThat(request.get().get("api_key").asText()).isEqualTo("test-key");
+        assertThat(request.get().get("exam_id").asString()).isEqualTo("1");
+        assertThat(request.get().get("api_key").asString()).isEqualTo("test-key");
 
         assertThat(r.indexNumber()).isEqualTo("S0101/0001");
         assertThat(r.firstName()).isEqualTo("Neema");
@@ -93,7 +93,7 @@ class LiveNectaClientTest {
     @Test
     void acseeUsesExamIdTwo() {
         client().fetchResults(NectaClient.ExamType.ACSEE, "S0101/0001", 2025);
-        assertThat(request.get().get("exam_id").asText()).isEqualTo("2");
+        assertThat(request.get().get("exam_id").asString()).isEqualTo("2");
     }
 
     @Test

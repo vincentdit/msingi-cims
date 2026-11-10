@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.http;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -30,7 +30,7 @@ public final class JsonApi {
         JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(connectSeconds)).build());
         f.setReadTimeout(Duration.ofSeconds(readSeconds));
         this.system = system;
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(f).defaultHeader("X-Api-Key", apiKey.trim()).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(f).defaultHeader("X-Api-Key", apiKey.trim()).build();
     }
 
     public record Answer(int status, JsonNode body) {
@@ -63,8 +63,8 @@ public final class JsonApi {
             throw new ExternalSystemUnavailableException(system, system + " could not be reached. Please try again later.", e);
         }
         if (!accepted.contains(a.status())) {
-            String msg = a.body() != null && a.body().hasNonNull("error") ? a.body().get("error").asText()
-                    : a.body() != null && a.body().hasNonNull("message") ? a.body().get("message").asText() : "HTTP " + a.status();
+            String msg = a.body() != null && a.body().hasNonNull("error") ? a.body().get("error").asString()
+                    : a.body() != null && a.body().hasNonNull("message") ? a.body().get("message").asString() : "HTTP " + a.status();
             throw new ExternalSystemUnavailableException(system, system + " did not accept the request: " + msg, null);
         }
         return a;
@@ -72,6 +72,6 @@ public final class JsonApi {
 
     public static String text(JsonNode n, String key) {
         JsonNode v = n == null ? null : n.get(key);
-        return v == null || v.isNull() || v.asText().isBlank() ? null : v.asText().trim();
+        return v == null || v.isNull() || v.asString().isBlank() ? null : v.asString().trim();
     }
 }

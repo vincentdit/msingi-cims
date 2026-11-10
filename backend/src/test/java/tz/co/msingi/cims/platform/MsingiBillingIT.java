@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,14 +82,14 @@ class MsingiBillingIT {
             platformUsers.save(u);
         });
         platform = s.body(mvc.perform(post("/api/platform/auth/login").contentType("application/json")
-                .content("{\"username\":\"fin" + suffix + "\",\"password\":\"Fin@2026x\"}"))).get("accessToken").asText();
+                .content("{\"username\":\"fin" + suffix + "\",\"password\":\"Fin@2026x\"}"))).get("accessToken").asString();
     }
 
     <T> T db(Supplier<T> work) {
         return TenantContext.callAs(inst.info(), () -> tx.execute(x -> work.get()));
     }
 
-    ResultActions p(MockHttpServletRequestBuilder req, String body) throws Exception {
+    ResultActions p(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String body) throws Exception {
         req.header("Authorization", "Bearer " + platform);
         if (body != null) req.contentType("application/json").content(body);
         return mvc.perform(req);
@@ -153,13 +153,13 @@ class MsingiBillingIT {
         JsonNode drafts = body(p(get("/api/platform/billing/invoices?status=draft&tenantId=" + tenantId), null)).get("rows");
         assertThat(drafts.size()).isEqualTo(2);
         long lic0 = 0, use0 = 0;
-        for (JsonNode d : drafts) if (d.get("kind").asText().equals("LICENCE")) lic0 = d.get("id").asLong(); else use0 = d.get("id").asLong();
+        for (JsonNode d : drafts) if (d.get("kind").asString().equals("LICENCE")) lic0 = d.get("id").asLong(); else use0 = d.get("id").asLong();
         final long licence = lic0, usageInv = use0;
         JsonNode lic = body(p(get("/api/platform/billing/invoices/" + licence), null));
-        assertThat(lic.get("lines").findValuesAsText("kind")).containsExactly("SETUP", "LICENCE");
+        assertThat(lic.get("lines").findValuesAsString("kind")).containsExactly("SETUP", "LICENCE");
         assertThat(lic.at("/invoice/total").decimalValue()).isEqualByComparingTo("9440000");   // 8,000,000 + 18% VAT
         JsonNode use = body(p(get("/api/platform/billing/invoices/" + usageInv), null));
-        assertThat(use.get("lines").findValuesAsText("kind")).containsExactly("STUDENTS", "APPLICATIONS", "APPLICATION_SHARE");
+        assertThat(use.get("lines").findValuesAsString("kind")).containsExactly("STUDENTS", "APPLICATIONS", "APPLICATION_SHARE");
         assertThat(use.at("/lines/0/quantity").decimalValue()).isEqualByComparingTo("3");
         assertThat(use.at("/lines/0/unitPrice").decimalValue()).isEqualByComparingTo("3000");   // 12,000 a year × 3/12
         assertThat(use.at("/subtotal").decimalValue()).isEqualByComparingTo("12000");           // 9,000 + 2,000 + 5% of 20,000
@@ -179,11 +179,11 @@ class MsingiBillingIT {
                           {"kind":"DISCOUNT","description":"Pilot discount","quantity":1,"unitPrice":2000}],"notes":"Pilot institution"}""")
                 .andExpect(jsonPath("$.subtotal").value(10000.0)).andExpect(jsonPath("$.invoice.total").value(11800.0));
         JsonNode issued = body(p(post("/api/platform/billing/invoices/" + licence + "/issue"), null).andExpect(status().isOk()));
-        assertThat(issued.at("/invoice/invoiceNo").asText()).startsWith("MSG-INV-" + today.getYear() + "-");
-        String ref = issued.at("/invoice/paymentReference").asText();
+        assertThat(issued.at("/invoice/invoiceNo").asString()).startsWith("MSG-INV-" + today.getYear() + "-");
+        String ref = issued.at("/invoice/paymentReference").asString();
         assertThat(ref).matches("7\\d{11}");
-        assertThat(issued.at("/invoice/dueDate").asText()).isEqualTo(today.plusDays(30).toString());
-        String usageRef = body(p(post("/api/platform/billing/invoices/" + usageInv + "/issue"), null)).at("/invoice/paymentReference").asText();
+        assertThat(issued.at("/invoice/dueDate").asString()).isEqualTo(today.plusDays(30).toString());
+        String usageRef = body(p(post("/api/platform/billing/invoices/" + usageInv + "/issue"), null)).at("/invoice/paymentReference").asString();
         p(post("/api/platform/billing/invoices/" + usageInv + "/issue"), null).andExpect(jsonPath("$.code").value("NOT_DRAFT"));
         assertThat(db(() -> jdbc.queryForList("select attachment_name from email_messages where to_address = ? and subject like 'Invoice MSG-INV-%'",
                 String.class, "bursar@" + suffix + ".ac.tz"))).hasSize(2).allMatch(n -> n.endsWith(".pdf"));
@@ -192,8 +192,8 @@ class MsingiBillingIT {
         JsonNode bank = body(p(post("/api/platform/billing/payments"), """
                 {"tenantId":%d,"amount":5000000,"paidOn":"%s","method":"BANK","provider":"CRDB","reference":"FT2610ABC","invoiceId":%d}"""
                 .formatted(tenantId, today, licence)).andExpect(status().isOk()));
-        assertThat(bank.get("receiptNo").asText()).startsWith("MSG-RCT-");
-        assertThat(body(p(get("/api/platform/billing/invoices/" + licence), null)).at("/invoice/status").asText()).isEqualTo("PARTLY_PAID");
+        assertThat(bank.get("receiptNo").asString()).startsWith("MSG-RCT-");
+        assertThat(body(p(get("/api/platform/billing/invoices/" + licence), null)).at("/invoice/status").asString()).isEqualTo("PARTLY_PAID");
 
         // the collector reports a mobile money payment quoting the usage invoice; more than due goes to the licence; a repeat changes nothing
         String note = "{\"reference\":\"" + usageRef + "\",\"transactionId\":\"QX81\",\"provider\":\"MPESA\",\"amount\":20000}";
@@ -207,7 +207,7 @@ class MsingiBillingIT {
         String unknown = "{\"reference\":\"700000000000\",\"transactionId\":\"QX82\",\"provider\":\"MPESA\",\"amount\":1}";
         mvc.perform(post("/api/integrations/msingi-billing/payment-notification").contentType("application/json").content(unknown)
                 .header("X-Billing-Signature", GepgCallbackController.sign(unknown, "test-billing-secret"))).andExpect(status().isBadRequest());
-        assertThat(body(p(get("/api/platform/billing/invoices/" + usageInv), null)).at("/invoice/status").asText()).isEqualTo("PAID");
+        assertThat(body(p(get("/api/platform/billing/invoices/" + usageInv), null)).at("/invoice/status").asString()).isEqualTo("PAID");
         assertThat(body(p(get("/api/platform/billing/invoices/" + licence), null)).at("/invoice/paidAmount").decimalValue()).isEqualByComparingTo("5008200");
         assertThat(body(p(get("/api/platform/billing/payments?tenantId=" + tenantId), null)).size()).isEqualTo(2);
 
@@ -215,7 +215,7 @@ class MsingiBillingIT {
         JsonNode account = s.body(s.call(get("/api/msingi-billing"), admin, null));
         assertThat(account.get("balance").decimalValue()).isEqualByComparingTo("4431800");
         assertThat(account.get("invoices").size()).isEqualTo(2);
-        assertThat(account.at("/payTo/channels/0/accountNumber").asText()).isEqualTo("0150123456700");
+        assertThat(account.at("/payTo/channels/0/accountNumber").asString()).isEqualTo("0150123456700");
         assertThat(account.at("/contract/notes").isNull() || account.at("/contract/notes").isMissingNode()).isTrue();
         byte[] pdf = s.call(get("/api/msingi-billing/invoices/" + licence + "/pdf"), admin, null).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
@@ -235,7 +235,7 @@ class MsingiBillingIT {
         assertThat(body(p(get("/api/platform/billing/invoices/" + licence), null)).at("/invoice/paidAmount").decimalValue()).isEqualByComparingTo("8200");
         JsonNode st = body(p(get("/api/platform/billing/statements/" + tenantId), null));
         assertThat(st.get("balance").decimalValue()).isEqualByComparingTo("9431800");
-        assertThat(st.get("entries").findValuesAsText("kind")).contains("INVOICE", "PAYMENT", "REVERSAL");
+        assertThat(st.get("entries").findValuesAsString("kind")).contains("INVOICE", "PAYMENT", "REVERSAL");
         assertThat(st.at("/aging/current").decimalValue()).isEqualByComparingTo("9431800");
 
         // overdue: one reminder for the highest level reached, never twice
@@ -243,7 +243,7 @@ class MsingiBillingIT {
         p(post("/api/platform/billing/run"), null).andExpect(jsonPath("$.reminders").value(1));
         p(post("/api/platform/billing/run"), null).andExpect(jsonPath("$.reminders").value(0));
         JsonNode reminded = body(p(get("/api/platform/billing/invoices/" + licence), null));
-        assertThat(reminded.at("/reminders/0/kind").asText()).isEqualTo("OVERDUE");
+        assertThat(reminded.at("/reminders/0/kind").asString()).isEqualTo("OVERDUE");
         assertThat(reminded.at("/reminders/0/level").asInt()).isEqualTo(3);
         assertThat(body(p(get("/api/platform/billing/overview"), null)).at("/aging/days1to30").decimalValue()).isGreaterThanOrEqualTo(new BigDecimal("9431800"));
 
@@ -289,10 +289,10 @@ class MsingiBillingIT {
         // testing period: the administrator pays the licence as if by mobile money
         long lic = body(p(get("/api/platform/billing/invoices?status=open&tenantId=" + tenantId), null)).at("/rows/0/id").asLong();
         s.call(post("/api/msingi-billing/invoices/" + lic + "/simulate-payment"), admin, null).andExpect(status().isOk()).andExpect(jsonPath("$.source").value("ONLINE"));
-        assertThat(body(p(get("/api/platform/billing/invoices/" + lic), null)).at("/invoice/status").asText()).isEqualTo("PAID");
+        assertThat(body(p(get("/api/platform/billing/invoices/" + lic), null)).at("/invoice/status").asString()).isEqualTo("PAID");
         p(post("/api/platform/billing/invoices/" + other + "/cancel"), "{}").andExpect(jsonPath("$.invoice.status").value("CANCELLED"));
         p(post("/api/platform/billing/contracts/" + tenantId + "/end"), "{\"endDate\":\"" + today + "\"}").andExpect(jsonPath("$.status").value("ENDED"));
-        assertThat(body(p(get("/api/platform/billing/overview"), null)).get("institutions").findValuesAsText("code")).contains(tenant);
+        assertThat(body(p(get("/api/platform/billing/overview"), null)).get("institutions").findValuesAsString("code")).contains(tenant);
     }
 
     @Test

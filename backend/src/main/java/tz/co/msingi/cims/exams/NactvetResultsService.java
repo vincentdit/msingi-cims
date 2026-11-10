@@ -50,7 +50,7 @@ public class NactvetResultsService {
     private final AuditService audit;
     private final tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient api;
     private final tz.co.msingi.cims.integration.settings.IntegrationSettingsService settings;
-    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
 
     public record File(String filename, byte[] content) {
     }
@@ -230,7 +230,7 @@ public class NactvetResultsService {
                     .map(i -> Map.of("registrationNo", String.valueOf(i.registrationNo()), "reason", String.valueOf(i.reason()))).toList();
             try {
                 x.setQueries(q.isEmpty() ? null : JSON.writeValueAsString(q));
-            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            } catch (tools.jackson.core.JacksonException e) {
                 throw new IllegalStateException(e);
             }
             x.setNote(q.isEmpty() ? "Accepted by NACTVET" : q.size() + " student(s) queried by NACTVET");
@@ -244,9 +244,9 @@ public class NactvetResultsService {
         java.util.List<Map<String, String>> q = java.util.List.of();
         if (x.getQueries() != null) {
             try {
-                q = JSON.readValue(x.getQueries(), new com.fasterxml.jackson.core.type.TypeReference<>() {
+                q = JSON.readValue(x.getQueries(), new tools.jackson.core.type.TypeReference<>() {
                 });
-            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            } catch (tools.jackson.core.JacksonException e) {
                 q = java.util.List.of();
             }
         }

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,7 +72,7 @@ class FeesIT {
         s.call(post("/api/finance/fee-items"), accountant, itemJson("REG", "Again", "OTHER", 5)).andExpect(jsonPath("$.code").value("DUPLICATE_CODE"));
 
         JsonNode v1 = s.body(s.call(post("/api/finance/fee-structures"), accountant, structureJson(reg, tuition, 1)).andExpect(status().isOk()));
-        assertThat(v1.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(v1.get("status").asString()).isEqualTo("DRAFT");
         assertThat(v1.get("total").decimalValue()).isEqualByComparingTo("620000");
         assertThat(v1.get("foreignTotal").decimalValue()).isEqualByComparingTo("920000");
         assertThat(v1.get("firstInstalment").decimalValue()).isEqualByComparingTo("320000");
@@ -91,7 +91,7 @@ class FeesIT {
         s.call(post("/api/finance/fee-structures"), accountant, structureJson(reg, tuition, 1)).andExpect(jsonPath("$.code").value("DRAFT_EXISTS"));
         s.call(post("/api/finance/fee-structures/" + v2.get("id").asLong() + "/approve"), bursar, null).andExpect(status().isOk());
         JsonNode list = s.body(s.call(get("/api/finance/fee-structures?academicYearId=" + yearId), viewer, null).andExpect(status().isOk()));
-        assertThat(list.findValuesAsText("status")).containsExactly("APPROVED", "SUPERSEDED");
+        assertThat(list.findValuesAsString("status")).containsExactly("APPROVED", "SUPERSEDED");
 
         // the person who prepared a version cannot approve it
         JsonNode v3 = s.body(s.call(post("/api/finance/fee-structures/" + v2.get("id").asLong() + "/revise"), bursar, null));
@@ -116,14 +116,14 @@ class FeesIT {
         JsonNode annual = annualInvoice(account);
         long invoiceId = annual.get("id").asLong();
         assertThat(annual.get("total").decimalValue()).isEqualByComparingTo("620000");
-        assertThat(annual.get("controlNo").asText()).startsWith("99");
-        assertThat(annual.get("dueDate").asText()).isEqualTo("2027-09-27");
-        assertThat(annual.get("payerType").asText()).isEqualTo("APPLICANT");
+        assertThat(annual.get("controlNo").asString()).startsWith("99");
+        assertThat(annual.get("dueDate").asString()).isEqualTo("2027-09-27");
+        assertThat(annual.get("payerType").asString()).isEqualTo("APPLICANT");
 
         // a part payment goes to the registration fee first, then tuition (first instalment)
         pay(a, invoiceId, "100000");
         annual = annualInvoice(account(a));
-        assertThat(annual.get("status").asText()).isEqualTo("PARTIALLY_PAID");
+        assertThat(annual.get("status").asString()).isEqualTo("PARTIALLY_PAID");
         assertThat(lineByCode(annual, "REG", 1).get("paid").decimalValue()).isEqualByComparingTo("20000");
         assertThat(lineByCode(annual, "TUITION", 1).get("paid").decimalValue()).isEqualByComparingTo("80000");
         assertThat(lineByCode(annual, "TUITION", 2).get("paid").decimalValue()).isZero();
@@ -132,9 +132,9 @@ class FeesIT {
         long studentId = s.body(s.call(post("/api/registry/windows/" + s.inst.windowId() + "/handover"), registrar, "{}"))
                 .at("/students/0/studentId").asLong();
         JsonNode statement = s.body(s.call(get("/api/finance/students/" + studentId + "/statement"), registrar, null).andExpect(status().isOk()));
-        assertThat(annualInvoice(statement).get("payerType").asText()).isEqualTo("STUDENT");
+        assertThat(annualInvoice(statement).get("payerType").asString()).isEqualTo("STUDENT");
         assertThat(statement.get("paid").decimalValue()).isEqualByComparingTo("100000");
-        assertThat(statement.get("registrationNo").asText()).startsWith(s.tenant + "/");
+        assertThat(statement.get("registrationNo").asString()).startsWith(s.tenant + "/");
 
         // registration is blocked until the first instalment is paid
         s.call(put("/api/registry/students/" + studentId + "/first-registration"), registrar,
@@ -154,7 +154,7 @@ class FeesIT {
         // an overpayment is kept as credit
         pay(a, invoiceId, "400000");
         account = account(a);
-        assertThat(annualInvoice(account).get("status").asText()).isEqualTo("PAID");
+        assertThat(annualInvoice(account).get("status").asString()).isEqualTo("PAID");
         assertThat(account.get("credit").decimalValue()).isEqualByComparingTo("100000");
 
         // billing runs never bill twice
@@ -180,7 +180,7 @@ class FeesIT {
         TenantContext.runAs(s.inst.info(), () -> tx.executeWithoutResult(t ->
                 applications.findById(a.applicationId()).orElseThrow().getApplicant().setNationality("Kenyan")));
         s.admit(officer, chair, a);
-        assertThat(account(a).get("invoices").findValuesAsText("purpose")).doesNotContain("ANNUAL_FEES"); // no structure yet
+        assertThat(account(a).get("invoices").findValuesAsString("purpose")).doesNotContain("ANNUAL_FEES"); // no structure yet
 
         approvedStructure();
         s.call(post("/api/finance/billing-runs"), accountant, "{\"academicYearId\":" + yearId + "}")
@@ -191,7 +191,7 @@ class FeesIT {
 
         JsonNode debtors = s.body(s.call(get("/api/finance/reports/debtors?academicYearId=" + yearId), bursar, null));
         assertThat(debtors.get("count").asInt()).isEqualTo(1);
-        assertThat(debtors.at("/rows/0/bucket").asText()).isEqualTo("NOT_DUE");
+        assertThat(debtors.at("/rows/0/bucket").asString()).isEqualTo("NOT_DUE");
         assertThat(debtors.get("totalBalance").decimalValue()).isEqualByComparingTo("920000");
     }
 
@@ -249,17 +249,17 @@ class FeesIT {
     }
 
     private static JsonNode annualInvoice(JsonNode account) {
-        for (JsonNode i : account.get("invoices")) if (i.get("purpose").asText().equals("ANNUAL_FEES")) return i;
+        for (JsonNode i : account.get("invoices")) if (i.get("purpose").asString().equals("ANNUAL_FEES")) return i;
         throw new AssertionError("no annual invoice in " + account);
     }
 
     private static JsonNode lineByCode(JsonNode invoice, String code, int instalment) {
-        for (JsonNode l : invoice.get("lines")) if (l.get("feeItemCode").asText().equals(code) && l.get("instalment").asInt() == instalment) return l;
+        for (JsonNode l : invoice.get("lines")) if (l.get("feeItemCode").asString().equals(code) && l.get("instalment").asInt() == instalment) return l;
         throw new AssertionError("no line " + code + "/" + instalment);
     }
 
     private static BigDecimal amountFor(JsonNode amounts, String key) {
-        for (JsonNode a : amounts) if (a.get("key").asText().equals(key)) return a.get("amount").decimalValue();
+        for (JsonNode a : amounts) if (a.get("key").asString().equals(key)) return a.get("amount").decimalValue();
         throw new AssertionError("no " + key + " in " + amounts);
     }
 }

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.portal;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +67,7 @@ class StudentPortalIT {
         a = s.apply("S0101/0001");
         b = s.applyEligibleEndingIn(5, 400);
         s.admit(officer, chair, a, b);
-        aPhone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asText();
+        aPhone = s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asString();
 
         // an applicant who has not been handed over is not a student
         s.call(post("/api/student-auth/login"), null, login(aPhone, "Kifaru#Mto47")).andExpect(jsonPath("$.code").value("NOT_A_STUDENT"));
@@ -75,11 +75,11 @@ class StudentPortalIT {
         JsonNode handover = s.body(s.call(post("/api/registry/windows/" + inst.windowId() + "/handover"), registrar, "{}").andExpect(status().isOk()));
         for (JsonNode st : handover.get("students")) {
             JsonNode detail = s.body(s.call(get("/api/registry/students/" + st.get("studentId").asLong()), registrar, null));
-            if (detail.at("/summary/phone").asText().equals(aPhone)) {
+            if (detail.at("/summary/phone").asString().equals(aPhone)) {
                 aStudentId = st.get("studentId").asLong();
-                aRegNo = detail.at("/summary/registrationNo").asText();
+                aRegNo = detail.at("/summary/registrationNo").asString();
             } else {
-                bRegNo = detail.at("/summary/registrationNo").asText();
+                bRegNo = detail.at("/summary/registrationNo").asString();
             }
         }
         assertThat(aRegNo).isNotNull();
@@ -89,16 +89,16 @@ class StudentPortalIT {
     void studentsSignInWithTheirRegistrationNumberAndSeeTheirDashboard() throws Exception {
         s.call(post("/api/student-auth/login"), null, login(aRegNo, "wrong")).andExpect(status().isUnauthorized());
         String token = s.body(s.call(post("/api/student-auth/login"), null, login(aRegNo.toLowerCase(), "Kifaru#Mto47")).andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
         s.call(post("/api/student-auth/login"), null, login("0" + aPhone.substring(3), "Kifaru#Mto47")).andExpect(status().isOk()); // local phone format
 
         JsonNode d = s.body(s.call(get("/api/student/dashboard"), token, null).andExpect(status().isOk()));
-        assertThat(d.get("registrationNo").asText()).isEqualTo(aRegNo);
-        assertThat(d.get("status").asText()).isEqualTo("ADMITTED");
-        assertThat(d.get("firstRegistrationStatus").asText()).isEqualTo("PENDING");
+        assertThat(d.get("registrationNo").asString()).isEqualTo(aRegNo);
+        assertThat(d.get("status").asString()).isEqualTo("ADMITTED");
+        assertThat(d.get("firstRegistrationStatus").asString()).isEqualTo("PENDING");
         assertThat(d.get("balance").decimalValue()).isEqualByComparingTo("620000");
-        assertThat(d.at("/nextPayment/controlNo").asText()).startsWith("99");
-        assertThat(d.get("clearance").findValuesAsText("gate")).containsExactly("REGISTRATION", "EXAMINATION");
+        assertThat(d.at("/nextPayment/controlNo").asString()).startsWith("99");
+        assertThat(d.get("clearance").findValuesAsString("gate")).containsExactly("REGISTRATION", "EXAMINATION");
         assertThat(d.get("unreadNotices").asInt()).isZero();
 
         // the token issued before hand-over has no student role; staff are not students
@@ -131,7 +131,7 @@ class StudentPortalIT {
 
         // only the live notice for this student's year
         JsonNode mine = s.body(s.call(get("/api/student/notices"), token, null));
-        assertThat(mine.findValuesAsText("title")).containsExactly("Orientation week");
+        assertThat(mine.findValuesAsString("title")).containsExactly("Orientation week");
         assertThat(mine.get(0).get("read").asBoolean()).isFalse();
         assertThat(s.body(s.call(get("/api/student/dashboard"), token, null)).get("unreadNotices").asInt()).isEqualTo(1);
         s.call(post("/api/student/notices/" + draft + "/read"), token, null).andExpect(status().isNotFound());
@@ -142,7 +142,7 @@ class StudentPortalIT {
 
         JsonNode staffList = s.body(s.call(get("/api/notices"), viewer, null).andExpect(status().isOk()));
         assertThat(byId(staffList, forAll).get("readCount").asInt()).isEqualTo(1);
-        assertThat(byId(staffList, year2).get("audience").asText()).isEqualTo("All students, year 2");
+        assertThat(byId(staffList, year2).get("audience").asString()).isEqualTo("All students, year 2");
 
         s.call(post("/api/notices/" + forAll + "/withdraw"), registrar, null).andExpect(jsonPath("$.status").value("WITHDRAWN"));
         assertThat(s.body(s.call(get("/api/student/notices"), token, null))).isEmpty();
@@ -155,19 +155,19 @@ class StudentPortalIT {
         String url = "/api/student/profile/change-requests";
         s.call(post(url), token, change("\"registrationNo\":\"X\"")).andExpect(jsonPath("$.code").value("FIELD_NOT_EDITABLE"));
         s.call(post(url), token, change("\"phone\":\"12345\"")).andExpect(jsonPath("$.code").value("INVALID_VALUE"));
-        String surname = s.lookup("S0101/0001").get("surname").asText(); // registered under NECTA's names
+        String surname = s.lookup("S0101/0001").get("surname").asString(); // registered under NECTA's names
         s.call(post(url), token, change("\"surname\":\"" + surname + "\"")).andExpect(jsonPath("$.code").value("NO_CHANGES"));
         s.call(post(url), token, "{\"changes\":{\"region\":\"Arusha\"},\"reason\":\" \"}").andExpect(status().isBadRequest());
 
         JsonNode r = s.body(s.call(post(url), token, change("\"surname\":\"Kisanga\",\"phone\":\"0713 000 111\",\"region\":\"Arusha\"")).andExpect(status().isOk()));
-        assertThat(r.get("status").asText()).isEqualTo("PENDING");
+        assertThat(r.get("status").asString()).isEqualTo("PENDING");
         assertThat(r.get("needsDocuments").asBoolean()).isTrue();
-        assertThat(r.get("changes").findValuesAsText("to")).containsExactly("Kisanga", "255713000111", "Arusha");
+        assertThat(r.get("changes").findValuesAsString("to")).containsExactly("Kisanga", "255713000111", "Arusha");
         s.call(post(url), token, change("\"region\":\"Mwanza\"")).andExpect(jsonPath("$.code").value("PENDING_REQUEST_EXISTS"));
         assertThat(s.body(s.call(get("/api/student/dashboard"), token, null)).at("/pendingRequest/id").asLong()).isEqualTo(r.get("id").asLong());
 
         long id = r.get("id").asLong();
-        assertThat(s.body(s.call(get("/api/registry/change-requests"), viewer, null)).findValuesAsText("registrationNo")).containsExactly(aRegNo);
+        assertThat(s.body(s.call(get("/api/registry/change-requests"), viewer, null)).findValuesAsString("registrationNo")).containsExactly(aRegNo);
         assertThat(s.body(s.call(get("/api/registry/change-requests/count"), registrar, null)).get("pending").asInt()).isEqualTo(1);
         s.call(post("/api/registry/change-requests/" + id + "/approve"), viewer, "{}").andExpect(status().isForbidden());
         s.call(post("/api/registry/change-requests/" + id + "/reject"), registrar, "{\"note\":\"\"}").andExpect(status().isBadRequest());
@@ -176,11 +176,11 @@ class StudentPortalIT {
         s.call(post("/api/registry/change-requests/" + id + "/approve"), registrar, "{}").andExpect(jsonPath("$.code").value("NOT_PENDING"));
 
         JsonNode profile = s.body(s.call(get("/api/student/profile"), token, null));
-        assertThat(profile.get("surname").asText()).isEqualTo("Kisanga");
-        assertThat(profile.get("phone").asText()).isEqualTo("255713000111");
-        assertThat(profile.get("requests").get(0).get("decisionNote").asText()).isEqualTo("Birth certificate seen");
+        assertThat(profile.get("surname").asString()).isEqualTo("Kisanga");
+        assertThat(profile.get("phone").asString()).isEqualTo("255713000111");
+        assertThat(profile.get("requests").get(0).get("decisionNote").asString()).isEqualTo("Birth certificate seen");
         s.call(post("/api/student-auth/login"), null, login("0713000111", "Kifaru#Mto47")).andExpect(status().isOk()); // sign-in follows the new number
-        assertThat(s.body(s.call(get("/api/registry/students/" + aStudentId), registrar, null)).at("/summary/fullName").asText()).endsWith("Kisanga");
+        assertThat(s.body(s.call(get("/api/registry/students/" + aStudentId), registrar, null)).at("/summary/fullName").asString()).endsWith("Kisanga");
 
         // a request can be withdrawn by the student while pending, or turned down with a reason
         long second = s.body(s.call(post(url), token, change("\"district\":\"Meru\""))).get("id").asLong();
@@ -189,7 +189,7 @@ class StudentPortalIT {
         long third = s.body(s.call(post(url), token, change("\"district\":\"Meru\""))).get("id").asLong();
         s.call(post("/api/registry/change-requests/" + third + "/reject"), registrar, "{\"note\":\"Please bring a letter from the ward office\"}")
                 .andExpect(jsonPath("$.status").value("REJECTED"));
-        assertThat(s.body(s.call(get("/api/registry/change-requests?status=DECIDED"), registrar, null)).findValuesAsText("status"))
+        assertThat(s.body(s.call(get("/api/registry/change-requests?status=DECIDED"), registrar, null)).findValuesAsString("status"))
                 .containsExactly("REJECTED", "APPROVED");
     }
 
@@ -199,7 +199,7 @@ class StudentPortalIT {
         JsonNode account = s.body(s.call(get("/api/student/account"), token, null).andExpect(status().isOk()));
         long invoiceId = account.at("/invoices/0/id").asLong();
         account = s.body(s.call(post("/api/student/invoices/" + invoiceId + "/simulate-payment"), token, "{\"amount\":120500}").andExpect(status().isOk()));
-        String receiptNo = account.at("/payments/0/receiptNo").asText();
+        String receiptNo = account.at("/payments/0/receiptNo").asString();
 
         byte[] pdf = s.call(get("/api/student/receipt.pdf?no=" + receiptNo), token, null)
                 .andExpect(status().isOk()).andExpect(content().contentType("application/pdf"))
@@ -236,7 +236,7 @@ class StudentPortalIT {
     }
 
     private String studentToken(String regNo) throws Exception {
-        return s.body(s.call(post("/api/student-auth/login"), null, login(regNo, "Kifaru#Mto47")).andExpect(status().isOk())).get("accessToken").asText();
+        return s.body(s.call(post("/api/student-auth/login"), null, login(regNo, "Kifaru#Mto47")).andExpect(status().isOk())).get("accessToken").asString();
     }
 
     private static String login(String login, String password) {

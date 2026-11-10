@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.organisation;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +50,7 @@ class AlmanacAndOrganisationIT {
         String officer = s.staffToken("officer");
         yearId = s.body(s.call(get("/api/admission/windows/" + inst.windowId()), officer, null)).get("academicYearId").asLong();
         for (JsonNode y : s.body(s.call(get("/api/academic/years"), admin, null))) {
-            if (y.get("id").asLong() == yearId) yearStart = LocalDate.parse(y.get("startDate").asText());
+            if (y.get("id").asLong() == yearId) yearStart = LocalDate.parse(y.get("startDate").asString());
         }
     }
 
@@ -69,16 +69,16 @@ class AlmanacAndOrganisationIT {
         // every member of staff reads it, unpublished
         JsonNode staff = s.body(s.call(get("/api/academic/almanac?academicYearId=" + yearId), lecturer, null).andExpect(status().isOk()));
         assertThat(staff.get("published").asBoolean()).isFalse();
-        assertThat(staff.findValuesAsText("title")).contains("Governing Board meeting", "Open day");
-        assertThat(staff.get("entries").get(0).get("venue").asText()).isEqualTo("Main hall");
+        assertThat(staff.findValuesAsString("title")).contains("Governing Board meeting", "Open day");
+        assertThat(staff.get("entries").get(0).get("venue").asString()).isEqualTo("Main hall");
 
         // the public site sees nothing until it is published, then only what is for everyone
         s.call(get("/api/public/almanac?academicYearId=" + yearId), null, null).andExpect(status().isNotFound());
         s.call(post("/api/academic/almanac/" + yearId + "/publish"), lecturer, null).andExpect(status().isForbidden());
         s.call(post("/api/academic/almanac/" + yearId + "/publish"), dpa, null).andExpect(jsonPath("$.published").value(true));
         JsonNode pub = s.body(s.call(get("/api/public/almanac?academicYearId=" + yearId), null, null).andExpect(status().isOk()));
-        assertThat(pub.findValuesAsText("title")).contains("Open day").doesNotContain("Governing Board meeting");
-        assertThat(s.body(s.call(get("/api/public/almanac/years"), null, null)).findValuesAsText("code")).isNotEmpty();
+        assertThat(pub.findValuesAsString("title")).contains("Open day").doesNotContain("Governing Board meeting");
+        assertThat(s.body(s.call(get("/api/public/almanac/years"), null, null)).findValuesAsString("code")).isNotEmpty();
 
         s.call(post("/api/academic/almanac/" + yearId + "/publish?publish=false"), dpa, null).andExpect(jsonPath("$.published").value(false));
         s.call(get("/api/public/almanac?academicYearId=" + yearId), null, null).andExpect(status().isNotFound());
@@ -90,10 +90,10 @@ class AlmanacAndOrganisationIT {
         JsonNode t = s.body(s.call(post("/api/organisation/template"), admin, null).andExpect(status().isOk()));
         assertThat(t.get("roots").size()).isEqualTo(1);
         JsonNode board = t.get("roots").get(0);
-        assertThat(board.get("name").asText()).isEqualTo("Governing Board");
+        assertThat(board.get("name").asString()).isEqualTo("Governing Board");
         JsonNode principal = board.get("children").get(0);
-        assertThat(principal.get("positions").get(0).get("title").asText()).isEqualTo("Principal");
-        assertThat(t.findValuesAsText("kind")).contains("DEPARTMENT", "COMMITTEE", "DIRECTORATE");
+        assertThat(principal.get("positions").get(0).get("title").asString()).isEqualTo("Principal");
+        assertThat(t.findValuesAsString("kind")).contains("DEPARTMENT", "COMMITTEE", "DIRECTORATE");
         s.call(post("/api/organisation/template"), admin, null).andExpect(jsonPath("$.code").value("STRUCTURE_EXISTS"));
 
         // fill the Principal's position, add a unit and a vacant position, move nothing into a loop
@@ -124,7 +124,7 @@ class AlmanacAndOrganisationIT {
     }
 
     static long findId(JsonNode tree, String name) {
-        if (tree.has("name") && name.equals(tree.get("name").asText())) return tree.get("id").asLong();
+        if (tree.has("name") && name.equals(tree.get("name").asString())) return tree.get("id").asLong();
         for (JsonNode child : tree) {
             long id = findId(child, name);
             if (id > 0) return id;

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission.letter;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -292,7 +292,7 @@ public class AdmissionLetterService {
         try {
             byte[] d = MessageDigest.getInstance("SHA-256").digest(json.writeValueAsString(content).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(d);
-        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
+        } catch (JacksonException | NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
     }

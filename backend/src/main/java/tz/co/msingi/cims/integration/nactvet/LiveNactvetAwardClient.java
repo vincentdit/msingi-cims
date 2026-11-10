@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.nactvet;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -51,7 +51,7 @@ public class LiveNactvetAwardClient implements NactvetAwardClient {
         ReachableIpRequestFactory factory = new ReachableIpRequestFactory(host, preferIp == null || preferIp.isBlank() ? null : preferIp);
         factory.setConnectTimeout(Duration.ofSeconds(8));
         factory.setReadTimeout(Duration.ofSeconds(45));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.path = path;
         this.authorization = authorization;
         this.apiCode = apiCode;
@@ -97,7 +97,7 @@ public class LiveNactvetAwardClient implements NactvetAwardClient {
     private static Integer code(JsonNode root) {
         for (String k : new String[]{"code", "status_code", "statusCode"}) {
             JsonNode v = root.get(k);
-            if (v != null && !v.isNull() && v.asText().trim().matches("\\d+")) return Integer.parseInt(v.asText().trim());
+            if (v != null && !v.isNull() && v.asString().trim().matches("\\d+")) return Integer.parseInt(v.asString().trim());
         }
         return null;
     }
@@ -105,7 +105,7 @@ public class LiveNactvetAwardClient implements NactvetAwardClient {
     private static String text(JsonNode n, String... keys) {
         for (String k : keys) {
             JsonNode v = n.get(k);
-            if (v != null && !v.isNull() && !v.asText().isBlank()) return v.asText().trim();
+            if (v != null && !v.isNull() && !v.asString().isBlank()) return v.asString().trim();
         }
         return null;
     }

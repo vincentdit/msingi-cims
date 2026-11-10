@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance.heslb;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -243,7 +243,7 @@ public class HeslbService {
     private List<Problem> problems(String s) {
         try {
             return s == null ? List.of() : List.of(mapper.readValue(s, Problem[].class));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return List.of();
         }
     }
@@ -251,7 +251,7 @@ public class HeslbService {
     private String json(Object o) {
         try {
             return mapper.writeValueAsString(o);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

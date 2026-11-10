@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,10 +91,10 @@ class DataScopeIT {
 
     @Test
     void headsOfDepartmentAndCoordinatorsSeeTheirOwnProgrammesAndStudents() throws Exception {
-        assertThat(s.body(s.call(get("/api/academic/programmes"), hodBus, null)).findValuesAsText("code")).containsExactly("BTCAC");
-        assertThat(s.body(s.call(get("/api/academic/programmes"), coordBus, null)).findValuesAsText("code")).containsExactly("BTCAC");
-        assertThat(s.body(s.call(get("/api/academic/programmes"), hodIct, null)).findValuesAsText("code")).containsExactly("BTCIT");
-        assertThat(s.body(s.call(get("/api/academic/programmes"), registrar, null)).findValuesAsText("code")).contains("BTCIT", "BTCAC");
+        assertThat(s.body(s.call(get("/api/academic/programmes"), hodBus, null)).findValuesAsString("code")).containsExactly("BTCAC");
+        assertThat(s.body(s.call(get("/api/academic/programmes"), coordBus, null)).findValuesAsString("code")).containsExactly("BTCAC");
+        assertThat(s.body(s.call(get("/api/academic/programmes"), hodIct, null)).findValuesAsString("code")).containsExactly("BTCIT");
+        assertThat(s.body(s.call(get("/api/academic/programmes"), registrar, null)).findValuesAsString("code")).contains("BTCIT", "BTCAC");
         s.call(get("/api/academic/programmes/" + btcit), hodBus, null).andExpect(status().isForbidden());
 
         assertThat(students(registrar)).isEqualTo(2);
@@ -129,8 +129,8 @@ class DataScopeIT {
         String curriculum = "{\"programmeId\":%d,\"effectiveYearId\":" + yearId + ",\"modules\":[],\"electiveRules\":[]}";
         s.call(post("/api/academic/curricula"), hodBus, curriculum.formatted(btcit)).andExpect(status().isForbidden());
         s.call(post("/api/academic/curricula"), coordBus, curriculum.formatted(btcac)).andExpect(status().isCreated());
-        assertThat(s.body(s.call(get("/api/academic/curricula"), hodIct, null)).findValuesAsText("programmeCode")).isEmpty();
-        assertThat(s.body(s.call(get("/api/academic/curricula"), hodBus, null)).findValuesAsText("programmeCode")).containsExactly("BTCAC");
+        assertThat(s.body(s.call(get("/api/academic/curricula"), hodIct, null)).findValuesAsString("programmeCode")).isEmpty();
+        assertThat(s.body(s.call(get("/api/academic/curricula"), hodBus, null)).findValuesAsString("programmeCode")).containsExactly("BTCAC");
     }
 
     @Test

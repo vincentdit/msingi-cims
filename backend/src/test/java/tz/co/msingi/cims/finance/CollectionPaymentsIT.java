@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -105,21 +105,21 @@ class CollectionPaymentsIT {
                 {"provider":"CRDB","accountName":"Test College","accountNumber":"0150123456700","active":false}""")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
         JsonNode setup = s.body(s.call(get("/api/finance/payment-channels"), accountant, null).andExpect(status().isOk()));
-        assertThat(setup.get("mode").asText()).isEqualTo("COLLECTION");
+        assertThat(setup.get("mode").asString()).isEqualTo("COLLECTION");
         assertThat(setup.get("channels")).hasSize(2);
         assertThat(setup.get("providers").size()).isGreaterThan(15);
 
         // Payers see only the active accounts.
         JsonNode pub = s.body(s.call(get("/api/public/institution"), null, null).andExpect(status().isOk()));
-        assertThat(pub.at("/payment/mode").asText()).isEqualTo("COLLECTION");
+        assertThat(pub.at("/payment/mode").asString()).isEqualTo("COLLECTION");
         assertThat(pub.at("/payment/channels")).hasSize(1);
-        assertThat(pub.at("/payment/channels/0/label").asText()).isEqualTo("M-Pesa");
-        assertThat(pub.at("/payment/channels/0/ussd").asText()).isEqualTo("*150*00#");
+        assertThat(pub.at("/payment/channels/0/label").asString()).isEqualTo("M-Pesa");
+        assertThat(pub.at("/payment/channels/0/ussd").asString()).isEqualTo("*150*00#");
 
         // No GePG wording for a private institution: its SMS templates offer the payment reference, not the control number.
         data.staff(inst.tenant(), "admin", tz.co.msingi.cims.platform.security.Role.INSTITUTION_ADMIN);
         JsonNode templates = s.body(s.call(get("/api/messaging/templates"), s.staffToken("admin"), null).andExpect(status().isOk()));
-        assertThat(templates.findValuesAsText("code")).contains("PAYMENT_REFERENCE").doesNotContain("CONTROL_NUMBER");
+        assertThat(templates.findValuesAsString("code")).contains("PAYMENT_REFERENCE").doesNotContain("CONTROL_NUMBER");
         assertThat(templates.toString()).doesNotContain("GePG");
 
         // The invoice gets a CIMS reference that names the institution, not a GePG control number.
@@ -165,7 +165,7 @@ class CollectionPaymentsIT {
         JsonNode rec = s.body(s.call(post("/api/finance/reconciliations"), accountant,
                 json.writeValueAsString(java.util.Map.of("date", today.toString(), "fileName", "crdb-statement.csv", "csv", csv))).andExpect(status().isOk()));
         JsonNode item = rec.get("items").get(0);
-        assertThat(item.get("kind").asText()).isEqualTo("MISSING_IN_CIMS");
+        assertThat(item.get("kind").asString()).isEqualTo("MISSING_IN_CIMS");
         s.call(post("/api/finance/reconciliations/items/" + item.get("id").asLong() + "/post"), accountant, "{}").andExpect(status().isOk());
         List<Payment> paid = TenantContext.callAs(inst.info(), () -> tx.execute(x -> billing.paymentsFor(cn.getInvoice().getId())));
         assertThat(paid).hasSize(1);
@@ -207,7 +207,7 @@ class CollectionPaymentsIT {
         s.call(post("/api/finance/payment-channels"), s.staffToken("bursar"), """
                 {"provider":"NMB","accountName":"Test College","accountNumber":"20110012345"}""")
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("USES_GEPG"));
-        assertThat(s.body(s.call(get("/api/public/institution"), null, null)).at("/payment/mode").asText()).isEqualTo("GEPG");
+        assertThat(s.body(s.call(get("/api/public/institution"), null, null)).at("/payment/mode").asString()).isEqualTo("GEPG");
         ControlNumber cn = bill(inst, "5000");
         assertThat(cn.getIssuer()).isEqualTo(ControlNumber.Issuer.GEPG);
         assertThat(cn.getControlNo()).startsWith("99");

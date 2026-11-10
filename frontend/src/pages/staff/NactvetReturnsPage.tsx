@@ -54,8 +54,8 @@ export default function NactvetReturnsPage() {
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="h6">Checks before sending</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {r.institutionNactvetNo ? `Institution NACTVET registration number ${r.institutionNactvetNo}. ` : ''}
-                  {r.checks.length === 0 ? 'Nothing to put right.' : `${r.blockers} to fix before sending, ${r.warnings} to look at.`}
+                  {r.institutionNactvetNo && <span>{`Institution NACTVET registration number ${r.institutionNactvetNo}. `}</span>}
+                  <span>{r.checks.length === 0 ? 'Nothing to put right.' : `${r.blockers} to fix before sending, ${r.warnings} to look at.`}</span>
                 </Typography>
               </Box>
               {r.checks.length > 0 && (
@@ -97,7 +97,7 @@ export default function NactvetReturnsPage() {
                   <Typography variant="h6" sx={{ flexGrow: 1 }}>Student registration</Typography>
                   <Button size="small" component={StaffLink} to="/staff/integrations">Open</Button>
                 </Stack>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Students who entered in {r.year.code} and are studying.</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{`Students who entered in ${r.year.code} and are studying.`}</Typography>
                 <Figures items={[['Students', r.registration.students], ['Not sent', r.registration.notSent], ['Waiting for NACTVET', r.registration.submitted],
                   ['Registered', r.registration.registered], ['Queried', r.registration.queried]]} />
               </CardContent></Card>
@@ -143,7 +143,7 @@ export default function NactvetReturnsPage() {
                 <Typography variant="h6" sx={{ flexGrow: 1 }}>Graduand lists</Typography>
                 <Button size="small" component={StaffLink} to="/staff/graduations">Open</Button>
               </Stack>
-              {r.graduations.length === 0 && <Typography variant="body2" color="text.secondary">No graduation in {r.year.code}.</Typography>}
+              {r.graduations.length === 0 && <Typography variant="body2" color="text.secondary">{`No graduation in ${r.year.code}.`}</Typography>}
             </CardContent>
             {r.graduations.length > 0 && (
               <TableContainer>

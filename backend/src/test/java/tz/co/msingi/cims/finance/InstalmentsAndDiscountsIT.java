@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,7 +111,7 @@ class InstalmentsAndDiscountsIT {
                 jdbc.queryForObject("select total_amount from invoices where id = ?", BigDecimal.class, invoiceId)));
         assertThat(total).isEqualByComparingTo("636000");
         JsonNode penalties = s.body(s.call(get("/api/finance/penalties"), accountant, null).andExpect(status().isOk()));
-        assertThat(penalties.get(0).get("rule").asText()).contains("5% of TZS 320,000");
+        assertThat(penalties.get(0).get("rule").asString()).contains("5% of TZS 320,000");
         Integer sms = TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForObject(
                 "select count(*) from messages where template_code in ('FEE_REMINDER', 'FEE_PENALTY')", Integer.class)));
         assertThat(sms).isEqualTo(3);
@@ -129,7 +129,7 @@ class InstalmentsAndDiscountsIT {
         // the amount is worked out from the scheme: 10% of TZS 600,000 tuition
         JsonNode d = s.body(s.call(post("/api/finance/adjustments"), accountant, adjustment("DISCOUNT", sibling, null)).andExpect(status().isOk()));
         assertThat(d.get("amount").decimalValue()).isEqualByComparingTo("60000");
-        assertThat(d.get("schemeName").asText()).isEqualTo("SIBLING scheme");
+        assertThat(d.get("schemeName").asString()).isEqualTo("SIBLING scheme");
         s.call(post("/api/finance/adjustments"), accountant, adjustment("SCHOLARSHIP", null, "50000")).andExpect(jsonPath("$.code").value("SCHEME_REQUIRED"));
         s.call(post("/api/finance/adjustments"), accountant, adjustment("SCHOLARSHIP", sibling, null)).andExpect(jsonPath("$.code").value("SCHEME_KIND"));
         JsonNode sch = s.body(s.call(post("/api/finance/adjustments"), accountant, adjustment("SCHOLARSHIP", merit, null)).andExpect(status().isOk()));

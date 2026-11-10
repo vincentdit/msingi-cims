@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.finance.aggregator;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 import tz.co.msingi.cims.common.exception.BusinessRuleException;
 

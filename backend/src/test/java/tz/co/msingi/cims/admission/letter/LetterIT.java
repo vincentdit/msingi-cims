@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission.letter;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
@@ -66,9 +66,9 @@ class LetterIT {
         Applicant a = acceptedApplicant("S0101/0001");
 
         JsonNode letter = app(a).get("letter");
-        String holder = s.lookup("S0101/0001").get("fullName").asText();
-        assertThat(letter.get("letterNo").asText()).isEqualTo(s.tenant + "/ADM/2027/000001");
-        String code = letter.get("verificationCode").asText();
+        String holder = s.lookup("S0101/0001").get("fullName").asString();
+        assertThat(letter.get("letterNo").asString()).isEqualTo(s.tenant + "/ADM/2027/000001");
+        String code = letter.get("verificationCode").asString();
         assertThat(code).matches("[0-9A-Z]{4}(-[0-9A-Z]{4}){3}");
 
         // the applicant downloads the PDF: letter + joining instructions, QR code links to the verification page
@@ -107,12 +107,12 @@ class LetterIT {
         JsonNode reissued = s.body(s.call(post("/api/admission/applications/" + a.applicationId() + "/admission-letter/reissue"), officer,
                 "{\"reason\":\"Middle name added\"}").andExpect(status().isOk()));
         assertThat(reissued.get("edition").asInt()).isEqualTo(2);
-        assertThat(reissued.get("letterNo").asText()).isEqualTo(s.tenant + "/ADM/2027/000001");
-        String code2 = reissued.get("verificationCode").asText();
+        assertThat(reissued.get("letterNo").asString()).isEqualTo(s.tenant + "/ADM/2027/000001");
+        String code2 = reissued.get("verificationCode").asString();
         assertThat(code2).isNotEqualTo(code);
         s.call(get("/api/public/verify/" + code), null, null)
                 .andExpect(jsonPath("$.status").value("SUPERSEDED")).andExpect(jsonPath("$.currentEdition").value(2));
-        assertThat(app(a).at("/letter/verificationCode").asText()).isEqualTo(code2);
+        assertThat(app(a).at("/letter/verificationCode").asString()).isEqualTo(code2);
 
         // revoke (senior role only)
         s.call(post("/api/admission/applications/" + a.applicationId() + "/admission-letter/revoke"), s.staffToken("clerk"),
@@ -126,7 +126,7 @@ class LetterIT {
     @Test
     void lettersWaitForJoiningInstructionsThenAreIssuedInBulk() throws Exception {
         Applicant a = acceptedApplicant("S0101/0001");
-        assertThat(app(a).get("status").asText()).isEqualTo("ACCEPTED"); // acceptance stands without a letter
+        assertThat(app(a).get("status").asString()).isEqualTo("ACCEPTED"); // acceptance stands without a letter
         assertThat(app(a).hasNonNull("letter")).isFalse();
         JsonNode ov = s.body(s.call(get("/api/admission/windows/" + s.inst.windowId() + "/verification"), officer, null));
         assertThat(ov.get("joiningInstructionsSet").asBoolean()).isFalse();
@@ -142,7 +142,7 @@ class LetterIT {
         assertThat(app(a).hasNonNull("letter")).isTrue();
         ov = s.body(s.call(get("/api/admission/windows/" + s.inst.windowId() + "/verification"), officer, null));
         assertThat(ov.get("lettersPending").asInt()).isZero();
-        assertThat(ov.at("/applicants/0/letterNo").asText()).isEqualTo(s.tenant + "/ADM/2027/000001");
+        assertThat(ov.at("/applicants/0/letterNo").asString()).isEqualTo(s.tenant + "/ADM/2027/000001");
 
         // staff copy
         s.call(get("/api/admission/applications/" + a.applicationId() + "/admission-letter"), officer, null)

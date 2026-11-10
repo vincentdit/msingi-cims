@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.reference;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -40,25 +40,25 @@ public class GeographyService {
         try {
             List<String> names = new ArrayList<>();
             for (JsonNode r : read("geo/regions.json.gz")) {
-                names.add(r.path("name").asText());
-                regionSlug.put(r.path("name").asText().toLowerCase(), r.path("slug").asText());
-                regionName.put(r.path("slug").asText(), r.path("name").asText());
+                names.add(r.path("name").asString());
+                regionSlug.put(r.path("name").asString().toLowerCase(), r.path("slug").asString());
+                regionName.put(r.path("slug").asString(), r.path("name").asString());
             }
             names.sort(String.CASE_INSENSITIVE_ORDER);
             regions = List.copyOf(names);
             for (JsonNode d : read("geo/districts.json.gz")) {
-                String r = d.path("region_slug").asText();
-                districts.computeIfAbsent(r, k -> new ArrayList<>()).add(d.path("name").asText());
-                districtSlug.put(r + "|" + d.path("name").asText().toLowerCase(), d.path("slug").asText());
+                String r = d.path("region_slug").asString();
+                districts.computeIfAbsent(r, k -> new ArrayList<>()).add(d.path("name").asString());
+                districtSlug.put(r + "|" + d.path("name").asString().toLowerCase(), d.path("slug").asString());
             }
             for (JsonNode w : read("geo/wards.json.gz")) {
-                String key = w.path("region_slug").asText() + "|" + w.path("district_slug").asText();
-                wards.computeIfAbsent(key, k -> new ArrayList<>()).add(w.path("name").asText());
-                wardSlug.put(key + "|" + w.path("name").asText().toLowerCase(), w.path("slug").asText());
+                String key = w.path("region_slug").asString() + "|" + w.path("district_slug").asString();
+                wards.computeIfAbsent(key, k -> new ArrayList<>()).add(w.path("name").asString());
+                wardSlug.put(key + "|" + w.path("name").asString().toLowerCase(), w.path("slug").asString());
             }
             for (JsonNode s : read("geo/streets.json.gz")) {
-                String key = s.path("region_slug").asText() + "|" + s.path("district_slug").asText() + "|" + s.path("ward_slug").asText();
-                streets.computeIfAbsent(key, k -> new ArrayList<>()).add(s.path("name").asText());
+                String key = s.path("region_slug").asString() + "|" + s.path("district_slug").asString() + "|" + s.path("ward_slug").asString();
+                streets.computeIfAbsent(key, k -> new ArrayList<>()).add(s.path("name").asString());
             }
             for (Map<String, List<String>> m : List.of(districts, wards, streets)) {
                 m.replaceAll((k, v) -> v.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList());

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -34,7 +34,7 @@ class NactvetCatalogueIT {
     @Autowired PasswordEncoder encoder;
     @Autowired TransactionTemplate tx;
 
-    ResultActions call(MockHttpServletRequestBuilder req, String token, String tenant, String body) throws Exception {
+    ResultActions call(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String token, String tenant, String body) throws Exception {
         if (tenant != null) req.header("X-Tenant", tenant);
         if (token != null) req.header("Authorization", "Bearer " + token);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);
@@ -57,12 +57,12 @@ class NactvetCatalogueIT {
             users.save(u);
         });
         String token = body(call(post("/api/platform/auth/login"), null, null, "{\"username\":\"cat" + suffix + "\",\"password\":\"Cat@2026x\"}"))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
 
         // sync: every institution and programme NACTVET lists; a second sync finds nothing new
         JsonNode run = body(call(post("/api/platform/nactvet/sync?wait=true"), token, null, null).andExpect(status().isOk()));
-        assertThat(run.get("status").asText()).isEqualTo("DONE");
-        assertThat(run.get("mode").asText()).isEqualTo("SIMULATED");
+        assertThat(run.get("status").asString()).isEqualTo("DONE");
+        assertThat(run.get("mode").asString()).isEqualTo("SIMULATED");
         assertThat(run.get("institutions").asInt()).isEqualTo(7);
         assertThat(run.get("newProgrammes").asInt()).isEqualTo(run.get("programmes").asInt()).isPositive();
         JsonNode again = body(call(post("/api/platform/nactvet/sync?wait=true"), token, null, null));
@@ -76,27 +76,27 @@ class NactvetCatalogueIT {
         JsonNode page = body(call(get("/api/platform/nactvet/institutions?q=jabali"), token, null, null));
         assertThat(page.get("totalElements").asLong()).isEqualTo(1);
         JsonNode row = page.at("/content/0");
-        assertThat(row.get("registrationNumber").asText()).isEqualTo("REG/SIM/103");
+        assertThat(row.get("registrationNumber").asString()).isEqualTo("REG/SIM/103");
         assertThat(row.get("programmes").asLong()).isEqualTo(12);
         assertThat(row.get("minLevel").asInt()).isEqualTo(4);
         assertThat(row.get("maxLevel").asInt()).isEqualTo(6);
         assertThat(body(call(get("/api/platform/nactvet/institutions?ownership=Government"), token, null, null)).get("totalElements").asLong()).isEqualTo(3);
         long nid = row.get("id").asLong();
         JsonNode detail = body(call(get("/api/platform/nactvet/institutions/" + nid), token, null, null));
-        assertThat(detail.at("/suggestion/code").asText()).isEqualTo("JTC");
-        assertThat(detail.at("/suggestion/ownership").asText()).isEqualTo("PUBLIC");
-        assertThat(detail.at("/suggestion/nactvetRegNo").asText()).isEqualTo("REG/SIM/103");
+        assertThat(detail.at("/suggestion/code").asString()).isEqualTo("JTC");
+        assertThat(detail.at("/suggestion/ownership").asString()).isEqualTo("PUBLIC");
+        assertThat(detail.at("/suggestion/nactvetRegNo").asString()).isEqualTo("REG/SIM/103");
         JsonNode programmes = detail.get("programmes");
         assertThat(programmes.size()).isEqualTo(12);
         JsonNode tc = null;
-        for (JsonNode p : programmes) if (p.get("name").asText().startsWith("Technician Certificate in Civil")) tc = p;
+        for (JsonNode p : programmes) if (p.get("name").asString().startsWith("Technician Certificate in Civil")) tc = p;
         assertThat(tc.get("ntaLevel").asInt()).isEqualTo(5);
         assertThat(tc.get("ntaEntryHolderLevel").asInt()).isEqualTo(4);
         assertThat(tc.get("totalCapacity").asInt()).isEqualTo(80);
 
         // onboard it with the civil engineering programmes
         List<Long> civil = new ArrayList<>();
-        for (JsonNode p : programmes) if (p.get("name").asText().contains("Civil")) civil.add(p.get("id").asLong());
+        for (JsonNode p : programmes) if (p.get("name").asString().contains("Civil")) civil.add(p.get("id").asLong());
         String code = "JTC" + suffix.substring(0, 3).toUpperCase();
         String onboard = """
                 {"code":"%s","name":"Jabali Technical College","shortName":"JTC","nactvetRegNo":"REG/SIM/103","ownership":"PUBLIC",
@@ -112,10 +112,10 @@ class NactvetCatalogueIT {
                 .andExpect(jsonPath("$.code").value("ALREADY_ONBOARDED"));
 
         // the institution's administrator sees the programmes as NACTVET lists them
-        String temp = issued.get("temporaryPassword").asText();
+        String temp = issued.get("temporaryPassword").asString();
         JsonNode login = body(call(post("/api/auth/login"), null, code, "{\"username\":\"ictadmin\",\"password\":\"" + temp + "\"}"));
-        String admin = body(call(post("/api/auth/password"), login.get("accessToken").asText(), code,
-                "{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"Ict@2026xx\"}")).get("accessToken").asText();
+        String admin = body(call(post("/api/auth/password"), login.get("accessToken").asString(), code,
+                "{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"Ict@2026xx\"}")).get("accessToken").asString();
         JsonNode list = body(call(get("/api/academic/programmes"), admin, code, null).andExpect(status().isOk()));
         assertThat(list.size()).isEqualTo(3);
         JsonNode cert = null, diploma = null;
@@ -123,23 +123,23 @@ class NactvetCatalogueIT {
             if (p.get("awardLevel").asInt() == 5) cert = p;
             if (p.get("awardLevel").asInt() == 6) diploma = p;
         }
-        assertThat(cert.get("code").asText()).isEqualTo("CE5");
-        assertThat(cert.get("awardName").asText()).isEqualTo("Technician Certificate (NTA Level 5)");
+        assertThat(cert.get("code").asString()).isEqualTo("CE5");
+        assertThat(cert.get("awardName").asString()).isEqualTo("Technician Certificate (NTA Level 5)");
         assertThat(cert.get("durationSemesters").asInt()).isEqualTo(2);
         assertThat(cert.get("entryLevel").asInt()).isEqualTo(5);
         assertThat(cert.get("accreditedCapacity").asInt()).isEqualTo(80);
-        assertThat(cert.get("nactvetCode").asText()).isNotBlank();
+        assertThat(cert.get("nactvetCode").asString()).isNotBlank();
         assertThat(diploma.get("durationSemesters").asInt()).isEqualTo(6);
         assertThat(diploma.get("entryLevel").asInt()).isEqualTo(4);
         JsonNode depts = body(call(get("/api/academic/departments"), admin, code, null));
-        assertThat(depts.findValuesAsText("name")).containsExactly("Science and Allied Technologies");
+        assertThat(depts.findValuesAsString("name")).containsExactly("Science and Allied Technologies");
 
         // later, the rest are imported from the institution's page; importing again adds nothing
         JsonNode imported = body(call(post("/api/platform/institutions/" + tenantId + "/nactvet"), token, null, "{}").andExpect(status().isOk()));
         assertThat(imported.at("/result/created").asInt()).isEqualTo(9);
         assertThat(imported.at("/institution/nactvet/notImported").asLong()).isZero();
         assertThat(body(call(post("/api/platform/institutions/" + tenantId + "/nactvet"), token, null, "{}")).at("/result/created").asInt()).isZero();
-        assertThat(body(call(get("/api/platform/nactvet/institutions?onboarded=yes"), token, null, null)).at("/content/0/tenantCode").asText()).isEqualTo(code);
+        assertThat(body(call(get("/api/platform/nactvet/institutions?onboarded=yes"), token, null, null)).at("/content/0/tenantCode").asString()).isEqualTo(code);
 
         // the pull is in the integration log and the platform audit trail
         JsonNode calls = body(call(get("/api/platform/integrations/calls?system=NACTVET_CATALOGUE"), token, null, null));

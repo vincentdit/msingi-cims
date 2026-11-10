@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,9 +99,9 @@ class GovernmentExchangesIT {
     @Test
     void settingsAreTheInstitutionsAndSayWhichSystemsAreLive() throws Exception {
         JsonNode v = s.body(s.call(put("/api/integration-settings"), admin, SETTINGS.formatted(false)).andExpect(status().isOk()));
-        assertThat(v.at("/settings/gepgSpCode").asText()).isEqualTo("SP19921");
-        assertThat(v.at("/modes/GEPG").asText()).isEqualTo("SIMULATED");
-        assertThat(v.get("institutionCode").asText()).isEqualTo("REG/" + tenant + "/001");
+        assertThat(v.at("/settings/gepgSpCode").asString()).isEqualTo("SP19921");
+        assertThat(v.at("/modes/GEPG").asString()).isEqualTo("SIMULATED");
+        assertThat(v.get("institutionCode").asString()).isEqualTo("REG/" + tenant + "/001");
         s.call(put("/api/integration-settings"), registrar, SETTINGS.formatted(false)).andExpect(status().isForbidden());
         s.call(put("/api/integration-settings"), admin, SETTINGS.formatted(false).replace("SP19921", "SP 1")).andExpect(status().isBadRequest());
     }
@@ -119,20 +119,20 @@ class GovernmentExchangesIT {
         s.call(post("/api/heslb/beneficiaries"), registrar, null).andExpect(status().isForbidden());
 
         JsonNode ben = s.body(s.call(post("/api/heslb/beneficiaries"), bursar, null).andExpect(status().isOk()));
-        assertThat(ben.get("summary").asText()).isEqualTo("1 beneficiaries: 1 new, 0 updated, 0 unchanged");
+        assertThat(ben.get("summary").asString()).isEqualTo("1 beneficiaries: 1 new, 0 updated, 0 unchanged");
         Map<String, Object> sp = db(() -> jdbc.queryForMap("""
                 select s.kind, x.cap_amount, x.coverage_percent, x.reference from sponsorships x join sponsors s on s.id = x.sponsor_id where s.code = 'HESLB'"""));
         assertThat(sp.get("kind")).isEqualTo("LOAN_BOARD");
         assertThat((BigDecimal) sp.get("cap_amount")).isEqualByComparingTo("1200000");
         assertThat((String) sp.get("reference")).startsWith("SIM27");
-        assertThat(s.body(s.call(post("/api/heslb/beneficiaries"), bursar, null)).get("summary").asText()).endsWith("0 new, 0 updated, 1 unchanged");
+        assertThat(s.body(s.call(post("/api/heslb/beneficiaries"), bursar, null)).get("summary").asString()).endsWith("0 new, 0 updated, 1 unchanged");
 
         JsonNode dis = s.body(s.call(post("/api/heslb/disbursements"), bursar, null).andExpect(status().isOk()));
         assertThat(dis.get("accepted").asInt()).isEqualTo(1);
         assertThat(s.body(s.call(post("/api/heslb/disbursements"), bursar, null)).get("accepted").asInt()).isZero();   // never twice
         JsonNode o = s.body(s.call(get("/api/heslb"), bursar, null).andExpect(status().isOk()));
         assertThat(o.get("sponsored").asInt()).isEqualTo(1);
-        assertThat(o.at("/disbursements/0/batchNo").asText()).isEqualTo("SIM/2027/B1");
+        assertThat(o.at("/disbursements/0/batchNo").asString()).isEqualTo("SIM/2027/B1");
         assertThat(o.at("/disbursements/0/amount").decimalValue()).isEqualByComparingTo("600000");
         assertThat(o.get("exchanges")).hasSize(5);
         Long otherInvoice = db(() -> billing.createInvoice(new BillingService.NewInvoice(Invoice.PayerType.APPLICANT, 1L, "X", null, null, "TEST", null, "X",
@@ -149,8 +149,8 @@ class GovernmentExchangesIT {
         String nin = dob.replace("-", "") + "-11111-00001-12";
         // NIDA off: kept as given
         JsonNode v = s.body(s.call(put("/api/registry/students/" + id + "/nin"), registrar, "{\"nin\":\"" + nin + "\"}").andExpect(status().isOk()));
-        assertThat(v.get("last4").asText()).isEqualTo("0112");
-        assertThat(v.get("status").asText()).isEqualTo("UNVERIFIED");
+        assertThat(v.get("last4").asString()).isEqualTo("0112");
+        assertThat(v.get("status").asString()).isEqualTo("UNVERIFIED");
         String stored = db(() -> jdbc.queryForObject("select nin_encrypted from students where id = ?", String.class, id));
         assertThat(stored).doesNotContain(nin.replace("-", "")).isNotBlank();
         s.call(put("/api/registry/students/" + id + "/nin"), registrar, "{\"nin\":\"123\"}").andExpect(jsonPath("$.code").value("INVALID_NIN"));
@@ -176,11 +176,11 @@ class GovernmentExchangesIT {
         assertThat(o.get("withoutVerification").asInt()).isEqualTo(1);
 
         JsonNode b = s.body(s.call(post("/api/nactvet-registration"), registrar, null).andExpect(status().isOk()));
-        assertThat(b.get("status").asText()).isEqualTo("COMPLETED");
+        assertThat(b.get("status").asString()).isEqualTo("COMPLETED");
         assertThat(b.get("registered").asInt()).isEqualTo(1);
         assertThat(b.get("queried").asInt()).isEqualTo(1);
         JsonNode items = s.body(s.call(get("/api/nactvet-registration/" + b.get("id").asLong() + "/items"), registrar, null));
-        assertThat(items.findValuesAsText("reason")).contains("No NACTVET admission verification number");
+        assertThat(items.findValuesAsString("reason")).contains("No NACTVET admission verification number");
 
         // the queried student is corrected and sent again on their own
         db(() -> jdbc.update("update students set nactvet_verification_no = 'NV/2027/999999' where id = ?", ids.get(1)));
@@ -207,7 +207,7 @@ class GovernmentExchangesIT {
         assertThat(f.get("selections").asInt()).isEqualTo(2);
         long batch = f.get("importBatchId").asLong();
         JsonNode b = s.body(s.call(get("/api/imports/batches/" + batch), officer, null).andExpect(status().isOk()));
-        assertThat(b.get("externalBody").asText()).isEqualTo("TAMISEMI");
+        assertThat(b.get("externalBody").asString()).isEqualTo("TAMISEMI");
         assertThat(b.get("totalRows").asInt()).isEqualTo(2);
         assertThat(b.get("errorRows").asInt()).isZero();
         s.call(post("/api/imports/batches/" + batch + "/apply"), admin, null).andExpect(jsonPath("$.status").value("APPLIED"));
@@ -237,13 +237,13 @@ class GovernmentExchangesIT {
         JsonNode p = s.body(s.call(get("/api/muse/preview?from=" + yesterday + "&to=" + yesterday), bursar, null).andExpect(status().isOk()));
         assertThat(p.get("problems")).isEmpty();
         assertThat(p.get("total").decimalValue()).isEqualByComparingTo("320000");
-        assertThat(p.at("/lines/0/account").asText()).isEqualTo("0150000000");
+        assertThat(p.at("/lines/0/account").asString()).isEqualTo("0150000000");
         assertThat(p.at("/lines/0/debit").decimalValue()).isEqualByComparingTo("320000");
-        assertThat(p.get("lines").findValuesAsText("gfsCode")).contains("142202080040", "140206");   // OTHER has no GFS code: the default applies
+        assertThat(p.get("lines").findValuesAsString("gfsCode")).contains("142202080040", "140206");   // OTHER has no GFS code: the default applies
 
         JsonNode posted = s.body(s.call(post("/api/muse/postings?from=" + yesterday + "&to=" + yesterday), bursar, null).andExpect(status().isOk()));
-        assertThat(posted.get("status").asText()).isEqualTo("POSTED");
-        assertThat(posted.get("museRef").asText()).startsWith("SIM/JV/");
+        assertThat(posted.get("status").asString()).isEqualTo("POSTED");
+        assertThat(posted.get("museRef").asString()).startsWith("SIM/JV/");
         s.call(post("/api/muse/postings?from=" + yesterday + "&to=" + yesterday), bursar, null)
                 .andExpect(jsonPath("$.code").value("CANNOT_POST"))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("already posted")));

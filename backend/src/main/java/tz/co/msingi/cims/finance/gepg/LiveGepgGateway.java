@@ -59,7 +59,7 @@ public class LiveGepgGateway implements GepgGateway {
                            @Value("${cims.gepg.live.read-timeout-seconds:30}") int readTimeout) {
         JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(connectTimeout)).build());
         f.setReadTimeout(Duration.ofSeconds(readTimeout));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(f).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(f).build();
         this.keys = keys;
         this.settings = settings;
         this.billPath = billPath;

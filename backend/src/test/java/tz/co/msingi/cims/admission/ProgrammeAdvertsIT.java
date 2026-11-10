@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,12 +66,12 @@ class ProgrammeAdvertsIT {
         JsonNode list = s.body(s.call(get("/api/public/programmes"), null, null).andExpect(status().isOk()));
         assertThat(list.size()).isEqualTo(1);
         JsonNode a = list.get(0);
-        assertThat(a.get("code").asText()).isEqualTo("BTCIT");
+        assertThat(a.get("code").asString()).isEqualTo("BTCIT");
         assertThat(a.get("open").asBoolean()).isTrue();
-        assertThat(a.get("path").asText()).isEqualTo("/p/BTCIT");
+        assertThat(a.get("path").asString()).isEqualTo("/p/BTCIT");
         assertThat(a.path("fee").isMissingNode() || a.get("fee").isNull()).isTrue();   // no approved fee structure yet
-        assertThat(a.get("requirementsEn").asText()).isEqualTo("Four CSEE (Form Four) passes at D or above, including Basic Mathematics (D or above).");
-        assertThat(a.get("requirementsSw").asText()).isEqualTo("Ufaulu wa masomo manne kidato cha nne kwa daraja D au zaidi, yakiwemo Basic Mathematics (daraja D au zaidi).");
+        assertThat(a.get("requirementsEn").asString()).isEqualTo("Four CSEE (Form Four) passes at D or above, including Basic Mathematics (D or above).");
+        assertThat(a.get("requirementsSw").asString()).isEqualTo("Ufaulu wa masomo manne kidato cha nne kwa daraja D au zaidi, yakiwemo Basic Mathematics (daraja D au zaidi).");
 
         // the year's fee and its instalments come from the approved fee structure
         approvedStructure();
@@ -89,7 +89,7 @@ class ProgrammeAdvertsIT {
         s.call(put(path), viewer, "{\"highlights\":\"Mine\"}").andExpect(status().isForbidden());
         JsonNode hl = s.body(s.call(get("/api/public/programmes/BTCIT"), null, null)).get("highlights");
         assertThat(hl.size()).isEqualTo(2);
-        assertThat(hl.get(1).asText()).isEqualTo("Hostel on campus");
+        assertThat(hl.get(1).asString()).isEqualTo("Hostel on campus");
 
         // a programme not on offer
         s.call(get("/api/public/programmes/NOPE"), null, null).andExpect(status().isNotFound());
@@ -139,13 +139,13 @@ class ProgrammeAdvertsIT {
         s.call(put("/api/admin/institution/profile"), admin, "{\"contactEmail\":\"not-an-email\",\"phones\":[]}").andExpect(jsonPath("$.code").value("INVALID_EMAIL"));
         s.call(put("/api/admin/institution/profile"), admin, "{\"phones\":[\"12ab\"]}").andExpect(jsonPath("$.code").value("INVALID_PHONE"));
         s.call(put("/api/admin/institution/profile"), viewer, "{\"phones\":[]}").andExpect(status().isForbidden());
-        assertThat(s.body(s.call(get("/api/admin/institution/profile"), admin, null)).get("whatsapp").asText()).isEqualTo("+255 754 000 111");
+        assertThat(s.body(s.call(get("/api/admin/institution/profile"), admin, null)).get("whatsapp").asString()).isEqualTo("+255 754 000 111");
 
         // the logo: PNG or JPEG, at least 200 pixels wide; shown to the public and on the posters
         s.call(logo(png(150, 150), "small.png"), admin, null).andExpect(status().is4xxClientError());
         byte[] logo = png(300, 300);
         s.call(logo(logo, "logo.png"), admin, null).andExpect(status().isOk()).andExpect(jsonPath("$.kind").value("LOGO"));
-        String url = s.body(s.call(get("/api/public/institution"), null, null)).at("/logo/url").asText();
+        String url = s.body(s.call(get("/api/public/institution"), null, null)).at("/logo/url").asString();
         assertThat(url).startsWith("/api/public/institution/photos/logo");
         // the logo is not the campus photo; the poster renders with it
         assertThat(s.body(s.call(get("/api/public/institution"), null, null)).path("campusPhoto").isMissingNode()

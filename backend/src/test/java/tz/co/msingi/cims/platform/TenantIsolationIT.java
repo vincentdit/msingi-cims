@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
@@ -78,7 +78,7 @@ class TenantIsolationIT {
         String tokenA = json.readTree(mvc.perform(post("/api/auth/login").header("X-Tenant", a.tenant().getCode())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"officer\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}"))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("accessToken").asText();
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("accessToken").asString();
 
         mvc.perform(get("/api/academic/programmes").header("X-Tenant", a.tenant().getCode()).header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isOk())

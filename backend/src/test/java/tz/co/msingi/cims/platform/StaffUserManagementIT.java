@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,7 +54,7 @@ class StaffUserManagementIT {
 
     String login(String username, String password) throws Exception {
         return s.body(s.call(post("/api/auth/login"), null, "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-                .andExpect(status().isOk())).get("accessToken").asText();
+                .andExpect(status().isOk())).get("accessToken").asString();
     }
 
     @Test
@@ -66,13 +66,13 @@ class StaffUserManagementIT {
                 .andExpect(jsonPath("$.user.phone").value("255712000111"))
                 .andExpect(jsonPath("$.user.roles[0].role").value("HEAD_OF_DEPARTMENT"))
                 .andExpect(jsonPath("$.user.roles[0].scopeName").isNotEmpty()));
-        String temp = issued.get("temporaryPassword").asText();
+        String temp = issued.get("temporaryPassword").asString();
         assertThat(temp).hasSize(12).matches(".*[A-Z].*").matches(".*[a-z].*").matches(".*\\d.*").matches(".*[^A-Za-z0-9].*");
 
         // with the temporary password only the password change is allowed
         JsonNode first = s.body(s.call(post("/api/auth/login"), null, "{\"username\":\"asha\",\"password\":\"" + temp + "\"}"));
         assertThat(first.get("user").get("mustChangePassword").asBoolean()).isTrue();
-        String tempToken = first.get("accessToken").asText();
+        String tempToken = first.get("accessToken").asString();
         s.call(get("/api/academic/departments"), tempToken, null).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
         s.call(post("/api/auth/password"), tempToken, "{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"weak\"}").andExpect(status().isBadRequest());
@@ -80,7 +80,7 @@ class StaffUserManagementIT {
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("WRONG_PASSWORD"));
         JsonNode changed = s.body(s.call(post("/api/auth/password"), tempToken, "{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"Mpya@2026x\"}")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.mustChangePassword").value(false)));
-        s.call(get("/api/academic/departments"), changed.get("accessToken").asText(), null).andExpect(status().isOk());
+        s.call(get("/api/academic/departments"), changed.get("accessToken").asString(), null).andExpect(status().isOk());
         login("asha", "Mpya@2026x");
 
         s.call(post("/api/admin/users"), admin, user("ASHA", "[{\"role\":\"LECTURER\"}]"))
@@ -105,9 +105,9 @@ class StaffUserManagementIT {
     void changingRolesResettingOrDisablingEndsTheUsersSessions() throws Exception {
         JsonNode issued = s.body(s.call(post("/api/admin/users"), admin, user("juma", "[{\"role\":\"REGISTRAR\"}]")));
         long id = issued.get("user").get("id").asLong();
-        String temp = issued.get("temporaryPassword").asText();
+        String temp = issued.get("temporaryPassword").asString();
         String t0 = s.body(s.call(post("/api/auth/password"), login("juma", temp), "{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"Juma@2026x\"}"))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
         String token = login("juma", "Juma@2026x");
         s.call(get("/api/registry/students"), token, null).andExpect(status().isOk());
 
@@ -128,7 +128,7 @@ class StaffUserManagementIT {
 
         // reset: a new temporary password, the old one no longer works
         String temp2 = s.body(s.call(post("/api/admin/users/" + id + "/reset-password"), admin, null)
-                .andExpect(jsonPath("$.user.mustChangePassword").value(true))).get("temporaryPassword").asText();
+                .andExpect(jsonPath("$.user.mustChangePassword").value(true))).get("temporaryPassword").asString();
         s.call(post("/api/auth/login"), null, "{\"username\":\"juma\",\"password\":\"Juma@2026x\"}").andExpect(status().isUnauthorized());
         login("juma", temp2);
     }

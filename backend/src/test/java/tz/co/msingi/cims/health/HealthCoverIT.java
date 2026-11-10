@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.health;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,7 +92,7 @@ class HealthCoverIT {
 
     String studentToken(String regNo) throws Exception {
         return s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Kifaru#Mto47\"}").andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
     }
 
     @Test
@@ -116,8 +116,8 @@ class HealthCoverIT {
                 .andExpect(jsonPath("$.cover.status").value("INVALID")).andExpect(jsonPath("$.cover.reason").value(org.hamcrest.Matchers.containsString("NEEMA JOHN KIMARO")));
         s.call(put("/api/student/health-cover/card"), student, "{\"cardNo\":\"x\"}").andExpect(jsonPath("$.code").value("INVALID_CARD"));
         JsonNode mine = s.body(s.call(put("/api/student/health-cover/card"), student, "{\"cardNo\":\"sn 1023 4561\"}").andExpect(status().isOk()));
-        assertThat(mine.at("/cover/status").asText()).isEqualTo("ACTIVE");
-        assertThat(mine.at("/cover/cardNo").asText()).isEqualTo("SN10234561");
+        assertThat(mine.at("/cover/status").asString()).isEqualTo("ACTIVE");
+        assertThat(mine.at("/cover/cardNo").asString()).isEqualTo("SN10234561");
         assertThat(mine.get("covered").asBoolean()).isTrue();
         s.call(put("/api/registry/students/" + b + "/health-cover/card"), registrar, "{\"cardNo\":\"SN10234561\"}").andExpect(jsonPath("$.code").value("CARD_IN_USE"));
         s.call(put("/api/registry/students/" + b + "/health-cover/card"), bursar, "{\"cardNo\":\"SN10234562\"}").andExpect(status().isForbidden());
@@ -127,7 +127,7 @@ class HealthCoverIT {
         JsonNode enrolled = s.body(s.call(post("/api/health-covers/enrol"), registrar, null).andExpect(status().isOk()));
         assertThat(enrolled.get("done").asInt()).isEqualTo(1);
         JsonNode coverB = s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null));
-        assertThat(coverB.at("/cover/status").asText()).isEqualTo("READY");
+        assertThat(coverB.at("/cover/status").asString()).isEqualTo("READY");
         assertThat(coverB.at("/cover/invoice").isValueNode() || coverB.at("/cover/invoice").isMissingNode()).isTrue();   // the student pays NHIF, not the institution
         Long yearId = coverB.get("academicYearId").asLong();
         assertThat(db(() -> health.coveredForRegistration(b, yearId))).isFalse();   // required and not paid
@@ -139,7 +139,7 @@ class HealthCoverIT {
         assertThat(o.get("setUp").asBoolean()).isTrue();   // simulated: no credentials needed
         assertThat(o.at("/counts/ACTIVE").asInt()).isEqualTo(1);
         assertThat(o.at("/counts/READY").asInt()).isEqualTo(1);
-        assertThat(s.body(s.call(get("/api/health-covers?status=READY"), registrar, null)).findValuesAsText("registrationNo")).containsExactly(regB);
+        assertThat(s.body(s.call(get("/api/health-covers?status=READY"), registrar, null)).findValuesAsString("registrationNo")).containsExactly(regB);
 
         // step 1: registration with NHIF (the NIDA number goes with it; NHIF's file has CreateStudentDto's columns)
         db(() -> jdbc.update("update students set nin_encrypted = ? where id = ?", cipher.encrypt("20060304-11111-00001-12"), b));
@@ -149,25 +149,25 @@ class HealthCoverIT {
         boolean refused = regB.endsWith("7");   // the simulator refuses admission numbers ending in 7 (2111, member already exists)
         assertThat(reg.get("done").asInt()).isEqualTo(refused ? 0 : 1);
         if (refused) {
-            assertThat(s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null)).at("/cover/reason").asText()).contains("2111");
+            assertThat(s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null)).at("/cover/reason").asString()).contains("2111");
             return;
         }
-        assertThat(s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null)).at("/cover/status").asText()).isEqualTo("REGISTERED");
+        assertThat(s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null)).at("/cover/status").asString()).isEqualTo("REGISTERED");
 
         // step 2: the card application; NHIF's control number reaches the student by SMS
         JsonNode intakes = s.body(s.call(get("/api/health-covers/nhif-intakes"), registrar, null).andExpect(status().isOk()));
         assertThat(intakes).hasSize(2);
-        JsonNode applied = s.body(s.call(post("/api/health-covers/card-applications?intakeCode=" + intakes.get(0).get("code").asText()), registrar, null)
+        JsonNode applied = s.body(s.call(post("/api/health-covers/card-applications?intakeCode=" + intakes.get(0).get("code").asString()), registrar, null)
                 .andExpect(status().isOk()));
         assertThat(applied.get("done").asInt()).isEqualTo(1);
-        assertThat(applied.get("summary").asText()).contains("1 control number(s) received");
+        assertThat(applied.get("summary").asString()).contains("1 control number(s) received");
         JsonNode bill = s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null));
-        assertThat(bill.at("/cover/status").asText()).isEqualTo("AWAITING_PAYMENT");
+        assertThat(bill.at("/cover/status").asString()).isEqualTo("AWAITING_PAYMENT");
         assertThat(bill.at("/cover/category").asInt()).isEqualTo(1);
-        String controlNo = bill.at("/cover/nhifBill/controlNo").asText();
+        String controlNo = bill.at("/cover/nhifBill/controlNo").asString();
         assertThat(controlNo).startsWith("995");
         assertThat(bill.at("/cover/nhifBill/amount").decimalValue()).isEqualByComparingTo("50400");
-        String batchNo = bill.at("/cover/batchRef").asText();
+        String batchNo = bill.at("/cover/batchRef").asString();
         assertThat(batchNo).matches(".+/\\d{4}/\\d{4}/\\d{5}-.+");
         assertThat(db(() -> jdbc.queryForObject("select count(*) from messages where template_code = 'NHIF_CONTROL_NUMBER'", Integer.class))).isEqualTo(1);
         assertThat(db(() -> health.coveredForRegistration(b, yearId))).isFalse();
@@ -175,10 +175,10 @@ class HealthCoverIT {
         // NHIF's callbacks: the Institution Admin makes the credentials NHIF uses; NHIF gets a token at CIMS and calls back with it
         s.call(post("/api/nhif-setup/callback-credentials"), registrar, null).andExpect(status().isForbidden());
         JsonNode creds = s.body(s.call(post("/api/nhif-setup/callback-credentials"), admin, null).andExpect(status().isOk()));
-        assertThat(creds.get("callbackUrl").asText()).endsWith("/api/integrations/nhif/callback");
-        token(creds.get("clientId").asText(), "wrong").andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("invalid_client"));
-        String token = json.readTree(token(creds.get("clientId").asText(), creds.get("clientSecret").asText()).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString()).get("access_token").asText();
+        assertThat(creds.get("callbackUrl").asString()).endsWith("/api/integrations/nhif/callback");
+        token(creds.get("clientId").asString(), "wrong").andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("invalid_client"));
+        String token = json.readTree(token(creds.get("clientId").asString(), creds.get("clientSecret").asString()).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("access_token").asString();
         callback(null, "{\"controlNo\":\"" + controlNo + "\",\"status\":\"Paid\",\"paymentDate\":\"2027-10-02T10:00:00\"}")
                 .andExpect(status().isUnauthorized());
 
@@ -192,10 +192,10 @@ class HealthCoverIT {
         callback(token, "{\"batchNo\":\"" + batchNo + "\",\"formFourIndexNo\":\"\",\"identificationNo\":\"20060304111110000112\",\" controlNo\":\""
                 + controlNo + "\",\"cardno\":\"SN987654321\"}").andExpect(status().isOk());
         JsonNode after = s.body(s.call(get("/api/registry/students/" + b + "/health-cover"), registrar, null));
-        assertThat(after.at("/cover/status").asText()).isEqualTo("ACTIVE");
-        assertThat(after.at("/cover/cardNo").asText()).isEqualTo("SN987654321");
-        assertThat(after.at("/cover/scheme").asText()).isEqualTo("Student package");
-        assertThat(after.at("/cover/nhifBill/paidOn").asText()).isEqualTo("2027-10-02");
+        assertThat(after.at("/cover/status").asString()).isEqualTo("ACTIVE");
+        assertThat(after.at("/cover/cardNo").asString()).isEqualTo("SN987654321");
+        assertThat(after.at("/cover/scheme").asString()).isEqualTo("Student package");
+        assertThat(after.at("/cover/nhifBill/paidOn").asString()).isEqualTo("2027-10-02");
         assertThat(db(() -> jdbc.queryForObject("select count(*) from messages where template_code in ('NHIF_PAYMENT_CONFIRMED', 'NHIF_CARD_ISSUED')", Integer.class)))
                 .isEqualTo(2);
         callback(token, "{\"controlNo\":\"995000000000\",\"status\":\"Paid\"}").andExpect(status().isBadRequest())
@@ -209,10 +209,10 @@ class HealthCoverIT {
 
         // the batch, re-checking own cards with NHIF, the reports, and the calls in the integration log
         JsonNode batches = s.body(s.call(get("/api/health-covers/overview"), registrar, null)).get("batches");
-        assertThat(batches.findValuesAsText("kind")).containsExactly("CARD_APPLICATION", "REGISTRATION");
+        assertThat(batches.findValuesAsString("kind")).containsExactly("CARD_APPLICATION", "REGISTRATION");
         assertThat(s.body(s.call(get("/api/health-covers/registrations/" + batches.get(0).get("id").asLong() + "/items"), registrar, null))
-                .findValuesAsText("registrationNo")).containsExactly(regB);
-        assertThat(s.body(s.call(post("/api/health-covers/recheck"), registrar, null)).get("summary").asText()).startsWith("1 card(s) checked");
+                .findValuesAsString("registrationNo")).containsExactly(regB);
+        assertThat(s.body(s.call(post("/api/health-covers/recheck"), registrar, null)).get("summary").asString()).startsWith("1 card(s) checked");
         JsonNode rep = s.body(s.call(get("/api/reports/REG-08"), registrar, null).andExpect(status().isOk()));
         assertThat(rep.toString()).contains("Covered %");
         JsonNode without = s.body(s.call(get("/api/reports/REG-09"), registrar, null).andExpect(status().isOk()));
@@ -227,16 +227,16 @@ class HealthCoverIT {
         s.call(put("/api/integration-settings"), admin, SETTINGS.formatted(true, false)).andExpect(status().isOk());
         String student = studentToken((String) st.get(1).get("registration_no"));
         JsonNode chose = s.body(s.call(post("/api/student/health-cover/institution"), student, null).andExpect(status().isOk()));
-        assertThat(chose.at("/cover/route").asText()).isEqualTo("INSTITUTION");
-        assertThat(chose.at("/cover/status").asText()).isEqualTo("READY");
-        assertThat(chose.get("message").asText()).contains("control number");
+        assertThat(chose.at("/cover/route").asString()).isEqualTo("INSTITUTION");
+        assertThat(chose.at("/cover/status").asString()).isEqualTo("READY");
+        assertThat(chose.get("message").asString()).contains("control number");
         // again: nothing changes
         assertThat(s.body(s.call(post("/api/student/health-cover/institution"), student, null)).at("/cover/id").asLong()).isEqualTo(chose.at("/cover/id").asLong());
 
         // the student finds their card after all, before the institution applied for one
         JsonNode card = s.body(s.call(put("/api/student/health-cover/card"), student, "{\"cardNo\":\"SN20345673\"}").andExpect(status().isOk()));
-        assertThat(card.at("/cover/route").asText()).isEqualTo("OWN_CARD");
-        assertThat(card.at("/cover/status").asText()).isEqualTo("ACTIVE");
+        assertThat(card.at("/cover/route").asString()).isEqualTo("OWN_CARD");
+        assertThat(card.at("/cover/status").asString()).isEqualTo("ACTIVE");
         s.call(post("/api/student/health-cover/institution"), student, null).andExpect(jsonPath("$.code").value("ALREADY_COVERED"));
         // not required here: registration never waits for cover
         Long yearId = card.get("academicYearId").asLong();
@@ -253,8 +253,8 @@ class HealthCoverIT {
         JsonNode sim = s.body(s.call(post("/api/health-covers/simulate-nhif"), registrar, null).andExpect(status().isOk()));
         assertThat(sim.get("done").asInt()).isEqualTo(1);
         JsonNode done = s.body(s.call(get("/api/registry/students/" + other + "/health-cover"), registrar, null));
-        assertThat(done.at("/cover/status").asText()).isEqualTo("ACTIVE");
-        assertThat(done.at("/cover/cardNo").asText()).startsWith("SN");
+        assertThat(done.at("/cover/status").asString()).isEqualTo("ACTIVE");
+        assertThat(done.at("/cover/cardNo").asString()).startsWith("SN");
     }
 
     ResultActions token(String clientId, String secret) throws Exception {

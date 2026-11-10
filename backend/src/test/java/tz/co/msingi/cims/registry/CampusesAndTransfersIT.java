@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.registry;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,8 +97,8 @@ class CampusesAndTransfersIT {
     @Test
     void aProgrammeTransferIsRecommendedApprovedAndKeptInHistory() throws Exception {
         JsonNode before = s.body(s.call(get("/api/registry/students/" + studentA), registrar, null));
-        assertThat(before.get("campus").asText()).isEqualTo("Main Campus");   // the old programme has no campus listed: the main one
-        String regNo = before.at("/summary/registrationNo").asText();
+        assertThat(before.get("campus").asString()).isEqualTo("Main Campus");   // the old programme has no campus listed: the main one
+        String regNo = before.at("/summary/registrationNo").asString();
 
         // business is not taught at the main campus
         s.call(post("/api/registry/students/" + studentA + "/transfers"), registrar,
@@ -110,8 +110,8 @@ class CampusesAndTransfersIT {
                 .andExpect(status().isForbidden());
         JsonNode t = s.body(s.call(post("/api/registry/students/" + studentA + "/transfers"), registrar,
                 "{\"toProgrammeId\":" + busProgramme + ",\"reason\":\"Change of career\"}").andExpect(status().isOk()));
-        assertThat(t.get("kind").asText()).isEqualTo("BOTH");          // new programme, and its campus
-        assertThat(t.get("toCampus").asText()).isEqualTo("Arusha Campus");
+        assertThat(t.get("kind").asString()).isEqualTo("BOTH");          // new programme, and its campus
+        assertThat(t.get("toCampus").asString()).isEqualTo("Arusha Campus");
         assertThat(t.get("toYear").asInt()).isEqualTo(1);
         long id = t.get("id").asLong();
         s.call(post("/api/registry/students/" + studentA + "/transfers"), registrar,
@@ -119,7 +119,7 @@ class CampusesAndTransfersIT {
 
         // the Head of the receiving department recommends; it shows in their inbox; the Registrar cannot decide
         JsonNode inbox = s.body(s.call(get("/api/approvals"), hodBus, null));
-        assertThat(inbox.get("items").findValuesAsText("kind")).contains("TRANSFER_RECOMMEND");
+        assertThat(inbox.get("items").findValuesAsString("kind")).contains("TRANSFER_RECOMMEND");
         s.call(post("/api/registry/transfers/" + id + "/recommend"), hodBus, "{\"note\":\"Welcome\"}").andExpect(jsonPath("$.state").value("RECOMMENDED"));
         s.call(post("/api/registry/transfers/" + id + "/decide"), registrar, "{\"approve\":true}").andExpect(status().isForbidden());
         s.call(post("/api/registry/transfers/" + id + "/decide"), chair, "{\"approve\":false}").andExpect(jsonPath("$.code").value("REASON_REQUIRED"));
@@ -127,12 +127,12 @@ class CampusesAndTransfersIT {
                 .andExpect(jsonPath("$.state").value("APPROVED"));
 
         JsonNode after = s.body(s.call(get("/api/registry/students/" + studentA), registrar, null));
-        assertThat(after.at("/summary/registrationNo").asText()).isEqualTo(regNo);
-        assertThat(after.at("/summary/programmeCode").asText()).isEqualTo("ODBA");
-        assertThat(after.get("campus").asText()).isEqualTo("Arusha Campus");
+        assertThat(after.at("/summary/registrationNo").asString()).isEqualTo(regNo);
+        assertThat(after.at("/summary/programmeCode").asString()).isEqualTo("ODBA");
+        assertThat(after.get("campus").asString()).isEqualTo("Arusha Campus");
         JsonNode history = s.body(s.call(get("/api/registry/students/" + studentA + "/transfers"), registrar, null));
         assertThat(history).hasSize(1);
-        assertThat(history.get(0).get("decidedByName").asText()).isEqualTo("Staff chair");
+        assertThat(history.get(0).get("decidedByName").asString()).isEqualTo("Staff chair");
         Integer audits = TenantContext.callAs(inst.info(), () -> tx.execute(x ->
                 jdbc.queryForObject("select count(*) from audit_logs where action = 'STUDENT_TRANSFERRED' and entity_id = ?", Integer.class, studentA)));
         assertThat(audits).isEqualTo(1);
@@ -141,9 +141,9 @@ class CampusesAndTransfersIT {
     @Test
     void aStudentAsksForACampusTransferFromThePortal() throws Exception {
         JsonNode d = s.body(s.call(get("/api/registry/students/" + studentA), registrar, null));
-        String regNo = d.at("/summary/registrationNo").asText();
+        String regNo = d.at("/summary/registrationNo").asString();
         String token = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Kifaru#Mto47\"}")
-                .andExpect(status().isOk())).get("accessToken").asText();
+                .andExpect(status().isOk())).get("accessToken").asString();
         // the old programme is taught at both campuses now
         s.call(put("/api/academic/programmes/" + inst.programmeId() + "/campuses"), admin, "{\"campusIds\":[" + mainCampus + "," + arusha + "]}").andExpect(status().isOk());
         JsonNode options = s.body(s.call(get("/api/student/transfer-options"), token, null).andExpect(status().isOk()));
@@ -152,13 +152,13 @@ class CampusesAndTransfersIT {
                 .andExpect(jsonPath("$.code").value("YEAR_SET_BY_REGISTRY"));
         JsonNode t = s.body(s.call(post("/api/student/transfers"), token, "{\"toCampusId\":" + arusha + ",\"reason\":\"Family moved to Arusha\"}")
                 .andExpect(status().isOk()));
-        assertThat(t.get("kind").asText()).isEqualTo("CAMPUS");
+        assertThat(t.get("kind").asString()).isEqualTo("CAMPUS");
         assertThat(t.get("requestedByStudent").asBoolean()).isTrue();
         // a campus transfer needs no Head of Department; the Deputy Principal decides it
         s.call(post("/api/registry/transfers/" + t.get("id").asLong() + "/recommend"), hodBus, "{}").andExpect(status().isNotFound()); // outside their department
         s.call(post("/api/registry/transfers/" + t.get("id").asLong() + "/decide"), chair, "{\"approve\":true}").andExpect(jsonPath("$.state").value("APPROVED"));
-        assertThat(s.body(s.call(get("/api/student/transfers"), token, null)).get(0).get("state").asText()).isEqualTo("APPROVED");
-        assertThat(s.body(s.call(get("/api/registry/students/" + studentA), registrar, null)).get("campus").asText()).isEqualTo("Arusha Campus");
+        assertThat(s.body(s.call(get("/api/student/transfers"), token, null)).get(0).get("state").asString()).isEqualTo("APPROVED");
+        assertThat(s.body(s.call(get("/api/registry/students/" + studentA), registrar, null)).get("campus").asString()).isEqualTo("Arusha Campus");
         // the student can cancel only their own request while it waits
         JsonNode back = s.body(s.call(post("/api/student/transfers"), token, "{\"toCampusId\":" + mainCampus + ",\"reason\":\"Changed my mind\"}"));
         s.call(post("/api/student/transfers/" + back.get("id").asLong() + "/cancel"), token, null).andExpect(jsonPath("$.state").value("CANCELLED"));
@@ -177,7 +177,7 @@ class CampusesAndTransfersIT {
             s.call(post("/api/finance/fee-structures/" + id + "/approve"), bursar, null).andExpect(jsonPath("$.status").value("APPROVED"));
         }
         JsonNode list = s.body(s.call(get("/api/finance/fee-structures?academicYearId=" + yearId), accountant, null));
-        assertThat(list.findValuesAsText("studentCategoryName")).contains("Evening");
+        assertThat(list.findValuesAsString("studentCategoryName")).contains("Evening");
 
         s.call(put("/api/registry/students/" + studentB + "/category"), registrar, "{\"studentCategoryId\":" + evening + "}")
                 .andExpect(jsonPath("$.studentCategory").value("Evening"));

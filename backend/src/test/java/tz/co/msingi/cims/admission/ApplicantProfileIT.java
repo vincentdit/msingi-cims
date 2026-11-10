@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,16 +101,16 @@ class ApplicantProfileIT {
     @Test
     void educationHistoryUsesThePrimarySchoolListAndNectaSchools() throws Exception {
         JsonNode found = s.body(s.call(get("/api/public/schools/primary?q=bangata"), null, null).andExpect(status().isOk()));
-        assertThat(found.findValuesAsText("name")).contains("BANGATA PRIMARY SCHOOL");
-        assertThat(found.get(0).get("code").asText()).isEqualTo("PS0101001");
-        assertThat(found.get(0).get("region").asText()).isEqualTo("ARUSHA");
-        assertThat(s.body(s.call(get("/api/public/schools/primary?q=ps0101001"), null, null)).get(0).get("name").asText()).isEqualTo("BANGATA PRIMARY SCHOOL");
+        assertThat(found.findValuesAsString("name")).contains("BANGATA PRIMARY SCHOOL");
+        assertThat(found.get(0).get("code").asString()).isEqualTo("PS0101001");
+        assertThat(found.get(0).get("region").asString()).isEqualTo("ARUSHA");
+        assertThat(s.body(s.call(get("/api/public/schools/primary?q=ps0101001"), null, null)).get(0).get("name").asString()).isEqualTo("BANGATA PRIMARY SCHOOL");
         assertThat(s.body(s.call(get("/api/public/schools/primary?q=b"), null, null)).size()).isZero();
         assertThat(s.body(s.call(get("/api/public/schools/primary?q=primary"), null, null)).size()).isEqualTo(25);
 
         // the O-level school comes with the Form Four results the applicant registered with
         String index = "S0909/0001";
-        String school = s.lookup(index).get("centreName").asText();
+        String school = s.lookup(index).get("centreName").asString();
         String token = s.applicantToken();
         s.call(get("/api/applicant/profile"), token, null)
                 .andExpect(jsonPath("$.olevelSchool").value(school)).andExpect(jsonPath("$.olevelFromNecta").value(true))
@@ -132,7 +132,7 @@ class ApplicantProfileIT {
         JsonNode acsee = s.body(s.call(post("/api/applicant/qualifications/necta"), token, "{\"type\":\"ACSEE\",\"indexNumber\":\"S0909/0101\",\"year\":2025}")
                 .andExpect(status().isCreated()));
         s.call(get("/api/applicant/profile"), token, null)
-                .andExpect(jsonPath("$.alevelSchool").value(acsee.get("centreName").asText())).andExpect(jsonPath("$.alevelFromNecta").value(true));
+                .andExpect(jsonPath("$.alevelSchool").value(acsee.get("centreName").asString())).andExpect(jsonPath("$.alevelFromNecta").value(true));
         s.call(delete("/api/applicant/qualifications/" + acsee.get("id").asLong()), token, null).andExpect(status().isNoContent());
         s.call(get("/api/applicant/profile"), token, null)
                 .andExpect(jsonPath("$.alevelSchool").doesNotExist()).andExpect(jsonPath("$.alevelFromNecta").value(false));

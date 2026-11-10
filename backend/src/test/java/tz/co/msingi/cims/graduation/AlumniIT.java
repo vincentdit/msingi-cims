@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.graduation;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,7 +94,7 @@ class AlumniIT {
         db(() -> jdbc.update("update tracer_invitations set token_hash = ? where student_id = ?", PortalLinks.hash(token),
                 jdbc.queryForObject("select id from students where registration_no = 'OLD/20/0002'", Long.class)));
         JsonNode pub = s.body(s.call(get("/api/public/tracer/" + token), null, null).andExpect(status().isOk()));
-        assertThat(pub.get("graduateName").asText()).isEqualTo("Baraka Said");
+        assertThat(pub.get("graduateName").asString()).isEqualTo("Baraka Said");
         assertThat(pub.get("questions").size()).isGreaterThanOrEqualTo(5);
         s.call(post("/api/public/tracer/" + token), null, "{\"relevance\":\"4\"}").andExpect(jsonPath("$.code").value("ANSWER_REQUIRED"));
         s.call(post("/api/public/tracer/" + token), null, "{\"employment\":\"SELF_EMPLOYED\",\"relevance\":\"9\"}").andExpect(jsonPath("$.code").value("INVALID_ANSWER"));

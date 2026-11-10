@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.graduation;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,15 +100,15 @@ class ClearanceAndGraduationIT {
         Map<String, JsonNode> fin = byRegNo(s.body(s.call(get("/api/clearance/finalists"), registrar, null)));
         assertThat(fin).hasSize(3);
         assertThat(fin.get(f.a).at("/award/qualified").asBoolean()).isTrue();
-        assertThat(fin.get(f.a).at("/award/classification").asText()).isEqualTo("First Class");
+        assertThat(fin.get(f.a).at("/award/classification").asString()).isEqualTo("First Class");
         assertThat(fin.get(f.b).at("/award/qualified").asBoolean()).isFalse();
-        assertThat(fin.get(f.b).at("/award/reason").asText()).startsWith("Final semester decision");
+        assertThat(fin.get(f.b).at("/award/reason").asString()).startsWith("Final semester decision");
 
         // offices: the defaults, with officers assigned to library, hostel and sports
         JsonNode offices = s.body(s.call(get("/api/clearance/offices"), registrar, null));
-        assertThat(offices.findValuesAsText("code")).containsExactly("HOD", "LIBRARY", "HOSTEL", "SPORTS", "FINANCE");
+        assertThat(offices.findValuesAsString("code")).containsExactly("HOD", "LIBRARY", "HOSTEL", "SPORTS", "FINANCE");
         Map<String, Long> office = new HashMap<>();
-        offices.forEach(o -> office.put(o.get("code").asText(), o.get("id").asLong()));
+        offices.forEach(o -> office.put(o.get("code").asString(), o.get("id").asLong()));
         long librarianId = userId("Staff librarian"), wardenId = userId("Staff warden");
         s.call(put("/api/clearance/offices/" + office.get("LIBRARY")), librarian, officeBody("LIBRARY", "Library", "STAFF", 20, librarianId))
                 .andExpect(status().isForbidden());
@@ -132,11 +132,11 @@ class ClearanceAndGraduationIT {
         JsonNode mine = s.body(s.call(post("/api/student/clearance"), f.aToken, null).andExpect(status().isOk()));
         assertThat(mine.at("/clearance/total").asInt()).isEqualTo(5);
         Map<String, JsonNode> items = items(mine.get("clearance"));
-        assertThat(items.get("FINANCE").get("status").asText()).isEqualTo("CLEARED");          // a owes nothing
+        assertThat(items.get("FINANCE").get("status").asString()).isEqualTo("CLEARED");          // a owes nothing
         s.call(post("/api/student/clearance"), f.aToken, null).andExpect(jsonPath("$.code").value("CLEARANCE_STARTED"));
         JsonNode cc = s.body(s.call(post("/api/clearance/clearances"), registrar, "{\"studentId\":" + f.cId + "}").andExpect(status().isOk()));
-        assertThat(items(cc).get("FINANCE").get("status").asText()).isEqualTo("HELD");
-        assertThat(items(cc).get("FINANCE").get("note").asText()).startsWith("TZS 100,000 outstanding");
+        assertThat(items(cc).get("FINANCE").get("status").asString()).isEqualTo("HELD");
+        assertThat(items(cc).get("FINANCE").get("note").asString()).startsWith("TZS 100,000 outstanding");
 
         // deciding
         long lib = items.get("LIBRARY").get("id").asLong(), hodItem = items.get("HOD").get("id").asLong();
@@ -153,11 +153,11 @@ class ClearanceAndGraduationIT {
         JsonNode queue = s.body(s.call(get("/api/clearance/offices/" + office.get("LIBRARY") + "/queue"), librarian, null));
         assertThat(queue).hasSize(2);
         s.call(get("/api/clearance/offices/" + office.get("LIBRARY") + "/queue"), warden, null).andExpect(status().isForbidden());
-        assertThat(s.body(s.call(get("/api/student/clearance"), f.aToken, null)).at("/clearance/status").asText()).isEqualTo("IN_PROGRESS");
+        assertThat(s.body(s.call(get("/api/student/clearance"), f.aToken, null)).at("/clearance/status").asString()).isEqualTo("IN_PROGRESS");
         s.call(put("/api/clearance/items/" + lib), librarian, "{\"status\":\"CLEARED\",\"note\":\"Books returned\"}").andExpect(status().isOk());
         mine = s.body(s.call(get("/api/student/clearance"), f.aToken, null));
-        assertThat(mine.at("/clearance/status").asText()).isEqualTo("CLEARED");
-        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode");
+        assertThat(mine.at("/clearance/status").asString()).isEqualTo("CLEARED");
+        List<String> sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode");
         assertThat(sms).contains("CLEARANCE_HELD", "CLEARANCE_COMPLETE");
 
         // graduation: only a is ready
@@ -166,8 +166,8 @@ class ClearanceAndGraduationIT {
         JsonNode gen = s.body(s.call(post("/api/graduations/" + gid + "/generate"), registrar, null));
         assertThat(gen.get("added").asInt()).isEqualTo(1);
         Map<String, JsonNode> notReady = byRegNo(gen.get("notReady"));
-        assertThat(notReady.get(f.b).get("reason").asText()).startsWith("Final semester decision");
-        assertThat(notReady.get(f.c).get("reason").asText()).startsWith("Clearance in progress (");
+        assertThat(notReady.get(f.b).get("reason").asString()).startsWith("Final semester decision");
+        assertThat(notReady.get(f.c).get("reason").asString()).startsWith("Clearance in progress (");
         s.call(post("/api/graduations/" + gid + "/submit"), registrar, null).andExpect(jsonPath("$.status").value("SUBMITTED"));
         s.call(post("/api/graduations/" + gid + "/generate"), registrar, null).andExpect(jsonPath("$.code").value("LIST_SUBMITTED"));
         s.call(put("/api/clearance/items/" + lib), librarian, "{\"status\":\"HELD\",\"note\":\"late fine\"}").andExpect(jsonPath("$.code").value("GRADUAND_LISTED"));
@@ -181,9 +181,9 @@ class ClearanceAndGraduationIT {
         JsonNode g = s.body(s.call(post("/api/graduations/" + gid + "/approve"), chair, "{\"boardMinuteRef\":\"GB/2028/04\"}")
                 .andExpect(jsonPath("$.status").value("APPROVED")));
         assertThat(g.get("graduands")).hasSize(1);
-        assertThat(g.at("/graduands/0/awardName").asText()).isEqualTo("Basic Technician Certificate (NTA Level 4)");
-        assertThat(s.body(s.call(get("/api/registry/students/" + f.aId), registrar, null)).at("/summary/status").asText()).isEqualTo("GRADUATED");
-        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsText("templateCode"))
+        assertThat(g.at("/graduands/0/awardName").asString()).isEqualTo("Basic Technician Certificate (NTA Level 4)");
+        assertThat(s.body(s.call(get("/api/registry/students/" + f.aId), registrar, null)).at("/summary/status").asString()).isEqualTo("GRADUATED");
+        assertThat(s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content").findValuesAsString("templateCode"))
                 .contains("GRADUATION_APPROVED");
 
         // certificates: numbered once, each print logged, reprints need a reason
@@ -197,13 +197,13 @@ class ClearanceAndGraduationIT {
                 .contentType("application/json").content("{\"reason\":\"Original damaged in the post\"}")).andExpect(status().isOk());
         g = s.body(s.call(get("/api/graduations/" + gid), registrar, null));
         assertThat(g.at("/graduands/0/printCount").asInt()).isEqualTo(2);
-        String code = g.at("/graduands/0/verificationCode").asText();
-        assertThat(g.at("/graduands/0/certificateNo").asText()).contains("/CERT/");
+        String code = g.at("/graduands/0/verificationCode").asString();
+        assertThat(g.at("/graduands/0/certificateNo").asString()).contains("/CERT/");
 
         // public verification shows the award without unnecessary personal data
         JsonNode v = s.body(s.call(get("/api/public/verify/" + code), null, null).andExpect(status().isOk()));
-        assertThat(v.get("documentType").asText()).isEqualTo("AWARD_CERTIFICATE");
-        assertThat(v.get("award").asText()).isEqualTo("Basic Technician Certificate (NTA Level 4)");
+        assertThat(v.get("documentType").asString()).isEqualTo("AWARD_CERTIFICATE");
+        assertThat(v.get("award").asString()).isEqualTo("Basic Technician Certificate (NTA Level 4)");
         assertThat(v.has("dateOfBirth")).isFalse();
 
         // NACTVET graduand file and submission record
@@ -216,33 +216,33 @@ class ClearanceAndGraduationIT {
 
         // the student's view; reports
         mine = s.body(s.call(get("/api/student/clearance"), f.aToken, null));
-        assertThat(mine.at("/graduation/status").asText()).isEqualTo("APPROVED");
-        assertThat(mine.at("/graduation/ceremonyDate").asText()).isEqualTo("2028-11-24");
+        assertThat(mine.at("/graduation/status").asString()).isEqualTo("APPROVED");
+        assertThat(mine.at("/graduation/ceremonyDate").asString()).isEqualTo("2028-11-24");
         assertThat(s.body(s.call(get("/api/reports/GRD-01"), registrar, null)).get("rowCount").asInt()).isEqualTo(2);
         assertThat(s.body(s.call(get("/api/reports/GRD-02"), registrar, null)).get("rowCount").asInt()).isEqualTo(1);
 
         // a lost certificate is replaced: a new number and code; the old code now says "replaced", the new one is valid
         long grId = g.at("/graduands/0/id").asLong();
-        String oldNo = g.at("/graduands/0/certificateNo").asText();
+        String oldNo = g.at("/graduands/0/certificateNo").asString();
         String base = "/api/graduations/" + gid + "/graduands/" + grId + "/certificate";
         s.call(post(base + "/replace"), registrar, "{\"reason\":\"\"}").andExpect(status().isBadRequest());
         JsonNode rep = s.body(s.call(post(base + "/replace"), registrar, "{\"reason\":\"Lost in a house fire (police report 12/2029)\"}").andExpect(status().isOk()));
-        assertThat(rep.get("certificateNo").asText()).isEqualTo(oldNo + "/R1");
+        assertThat(rep.get("certificateNo").asString()).isEqualTo(oldNo + "/R1");
         assertThat(rep.get("replacementCount").asInt()).isEqualTo(1);
         assertThat(rep.get("printCount").asInt()).isZero();
-        String newCode = rep.get("verificationCode").asText();
+        String newCode = rep.get("verificationCode").asString();
         assertThat(newCode).isNotEqualTo(code);
-        assertThat(s.body(s.call(get("/api/public/verify/" + code), null, null)).get("status").asText()).isEqualTo("SUPERSEDED");
+        assertThat(s.body(s.call(get("/api/public/verify/" + code), null, null)).get("status").asString()).isEqualTo("SUPERSEDED");
         JsonNode nv = s.body(s.call(get("/api/public/verify/" + newCode), null, null));
-        assertThat(nv.get("status").asText()).isEqualTo("VALID");
-        assertThat(nv.get("letterNo").asText()).isEqualTo(oldNo + "/R1");
+        assertThat(nv.get("status").asString()).isEqualTo("VALID");
+        assertThat(nv.get("letterNo").asString()).isEqualTo(oldNo + "/R1");
         s.call(get("/api/public/verify/ZZZZ-ZZZZ-ZZZZ"), null, null).andExpect(status().isNotFound());
         // every check is logged: the registry sees how often each certificate was checked
         JsonNode recs = s.body(s.call(get(base), registrar, null).andExpect(status().isOk()));
         assertThat(recs).hasSize(2);
-        assertThat(recs.get(0).get("status").asText()).isEqualTo("VALID");
+        assertThat(recs.get(0).get("status").asString()).isEqualTo("VALID");
         assertThat(recs.get(0).get("verifications").asLong()).isEqualTo(1);
-        assertThat(recs.get(1).get("status").asText()).isEqualTo("REPLACED");
+        assertThat(recs.get(1).get("status").asString()).isEqualTo("REPLACED");
         assertThat(recs.get(1).get("verifications").asLong()).isEqualTo(2);   // checked before and after it was replaced
         JsonNode log = s.body(s.call(get("/api/document-verifications?days=7"), registrar, null).andExpect(status().isOk()));
         assertThat(log.get("checks").asLong()).isEqualTo(4);
@@ -252,15 +252,15 @@ class ClearanceAndGraduationIT {
         // revocation is the Principal's (Institution Admin's) decision; a revoked certificate is not printed again
         s.call(post(base + "/revoke"), registrar, "{\"reason\":\"Award withdrawn\"}").andExpect(status().isForbidden());
         JsonNode rev = s.body(s.call(post(base + "/revoke"), admin, "{\"reason\":\"Award withdrawn by the Governing Board, minute GB/12/2029\"}").andExpect(status().isOk()));
-        assertThat(rev.get("certificateStatus").asText()).isEqualTo("REVOKED");
-        assertThat(s.body(s.call(get("/api/public/verify/" + newCode), null, null)).get("status").asText()).isEqualTo("REVOKED");
+        assertThat(rev.get("certificateStatus").asString()).isEqualTo("REVOKED");
+        assertThat(s.body(s.call(get("/api/public/verify/" + newCode), null, null)).get("status").asString()).isEqualTo("REVOKED");
         s.call(post(base + "/replace"), registrar, "{\"reason\":\"again\"}").andExpect(jsonPath("$.code").value("CERTIFICATE_REVOKED"));
         s.call(post("/api/graduations/" + gid + "/certificates/print"), registrar, "{\"reason\":\"x\"}").andExpect(jsonPath("$.code").value("NO_CERTIFICATES"));
 
         // NACTVET returns: the year's results with NACTVET and the checks before sending
         JsonNode ret = s.body(s.call(get("/api/nactvet-returns?academicYearId=" + yearId), registrar, null).andExpect(status().isOk()));
         assertThat(ret.at("/results/published").asLong()).isGreaterThanOrEqualTo(1);
-        assertThat(ret.get("checks").findValuesAsText("code")).contains("RESULTS_NOT_SENT");
+        assertThat(ret.get("checks").findValuesAsString("code")).contains("RESULTS_NOT_SENT");
         byte[] problems = mvc.perform(get("/api/nactvet-returns/problems?academicYearId=" + yearId).header("Authorization", "Bearer " + registrar)
                 .header("X-Tenant", s.tenant)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(problems.length).isGreaterThan(1000);
@@ -296,16 +296,16 @@ class ClearanceAndGraduationIT {
             s.call(put("/api/registry/students/" + id + "/first-registration"), registrar,
                     "{\"documents\":[{\"item\":\"Original CSEE certificate\",\"verified\":true}]}").andExpect(status().isOk());
             s.call(post("/api/registry/students/" + id + "/first-registration/approve"), registrar, null).andExpect(status().isOk());
-            byPhone.put(d.at("/summary/phone").asText(), d.at("/summary/registrationNo").asText());
-            idByRegNo.put(d.at("/summary/registrationNo").asText(), id);
+            byPhone.put(d.at("/summary/phone").asString(), d.at("/summary/registrationNo").asString());
+            idByRegNo.put(d.at("/summary/registrationNo").asString(), id);
         }
         String[] regNos = new String[3];
         String[] tokens = new String[3];
         Applicant[] apps = {a, b, c};
         for (int i = 0; i < 3; i++) {
-            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asText();
+            String phone = s.body(s.call(get("/api/applicant/profile"), apps[i].token(), null)).get("phone").asString();
             regNos[i] = byPhone.get(phone);
-            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asText();
+            tokens[i] = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNos[i] + "\",\"password\":\"Kifaru#Mto47\"}")).get("accessToken").asString();
             s.call(post("/api/student/semester-registration"), tokens[i], "{\"semesterId\":" + semId + ",\"electiveModuleIds\":[],\"detailsConfirmed\":true}")
                     .andExpect(status().isOk());
         }
@@ -316,7 +316,7 @@ class ClearanceAndGraduationIT {
         JsonNode v = s.body(s.call(get("/api/exams/offerings/" + off), lecturer, null));
         long ca = v.get("components").get(0).get("id").asLong(), se = v.get("components").get(1).get("id").asLong();
         Map<String, Long> reg = new HashMap<>();
-        v.get("rows").forEach(x -> reg.put(x.get("registrationNo").asText(), x.get("moduleRegistrationId").asLong()));
+        v.get("rows").forEach(x -> reg.put(x.get("registrationNo").asString(), x.get("moduleRegistrationId").asLong()));
         String[] marks = {"85", "20", "70"};
         StringBuilder e = new StringBuilder();
         for (int i = 0; i < 3; i++) {
@@ -337,7 +337,7 @@ class ClearanceAndGraduationIT {
 
     private long userId(String fullName) throws Exception {
         return s.body(s.call(get("/api/clearance/staff"), registrar, null)).findParents("fullName").stream()
-                .filter(x -> x.get("fullName").asText().equals(fullName)).findFirst().orElseThrow().get("id").asLong();
+                .filter(x -> x.get("fullName").asString().equals(fullName)).findFirst().orElseThrow().get("id").asLong();
     }
 
     private static String officeBody(String code, String name, String kind, int order, Long staffId) {
@@ -351,19 +351,19 @@ class ClearanceAndGraduationIT {
 
     private static Map<String, JsonNode> byRegNo(JsonNode arr) {
         Map<String, JsonNode> m = new HashMap<>();
-        arr.forEach(x -> m.put(x.get("registrationNo").asText(), x));
+        arr.forEach(x -> m.put(x.get("registrationNo").asString(), x));
         return m;
     }
 
     private static Map<String, JsonNode> items(JsonNode clearance) {
         Map<String, JsonNode> m = new HashMap<>();
-        clearance.get("items").forEach(x -> m.put(x.get("officeCode").asText(), x));
+        clearance.get("items").forEach(x -> m.put(x.get("officeCode").asString(), x));
         return m;
     }
 
     private void payAnnualFees(Applicant a) throws Exception {
         for (JsonNode inv : s.body(s.call(get("/api/applicant/account"), a.token(), null)).get("invoices")) {
-            if (inv.get("purpose").asText().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
+            if (inv.get("purpose").asString().equals("ANNUAL_FEES") && inv.get("balance").decimalValue().signum() > 0) {
                 s.call(post("/api/applicant/invoices/" + inv.get("id").asLong() + "/simulate-payment"), a.token(), "{}").andExpect(status().isOk());
             }
         }

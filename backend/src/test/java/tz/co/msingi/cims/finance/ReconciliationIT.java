@@ -1,8 +1,8 @@
 package tz.co.msingi.cims.finance;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,7 +99,7 @@ class ReconciliationIT {
         assertThat(r.get("matchedCount").asInt()).isEqualTo(1);
         assertThat(r.get("exceptionCount").asInt()).isEqualTo(5);
         assertThat(kinds(r)).containsExactlyInAnyOrder("MATCHED", "AMOUNT_MISMATCH", "DUPLICATE", "MISSING_IN_CIMS", "UNKNOWN_BILL", "MISSING_IN_GEPG");
-        assertThat(item(r, "MATCHED").get("payerName").asText()).isNotBlank();
+        assertThat(item(r, "MATCHED").get("payerName").asString()).isNotBlank();
         long reconId = r.get("id").asLong();
 
         // the day cannot be closed with open exceptions
@@ -111,9 +111,9 @@ class ReconciliationIT {
         r = s.body(s.call(post("/api/finance/reconciliations/items/" + item(r, "MISSING_IN_CIMS").get("id").asLong() + "/post"), accountant, "{}")
                 .andExpect(status().isOk()));
         JsonNode posted = item(r, "MISSING_IN_CIMS");
-        assertThat(posted.get("status").asText()).isEqualTo("RESOLVED");
-        assertThat(posted.get("resolution").asText()).isEqualTo("POSTED");
-        assertThat(posted.get("receiptNo").asText()).isNotBlank();
+        assertThat(posted.get("status").asString()).isEqualTo("RESOLVED");
+        assertThat(posted.get("resolution").asString()).isEqualTo("POSTED");
+        assertThat(posted.get("receiptNo").asString()).isNotBlank();
         assertThat(annualInvoice(a).get("paid").decimalValue()).isEqualByComparingTo("250000");
         s.call(post("/api/finance/reconciliations/items/" + posted.get("id").asLong() + "/post"), accountant, "{}")
                 .andExpect(jsonPath("$.code").value("NOT_OPEN"));
@@ -136,10 +136,10 @@ class ReconciliationIT {
 
         JsonNode month = s.body(s.call(get("/api/finance/reconciliations?month=" + YearMonth.from(today)), viewer, null).andExpect(status().isOk()));
         JsonNode day = month.get("days").get(today.getDayOfMonth() - 1);
-        assertThat(day.get("status").asText()).isEqualTo("CLOSED");
+        assertThat(day.get("status").asString()).isEqualTo("CLOSED");
         assertThat(day.get("cimsCount").asInt()).isEqualTo(4);
         assertThat(month.get("canSignOff").asBoolean()).isFalse();
-        assertThat(month.get("signOffBlocker").asText()).isEqualTo("The month has not ended yet");
+        assertThat(month.get("signOffBlocker").asString()).isEqualTo("The month has not ended yet");
     }
 
     @Test
@@ -159,7 +159,7 @@ class ReconciliationIT {
         assertThat(item(t, "MATCHED").get("paidDateDiffers").asBoolean()).isTrue();
         assertThat(t.get("cimsCount").asInt()).isZero();
         JsonNode again = s.body(s.call(get("/api/finance/reconciliations/" + y.get("id").asLong()), viewer, null));
-        assertThat(item(again, "MISSING_IN_GEPG").get("resolution").asText()).isEqualTo("AUTO_MATCHED");
+        assertThat(item(again, "MISSING_IN_GEPG").get("resolution").asString()).isEqualTo("AUTO_MATCHED");
         assertThat(again.get("openExceptions").asInt()).isZero();
     }
 
@@ -174,12 +174,12 @@ class ReconciliationIT {
 
         JsonNode m = s.body(s.call(get("/api/finance/reconciliations?month=" + last), bursar, null));
         assertThat(m.get("collected").decimalValue()).isEqualByComparingTo("60000");
-        assertThat(m.get("signOffBlocker").asText()).isEqualTo("Not reconciled yet: " + day);
+        assertThat(m.get("signOffBlocker").asString()).isEqualTo("Not reconciled yet: " + day);
         s.call(post("/api/finance/reconciliations/months/" + last + "/sign-off"), bursar, "{}").andExpect(jsonPath("$.code").value("CANNOT_SIGN_OFF"));
 
         JsonNode r = s.body(importFile(accountant, day, HEADER + "\n" + row));
         assertThat(r.get("exceptionCount").asInt()).isZero();
-        assertThat(s.body(s.call(get("/api/finance/reconciliations?month=" + last), bursar, null)).get("signOffBlocker").asText())
+        assertThat(s.body(s.call(get("/api/finance/reconciliations?month=" + last), bursar, null)).get("signOffBlocker").asString())
                 .isEqualTo("Still open: " + day);
         s.call(post("/api/finance/reconciliations/" + r.get("id").asLong() + "/close"), accountant, null).andExpect(status().isOk());
 
@@ -235,7 +235,7 @@ class ReconciliationIT {
 
     private JsonNode annualInvoice(Applicant a) throws Exception {
         for (JsonNode i : s.body(s.call(get("/api/applicant/account"), a.token(), null)).get("invoices")) {
-            if (i.get("purpose").asText().equals("ANNUAL_FEES")) return i;
+            if (i.get("purpose").asString().equals("ANNUAL_FEES")) return i;
         }
         throw new AssertionError("no annual invoice");
     }
@@ -262,12 +262,12 @@ class ReconciliationIT {
 
     private static List<String> kinds(JsonNode r) {
         List<String> out = new ArrayList<>();
-        r.get("items").forEach(i -> out.add(i.get("kind").asText()));
+        r.get("items").forEach(i -> out.add(i.get("kind").asString()));
         return out;
     }
 
     private static JsonNode item(JsonNode r, String kind) {
-        for (JsonNode i : r.get("items")) if (i.get("kind").asText().equals(kind)) return i;
+        for (JsonNode i : r.get("items")) if (i.get("kind").asString().equals(kind)) return i;
         throw new AssertionError("no " + kind + " in " + r);
     }
 }

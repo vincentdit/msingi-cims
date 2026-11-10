@@ -1,6 +1,6 @@
 package tz.co.msingi.cims.integration.necta;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -67,7 +67,7 @@ public class LiveNectaClient implements NectaClient {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(connectTimeout));
         factory.setReadTimeout(Duration.ofSeconds(readTimeout));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        this.http = tz.co.msingi.cims.common.web.Json2Http.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.resultsPath = resultsPath;
         this.apiKey = apiKey;
         this.retryDelayMs = retryDelayMs;
@@ -144,7 +144,7 @@ public class LiveNectaClient implements NectaClient {
         if (results.isObject()) {
             division = text(results.path("division"));
             JsonNode pts = results.path("points");
-            if (pts.isNumber() || (pts.isTextual() && pts.asText().matches("\\d+(\\.\\d+)?"))) {
+            if (pts.isNumber() || (pts.isString() && pts.asString().matches("\\d+(\\.\\d+)?"))) {
                 points = (int) Math.round(pts.asDouble());
             }
         }
@@ -174,7 +174,7 @@ public class LiveNectaClient implements NectaClient {
 
     private static String text(JsonNode n) {
         if (n == null || n.isMissingNode() || n.isNull()) return null;
-        String s = n.asText().trim();
+        String s = n.asString().trim();
         return s.isEmpty() ? null : s;
     }
 

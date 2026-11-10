@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,24 +63,24 @@ class AuditTrailIT {
     @Test
     void theAuditorSeesWhoDidWhatWhenAndFromWhere() throws Exception {
         JsonNode created = logs("?entity=StaffUser&action=CREATE").get("content").get(0);
-        assertThat(created.get("actorName").asText()).isEqualTo("Staff admin");
-        assertThat(created.get("area").asText()).isEqualTo("Security");
+        assertThat(created.get("actorName").asString()).isEqualTo("Staff admin");
+        assertThat(created.get("area").asString()).isEqualTo("Security");
         assertThat(created.get("entityId").asLong()).isEqualTo(createdId);
-        assertThat(created.get("details").get("username").asText()).isEqualTo("neema");
-        assertThat(created.get("ipAddress").asText()).isNotBlank();
+        assertThat(created.get("details").get("username").asString()).isEqualTo("neema");
+        assertThat(created.get("ipAddress").asString()).isNotBlank();
 
         // failed sign-ins are recorded against the account, with the reason
         JsonNode failed = logs("?action=LOGIN_FAILED").get("content");
         assertThat(failed).hasSize(1);
-        assertThat(failed.get(0).get("actorName").asText()).isEqualTo("Staff registrar");
-        assertThat(failed.get(0).get("details").get("reason").asText()).isEqualTo("wrong password");
+        assertThat(failed.get(0).get("actorName").asString()).isEqualTo("Staff registrar");
+        assertThat(failed.get(0).get("details").get("reason").asString()).isEqualTo("wrong password");
 
         // filters: security events, a person, free text and a record's whole history
-        assertThat(logs("?security=true").get("content").findValuesAsText("action")).contains("LOGIN", "LOGIN_FAILED", "CREATE");
+        assertThat(logs("?security=true").get("content").findValuesAsString("action")).contains("LOGIN", "LOGIN_FAILED", "CREATE");
         long adminId = created.get("actorUserId").asLong();
-        assertThat(logs("?actorId=" + adminId).get("content").findValuesAsText("actorName")).containsOnly("Staff admin");
+        assertThat(logs("?actorId=" + adminId).get("content").findValuesAsString("actorName")).containsOnly("Staff admin");
         assertThat(logs("?q=neema").get("totalElements").asLong()).isEqualTo(1);
-        assertThat(logs("?entity=StaffUser&entityId=" + createdId).get("content").findValuesAsText("action")).containsExactly("CREATE");
+        assertThat(logs("?entity=StaffUser&entityId=" + createdId).get("content").findValuesAsString("action")).containsExactly("CREATE");
         assertThat(logs("?area=Finance").get("totalElements").asLong()).isZero();
 
         JsonNode page = logs("?size=2&page=0");
@@ -109,7 +109,7 @@ class AuditTrailIT {
                 .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(csv).contains("When (EAT),Who,User ID,Action,Area,Record,Record ID,Details,From (IP)").contains("LOGIN_FAILED");
         JsonNode exported = logs("?action=AUDIT_EXPORTED").get("content").get(0);
-        assertThat(exported.get("actorName").asText()).isEqualTo("Staff auditor");
+        assertThat(exported.get("actorName").asString()).isEqualTo("Staff auditor");
         assertThat(exported.get("details").get("records").asInt()).isPositive();
     }
 

@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance.aggregator;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -65,7 +65,7 @@ class PhonePaymentIT {
                  "region":"Dodoma","nextOfKinName":"Parent","nextOfKinPhone":"0713000111"}""").andExpect(status().isOk());
         long appId = s.body(s.call(post("/api/applicant/applications"), token, "{\"windowId\":" + inst.windowId() + "}")).get("id").asLong();
         JsonNode fee = s.body(s.call(post("/api/applicant/applications/" + appId + "/fee"), token, null).andExpect(status().isOk()));
-        return new String[]{token, fee.get("invoiceId").asText(), String.valueOf(appId)};
+        return new String[]{token, fee.get("invoiceId").asString(), String.valueOf(appId)};
     }
 
     @Test
@@ -100,11 +100,11 @@ class PhonePaymentIT {
                  "fields":{"vendor":"TILL1","apiKey":"key-1","apiSecret":"secret-1"}}""").andExpect(status().isOk()));
         assertThat(sel.toString()).doesNotContain("secret-1");
         assertThat(sel.at("/fields/2/set").asBoolean()).isTrue();
-        assertThat(sel.get("defaultUrl").asText()).contains("selcommobile.com");
-        assertThat(sel.get("notifyUrl").asText()).contains("/api/integrations/collections/selcom/");
+        assertThat(sel.get("defaultUrl").asString()).contains("selcommobile.com");
+        assertThat(sel.get("notifyUrl").asString()).contains("/api/integrations/collections/selcom/");
 
         // Selcom's signed notification for a request: refused with a wrong signature, recorded with the right one
-        String selToken = sel.get("notifyUrl").asText().replaceAll(".*/", "");
+        String selToken = sel.get("notifyUrl").asString().replaceAll(".*/", "");
         Long invoiceId = Long.valueOf(a[1]);
         String reference = TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForObject("select control_no from control_numbers where invoice_id = ? order by id desc limit 1", String.class, invoiceId)));
         TenantContext.runAs(inst.info(), () -> tx.executeWithoutResult(x -> jdbc.update("""
@@ -140,16 +140,16 @@ class PhonePaymentIT {
         s.call(post("/api/applicant/invoices/" + b[1] + "/phone-payment"), b[0], "{\"phone\":\"12345\"}").andExpect(jsonPath("$.code").value("INVALID_PHONE"));
         s.call(post("/api/applicant/invoices/" + a[1] + "/phone-payment"), b[0], "{\"phone\":\"0712345678\"}").andExpect(status().isNotFound());   // not mine
         JsonNode req = s.body(s.call(post("/api/applicant/invoices/" + b[1] + "/phone-payment"), b[0], "{\"phone\":\"0712 345 678\"}").andExpect(status().isOk()));
-        assertThat(req.get("status").asText()).isEqualTo("PENDING");
-        assertThat(req.get("phone").asText()).isEqualTo("255712345678");
+        assertThat(req.get("status").asString()).isEqualTo("PENDING");
+        assertThat(req.get("phone").asString()).isEqualTo("255712345678");
         assertThat(req.get("amount").decimalValue()).isEqualByComparingTo("30000");
         // a second tap does not prompt again
         assertThat(s.body(s.call(post("/api/applicant/invoices/" + b[1] + "/phone-payment"), b[0], "{\"phone\":\"0712345678\"}")).get("id").asLong())
                 .isEqualTo(req.get("id").asLong());
         Thread.sleep(SimulatedAggregatorClient.PAY_AFTER_MS + 500);
         JsonNode done = s.body(s.call(get("/api/applicant/phone-payments/" + req.get("id").asLong()), b[0], null).andExpect(status().isOk()));
-        assertThat(done.get("status").asText()).isEqualTo("PAID");
-        assertThat(done.get("receiptNo").asText()).contains("/RCT/");
+        assertThat(done.get("status").asString()).isEqualTo("PAID");
+        assertThat(done.get("receiptNo").asString()).contains("/RCT/");
         assertThat(s.body(s.call(get("/api/applicant/applications/" + b[2] + "/fee"), b[0], null)).get("feePaid").asBoolean()).isTrue();
         s.call(post("/api/applicant/invoices/" + b[1] + "/phone-payment"), b[0], "{\"phone\":\"0712345678\"}").andExpect(jsonPath("$.code").value("NOTHING_TO_PAY"));
 
@@ -157,8 +157,8 @@ class PhonePaymentIT {
         String[] c = applicantWithFee(s, inst, 3);
         JsonNode poor = s.body(s.call(post("/api/applicant/invoices/" + c[1] + "/phone-payment"), c[0], "{\"phone\":\"0712345679\"}"));
         JsonNode failed = s.body(s.call(get("/api/applicant/phone-payments/" + poor.get("id").asLong()), c[0], null));
-        assertThat(failed.get("status").asText()).isEqualTo("FAILED");
-        assertThat(failed.get("message").asText()).contains("Insufficient balance");
+        assertThat(failed.get("status").asString()).isEqualTo("FAILED");
+        assertThat(failed.get("message").asString()).contains("Insufficient balance");
 
         // a prompt given up on (expired) but paid late is still recorded by the job, without anyone
         String[] d = applicantWithFee(s, inst, 4);
@@ -168,14 +168,14 @@ class PhonePaymentIT {
                 "update phone_payment_requests set status = 'EXPIRED', completed_at = now(), last_checked_at = null where id = ?", lateId)));
         Thread.sleep(SimulatedAggregatorClient.PAY_AFTER_MS + 500);
         TenantContext.runAs(inst.info(), () -> service.sweep());
-        assertThat(s.body(s.call(get("/api/applicant/phone-payments/" + lateId), d[0], null)).get("status").asText()).isEqualTo("PAID");
+        assertThat(s.body(s.call(get("/api/applicant/phone-payments/" + lateId), d[0], null)).get("status").asString()).isEqualTo("PAID");
         assertThat(s.body(s.call(get("/api/applicant/applications/" + d[2] + "/fee"), d[0], null)).get("feePaid").asBoolean()).isTrue();
         // asked once: the next sweep within 30 minutes leaves it alone
         assertThat(TenantContext.callAs(inst.info(), () -> service.sweep())).isZero();
 
         // the bursary's list, and the integration log
         JsonNode list = s.body(s.call(get("/api/phone-payments"), accountant, null).andExpect(status().isOk()));
-        assertThat(list.findValuesAsText("status")).contains("PAID", "FAILED");
+        assertThat(list.findValuesAsString("status")).contains("PAID", "FAILED");
         assertThat(s.body(s.call(get("/api/phone-payments?status=FAILED"), accountant, null))).hasSize(1);
         java.util.List<String> ops = TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForList("select operation from integration_calls where system = 'COLLECTION'", String.class)));
         assertThat(ops).contains("phonePrompt simulated", "notification selcom");

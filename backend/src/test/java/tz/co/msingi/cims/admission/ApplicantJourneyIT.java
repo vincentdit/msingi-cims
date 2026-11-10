@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.admission;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,20 +47,20 @@ class ApplicantJourneyIT {
         // the applicant types the Form Four index number and year; NECTA supplies the names to confirm
         JsonNode candidate = body(call(post("/api/applicant-auth/necta-lookup"), null, """
                 {"indexNumber":"s0101-0002","examYear":2025}""").andExpect(status().isOk()));
-        assertThat(candidate.get("indexNumber").asText()).isEqualTo("S0101/0002");
-        assertThat(candidate.get("firstName").asText()).isNotBlank();
-        assertThat(candidate.get("surname").asText()).isNotBlank();
-        assertThat(candidate.get("sex").asText()).isIn("M", "F");
+        assertThat(candidate.get("indexNumber").asString()).isEqualTo("S0101/0002");
+        assertThat(candidate.get("firstName").asString()).isNotBlank();
+        assertThat(candidate.get("surname").asString()).isNotBlank();
+        assertThat(candidate.get("sex").asString()).isIn("M", "F");
         assertThat(candidate.get("subjects").size()).isEqualTo(9);
         assertThat(candidate.get("alreadyRegistered").asBoolean()).isFalse();
-        String fullName = candidate.get("fullName").asText();
+        String fullName = candidate.get("fullName").asString();
 
         // names typed by the browser are not accepted: they come from NECTA again on registration
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
                 {"indexNumber":"S0101/0002/2025","firstName":"Someone","surname":"Else","phone":"0755 123 456","password":"Kifaru#Mto47","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
-        assertThat(reg.get("fullName").asText()).isEqualTo(fullName);
-        String otp = reg.get("devOtp").asText();
+        assertThat(reg.get("fullName").asString()).isEqualTo(fullName);
+        String otp = reg.get("devOtp").asString();
 
         call(post("/api/applicant-auth/login"), null, """
                 {"login":"0755123456","password":"Kifaru#Mto47"}""")
@@ -69,20 +69,20 @@ class ApplicantJourneyIT {
 
         String token = body(call(post("/api/applicant-auth/verify"), null,
                 "{\"phone\":\"+255755123456\",\"code\":\"" + otp + "\"}").andExpect(status().isOk()))
-                .get("accessToken").asText();
+                .get("accessToken").asString();
 
         // the profile carries NECTA's names and sex, and the CSEE results are already there
         JsonNode profile = body(call(get("/api/applicant/profile"), token, null));
-        assertThat(profile.get("fullName").asText()).isEqualTo(fullName);
-        assertThat(profile.get("sex").asText()).isEqualTo(candidate.get("sex").asText());
-        assertThat(profile.get("nectaIndexNumber").asText()).isEqualTo("S0101/0002");
+        assertThat(profile.get("fullName").asString()).isEqualTo(fullName);
+        assertThat(profile.get("sex").asString()).isEqualTo(candidate.get("sex").asString());
+        assertThat(profile.get("nectaIndexNumber").asString()).isEqualTo("S0101/0002");
         assertThat(profile.get("namesFromNecta").asBoolean()).isTrue();
-        assertThat(profile.get("premNumber").asText()).matches("\\d{11}").isEqualTo(candidate.get("premNumber").asText());   // from NECTA
+        assertThat(profile.get("premNumber").asString()).matches("\\d{11}").isEqualTo(candidate.get("premNumber").asString());   // from NECTA
         JsonNode quals = body(call(get("/api/applicant/qualifications"), token, null));
         assertThat(quals.size()).isEqualTo(1);
         assertThat(quals.get(0).get("registration").asBoolean()).isTrue();
         assertThat(quals.get(0).get("verified").asBoolean()).isTrue();
-        assertThat(quals.get(0).get("candidateName").asText()).isEqualTo(fullName);
+        assertThat(quals.get(0).get("candidateName").asString()).isEqualTo(fullName);
         call(delete("/api/applicant/qualifications/" + quals.get(0).get("id").asLong()), token, null)
                 .andExpect(jsonPath("$.code").value("QUALIFICATION_LOCKED"));
 
@@ -118,16 +118,16 @@ class ApplicantJourneyIT {
                 .andExpect(jsonPath("$.code").value("FEE_NOT_PAID"));
         // what is still to do comes as codes the portal words in the applicant's language, and as plain English
         JsonNode started = body(call(get("/api/applicant/applications"), token, null)).get(0);
-        assertThat(started.get("todo").findValuesAsText("code")).containsExactly("FEE", "CHOICE");
-        assertThat(started.get("blockers").get(0).asText()).isEqualTo("Pay the application fee");
+        assertThat(started.get("todo").findValuesAsString("code")).containsExactly("FEE", "CHOICE");
+        assertThat(started.get("blockers").get(0).asString()).isEqualTo("Pay the application fee");
 
         JsonNode fee = body(call(post("/api/applicant/applications/" + appId + "/fee"), token, null));
-        assertThat(fee.get("controlNo").asText()).startsWith("99").hasSize(12);
+        assertThat(fee.get("controlNo").asString()).startsWith("99").hasSize(12);
         assertThat(fee.get("feePaid").asBoolean()).isFalse();
 
         fee = body(call(post("/api/applicant/applications/" + appId + "/fee/simulate-payment"), token, null));
         assertThat(fee.get("feePaid").asBoolean()).isTrue();
-        assertThat(fee.get("invoiceStatus").asText()).isEqualTo("PAID");
+        assertThat(fee.get("invoiceStatus").asString()).isEqualTo("PAID");
 
         call(put("/api/applicant/applications/" + appId + "/choices"), token,
                 "{\"windowProgrammeIds\":[" + inst.windowProgrammeId() + "]}")
@@ -136,15 +136,15 @@ class ApplicantJourneyIT {
 
         JsonNode submitted = body(call(post("/api/applicant/applications/" + appId + "/submit"), token, null)
                 .andExpect(status().isOk()));
-        assertThat(submitted.get("status").asText()).isEqualTo("SUBMITTED");
-        assertThat(submitted.get("referenceNo").asText()).isEqualTo(tenant + "/APP/2027/000001");
+        assertThat(submitted.get("status").asString()).isEqualTo("SUBMITTED");
+        assertThat(submitted.get("referenceNo").asString()).isEqualTo(tenant + "/APP/2027/000001");
 
         // still open to changes while the window is open (see AmendAfterSubmissionIT)
         assertThat(submitted.get("amendable").asBoolean()).isTrue();
 
         // the Admissions Office sees it under NECTA's names
         String staff = body(call(post("/api/auth/login"), null,
-                "{\"username\":\"officer\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}")).get("accessToken").asText();
+                "{\"username\":\"officer\",\"password\":\"" + TestData.STAFF_PASSWORD + "\"}")).get("accessToken").asString();
         call(get("/api/admission/applications?status=SUBMITTED"), staff, null)
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].applicantName").value(fullName));
@@ -182,7 +182,7 @@ class ApplicantJourneyIT {
                 {"indexNumber":"S0101/0007","examYear":2025,"phone":"0688 000 998","password":"Kifaru#Mto47","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
         String token = body(call(post("/api/applicant-auth/verify"), null,
-                "{\"phone\":\"0688000998\",\"code\":\"" + again.get("devOtp").asText() + "\"}").andExpect(status().isOk())).get("accessToken").asText();
+                "{\"phone\":\"0688000998\",\"code\":\"" + again.get("devOtp").asString() + "\"}").andExpect(status().isOk())).get("accessToken").asString();
         assertThat(body(call(get("/api/applicant/qualifications"), token, null)).size()).isEqualTo(1);
         // the first number is free again
         call(post("/api/applicant-auth/login"), null, """
@@ -199,13 +199,13 @@ class ApplicantJourneyIT {
         JsonNode reg = body(call(post("/api/applicant-auth/register"), null, """
                 {"indexNumber":"S0101/0008","examYear":2025,"phone":"0688 000 701","email":"neema.typo@example.com","password":"Kifaru#Mto47","acceptPrivacyNotice":true}""")
                 .andExpect(status().isCreated()));
-        assertThat(reg.get("maskedEmail").asText()).isEqualTo("n***o@example.com");
-        assertThat(reg.get("message").asText()).contains("by email to n***o@example.com");
+        assertThat(reg.get("maskedEmail").asString()).isEqualTo("n***o@example.com");
+        assertThat(reg.get("message").asString()).contains("by email to n***o@example.com");
         // the email outbox keeps the code masked
         java.util.List<String> bodies = tz.co.msingi.cims.platform.tenancy.TenantContext.callAs(inst.info(), () -> tx.execute(x ->
                 jdbc.queryForList("select body from email_messages where to_address = 'neema.typo@example.com'", String.class)));
         assertThat(bodies)
-                .singleElement().asString().contains("******").doesNotContain(reg.get("devOtp").asText());
+                .singleElement().asString().contains("******").doesNotContain(reg.get("devOtp").asString());
 
         // the wrong password cannot move the registration
         call(post("/api/applicant-auth/change-contact"), null, """
@@ -214,11 +214,11 @@ class ApplicantJourneyIT {
         JsonNode moved = body(call(post("/api/applicant-auth/change-contact"), null, """
                 {"phone":"0688000701","password":"Kifaru#Mto47","newPhone":"0688 000 702","newEmail":"neema@example.com"}""")
                 .andExpect(status().isOk()));
-        assertThat(moved.get("maskedEmail").asText()).isEqualTo("n***a@example.com");
+        assertThat(moved.get("maskedEmail").asString()).isEqualTo("n***a@example.com");
         // the first code no longer works; the new one confirms the corrected number
-        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + reg.get("devOtp").asText() + "\"}")
+        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + reg.get("devOtp").asString() + "\"}")
                 .andExpect(status().isUnprocessableEntity());
-        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + moved.get("devOtp").asText() + "\"}")
+        call(post("/api/applicant-auth/verify"), null, "{\"phone\":\"0688000702\",\"code\":\"" + moved.get("devOtp").asString() + "\"}")
                 .andExpect(status().isOk());
         call(post("/api/applicant-auth/change-contact"), null, """
                 {"phone":"0688000702","password":"Kifaru#Mto47","newPhone":"0688 000 703"}""")
@@ -259,7 +259,7 @@ class ApplicantJourneyIT {
                 .andExpect(jsonPath("$.errors.acceptPrivacyNotice").exists());
     }
 
-    private ResultActions call(MockHttpServletRequestBuilder req, String token, String body) throws Exception {
+    private ResultActions call(org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder<?> req, String token, String body) throws Exception {
         req.header("X-Tenant", tenant);
         if (token != null) req.header("Authorization", "Bearer " + token);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);

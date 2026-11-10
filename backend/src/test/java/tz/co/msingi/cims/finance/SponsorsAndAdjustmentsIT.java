@@ -1,7 +1,7 @@
 package tz.co.msingi.cims.finance;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,11 +89,11 @@ class SponsorsAndAdjustmentsIT {
         for (JsonNode st : handover.get("students")) {
             long id = st.get("studentId").asLong();
             JsonNode d = s.body(s.call(get("/api/registry/students/" + id), registrar, null));
-            studentByPhone.put(d.at("/summary/phone").asText(), id);
-            regNo.put(id, d.at("/summary/registrationNo").asText());
+            studentByPhone.put(d.at("/summary/phone").asString(), id);
+            regNo.put(id, d.at("/summary/registrationNo").asString());
         }
-        long sa = studentByPhone.get(s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asText());
-        long sb = studentByPhone.get(s.body(s.call(get("/api/applicant/profile"), b.token(), null)).get("phone").asText());
+        long sa = studentByPhone.get(s.body(s.call(get("/api/applicant/profile"), a.token(), null)).get("phone").asString());
+        long sb = studentByPhone.get(s.body(s.call(get("/api/applicant/profile"), b.token(), null)).get("phone").asString());
         long invA = annual(sa), invB = annual(sb);
         assertThat(s.body(s.call(get("/api/finance/students/" + sa + "/clearance"), registrar, null)).get("amountNeeded").decimalValue())
                 .isEqualByComparingTo("320000");
@@ -128,7 +128,7 @@ class SponsorsAndAdjustmentsIT {
                 .isEqualByComparingTo("20000");
         JsonNode stA = s.body(s.call(get("/api/finance/students/" + sa + "/statement"), registrar, null));
         assertThat(stA.get("sponsorPending").decimalValue()).isEqualByComparingTo("300000");
-        assertThat(stA.at("/sponsors/0/sponsor").asText()).isEqualTo("Higher Education Students' Loans Board");
+        assertThat(stA.at("/sponsors/0/sponsor").asString()).isEqualTo("Higher Education Students' Loans Board");
 
         // HESLB pays a's share by bank: it moves onto a's invoice; a duplicate reference is refused
         s.call(post("/api/finance/sponsor-invoices/" + sponsorInv + "/remittances"), accountant, "{\"amount\":300000,\"reference\":\"BOT-001\",\"paidOn\":\"" + TODAY + "\"}")
@@ -138,7 +138,7 @@ class SponsorsAndAdjustmentsIT {
         stA = s.body(s.call(get("/api/finance/students/" + sa + "/statement"), registrar, null));
         assertThat(stA.get("paid").decimalValue()).isEqualByComparingTo("300000");
         assertThat(stA.get("sponsorPending").decimalValue()).isZero();
-        assertThat(stA.get("payments").findValuesAsText("channel")).contains("SPONSOR");
+        assertThat(stA.get("payments").findValuesAsString("channel")).contains("SPONSOR");
 
         // HESLB's officer sees only HESLB, asks for a control number and pays the rest through GePG
         data.staffScoped(inst.tenant(), "heslb", Role.SPONSOR_OFFICER, "SPONSOR", heslb);
@@ -149,7 +149,7 @@ class SponsorsAndAdjustmentsIT {
         s.call(post("/api/finance/sponsors/" + heslb + "/invoices"), officerH, "{\"academicYearId\":" + yearId + "}").andExpect(status().isForbidden());
         s.call(get("/api/finance/students/" + sa + "/statement"), officerH, null).andExpect(status().isForbidden());
         String controlNo = s.body(s.call(post("/api/finance/sponsor-invoices/" + sponsorInv + "/control-number"), officerH, null).andExpect(status().isOk()))
-                .get("controlNo").asText();
+                .get("controlNo").asString();
         tenantWork.run(inst.tenant(), () -> billing.recordPayment(new BillingService.PaymentNotification(null, controlNo, "GEPG-" + UUID.randomUUID().toString().substring(0, 12), "PSP1",
                 "CRDB", "BANK", new BigDecimal("250000"), "255754000111", OffsetDateTime.now())));
         assertThat(s.body(s.call(get("/api/finance/students/" + sb + "/statement"), registrar, null)).get("paid").decimalValue()).isEqualByComparingTo("250000");
@@ -163,14 +163,14 @@ class SponsorsAndAdjustmentsIT {
         // a waiver within the threshold: requested by the Accountant, approved by the Bursar, posted as a credit note
         s.call(post("/api/finance/adjustments"), accountant, waiver(sa, invA, "1000000")).andExpect(jsonPath("$.code").value("WAIVER_TOO_LARGE"));
         JsonNode w1 = s.body(s.call(post("/api/finance/adjustments"), accountant, waiver(sa, invA, "50000")).andExpect(status().isOk()));
-        assertThat(w1.get("status").asText()).isEqualTo("PENDING");
+        assertThat(w1.get("status").asString()).isEqualTo("PENDING");
         assertThat(w1.get("needsSecondLevel").asBoolean()).isFalse();
         s.call(post("/api/finance/adjustments/" + w1.get("id").asLong() + "/approve"), accountant, "{}").andExpect(status().isForbidden());
         JsonNode inbox = s.body(s.call(get("/api/approvals"), bursar, null).andExpect(status().isOk()));
-        assertThat(inbox.get("items").findValuesAsText("kind")).contains("FIN_ADJUSTMENT");
+        assertThat(inbox.get("items").findValuesAsString("kind")).contains("FIN_ADJUSTMENT");
         JsonNode w1done = s.body(s.call(post("/api/finance/adjustments/" + w1.get("id").asLong() + "/approve"), bursar, "{}").andExpect(status().isOk()));
-        assertThat(w1done.get("status").asText()).isEqualTo("APPROVED");
-        assertThat(w1done.get("documentNo").asText()).contains("/CN/");
+        assertThat(w1done.get("status").asString()).isEqualTo("APPROVED");
+        assertThat(w1done.get("documentNo").asString()).contains("/CN/");
         assertThat(s.body(s.call(get("/api/finance/students/" + sa + "/statement"), registrar, null)).get("paid").decimalValue()).isEqualByComparingTo("350000");
 
         // above the threshold, the Principal approves as well; the Bursar cannot do both levels
@@ -179,7 +179,7 @@ class SponsorsAndAdjustmentsIT {
         long w2 = s.body(s.call(post("/api/finance/adjustments"), accountant, waiver(sb, invB, "150000"))).get("id").asLong();
         s.call(post("/api/finance/adjustments/" + w2 + "/approve"), bursar, "{\"note\":\"Orphan, letter from the ward office\"}").andExpect(jsonPath("$.status").value("ENDORSED"));
         s.call(post("/api/finance/adjustments/" + w2 + "/approve"), bursar, "{}").andExpect(status().isForbidden());
-        assertThat(s.body(s.call(get("/api/approvals"), viewer, null)).get("items").findValuesAsText("kind")).contains("FIN_ADJUSTMENT_SECOND");
+        assertThat(s.body(s.call(get("/api/approvals"), viewer, null)).get("items").findValuesAsString("kind")).contains("FIN_ADJUSTMENT_SECOND");
         s.call(post("/api/finance/adjustments/" + w2 + "/approve"), viewer, "{}").andExpect(jsonPath("$.status").value("APPROVED"));
 
         // a refund of credit: limited to the credit, approved, then paid out
@@ -190,13 +190,13 @@ class SponsorsAndAdjustmentsIT {
         long r1 = s.body(s.call(post("/api/finance/adjustments"), accountant, refund(sa, "30000"))).get("id").asLong();
         s.call(post("/api/finance/adjustments/" + r1 + "/reject"), bursar, "{}").andExpect(jsonPath("$.code").value("NOTE_REQUIRED"));
         JsonNode r1done = s.body(s.call(post("/api/finance/adjustments/" + r1 + "/approve"), bursar, "{}"));
-        assertThat(r1done.get("documentNo").asText()).contains("/RFV/");
+        assertThat(r1done.get("documentNo").asString()).contains("/RFV/");
         assertThat(r1done.get("canMarkPaid").asBoolean()).isTrue();
         assertThat(s.body(s.call(get("/api/finance/adjustments/options?studentId=" + sa), accountant, null)).get("credit").decimalValue()).isZero();
         s.call(post("/api/finance/adjustments/" + r1 + "/paid"), accountant, "{\"reference\":\"CHQ 004512\"}").andExpect(jsonPath("$.status").value("PAID"));
         JsonNode sms = s.body(s.call(get("/api/messaging/messages?size=100"), viewer, null)).get("content");
-        assertThat(sms.findValuesAsText("templateCode").stream().filter("FIN_ADJUSTMENT_DECIDED"::equals).count()).isEqualTo(3);
-        assertThat(sms.findValuesAsText("templateCode")).contains("SPONSOR_ASSIGNED");
+        assertThat(sms.findValuesAsString("templateCode").stream().filter("FIN_ADJUSTMENT_DECIDED"::equals).count()).isEqualTo(3);
+        assertThat(sms.findValuesAsString("templateCode")).contains("SPONSOR_ASSIGNED");
 
         // the Bursar's dashboard and targets
         s.call(put("/api/finance/targets?academicYearId=" + yearId), bursar, "{\"targets\":[{\"dueDate\":\"2026-01-01\",\"percent\":60},{\"dueDate\":\"2026-02-01\",\"percent\":40}]}")
@@ -213,7 +213,7 @@ class SponsorsAndAdjustmentsIT {
         assertThat(dash.at("/currentTarget/percent").decimalValue()).isEqualByComparingTo("90");
         assertThat(dash.get("programmes")).hasSize(1);
         assertThat(dash.at("/work/refundsToPay").asInt()).isZero();
-        assertThat(dash.get("next").findValuesAsText("text")).anyMatch(t -> t.contains("behind the 90% target"));
+        assertThat(dash.get("next").findValuesAsString("text")).anyMatch(t -> t.contains("behind the 90% target"));
         s.call(get("/api/finance/dashboard"), auditor, null).andExpect(status().isOk());
         s.call(get("/api/finance/dashboard"), registrar, null).andExpect(status().isForbidden());
         String postings = s.text(s.call(get("/api/finance/postings.csv?from=" + TODAY + "&to=" + TODAY), accountant, null).andExpect(status().isOk()));
@@ -227,7 +227,7 @@ class SponsorsAndAdjustmentsIT {
 
     private long annual(long studentId) throws Exception {
         for (JsonNode i : s.body(s.call(get("/api/finance/students/" + studentId + "/statement"), registrar, null)).get("invoices")) {
-            if (i.get("purpose").asText().equals("ANNUAL_FEES")) return i.get("id").asLong();
+            if (i.get("purpose").asString().equals("ANNUAL_FEES")) return i.get("id").asLong();
         }
         throw new AssertionError("no annual invoice");
     }
