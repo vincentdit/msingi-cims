@@ -43,7 +43,9 @@ public final class MessageTemplates {
                 Map.entry("sponsor", "Higher Education Students' Loans Board"),
                 Map.entry("channels", "M-Pesa 555123, CRDB Bank 0150123456700"), Map.entry("instalment", "2"),
                 Map.entry("when", "is due on 15 Jan 2028"), Map.entry("document", "Birth certificate"), Map.entry("link", "https://apply.college.ac.tz/s/AbC123"), Map.entry("student", "Asha Juma Mwinyi"),
-                Map.entry("cardNo", "SN104526781"), Map.entry("validTo", "30 June 2028"));
+                Map.entry("cardNo", "SN104526781"), Map.entry("validTo", "30 June 2028"), Map.entry("month", "November 2026"),
+                Map.entry("reqNo", "DEMO/PR/2026/00012"), Map.entry("closes", "30 Nov 2026"), Map.entry("caseNo", "DEMO/DC/2026/0004"),
+                Map.entry("days", "14"));
 
         add("OTP_CODE", "Verification code", "An applicant registers, signs in for the first time or resets a password", "Accounts",
                 List.of("code", "institution", "minutes"), Set.of("code"),
@@ -163,6 +165,30 @@ public final class MessageTemplates {
                 List.of("institution", "leave", "from", "to", "note"), Set.of("leave", "from"),
                 "{institution}: your {leave} request from {from} to {to} was not approved. {note}",
                 "{institution}: ombi lako la {leave} kuanzia {from} hadi {to} halijaidhinishwa. {note}", s);
+        add("PAYSLIP_READY", "Payslip ready", "Salaries for the month are recorded as paid", "Staff",
+                List.of("institution", "month"), Set.of("month"),
+                "{institution}: your payslip for {month} is ready. Open CIMS, My payslips.",
+                "{institution}: hati yako ya mshahara ya {month} iko tayari. Fungua CIMS, Hati zangu za mshahara.", s);
+        add("REQUISITION_DECIDED", "Requisition decided", "A purchase requisition is approved or not approved", "Staff",
+                List.of("institution", "reqNo", "outcome"), Set.of("reqNo", "outcome"),
+                "{institution}: requisition {reqNo} {outcome}.",
+                "{institution}: ombi la ununuzi {reqNo} {outcome}.", s);
+        add("EVALUATION_OPEN", "Module evaluation open", "The students' evaluation of a semester's modules opens", "Students",
+                List.of("institution", "semester", "closes"), Set.of("semester"),
+                "{institution}: tell us how your modules for {semester} went. Your answers are anonymous. Open the student app before {closes}.",
+                "{institution}: tueleze masomo ya {semester} yalivyokwenda. Majibu yako hayatambulishi jina lako. Fungua programu ya mwanafunzi kabla ya {closes}.", s);
+        add("DISCIPLINE_HEARING", "Disciplinary hearing", "A student is called to a disciplinary hearing", "Students",
+                List.of("institution", "caseNo", "date", "place"), Set.of("caseNo", "date"),
+                "{institution}: you are called to a disciplinary hearing, case {caseNo}, on {date} at {place}. You may bring a written statement and a witness.",
+                "{institution}: unaitwa kwenye shauri la nidhamu, kesi {caseNo}, tarehe {date} mahali {place}. Unaweza kuleta maelezo ya maandishi na shahidi.", s);
+        add("DISCIPLINE_DECISION", "Disciplinary decision", "The decision in a student's disciplinary case is recorded", "Students",
+                List.of("institution", "caseNo", "outcome", "days"), Set.of("caseNo", "outcome"),
+                "{institution}: decision in case {caseNo}: {outcome}. You may appeal in the student app within {days} days.",
+                "{institution}: uamuzi wa kesi {caseNo}: {outcome}. Unaweza kukata rufaa kupitia programu ya mwanafunzi ndani ya siku {days}.", s);
+        add("COUNSELLING_APPOINTMENT", "Counselling appointment", "The Dean of Students sets a time to meet a student", "Students",
+                List.of("institution", "date"), Set.of("date"),
+                "{institution}: the Dean of Students will see you on {date}. Reply or call the office if the time does not suit you.",
+                "{institution}: Mlezi wa Wanafunzi atakuona tarehe {date}. Wasiliana na ofisi kama muda huu haukufai.", s);
         add("FEE_REMINDER", "Instalment reminder", "An instalment of the year's fees is due soon, due today or overdue", "Fees",
                 List.of("amount", "instalment", "when", "controlNo", "description", "institution"), Set.of("amount"),
                 "{institution}: instalment {instalment} of {description}, {amount}, {when}. Pay with number {controlNo}.",

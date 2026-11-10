@@ -56,6 +56,11 @@ import TimetableIcon from '@mui/icons-material/ViewWeek';
 import ExamTimetableIcon from '@mui/icons-material/EventNote';
 import AlmanacIcon from '@mui/icons-material/CalendarMonth';
 import OrganisationIcon from '@mui/icons-material/AccountTree';
+import PayrollIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import PayslipIcon from '@mui/icons-material/ReceiptLongOutlined';
+import QualityIcon from '@mui/icons-material/ThumbsUpDownOutlined';
+import WelfareIcon from '@mui/icons-material/VolunteerActivismOutlined';
+import ProcurementIcon from '@mui/icons-material/ShoppingCartOutlined';
 import IdleSignOut from './IdleSignOut';
 import { disabledLinkStyles } from './StaffLink';
 import { Alert, Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
@@ -64,15 +69,43 @@ import { setLanguage } from '../i18n';
 import {
   AppBar, Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import NextIcon from '@mui/icons-material/NavigateNext';
+import { Breadcrumbs, Link as MuiLink } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { can, canOpen, ROLE_LABEL, type PageKey } from '../auth/access';
 import { useSession } from '../auth/session';
 import { useInstitution } from './InstitutionContext';
 
 const WIDTH = 248;
+/** The bright mark of the page that is open: readable on the dark menu whatever the institution's colours. */
+const MARK = '#7CC4FF';
+
+/** The menu entry of a path: the longest menu link the path is on or below ("/staff/hr/12" is under Human resources). */
+function entryFor(groups: { title?: string; items: Item[] }[], path: string) {
+  let best: { group?: string; item: Item } | undefined;
+  for (const g of groups) for (const i of g.items) {
+    const on = path === i.to || (!i.end && path.startsWith(`${i.to}/`));
+    if (on && (!best || i.to.length > best.item.to.length)) best = { group: g.title, item: i };
+  }
+  return best;
+}
+
+/** One look for every menu link: the open page gets a lighter band, a coloured bar on its left, bold text and a coloured icon. */
+const linkSx = {
+  borderRadius: 2, my: 0.25, py: 0.75, color: 'inherit', position: 'relative',
+  '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' },
+  '&.active': {
+    bgcolor: 'rgba(124,196,255,0.18)', color: '#fff',
+    '&::before': { content: '""', position: 'absolute', left: -8, top: 6, bottom: 6, width: 4, borderRadius: 2, bgcolor: MARK },
+    '& .MuiListItemIcon-root': { color: MARK, opacity: 1 },
+    '& .MuiListItemText-primary': { fontWeight: 700 },
+  },
+  '&.active:hover': { bgcolor: 'rgba(124,196,255,0.24)' },
+  '&:focus-visible': { outline: `2px solid ${MARK}`, outlineOffset: -2 },
+} as const;
 
 type Item = { page: PageKey; to: string; label: string; icon: JSX.Element; end?: boolean };
 const GROUPS: { title?: string; items: Item[] }[] = [
@@ -109,6 +142,7 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'teaching', to: '/staff/teaching', label: 'Teaching & attendance', icon: <TeachingIcon /> },
     { page: 'marks', to: '/staff/marks', label: 'Marks', icon: <MarksIcon /> },
     { page: 'competence', to: '/staff/competence', label: 'Competence (NVA)', icon: <CompetenceIcon /> },
+    { page: 'quality', to: '/staff/quality', label: 'Quality assurance', icon: <QualityIcon /> },
   ] },
   { title: 'Examinations', items: [
     { page: 'examsOffice', to: '/staff/exams-office', label: 'Examinations office', icon: <OfficeIcon /> },
@@ -124,10 +158,14 @@ const GROUPS: { title?: string; items: Item[] }[] = [
     { page: 'hostels', to: '/staff/hostels', label: 'Hostels', icon: <HostelIcon /> },
     { page: 'ipt', to: '/staff/ipt', label: 'Industrial training', icon: <IptIcon /> },
     { page: 'library', to: '/staff/library', label: 'Library', icon: <LibraryIcon /> },
+    { page: 'welfare', to: '/staff/welfare', label: 'Discipline and welfare', icon: <WelfareIcon /> },
   ] },
   { title: 'Staff and property', items: [
     { page: 'leave', to: '/staff/leave', label: 'Leave', icon: <LeaveIcon /> },
+    { page: 'payslips', to: '/staff/payslips', label: 'My payslips', icon: <PayslipIcon /> },
     { page: 'hr', to: '/staff/hr', label: 'Human resources', icon: <HrIcon /> },
+    { page: 'payroll', to: '/staff/payroll', label: 'Payroll', icon: <PayrollIcon /> },
+    { page: 'procurement', to: '/staff/procurement', label: 'Procurement', icon: <ProcurementIcon /> },
     { page: 'assets', to: '/staff/assets', label: 'Assets and stores', icon: <AssetsIcon /> },
   ] },
   { title: 'Finance', items: [
@@ -165,6 +203,13 @@ export function homeFor(roles: readonly string[] | undefined) {
   if (roles?.length && roles.every((r) => r === 'BURSAR' || r === 'ACCOUNTANT')) return '/staff/finance-overview';
   if (roles?.length && roles.every((r) => r === 'SPONSOR_OFFICER')) return '/staff/sponsors';
   // officers of one service start from that service
+  const only = (r: string) => !!roles?.length && roles.every((x) => x === r);
+  if (only('DEAN_OF_STUDENTS')) return '/staff/welfare';
+  if (only('QUALITY_ASSURANCE_OFFICER')) return '/staff/quality';
+  if (only('PROCUREMENT_OFFICER')) return '/staff/procurement';
+  if (only('LIBRARIAN')) return '/staff/library';
+  if (only('HR_OFFICER')) return '/staff/hr';
+  if (only('STORES_OFFICER')) return '/staff/assets';
   if (roles?.length && roles.every((r) => r === 'CLEARANCE_OFFICER' || r === 'HOSTEL_WARDEN' || r === 'IPT_COORDINATOR')) {
     return roles.includes('IPT_COORDINATOR') ? '/staff/ipt' : roles.includes('HOSTEL_WARDEN') ? '/staff/hostels' : '/staff/clearance';
   }
@@ -204,6 +249,22 @@ export default function StaffLayout() {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => can(roles, i.page)) })).filter((g) => g.items.length);
   const idleOut = useCallback(() => { signOut('staff'); navigate('/staff/login?idle=1'); }, [signOut, navigate]);
   const onPassword = location.pathname.startsWith('/staff/password');
+  const here = onPassword ? { group: undefined, item: { page: 'dashboard' as PageKey, to: '/staff/password', label: 'My account', icon: <KeyIcon /> } }
+    : entryFor(groups, location.pathname);
+  const deeper = !!here && location.pathname !== here.item.to;
+  // the open page stays in sight in a long menu, and the browser tab is named after it
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    // the phone menu is drawn only as it slides open, so look for the link a moment later
+    const t = window.setTimeout(() => {
+      const el = navRef.current?.querySelector<HTMLElement>('a.active');
+      el?.scrollIntoView?.({ block: 'center' });
+    }, desktop ? 0 : 300);
+    return () => window.clearTimeout(t);
+  }, [location.pathname, open, desktop]);
+  useEffect(() => {
+    document.title = here ? `${here.item.label} · ${inst.shortName ?? inst.name}` : (inst.shortName ?? inst.name);
+  }, [here?.item.label, inst.shortName, inst.name]);
   if ((me?.mustChangePassword || me?.mfaSetupRequired) && !onPassword) return <Navigate to="/staff/password" replace />;
   if (location.pathname === '/staff' && !can(roles, 'dashboard')) return <Navigate to={homeFor(roles)} replace />;
   const allowed = onPassword || canOpen(roles, location.pathname);
@@ -215,10 +276,18 @@ export default function StaffLayout() {
         <Typography variant="caption" sx={{ opacity: 0.7 }}>CIMS · Back-office</Typography>
       </Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-      <List component="nav" aria-label="Main menu" sx={{ px: 1, flexGrow: 1 }} dense>
-        {groups.map((g, gi) => (
+      <List component="nav" ref={navRef} aria-label="Main menu" sx={{ px: 1, flexGrow: 1 }} dense>
+        {groups.map((g, gi) => {
+          const openGroup = !!g.title && here?.group === g.title;
+          return (
           <Box key={g.title ?? gi} role="group" aria-label={g.title ?? undefined} sx={{ mt: gi ? 1.5 : 0.5 }}>
-            {g.title && <Typography component="div" sx={{ px: 1.5, pb: 0.5, fontSize: 12, fontWeight: 600, color: 'rgba(230,235,242,0.55)' }}>{g.title}</Typography>}
+            {g.title && (
+              <Typography component="div" sx={{ px: 1.5, pb: 0.5, fontSize: 12, fontWeight: openGroup ? 700 : 600, display: 'flex', alignItems: 'center', gap: 0.75,
+                color: openGroup ? MARK : 'rgba(230,235,242,0.55)', textTransform: openGroup ? 'uppercase' : 'none', letterSpacing: openGroup ? 0.6 : 0 }}>
+                {openGroup && <Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: MARK }} />}
+                <span>{g.title}</span>
+              </Typography>
+            )}
             <Box sx={{ p: 0, m: 0 }}>
               {g.items.map((n) => (
                 <ListItemButton
@@ -227,11 +296,7 @@ export default function StaffLayout() {
                   to={n.to}
                   end={n.end}
                   onClick={() => setOpen(false)}
-                  sx={{
-                    borderRadius: 2, my: 0.25, py: 0.75, color: 'inherit',
-                    '&.active': { bgcolor: 'rgba(255,255,255,0.10)', color: '#fff' },
-                    '& .MuiListItemIcon-root': { color: 'inherit', minWidth: 38, opacity: 0.85 },
-                  }}
+                  sx={{ ...linkSx, '& .MuiListItemIcon-root': { color: 'inherit', minWidth: 38, opacity: 0.85 } }}
                 >
                   <ListItemIcon>{n.icon}</ListItemIcon>
                   <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 15 }} />
@@ -241,7 +306,8 @@ export default function StaffLayout() {
               ))}
             </Box>
           </Box>
-        ))}
+          );
+        })}
       </List>
       <Box sx={{ p: 2 }}>
         <ToggleButtonGroup size="small" exclusive value={lang} onChange={(_, v) => chooseLanguage(v)} aria-label="Language"
@@ -257,7 +323,7 @@ export default function StaffLayout() {
             {scope.departments.length ? `Department: ${scope.departments.join(', ')}` : `Programme: ${scope.programmes.join(', ')}`}
           </Typography>
         )}
-        <ListItemButton component={NavLink} to="/staff/password" sx={{ mt: 1, borderRadius: 2, px: 1, color: 'inherit' }} onClick={() => setOpen(false)}>
+        <ListItemButton component={NavLink} to="/staff/password" sx={{ ...linkSx, mt: 1, px: 1 }} onClick={() => setOpen(false)}>
           <ListItemIcon sx={{ color: 'inherit', minWidth: 34 }}><KeyIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="My account" />
         </ListItemButton>
@@ -277,7 +343,10 @@ export default function StaffLayout() {
         <AppBar position="fixed" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
           <Toolbar>
             <IconButton edge="start" onClick={() => setOpen(true)} aria-label="menu"><MenuIcon /></IconButton>
-            <Typography sx={{ ml: 1, fontFamily: 'Sora', fontWeight: 700 }}>{inst.shortName ?? inst.name}</Typography>
+            <Box sx={{ ml: 1, minWidth: 0 }}>
+              <Typography noWrap sx={{ fontFamily: 'Sora', fontWeight: 700, lineHeight: 1.2 }}>{here?.item.label ?? inst.shortName ?? inst.name}</Typography>
+              {here && <Typography noWrap variant="caption" color="text.secondary" display="block">{here.group ?? (inst.shortName ?? inst.name)}</Typography>}
+            </Box>
           </Toolbar>
         </AppBar>
       )}
@@ -291,6 +360,19 @@ export default function StaffLayout() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, mt: { xs: 8, md: 0 }, minWidth: 0 }}>
         {/* a new language redraws the page in it (keyed), without reloading data */}
+        {/* where you are: the menu section and page, with a way back to the list page from a record opened from it */}
+        {allowed && here && desktop && (
+          <Breadcrumbs separator={<NextIcon fontSize="small" />} aria-label="You are here" sx={{ mb: 2, fontSize: 14, color: 'text.secondary' }}>
+            {here.group && <span>{here.group}</span>}
+            {deeper ? (
+              <MuiLink component={RouterLink} to={here.item.to} underline="hover" color="inherit" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <span>{here.item.label}</span>
+              </MuiLink>
+            ) : (
+              <Typography component="span" aria-current="page" sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}>{here.item.label}</Typography>
+            )}
+          </Breadcrumbs>
+        )}
         {allowed ? <Box key={lang}><Outlet /></Box> : (
           <Alert severity="info" sx={{ maxWidth: 640 }} action={<Button color="inherit" onClick={() => navigate(homeFor(roles))}>Go to my pages</Button>}>
             This page is not part of your role. Ask the institution administrator if you need it.

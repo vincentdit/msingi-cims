@@ -57,7 +57,11 @@ public class ApprovalsService {
         APPEAL_ASSIGN("Remark or appeal", "Examinations Office"),
         APPEAL_FORWARD("Remark or appeal", "Examinations Office"),
         FIN_ADJUSTMENT("Waiver or refund", "Bursar"),
-        FIN_ADJUSTMENT_SECOND("Waiver or refund", "Principal");
+        FIN_ADJUSTMENT_SECOND("Waiver or refund", "Principal"),
+        PAYROLL("Payroll", "Bursar or Principal"),
+        REQUISITION_ENDORSE("Purchase requisition", "Head of Department"),
+        REQUISITION_APPROVE("Purchase requisition", "Bursar or Principal"),
+        DISCIPLINE_APPEAL("Disciplinary appeal", "Principal");
 
         public final String label;
         public final String body;
@@ -259,6 +263,50 @@ public class ApprovalsService {
                         pending ? rs.getString("requested_by_name") : rs.getString("first_by_name"),
                         rs.getObject(pending ? "requested_at" : "first_at", OffsetDateTime.class), "/staff/waivers", !own,
                         own ? "You requested or approved this already; someone else decides it." : null));
+            });
+        }
+        if (bursar || principal) {
+            jdbc.query("""
+                    select r.id, r.period, r.staff_count, r.net_total, r.prepared_by, r.prepared_by_name, r.prepared_at from payroll_runs r
+                    where r.status = 'DRAFT' and r.staff_count > 0""", p, rs -> {
+                boolean own = Objects.equals(rs.getObject("prepared_by") == null ? null : rs.getLong("prepared_by"), me);
+                out.add(item(Kind.PAYROLL, rs.getLong("id"), "Salaries " + rs.getObject("period", java.time.LocalDate.class)
+                                .format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH)),
+                        rs.getInt("staff_count") + " staff · net TZS " + String.format(java.util.Locale.ENGLISH, "%,.0f", rs.getBigDecimal("net_total")),
+                        rs.getString("prepared_by_name"), rs.getObject("prepared_at", OffsetDateTime.class), "/staff/payroll/runs/" + rs.getLong("id"), !own,
+                        own ? "You prepared this payroll; someone else approves it." : null));
+            });
+            jdbc.query("""
+                    select r.id, r.req_no, r.title, r.estimated_total, r.requested_by, r.endorsed_by, r.requested_by_name, r.endorsed_by_name, r.endorsed_at
+                    from purchase_requisitions r where r.status = 'ENDORSED'""", p, rs -> {
+                boolean own = Objects.equals(rs.getObject("requested_by") == null ? null : rs.getLong("requested_by"), me)
+                        || Objects.equals(rs.getObject("endorsed_by") == null ? null : rs.getLong("endorsed_by"), me);
+                out.add(item(Kind.REQUISITION_APPROVE, rs.getLong("id"), rs.getString("req_no") + " · " + rs.getString("title"),
+                        "Estimate TZS " + String.format(java.util.Locale.ENGLISH, "%,.0f", rs.getBigDecimal("estimated_total")) + " · endorsed by "
+                                + rs.getString("endorsed_by_name"), rs.getString("requested_by_name"), rs.getObject("endorsed_at", OffsetDateTime.class),
+                        "/staff/procurement/requisitions/" + rs.getLong("id"), !own, own ? "You asked for or endorsed this; someone else approves it." : null));
+            });
+            jdbc.query("""
+                    select c.id, c.case_no, c.decided_by, c.appealed_at, s.registration_no from discipline_cases c join students s on s.id = c.student_id
+                    where c.status = 'APPEALED'""", p, rs -> {
+                if (!admin && !roles.contains(Role.MANAGEMENT_VIEWER)) return;
+                boolean own = Objects.equals(rs.getObject("decided_by") == null ? null : rs.getLong("decided_by"), me);
+                out.add(item(Kind.DISCIPLINE_APPEAL, rs.getLong("id"), rs.getString("case_no") + " · " + rs.getString("registration_no"),
+                        "The student appeals the decision", rs.getString("registration_no"), rs.getObject("appealed_at", OffsetDateTime.class),
+                        "/staff/welfare/cases/" + rs.getLong("id"), !own, own ? "You decided this case; someone else hears the appeal." : null));
+            });
+        }
+        if (hod.any() || admin) {
+            jdbc.query("""
+                    select r.id, r.req_no, r.title, r.department_id, r.estimated_total, r.requested_by, r.requested_by_name, r.requested_at
+                    from purchase_requisitions r where r.status = 'SUBMITTED'""", p, rs -> {
+                Long dept = rs.getObject("department_id") == null ? null : rs.getLong("department_id");
+                if (!admin && !hod.covers(dept)) return;
+                boolean own = Objects.equals(rs.getObject("requested_by") == null ? null : rs.getLong("requested_by"), me);
+                out.add(item(Kind.REQUISITION_ENDORSE, rs.getLong("id"), rs.getString("req_no") + " · " + rs.getString("title"),
+                        "Estimate TZS " + String.format(java.util.Locale.ENGLISH, "%,.0f", rs.getBigDecimal("estimated_total")), rs.getString("requested_by_name"),
+                        rs.getObject("requested_at", OffsetDateTime.class), "/staff/procurement/requisitions/" + rs.getLong("id"), !own,
+                        own ? "You asked for this; someone else endorses it." : null));
             });
         }
         out.sort(Comparator.comparing(Item::canAct).reversed()

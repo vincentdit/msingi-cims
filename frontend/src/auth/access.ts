@@ -23,6 +23,9 @@ export const ROLES = {
   LIBRARIAN: 'LIBRARIAN',
   HR: 'HR_OFFICER',
   STORES: 'STORES_OFFICER',
+  DEAN: 'DEAN_OF_STUDENTS',
+  QA: 'QUALITY_ASSURANCE_OFFICER',
+  PROCUREMENT: 'PROCUREMENT_OFFICER',
 } as const;
 
 const R = ROLES;
@@ -33,7 +36,8 @@ export type PageKey =
   | 'dashboard' | 'approvals' | 'reports' | 'windows' | 'applications' | 'programmes' | 'students' | 'statusChanges' | 'transfers' | 'semesterRegistrations' | 'healthInsurance' | 'graduations'
   | 'calendar' | 'curricula' | 'myTeaching' | 'timetable' | 'examTimetable' | 'teaching' | 'competence' | 'marks' | 'eligibility' | 'results' | 'amendments' | 'regulations'
   | 'examsOffice' | 'appeals' | 'clearance' | 'hostels' | 'ipt' | 'financeOverview' | 'sponsors' | 'waivers' | 'finance' | 'notices' | 'messages' | 'users' | 'audit' | 'institution' | 'security' | 'letters' | 'imports' | 'alumni' | 'integrations' | 'helpdesk' | 'help' | 'subscription'
-  | 'almanac' | 'organisation' | 'nactvetReturns' | 'verifications' | 'library' | 'hr' | 'leave' | 'assets';
+  | 'almanac' | 'organisation' | 'nactvetReturns' | 'verifications' | 'library' | 'hr' | 'leave' | 'assets'
+  | 'payroll' | 'payslips' | 'quality' | 'welfare' | 'procurement';
 
 export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // the roles the dashboard has figures for (admissions, registry or finance); others start from their own board
@@ -97,6 +101,15 @@ export const PAGE_ROLES: Record<PageKey, readonly string[]> = {
   // every member of staff asks for leave here; Heads of Department and HR also decide
   leave: Object.values(R),
   assets: [R.ADMIN, R.STORES, R.BURSAR, R.ACCOUNTANT, R.MANAGEMENT, R.AUDITOR],
+  // salaries: HR and the Accountant prepare, the Bursar or the Principal approves; every member of staff reads their own payslips
+  payroll: [R.ADMIN, R.HR, R.ACCOUNTANT, R.BURSAR, R.MANAGEMENT, R.AUDITOR],
+  payslips: Object.values(R),
+  // students' evaluation of modules: the QA office and management; Heads for their department; lecturers for their own modules
+  quality: [R.ADMIN, R.QA, R.ACADEMIC, R.MANAGEMENT, R.AUDITOR, R.HOD, R.LECTURER],
+  // every member of staff can report an incident or refer a student; the Dean of Students handles them
+  welfare: Object.values(R),
+  // every member of staff can ask to buy; procurement, finance and stores do the rest
+  procurement: Object.values(R),
 };
 
 export const can = (roles: readonly string[] | undefined, page: PageKey) => !!roles?.some((r) => PAGE_ROLES[page].includes(r));
@@ -110,6 +123,7 @@ const PATH_PAGE: Record<string, PageKey> = {
   institution: 'institution', security: 'security', letters: 'letters', imports: 'imports', alumni: 'alumni', 'results-trends': 'results', integrations: 'integrations', helpdesk: 'helpdesk', help: 'help', 'msingi-subscription': 'subscription',
   almanac: 'almanac', organisation: 'organisation', 'nactvet-returns': 'nactvetReturns', verifications: 'verifications',
   library: 'library', hr: 'hr', leave: 'leave', assets: 'assets',
+  payroll: 'payroll', payslips: 'payslips', quality: 'quality', welfare: 'welfare', procurement: 'procurement',
 };
 
 export function pageOf(pathname: string): PageKey | undefined {
@@ -143,4 +157,5 @@ export const ROLE_LABEL: Record<string, string> = {
   LECTURER: 'Lecturer', ASSESSOR: 'Assessor (NVA)', EXAMINATIONS_OFFICER: 'Examinations Officer', BURSAR: 'Bursar', ACCOUNTANT: 'Accountant',
   HOSTEL_WARDEN: 'Hostel Warden', IPT_COORDINATOR: 'IPT Coordinator', CLEARANCE_OFFICER: 'Clearance Officer', SPONSOR_OFFICER: 'Sponsor Officer', AUDITOR: 'Auditor',
   LIBRARIAN: 'Librarian', HR_OFFICER: 'Human Resources Officer', STORES_OFFICER: 'Stores and Assets Officer',
+  DEAN_OF_STUDENTS: 'Dean of Students', QUALITY_ASSURANCE_OFFICER: 'Quality Assurance Officer', PROCUREMENT_OFFICER: 'Procurement Officer',
 };

@@ -11,6 +11,7 @@ import CheckInPage from '../pages/student/CheckInPage';
 import StudentTimetablePage from '../pages/student/StudentTimetablePage';
 
 import { StudentLibraryPage, StudentModulePage, StudentModulesPage } from '../pages/student/StudentStudyPages';
+import { StudentEvaluationsPage, StudentWelfarePage } from '../pages/student/StudentWelfarePages';
 export default function StudentApp() {
   return (
     <Routes>
@@ -25,6 +26,8 @@ export default function StudentApp() {
         <Route path="modules" element={<StudentModulesPage />} />
         <Route path="modules/:id" element={<StudentModulePage />} />
         <Route path="library" element={<StudentLibraryPage />} />
+        <Route path="evaluations" element={<StudentEvaluationsPage />} />
+        <Route path="welfare" element={<StudentWelfarePage />} />
         <Route path="notices" element={<StudentNotices />} />
         <Route path="almanac" element={<PublishedAlmanac realm="student" />} />
         <Route path="profile" element={<StudentProfilePage />} />

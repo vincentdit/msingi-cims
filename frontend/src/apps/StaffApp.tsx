@@ -53,6 +53,10 @@ import MaterialsPage from '../pages/staff/MaterialsPage';
 import LibraryPage from '../pages/staff/LibraryPage';
 import { HrPage, StaffMemberPage } from '../pages/staff/HrPages';
 import LeavePage from '../pages/staff/LeavePage';
+import PayrollPage, { MyPayslipsPage, PayrollRunPage } from '../pages/staff/PayrollPages';
+import QualityPage, { QualityRoundPage } from '../pages/staff/QualityPages';
+import WelfarePage, { DisciplineCasePage } from '../pages/staff/WelfarePages';
+import ProcurementPage, { PurchaseOrderPage, RequisitionPage } from '../pages/staff/ProcurementPages';
 import AssetsPage from '../pages/staff/AssetsPage';
 
 export default function StaffApp() {
@@ -135,6 +139,16 @@ export default function StaffApp() {
         <Route path="hr/:id" element={<StaffMemberPage />} />
         <Route path="leave" element={<LeavePage />} />
         <Route path="assets" element={<AssetsPage />} />
+        <Route path="payroll" element={<PayrollPage />} />
+        <Route path="payroll/runs/:id" element={<PayrollRunPage />} />
+        <Route path="payslips" element={<MyPayslipsPage />} />
+        <Route path="quality" element={<QualityPage />} />
+        <Route path="quality/rounds/:id" element={<QualityRoundPage />} />
+        <Route path="welfare" element={<WelfarePage />} />
+        <Route path="welfare/cases/:id" element={<DisciplineCasePage />} />
+        <Route path="procurement" element={<ProcurementPage />} />
+        <Route path="procurement/requisitions/:id" element={<RequisitionPage />} />
+        <Route path="procurement/orders/:id" element={<PurchaseOrderPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/staff" replace />} />
     </Routes>

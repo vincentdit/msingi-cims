@@ -298,6 +298,7 @@ public class FinanceDashboardService {
             case "SPONSOR_FEES" -> "Sponsors";
             case "HOSTEL_DAMAGES" -> "Hostel damages";
             case "LIBRARY_FINES" -> "Library fines";
+            case "DISCIPLINE_CHARGES" -> "Disciplinary fines and compensation";
             default -> p.charAt(0) + p.substring(1).toLowerCase().replace('_', ' ');
         };
     }

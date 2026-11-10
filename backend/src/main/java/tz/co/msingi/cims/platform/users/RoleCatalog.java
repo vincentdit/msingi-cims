@@ -61,7 +61,13 @@ public final class RoleCatalog {
             info(Role.HR_OFFICER, "Human Resources Officer",
                     "Keeps staff records and qualifications, leave types and balances, and approves leave."),
             info(Role.STORES_OFFICER, "Stores and Assets Officer",
-                    "Keeps the asset register and its verification, and receives and issues stores."));
+                    "Keeps the asset register and its verification, and receives and issues stores."),
+            info(Role.DEAN_OF_STUDENTS, "Dean of Students",
+                    "Handles student discipline cases and hearings, and student welfare and counselling (the only role that reads counselling notes)."),
+            info(Role.QUALITY_ASSURANCE_OFFICER, "Quality Assurance Officer",
+                    "Runs the students' evaluation of modules and teaching each semester and reads the results."),
+            info(Role.PROCUREMENT_OFFICER, "Procurement Officer",
+                    "Keeps suppliers, collects quotations for approved requisitions and issues local purchase orders."));
 
     private static Map.Entry<Role, RoleInfo> info(Role role, String label, String description, Scope... scopes) {
         List<Scope> s = scopes.length == 0 ? List.of(Scope.INSTITUTION) : List.of(scopes);

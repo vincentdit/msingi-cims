@@ -45,14 +45,17 @@ const BY_ROLE: Record<string, string[]> = {
   EXAMINATIONS_OFFICER: ['Examinations Officer'],
   BURSAR: ['Bursar', 'Chief Accountant'],
   ACCOUNTANT: ['Accountant', 'Assistant Accountant', 'Cashier'],
-  HOSTEL_WARDEN: ['Dean of Students', 'Hostel Warden', 'Matron', 'Patron'],
+  HOSTEL_WARDEN: ['Hostel Warden', 'Matron', 'Patron'],
   IPT_COORDINATOR: ['IPT Coordinator'],
   CLEARANCE_OFFICER: ['Registry Officer', 'Librarian', 'Storekeeper'],
   SPONSOR_OFFICER: ['Loans Officer'],
   AUDITOR: ['Internal Auditor'],
   LIBRARIAN: ['Librarian', 'Assistant Librarian', 'Library Assistant'],
   HR_OFFICER: ['Human Resources Officer', 'Human Resources Manager', 'Administrative Officer'],
-  STORES_OFFICER: ['Supplies Officer', 'Storekeeper', 'Procurement Officer', 'Estates Officer'],
+  STORES_OFFICER: ['Supplies Officer', 'Storekeeper', 'Estates Officer'],
+  DEAN_OF_STUDENTS: ['Dean of Students', 'Students Welfare Officer', 'Counsellor'],
+  QUALITY_ASSURANCE_OFFICER: ['Quality Assurance Officer', 'Quality Assurance Coordinator'],
+  PROCUREMENT_OFFICER: ['Procurement Officer', 'Head of Procurement Management Unit', 'Supplies Officer'],
 };
 
 type Option = { title: string; group: string };

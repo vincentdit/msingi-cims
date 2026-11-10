@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { api, download, formatDate, formatDateTime, formatTzs, uploadForm } from '../../api/client';
 import { ErrorAlert, Loading } from '../../components/common';
+import { WelfareRows } from './StudentWelfarePages';
 import { fileSize, type Material } from '../staff/MaterialsPage';
 
 const student = { realm: 'student' as const };
@@ -53,6 +54,7 @@ export function StudyCard() {
           <ChevronRightIcon color="action" />
         </CardContent>
       </CardActionArea>
+      <WelfareRows />
     </Card>
   );
 }
