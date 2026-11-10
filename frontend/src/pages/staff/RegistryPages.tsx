@@ -30,6 +30,7 @@ import { StudentTransferCard } from './TransferPages';
 import { StaffLink } from '../../components/StaffLink';
 import { useGepg } from '../../components/HowToPay';
 
+import FamilyLinksCard from './FamilyLinksCard';
 const staff = { realm: 'staff' as const };
 const REGISTRY_ROLES = ['INSTITUTION_ADMIN', 'REGISTRAR'];
 
@@ -322,6 +323,7 @@ export function StudentDetailPage() {
   const canSeeFees = useRoles()(['INSTITUTION_ADMIN', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'AUDITOR', 'REGISTRAR']);
   const canSeeNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'ADMISSIONS_OFFICER']);
   const canEditNin = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR']);
+  const canSeeFamily = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT']);
   const canSeeHealth = useRoles()(['INSTITUTION_ADMIN', 'REGISTRAR', 'BURSAR', 'ACCOUNTANT', 'MANAGEMENT_VIEWER', 'DEPUTY_PRINCIPAL_ACADEMIC', 'AUDITOR']);
   const st = useQuery({ queryKey: ['staff', 'student', id], queryFn: () => api<StudentDetail>(`/api/registry/students/${id}`, staff) });
   const [docs, setDocs] = useState<{ item: string; verified: boolean }[]>([]);
@@ -431,6 +433,7 @@ export function StudentDetailPage() {
           {canSeeNin && <NinCard studentId={s.id} canEdit={canEditNin} />}
           {canSeeHealth && <HealthCoverCard studentId={s.id} canEdit={canEditNin} />}
           {canSeeFees && <StudentFeesCard studentId={s.id} />}
+          {canSeeFamily && <FamilyLinksCard studentId={s.id} canEdit={canEditNin} />}
           <StudentExamCard studentId={s.id} regNo={s.registrationNo} />
           <Section title="Programme">
             <Field label="Programme" value={`${s.programmeName} (${s.programmeCode})`} />

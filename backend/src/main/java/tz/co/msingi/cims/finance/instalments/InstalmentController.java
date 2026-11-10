@@ -64,6 +64,13 @@ public class InstalmentController {
         return service.penalties();
     }
 
+    @Operation(summary = "Fee reminders sent in the last days (default 30), newest first")
+    @GetMapping("/reminders")
+    @PreAuthorize(READ)
+    public java.util.List<InstalmentService.ReminderView> reminders(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "30") int days) {
+        return service.reminders(days);
+    }
+
     @Operation(summary = "Send today's reminders and apply penalties now (also runs every morning); a past date re-runs a missed day")
     @PostMapping("/reminders/run")
     @PreAuthorize(BURSAR)

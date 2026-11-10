@@ -51,18 +51,40 @@ public class Messaging {
                         + ("SW".equals(lang) ? " (ujumbe wa CIMS; usijibu barua pepe hii)" : " (sent by CIMS; please do not reply to this email)"), null));
     }
 
+    /** The event message {@code code} by email only, to an address that has no CIMS account (a sponsor's contact). */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void emailEvent(String code, String to, Map<String, ?> values) {
+        if (to == null || to.isBlank()) return;
+        MessageTemplates.Definition def = MessageTemplates.require(code);
+        MessageTemplate custom = templates.findByCode(code).orElse(null);
+        if (custom != null && !custom.isEnabled()) return;
+        String lang = settings().getDefaultLanguage();
+        String text = custom != null ? ("SW".equals(lang) ? custom.getBodySw() : custom.getBodyEn()) : ("SW".equals(lang) ? def.sw() : def.en());
+        Map<String, Object> v = withInstitution(values);
+        String body = MessageRender.render(text, v, lang);
+        email.queue(to, null, tz.co.msingi.cims.notification.email.EmailMessage.Kind.EVENT, code, def.name() + " — " + v.get("institution"),
+                SmsText.plain(body) + "\n\n— " + v.get("institution")
+                        + ("SW".equals(lang) ? " (ujumbe wa CIMS; usijibu barua pepe hii)" : " (sent by CIMS; please do not reply to this email)"), null);
+    }
+
     /** A verification code: sent straight away (it is needed now) and logged with the code masked. */
     @Transactional(propagation = Propagation.REQUIRED)
     public void securityCode(String phone, String code, Map<String, ?> values) {
-        MessageTemplates.Definition def = MessageTemplates.require("OTP_CODE");
-        MessageTemplate custom = templates.findByCode("OTP_CODE").filter(MessageTemplate::isEnabled).orElse(null);
+        securityCode("OTP_CODE", phone, code, values);
+    }
+
+    /** A verification code with its own template (e.g. FAMILY_CODE): sent at once, logged with the code masked. */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void securityCode(String template, String phone, String code, Map<String, ?> values) {
+        MessageTemplates.Definition def = MessageTemplates.require(template);
+        MessageTemplate custom = templates.findByCode(template).filter(MessageTemplate::isEnabled).orElse(null);
         String lang = settings().getDefaultLanguage();
         String text = custom != null ? ("SW".equals(lang) ? custom.getBodySw() : custom.getBodyEn()) : ("SW".equals(lang) ? def.sw() : def.en());
         Map<String, Object> v = new HashMap<>(withInstitution(values));
         v.put("code", code);
         String body = MessageRender.render(text, v, lang);
         v.put("code", "******");
-        Message m = newMessage(phone, null, Message.Kind.SECURITY, "OTP_CODE", null, lang, body);
+        Message m = newMessage(phone, null, Message.Kind.SECURITY, template, null, lang, body);
         m.setBody(MessageRender.render(text, v, lang));
         messages.saveAndFlush(m);
         dispatcher.sendNow(m, SmsText.plain(body));

@@ -30,6 +30,15 @@ export function InstitutionProvider({ children }: { children: ReactNode }) {
     else if (q.data) document.title = `${q.data.shortName ?? q.data.name} — Online Admission`;
   }, [q.data, platform]);
 
+  // the installable app carries the institution's name and colour (GET /api/public/manifest.webmanifest)
+  useEffect(() => {
+    if (platform || !q.data) return;
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (link && !import.meta.env.VITE_TENANT) link.href = '/api/public/manifest.webmanifest';
+    const colour = q.data.branding.primaryColor;
+    if (colour) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', colour);
+  }, [q.data, platform]);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

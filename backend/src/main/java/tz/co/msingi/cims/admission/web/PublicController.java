@@ -60,6 +60,41 @@ public class PublicController {
                 payments.forPayers().withPhonePrompt(mobileMoney.phonePrompt()), security.idle(), paymentSimulation);
     }
 
+    /**
+     * The web app manifest for this institution, so the student app installs on a phone under the institution's own name and colour.
+     * index.html points at the generic /manifest.webmanifest; the portal swaps in this one once it knows the institution.
+     */
+    @Operation(summary = "Installable app manifest with the institution's name and colour")
+    @GetMapping(value = "/manifest.webmanifest", produces = "application/manifest+json")
+    public org.springframework.http.ResponseEntity<Map<String, Object>> manifest() {
+        Tenant t = tenants.findById(TenantContext.requireTenantId()).orElseThrow(() -> new NotFoundException("Institution not found"));
+        String colour = t.getBranding() != null && t.getBranding().get("primaryColor") instanceof String c && c.matches("#[0-9A-Fa-f]{6}") ? c : "#1F4E8C";
+        String shortName = t.getShortName() != null && !t.getShortName().isBlank() ? t.getShortName() : t.getName();
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", "/student");
+        m.put("name", shortName + " Student App");
+        m.put("short_name", shortName.length() > 12 ? shortName.substring(0, 12) : shortName);
+        m.put("description", "Fees, results, timetable and notices from " + t.getName() + ".");
+        m.put("start_url", "/student");
+        m.put("scope", "/");
+        m.put("display", "standalone");
+        m.put("orientation", "portrait");
+        m.put("background_color", "#F6F7F9");
+        m.put("theme_color", colour);
+        m.put("lang", "en");
+        m.put("icons", List.of(
+                Map.of("src", "/icon-192.png", "sizes", "192x192", "type", "image/png"),
+                Map.of("src", "/icon-512.png", "sizes", "512x512", "type", "image/png"),
+                Map.of("src", "/icon-maskable-512.png", "sizes", "512x512", "type", "image/png", "purpose", "maskable")));
+        m.put("shortcuts", List.of(
+                Map.of("name", "Fees", "url", "/student/fees"),
+                Map.of("name", "Results", "url", "/student/results"),
+                Map.of("name", "Timetable", "url", "/student/timetable")));
+        return org.springframework.http.ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofHours(1)))
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/manifest+json")).body(m);
+    }
+
     @Operation(summary = "The facts the applicants' privacy notice shows: version, institution, contacts and retention of applications")
     @GetMapping("/privacy-notice")
     public PrivacyNoticeView privacyNotice() {

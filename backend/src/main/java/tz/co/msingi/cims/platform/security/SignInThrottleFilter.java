@@ -21,7 +21,7 @@ import java.util.List;
 public class SignInThrottleFilter extends OncePerRequestFilter {
 
     /** POSTs under these paths are sign-in attempts or ask for a code or a new password. */
-    static final List<String> PATHS = List.of("/api/auth/", "/api/applicant-auth/", "/api/student-auth/", "/api/platform/auth/login");
+    static final List<String> PATHS = List.of("/api/auth/", "/api/applicant-auth/", "/api/student-auth/", "/api/family-auth/", "/api/platform/auth/login");
 
     private final RateLimiter perMinute;
     private final RateLimiter perHour;

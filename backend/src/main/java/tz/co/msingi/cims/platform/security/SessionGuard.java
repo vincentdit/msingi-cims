@@ -61,6 +61,19 @@ public class SessionGuard extends OncePerRequestFilter {
                         : "Sign in to the Msingi platform console to use this.");
                 return;
             }
+            boolean familyToken = TokenService.TYPE_FAMILY.equals(jwt.getClaimAsString(TokenService.CLAIM_USER_TYPE));
+            boolean familyPath = path.startsWith("/api/family/");
+            // a family portal sign-in works only in the family portal, and the family portal takes nothing else
+            if (familyToken != familyPath) {
+                deny(res, HttpServletResponse.SC_FORBIDDEN, "WRONG_REALM", familyToken
+                        ? "A family portal sign-in can only be used in the family portal."
+                        : "Sign in to the family portal with the code sent to your phone.");
+                return;
+            }
+            if (familyToken) {
+                chain.doFilter(req, res);
+                return;
+            }
             boolean apiToken = "API".equals(jwt.getClaimAsString(TokenService.CLAIM_USER_TYPE));
             boolean apiPath = path.startsWith("/api/integration/");
             // a connected system's token works only on the integration API, and only while its client is active

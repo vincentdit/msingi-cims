@@ -67,6 +67,34 @@ public class TokenService {
                         mfaSetup, user.getLanguage()), null);
     }
 
+    public static final String TYPE_FAMILY = "FAMILY";
+    public static final String CLAIM_PHONE = "phone";
+
+    /**
+     * A family portal sign-in (parent, guardian or sponsor contact, after the code sent to their phone): no account behind it, only the
+     * phone, which decides which students it may see. Usable only on /api/family/** (SessionGuard) and for 30 minutes at most.
+     */
+    public TokenResponse issueFamily(String phone, String name) {
+        TenantContext.TenantInfo tenant = TenantContext.require();
+        Instant now = Instant.now();
+        java.time.Duration ttl = props.accessTokenTtl().compareTo(java.time.Duration.ofMinutes(30)) < 0 ? props.accessTokenTtl() : java.time.Duration.ofMinutes(30);
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(props.issuer())
+                .subject("family:" + phone)
+                .issuedAt(now)
+                .expiresAt(now.plus(ttl))
+                .claim(CLAIM_TENANT, tenant.code())
+                .claim(CLAIM_TENANT_ID, tenant.id())
+                .claim(CLAIM_ROLES, List.of("FAMILY"))
+                .claim(CLAIM_USER_TYPE, TYPE_FAMILY)
+                .claim(CLAIM_NAME, name == null ? "Family" : name)
+                .claim(CLAIM_PHONE, phone)
+                .build();
+        String token = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(SignatureAlgorithm.RS256).build(), claims)).getTokenValue();
+        return new TokenResponse(token, "Bearer", ttl.toSeconds(),
+                new TokenResponse.UserSummary(null, name == null ? "Family" : name, TYPE_FAMILY, List.of("FAMILY"), tenant.code(), false));
+    }
+
     /** After the password, when the staff member uses MFA: no token yet, only a challenge to send back with the code. */
     public static TokenResponse mfaChallenge(String challenge, boolean sms) {
         return new TokenResponse(null, null, 0, null, new MfaChallenge(challenge, sms));

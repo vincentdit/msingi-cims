@@ -3,13 +3,14 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { clearSession, getSessionUser, getToken, setSession, type Realm } from '../api/client';
 import type { TokenResponse } from '../api/types';
 import { setLanguage } from '../i18n';
+import { clearOffline, endOfflineView, inOfflineView } from '../api/offline';
 
 type User = TokenResponse['user'];
 
 interface SessionCtx {
   user(realm: Realm): User | null;
   signIn(realm: Realm, t: TokenResponse): void;
-  signOut(realm: Realm): void;
+  signOut(realm: Realm, keepOfflineCopy?: boolean): void;
 }
 
 const Ctx = createContext<SessionCtx | null>(null);
@@ -23,12 +24,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const user = useCallback((realm: Realm) => (getToken(realm) ? getSessionUser<User>(realm) : null), []);
   const signIn = useCallback((realm: Realm, t: TokenResponse) => {
     setSession(realm, t.accessToken, t.expiresIn, t.user);
+    if (realm === 'student') endOfflineView();
     // the language kept with the account follows the person to this device (BR-40)
     if (t.user?.language === 'en' || t.user?.language === 'sw') setLanguage(t.user.language);
     bump();
   }, []);
-  const signOut = useCallback((realm: Realm) => {
+  /** keepOfflineCopy: an automatic sign-out (idle) keeps the student app's copy for no-network use; signing out by hand deletes it. */
+  const signOut = useCallback((realm: Realm, keepOfflineCopy = false) => {
     clearSession(realm);
+    if (realm === 'student' && !keepOfflineCopy) clearOffline();
     bump();
   }, []);
 
@@ -44,8 +48,9 @@ export function useSession() {
 export function RequireAuth({ realm, children }: { realm: Realm; children: ReactNode }) {
   const { user } = useSession();
   const location = useLocation();
-  if (!user(realm)) {
-    const login = realm === 'staff' ? '/staff/login' : realm === 'student' ? '/student/login' : realm === 'platform' ? '/platform/login' : '/login';
+  if (!user(realm) && !(realm === 'student' && inOfflineView())) {
+    const login = realm === 'staff' ? '/staff/login' : realm === 'student' ? '/student/login' : realm === 'platform' ? '/platform/login'
+      : realm === 'family' ? '/family/login' : '/login';
     return <Navigate to={login} replace state={{ from: location.pathname + location.search }} />;
   }
   return <>{children}</>;

@@ -1,4 +1,5 @@
 import type { Problem } from './types';
+import { inOfflineView, readOffline, saveOffline } from './offline';
 
 /**
  * Minimal API client.
@@ -6,7 +7,7 @@ import type { Problem } from './types';
  *   institution set VITE_TENANT (sent as the X-Tenant header).
  * - Applicant, student, staff and Msingi platform sessions are kept separately in sessionStorage.
  */
-export type Realm = 'applicant' | 'staff' | 'student' | 'platform';
+export type Realm = 'applicant' | 'staff' | 'student' | 'platform' | 'family';
 
 const TENANT = import.meta.env.VITE_TENANT as string | undefined;
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
@@ -61,6 +62,25 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, options: { method?: string; body?: unknown; realm?: Realm } = {}): Promise<T> {
+  // the installed student app keeps a copy of a few pages for when there is no network (api/offline.ts)
+  const offlineCopy = options.realm === 'student' && (options.method ?? 'GET') === 'GET';
+  if (offlineCopy && !getToken('student') && inOfflineView()) {
+    const saved = readOffline<T>(path);
+    if (saved !== undefined) return saved;
+    throw new ApiError(UNREACHABLE);
+  }
+  const data = await request<T>(path, options).catch((e: unknown) => {
+    if (offlineCopy && e instanceof ApiError && e.problem.code === 'SERVER_UNREACHABLE') {
+      const saved = readOffline<T>(path);
+      if (saved !== undefined) return saved;
+    }
+    throw e;
+  });
+  if (offlineCopy) saveOffline(path, data);
+  return data;
+}
+
+async function request<T>(path: string, options: { method?: string; body?: unknown; realm?: Realm }): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (TENANT) headers['X-Tenant'] = TENANT;
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';

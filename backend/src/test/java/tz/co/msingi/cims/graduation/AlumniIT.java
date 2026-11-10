@@ -35,6 +35,7 @@ class AlumniIT {
     @Autowired TestData data;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
+    @Autowired tz.co.msingi.cims.graduation.alumni.TracerSurveyJob tracerJob;
 
     AdmissionScenario s;
     TestData.Institution inst;
@@ -111,5 +112,47 @@ class AlumniIT {
         s.call(get("/api/alumni?q=said"), registrar, null).andExpect(jsonPath("$[0].employer").value("Said Computer Services"))
                 .andExpect(jsonPath("$[0].updatedVia").value("SURVEY"));
         s.call(post("/api/tracer-surveys/" + id + "/close"), registrar, null).andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
+    @Test
+    void graduatesAreAlsoInvitedByEmailAndThoseWhoDoNotAnswerAreRemindedOnce() throws Exception {
+        db(() -> jdbc.update("update students set email = 'baraka@example.tz' where registration_no = 'OLD/20/0002'"));
+        long id = s.body(s.call(post("/api/tracer-surveys"), registrar, "{\"title\":\"Tracer study 2027\",\"remindAfterDays\":5,\"closesOn\":\""
+                + java.time.LocalDate.now().plusDays(30) + "\"}").andExpect(status().isCreated())).get("id").asLong();
+        s.call(post("/api/tracer-surveys/" + id + "/remind"), registrar, null).andExpect(jsonPath("$.code").value("SURVEY_NOT_OPEN"));
+        s.call(post("/api/tracer-surveys/" + id + "/open"), registrar, null).andExpect(jsonPath("$.invited").value(2)).andExpect(jsonPath("$.remindAfterDays").value(5));
+        assertThat(db(() -> jdbc.queryForObject("select count(*) from messages where template_code = 'TRACER_SURVEY'", Integer.class))).isEqualTo(2);
+        assertThat(db(() -> jdbc.queryForObject("select to_address from email_messages where template_code = 'TRACER_SURVEY'", String.class)))
+                .isEqualTo("baraka@example.tz");
+
+        // nothing is due yet; six days later both are reminded, once, each with a new link (the old one stops working)
+        tracerJob.runNow();
+        assertThat(db(() -> jdbc.queryForObject("select count(*) from tracer_invitations where reminded_at is not null", Integer.class))).isZero();
+        String old = "old-link-token-0123456789abcdefgh";
+        db(() -> jdbc.update("update tracer_invitations set sent_at = now() - interval '6 days'"));
+        db(() -> jdbc.update("update tracer_invitations set token_hash = ? where student_id = (select id from students where registration_no = 'OLD/20/0001')",
+                PortalLinks.hash(old)));
+        tracerJob.runNow();
+        tracerJob.runNow();
+        assertThat(db(() -> jdbc.queryForObject("select count(*) from messages where template_code = 'TRACER_REMINDER'", Integer.class))).isEqualTo(2);
+        assertThat(db(() -> jdbc.queryForObject("select count(*) from email_messages where template_code = 'TRACER_REMINDER'", Integer.class))).isEqualTo(1);
+        s.call(get("/api/public/tracer/" + old), null, null).andExpect(status().isNotFound());
+        s.call(get("/api/tracer-surveys/" + id), registrar, null).andExpect(jsonPath("$.reminded").value(2));
+        // reminding by hand leaves alone those reminded in the last three days
+        s.call(post("/api/tracer-surveys/" + id + "/remind"), registrar, null).andExpect(jsonPath("$.reminded").value(0));
+        s.call(post("/api/tracer-surveys/" + id + "/remind"), lecturer, null).andExpect(status().isForbidden());
+
+        // the report: summary, answers and anonymised responses
+        byte[] xlsx = s.call(get("/api/tracer-surveys/" + id + "/report"), registrar, null).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (var wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(xlsx))) {
+            assertThat(wb.getSheetName(0)).isEqualTo("Summary");
+            assertThat(wb.getSheet("Summary").getRow(5).getCell(1).getNumericCellValue()).isEqualTo(2.0);   // invited
+            assertThat(wb.getSheet("Responses")).isNotNull();
+        }
+
+        // past its closing date the survey closes itself
+        db(() -> jdbc.update("update tracer_surveys set closes_on = current_date - 1 where id = ?", id));
+        tracerJob.runNow();
+        s.call(get("/api/tracer-surveys/" + id), registrar, null).andExpect(jsonPath("$.status").value("CLOSED"));
     }
 }

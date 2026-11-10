@@ -12,6 +12,10 @@ import { InstitutionProvider } from './components/InstitutionContext';
 import { GlobalProgress } from './components/Progress';
 import i18n from './i18n';
 import { loadUiDictionary } from './locale/dictionary';
+import { captureInstallPrompt } from './components/AppInstall';
+
+// the browser offers to install the app once, early: keep the offer for the student home page's Install button
+captureInstallPrompt();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },

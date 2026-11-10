@@ -49,12 +49,14 @@ public class AlumniService {
     public record Question(String code, String text, String type, List<String> options, boolean required) {
     }
 
-    public record SurveyRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String intro, Long graduationId, Long programmeId, LocalDate closesOn) {
+    public record SurveyRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String intro, Long graduationId, Long programmeId, LocalDate closesOn,
+                                @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(60) Integer remindAfterDays) {
     }
 
     public record SurveyView(Long id, String title, String intro, Long graduationId, String graduation, Long programmeId, String programme,
                              String status, LocalDate closesOn, int cohort, int invited, int responded, List<Question> questions,
-                             Map<String, Map<String, Long>> distributions, Double employmentRate, String createdByName, OffsetDateTime openedAt) {
+                             Map<String, Map<String, Long>> distributions, Double employmentRate, String createdByName, OffsetDateTime openedAt,
+                             int reminded, int remindAfterDays) {
     }
 
     public record PublicSurvey(String institution, String title, String intro, String graduateName, String programme, List<Question> questions,
@@ -143,14 +145,15 @@ public class AlumniService {
     @Transactional
     public SurveyView create(SurveyRequest r) {
         Long id = jdbc.queryForObject("""
-                insert into tracer_surveys (tenant_id, title, intro, graduation_id, programme_id, questions, closes_on, created_by_name)
-                values (cims_current_tenant(), ?, ?, ?, ?, ?::jsonb, ?, ?) returning id""", Long.class,
-                r.title().trim(), blank(r.intro()), r.graduationId(), r.programmeId(), json(STANDARD), r.closesOn(), CurrentUser.name());
+                insert into tracer_surveys (tenant_id, title, intro, graduation_id, programme_id, questions, closes_on, created_by_name, remind_after_days)
+                values (cims_current_tenant(), ?, ?, ?, ?, ?::jsonb, ?, ?, ?) returning id""", Long.class,
+                r.title().trim(), blank(r.intro()), r.graduationId(), r.programmeId(), json(STANDARD), r.closesOn(), CurrentUser.name(),
+                r.remindAfterDays() == null ? 7 : r.remindAfterDays());
         audit.record("TRACER_SURVEY_CREATED", "TracerSurvey", id, Map.of("title", r.title()));
         return survey(id);
     }
 
-    /** Opens the survey and invites every graduate of the cohort who may be contacted and has a phone number. */
+    /** Opens the survey and invites every graduate of the cohort who may be contacted, by SMS and by email where there is an address. */
     @Transactional
     public SurveyView open(Long id) {
         Map<String, Object> s = row(id);
@@ -159,16 +162,63 @@ public class AlumniService {
         if (cohort.isEmpty()) throw new BusinessRuleException("NO_GRADUATES", "No graduates match this survey's cohort");
         int invited = 0;
         for (Map<String, Object> g : cohort) {
-            if (Boolean.FALSE.equals(g.get("consent")) || g.get("phone") == null) continue;
+            if (Boolean.FALSE.equals(g.get("consent"))) continue;
+            String phone = (String) g.get("phone"), email = (String) g.get("email");
+            if (phone == null && email == null) continue;
             PortalLinks.Token t = links.newToken();
-            jdbc.update("insert into tracer_invitations (tenant_id, survey_id, student_id, token_hash) values (cims_current_tenant(), ?, ?, ?)",
-                    id, g.get("id"), t.hash());
-            messaging.eventWithLink("TRACER_SURVEY", (String) g.get("phone"), Map.of("title", (String) s.get("title"), "link", links.url("/survey/" + t.token())), "link");
+            // by SMS, and also by email where the graduate has an address (a graduate's phone number is often out of date)
+            jdbc.update("insert into tracer_invitations (tenant_id, survey_id, student_id, token_hash, channel) values (cims_current_tenant(), ?, ?, ?, ?)",
+                    id, g.get("id"), t.hash(), phone != null ? "SMS" : "EMAIL");
+            send("TRACER_SURVEY", phone, email, (String) s.get("title"), t.token());
             invited++;
         }
         jdbc.update("update tracer_surveys set status = 'OPEN', opened_at = now() where id = ?", id);
         audit.record("TRACER_SURVEY_OPENED", "TracerSurvey", id, Map.of("invited", invited));
         return survey(id);
+    }
+
+    /**
+     * Reminds the graduates who have not answered. Each gets a new personal link (only a hash of the old one was kept, so it cannot be
+     * sent again; the old link stops working). With onlyDue, as the daily job does, only those never reminded whose invitation is older
+     * than the survey's remind_after_days; by hand, anyone not reminded in the last three days. Returns how many were reminded.
+     */
+    @Transactional
+    public int remind(Long id, boolean onlyDue) {
+        Map<String, Object> s = row(id);
+        if (!"OPEN".equals(s.get("status"))) throw new BusinessRuleException("SURVEY_NOT_OPEN", "Only an open survey can send reminders");
+        List<Map<String, Object>> due = jdbc.queryForList("""
+                select i.id, coalesce(a.phone, st.phone) as phone, coalesce(a.email, st.email) as email
+                from tracer_invitations i join tracer_surveys ts on ts.id = i.survey_id
+                join students st on st.id = i.student_id left join alumni_profiles a on a.student_id = st.id
+                where i.survey_id = ? and i.responded_at is null and coalesce(a.consent_contact, true)
+                  and (i.reminded_at is null or i.reminded_at < now() - interval '3 days')
+                  and (not ? or (i.reminded_at is null and i.sent_at < now() - make_interval(days => ts.remind_after_days)))""", id, onlyDue);
+        int n = 0;
+        for (Map<String, Object> d : due) {
+            String phone = (String) d.get("phone"), email = (String) d.get("email");
+            if (phone == null && email == null) continue;
+            PortalLinks.Token t = links.newToken();
+            jdbc.update("update tracer_invitations set token_hash = ?, reminded_at = now(), channel = ? where id = ?", t.hash(), phone != null ? "SMS" : "EMAIL", d.get("id"));
+            send("TRACER_REMINDER", phone, email, (String) s.get("title"), t.token());
+            n++;
+        }
+        if (n > 0 || !onlyDue) audit.record("TRACER_SURVEY_REMINDED", "TracerSurvey", id, Map.of("reminded", n, "automatic", onlyDue));
+        return n;
+    }
+
+    private void send(String template, String phone, String email, String title, String token) {
+        Map<String, String> v = Map.of("title", title, "link", links.url("/survey/" + token));
+        if (phone != null) messaging.eventWithLink(template, phone, v, "link");
+        if (email != null && !email.isBlank()) messaging.emailEvent(template, email, v);
+    }
+
+    /** Every morning for each institution: closes surveys past their closing date and sends the one reminder that is due. */
+    @Transactional
+    public int daily() {
+        for (Long id : jdbc.queryForList("select id from tracer_surveys where status = 'OPEN' and closes_on < current_date", Long.class)) close(id);
+        int n = 0;
+        for (Long id : jdbc.queryForList("select id from tracer_surveys where status = 'OPEN'", Long.class)) n += remind(id, true);
+        return n;
     }
 
     @Transactional
@@ -197,6 +247,7 @@ public class AlumniService {
             if ("EMPLOYED".equals(e) || "SELF_EMPLOYED".equals(e)) working++;
         }
         Integer invited = jdbc.queryForObject("select count(*) from tracer_invitations where survey_id = ?", Integer.class, id);
+        Integer reminded = jdbc.queryForObject("select count(*) from tracer_invitations where survey_id = ? and reminded_at is not null", Integer.class, id);
         Long gradId = s.get("graduation_id") == null ? null : ((Number) s.get("graduation_id")).longValue();
         Long progId = s.get("programme_id") == null ? null : ((Number) s.get("programme_id")).longValue();
         return new SurveyView(id, (String) s.get("title"), (String) s.get("intro"), gradId,
@@ -205,7 +256,114 @@ public class AlumniService {
                 (String) s.get("status"), s.get("closes_on") == null ? null : ((java.sql.Date) s.get("closes_on")).toLocalDate(),
                 cohort(s).size(), invited == null ? 0 : invited, answers.size(), questions, dist,
                 answers.isEmpty() ? null : Math.round(working * 1000.0 / answers.size()) / 10.0, (String) s.get("created_by_name"),
-                s.get("opened_at") == null ? null : ((java.sql.Timestamp) s.get("opened_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+                s.get("opened_at") == null ? null : ((java.sql.Timestamp) s.get("opened_at")).toInstant().atOffset(java.time.ZoneOffset.UTC),
+                reminded == null ? 0 : reminded, ((Number) s.get("remind_after_days")).intValue());
+    }
+
+    public record Download(String filename, byte[] content) {
+    }
+
+    /**
+     * The survey report for NACTVET and the Board: a summary with the response and employment rates overall and by programme, how the
+     * answers are spread, and every response without names or contact details (a sequence number and the programme only).
+     */
+    @Transactional
+    public Download report(Long id) {
+        SurveyView v = survey(id);
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                select p.code as programme, r.answers::text as a, r.submitted_at
+                from tracer_responses r join students st on st.id = r.student_id join programmes p on p.id = st.programme_id
+                where r.survey_id = ? order by r.submitted_at""", id);
+        List<Map<String, Object>> byProg = jdbc.queryForList("""
+                select p.code, p.name, count(i.id) as invited, count(r.id) as responded,
+                       count(r.id) filter (where r.answers->>'employment' in ('EMPLOYED', 'SELF_EMPLOYED')) as working
+                from tracer_invitations i join students st on st.id = i.student_id join programmes p on p.id = st.programme_id
+                left join tracer_responses r on r.survey_id = i.survey_id and r.student_id = i.student_id
+                where i.survey_id = ? group by p.code, p.name order by p.code""", id);
+        try (org.apache.poi.ss.usermodel.Workbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook(); java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sum = wb.createSheet("Summary");
+            int[] r = {0};
+            java.util.function.BiConsumer<String, Object> line = (k, val) -> {
+                org.apache.poi.ss.usermodel.Row x = sum.createRow(r[0]++);
+                x.createCell(0).setCellValue(k);
+                if (val instanceof Number n) x.createCell(1).setCellValue(n.doubleValue());
+                else if (val != null) x.createCell(1).setCellValue(val.toString());
+            };
+            line.accept("Survey", v.title());
+            line.accept("Graduation", v.graduation() == null ? "All graduates" : v.graduation());
+            line.accept("Programme", v.programme() == null ? "All programmes" : v.programme());
+            line.accept("Status", v.status());
+            line.accept("Graduates in the cohort", v.cohort());
+            line.accept("Invited", v.invited());
+            line.accept("Responded", v.responded());
+            line.accept("Response rate (%)", v.invited() == 0 ? null : Math.round(v.responded() * 1000.0 / v.invited()) / 10.0);
+            line.accept("Employed or self-employed (% of responses)", v.employmentRate());
+            r[0]++;
+            org.apache.poi.ss.usermodel.Row h = sum.createRow(r[0]++);
+            String[] head = {"Programme", "Name", "Invited", "Responded", "Response rate (%)", "Working (% of responses)"};
+            for (int i = 0; i < head.length; i++) h.createCell(i).setCellValue(head[i]);
+            for (Map<String, Object> p : byProg) {
+                org.apache.poi.ss.usermodel.Row x = sum.createRow(r[0]++);
+                long inv = ((Number) p.get("invited")).longValue(), resp = ((Number) p.get("responded")).longValue(), work = ((Number) p.get("working")).longValue();
+                x.createCell(0).setCellValue((String) p.get("code"));
+                x.createCell(1).setCellValue((String) p.get("name"));
+                x.createCell(2).setCellValue(inv);
+                x.createCell(3).setCellValue(resp);
+                if (inv > 0) x.createCell(4).setCellValue(Math.round(resp * 1000.0 / inv) / 10.0);
+                if (resp > 0) x.createCell(5).setCellValue(Math.round(work * 1000.0 / resp) / 10.0);
+            }
+            sum.setColumnWidth(0, 44 * 256);
+            sum.setColumnWidth(1, 40 * 256);
+            for (int i = 2; i < 6; i++) sum.setColumnWidth(i, 20 * 256);
+
+            org.apache.poi.ss.usermodel.Sheet dist = wb.createSheet("Answers");
+            int d = 0;
+            org.apache.poi.ss.usermodel.Row dh = dist.createRow(d++);
+            dh.createCell(0).setCellValue("Question");
+            dh.createCell(1).setCellValue("Answer");
+            dh.createCell(2).setCellValue("Responses");
+            dh.createCell(3).setCellValue("% of responses");
+            for (Question q : v.questions()) {
+                Map<String, Long> m = v.distributions().get(q.code());
+                if (m == null) continue;
+                for (Map.Entry<String, Long> e : m.entrySet()) {
+                    org.apache.poi.ss.usermodel.Row x = dist.createRow(d++);
+                    x.createCell(0).setCellValue(q.text());
+                    x.createCell(1).setCellValue(e.getKey());
+                    x.createCell(2).setCellValue(e.getValue());
+                    x.createCell(3).setCellValue(Math.round(e.getValue() * 1000.0 / Math.max(1, v.responded())) / 10.0);
+                }
+            }
+            dist.setColumnWidth(0, 44 * 256);
+            dist.setColumnWidth(1, 36 * 256);
+            dist.createFreezePane(0, 1);
+
+            org.apache.poi.ss.usermodel.Sheet resp = wb.createSheet("Responses");
+            org.apache.poi.ss.usermodel.Row rh = resp.createRow(0);
+            rh.createCell(0).setCellValue("No.");
+            rh.createCell(1).setCellValue("Programme");
+            rh.createCell(2).setCellValue("Answered on");
+            for (int i = 0; i < v.questions().size(); i++) rh.createCell(3 + i).setCellValue(v.questions().get(i).text());
+            int n = 1;
+            for (Map<String, Object> row : rows) {
+                Map<String, Object> ans = parse((String) row.get("a"), new TypeReference<>() {});
+                org.apache.poi.ss.usermodel.Row x = resp.createRow(n);
+                x.createCell(0).setCellValue(n++);
+                x.createCell(1).setCellValue((String) row.get("programme"));
+                x.createCell(2).setCellValue(((java.sql.Timestamp) row.get("submitted_at")).toLocalDateTime().toLocalDate().toString());
+                for (int i = 0; i < v.questions().size(); i++) {
+                    Object a = ans.get(v.questions().get(i).code());
+                    if (a != null) x.createCell(3 + i).setCellValue(a.toString());
+                }
+            }
+            for (int i = 0; i < 3 + v.questions().size(); i++) resp.setColumnWidth(i, (i == 0 ? 8 : 24) * 256);
+            resp.createFreezePane(0, 1);
+            wb.write(out);
+            audit.record("TRACER_SURVEY_REPORT", "TracerSurvey", id, Map.of("responses", rows.size()));
+            return new Download("tracer-survey-" + id + ".xlsx", out.toByteArray());
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -287,12 +445,12 @@ public class AlumniService {
         if (s.get("programme_id") != null) { where.append(" and st.programme_id = ?"); args.add(s.get("programme_id")); }
         if (s.get("graduation_id") != null) { where.append(" and exists (select 1 from graduands g where g.student_id = st.id and g.graduation_id = ?)"); args.add(s.get("graduation_id")); }
         return jdbc.queryForList("""
-                select st.id, coalesce(a.phone, st.phone) as phone, coalesce(a.consent_contact, true) as consent
+                select st.id, coalesce(a.phone, st.phone) as phone, coalesce(a.email, st.email) as email, coalesce(a.consent_contact, true) as consent
                 from students st left join alumni_profiles a on a.student_id = st.id""" + where, args.toArray());
     }
 
     private Map<String, Object> row(Long id) {
-        List<Map<String, Object>> r = jdbc.queryForList("select id, title, intro, graduation_id, programme_id, questions::text as questions, status, closes_on, created_by_name, opened_at from tracer_surveys where id = ?", id);
+        List<Map<String, Object>> r = jdbc.queryForList("select id, title, intro, graduation_id, programme_id, questions::text as questions, status, closes_on, created_by_name, opened_at, remind_after_days from tracer_surveys where id = ?", id);
         if (r.isEmpty()) throw new NotFoundException("Survey", id);
         return r.get(0);
     }

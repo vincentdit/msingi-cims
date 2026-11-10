@@ -24,6 +24,7 @@ interface Survey {
   id: number; title: string; intro?: string; graduation?: string; programme?: string; status: 'DRAFT' | 'OPEN' | 'CLOSED'; closesOn?: string; cohort: number;
   invited: number; responded: number; questions: { code: string; text: string; type: string; options: string[] }[];
   distributions: Record<string, Record<string, number>>; employmentRate?: number; createdByName: string; openedAt?: string;
+  reminded: number; remindAfterDays: number;
 }
 
 /** Alumni contacts and graduate tracer surveys (BR-31 / FR-GRD-05). */
@@ -132,19 +133,24 @@ function SurveysTab() {
   const list = useQuery({ queryKey: ['tracer-surveys'], queryFn: () => api<Survey[]>('/api/tracer-surveys', staff) });
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const graduations = useQuery({ queryKey: ['staff', 'graduations'], queryFn: () => api<{ id: number; name: string }[]>('/api/graduations', staff) });
-  const [form, setForm] = useState<{ title: string; intro: string; programmeId: string; graduationId: string; closesOn: string } | null>(null);
+  const [form, setForm] = useState<{ title: string; intro: string; programmeId: string; graduationId: string; closesOn: string; remindAfterDays: number } | null>(null);
+  const [reminded, setReminded] = useState<number | null>(null);
   const [open, setOpen] = useState<Survey | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ['tracer-surveys'] });
   const create = useMutation({
     mutationFn: () => api<Survey>('/api/tracer-surveys', { ...staff, method: 'POST', body: { title: form!.title, intro: form!.intro || null,
-      programmeId: form!.programmeId ? Number(form!.programmeId) : null, graduationId: form!.graduationId ? Number(form!.graduationId) : null, closesOn: form!.closesOn || null } }),
+      programmeId: form!.programmeId ? Number(form!.programmeId) : null, graduationId: form!.graduationId ? Number(form!.graduationId) : null, closesOn: form!.closesOn || null,
+      remindAfterDays: form!.remindAfterDays } }),
     onSuccess: (s) => { refresh(); setForm(null); setOpen(s); },
   });
   const act = useMutation({ mutationFn: ({ id, what }: { id: number; what: 'open' | 'close' }) => api<Survey>(`/api/tracer-surveys/${id}/${what}`, { ...staff, method: 'POST' }),
     onSuccess: (s) => { refresh(); setOpen(s); } });
+  const remind = useMutation({ mutationFn: (id: number) => api<{ reminded: number }>(`/api/tracer-surveys/${id}/remind`, { ...staff, method: 'POST' }),
+    onSuccess: async (r, id) => { setReminded(r.reminded); refresh(); setOpen(await api<Survey>(`/api/tracer-surveys/${id}`, staff)); } });
+  const report = useMutation({ mutationFn: (s: Survey) => download(`/api/tracer-surveys/${s.id}/report`, 'staff', `tracer-survey-${s.id}.xlsx`) });
   return (
     <Stack spacing={2}>
-      {canEdit && <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm({ title: `Tracer study ${new Date().getFullYear()}`, intro: '', programmeId: '', graduationId: '', closesOn: '' })}>New survey</Button></Box>}
+      {canEdit && <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setForm({ title: `Tracer study ${new Date().getFullYear()}`, intro: '', programmeId: '', graduationId: '', closesOn: '', remindAfterDays: 7 })}>New survey</Button></Box>}
       <ErrorAlert error={list.error ?? act.error} />
       {(list.data ?? []).map((s) => (
         <Card key={s.id} sx={{ cursor: 'pointer' }} onClick={() => setOpen(s)}><CardContent>
@@ -173,7 +179,12 @@ function SurveysTab() {
             <TextField select label="Graduation" value={form.graduationId} onChange={(e) => setForm({ ...form, graduationId: e.target.value })}>
               <MenuItem value="">All graduates</MenuItem>{(graduations.data ?? []).map((g) => <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>)}
             </TextField>
-            <TextField type="date" label="Closes on (optional)" value={form.closesOn} onChange={(e) => setForm({ ...form, closesOn: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+            <Stack direction="row" spacing={2}>
+              <TextField type="date" label="Closes on (optional)" value={form.closesOn} onChange={(e) => setForm({ ...form, closesOn: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
+              <TextField type="number" label="Remind after (days)" value={form.remindAfterDays} onChange={(e) => setForm({ ...form, remindAfterDays: Number(e.target.value) })}
+                slotProps={{ htmlInput: { min: 1, max: 60 } }} sx={{ width: 180 }} />
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Graduates who have not answered get one reminder after these days. The survey closes itself on its closing date.</Typography>
             <Typography variant="caption" color="text.secondary">The survey uses the standard tracer questions: what the graduate does now, time to first job, employer, sector, relevance of the training, preparation for work, recommendation and suggestions.</Typography>
             <ErrorAlert error={create.error} />
           </Stack>
@@ -185,9 +196,11 @@ function SurveysTab() {
           <DialogTitle>{open.title}</DialogTitle>
           <DialogContent>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {open.cohort} graduates in the cohort · {open.invited} invited · {open.responded} answered{open.openedAt ? ` · opened ${formatDateTime(open.openedAt)}` : ''}
+              {open.cohort} graduates in the cohort · {open.invited} invited · {open.responded} answered{open.reminded ? ` · ${open.reminded} reminded` : ''}{open.openedAt ? ` · opened ${formatDateTime(open.openedAt)}` : ''}
             </Typography>
-            {open.status === 'DRAFT' && <Alert severity="info" sx={{ mb: 2 }}>Opening the survey sends each graduate who may be contacted an SMS with a personal link.</Alert>}
+            {open.status === 'DRAFT' && <Alert severity="info" sx={{ mb: 2 }}>Opening the survey sends each graduate who may be contacted an SMS with a personal link (by email to those with no phone number). Those who have not answered get one reminder after {open.remindAfterDays} days.</Alert>}
+            {reminded != null && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setReminded(null)}>{reminded === 1 ? '1 graduate reminded.' : `${reminded} graduates reminded.`}</Alert>}
+            <ErrorAlert error={remind.error ?? report.error} />
             {open.employmentRate != null && <Alert severity="success" sx={{ mb: 2 }}>{open.employmentRate}% of those who answered are employed or self-employed.</Alert>}
             {open.questions.filter((q) => q.type !== 'TEXT').map((q) => {
               const d = open.distributions[q.code] ?? {};
@@ -209,7 +222,9 @@ function SurveysTab() {
             })}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpen(null)}>Close</Button>
+            <Button onClick={() => { setOpen(null); setReminded(null); }}>Close</Button>
+            {open.status !== 'DRAFT' && <Button startIcon={<DownloadIcon />} disabled={report.isPending} onClick={() => report.mutate(open)}>Report (Excel)</Button>}
+            {canEdit && open.status === 'OPEN' && open.responded < open.invited && <Button disabled={remind.isPending} onClick={() => remind.mutate(open.id)}>Remind those who have not answered</Button>}
             {canEdit && open.status === 'DRAFT' && <Button variant="contained" disabled={act.isPending} onClick={() => act.mutate({ id: open.id, what: 'open' })}>Open and invite</Button>}
             {canEdit && open.status === 'OPEN' && <Button color="warning" disabled={act.isPending} onClick={() => act.mutate({ id: open.id, what: 'close' })}>Close the survey</Button>}
           </DialogActions>

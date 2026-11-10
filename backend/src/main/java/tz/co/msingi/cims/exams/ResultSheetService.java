@@ -473,6 +473,16 @@ public class ResultSheetService {
     @Transactional(readOnly = true)
     public StudentResults mine() {
         Student st = students.findByUserId(CurrentUser.requireId()).orElseThrow(() -> new NotFoundException("No student record is linked to this account"));
+        return resultsOf(st);
+    }
+
+    /** A student's published results as the student sees them (withheld when fees block results); also for the family portal. */
+    @Transactional(readOnly = true)
+    public StudentResults resultsOf(Long studentId) {
+        return resultsOf(students.findById(studentId).orElseThrow(() -> new NotFoundException("Student", studentId)));
+    }
+
+    private StudentResults resultsOf(Student st) {
         List<StudentSemesterResult> out = new ArrayList<>();
         for (SemesterResult r : semesterResults.findByStudentIdOrderByIdAsc(st.getId())) {
             ResultSheet s = r.getSheet();

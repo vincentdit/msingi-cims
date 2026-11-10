@@ -123,6 +123,22 @@ public final class MessageTemplates {
                 List.of("controlNo", "amount", "description", "institution"), Set.of("controlNo"),
                 "Control number {controlNo} for {amount} ({description}). Pay via bank or mobile money.",
                 "Namba ya malipo {controlNo} kwa {amount} ({description}). Lipa kupitia benki au simu.", s);
+        add("FEE_REMINDER_GUARDIAN", "Fee reminder to a guardian", "A student's instalment is still unpaid at the second overdue reminder", "Fees",
+                List.of("student", "amount", "when", "controlNo", "institution"), Set.of("student", "amount"),
+                "{institution}: {student}'s fees, {amount}, {when}. Pay with number {controlNo}. See the family portal for details.",
+                "{institution}: ada ya {student}, {amount}, {when}. Lipa kwa namba {controlNo}. Angalia tovuti ya wazazi kwa maelezo.", s);
+        add("FEE_REMINDER_SPONSOR", "Fee reminder to a sponsor", "A sponsor's share for a student is still unpaid after the due date", "Fees",
+                List.of("sponsor", "student", "registrationNo", "amount", "when", "institution"), Set.of("student", "amount"),
+                "{institution}: {sponsor}, your share of fees for {student} ({registrationNo}), {amount}, {when}. Please arrange payment.",
+                "{institution}: {sponsor}, sehemu yako ya ada ya {student} ({registrationNo}), {amount}, {when}. Tafadhali lipa.", s);
+        add("TRACER_REMINDER", "Tracer survey reminder", "A graduate has not answered the tracer survey a week after the invitation", "Graduation",
+                List.of("institution", "title", "link"), Set.of("link"),
+                "{institution}: a reminder about our short survey ({title}). Your answers help future students: {link}",
+                "{institution}: tunakukumbusha dodoso fupi ({title}). Majibu yako yanasaidia wanafunzi wajao: {link}", s);
+        add("FAMILY_CODE", "Family portal sign-in code", "A parent, guardian or sponsor asks for a code to sign in to the family portal", "Security",
+                List.of("institution", "code"), Set.of("code"),
+                "{institution}: your family portal code is {code}. It is valid for 10 minutes. Do not share it.",
+                "{institution}: namba yako ya kuingia tovuti ya wazazi ni {code}. Inatumika kwa dakika 10. Usimpe mtu.", s);
         add("FEE_REMINDER", "Instalment reminder", "An instalment of the year's fees is due soon, due today or overdue", "Fees",
                 List.of("amount", "instalment", "when", "controlNo", "description", "institution"), Set.of("amount"),
                 "{institution}: instalment {instalment} of {description}, {amount}, {when}. Pay with number {controlNo}.",

@@ -14,7 +14,16 @@ import { ErrorAlert, Loading } from '../../components/common';
 
 const staff = { realm: 'staff' as const };
 
-interface Rules { remindersEnabled: boolean; reminderDaysBefore: number; penaltyMode: 'NONE' | 'PERCENT' | 'FIXED'; penaltyValue: number; penaltyGraceDays: number }
+interface Rules {
+  remindersEnabled: boolean; reminderDaysBefore: number; penaltyMode: 'NONE' | 'PERCENT' | 'FIXED'; penaltyValue: number; penaltyGraceDays: number;
+  overdueRepeatDays: number; overdueMaxReminders: number; remindGuardians: boolean; remindSponsors: boolean;
+}
+interface Reminder {
+  id: number; sentAt: string; invoiceNo: string; payerName: string; registrationNo?: string; instalment: number; kind: 'BEFORE' | 'DUE' | 'OVERDUE'; round: number;
+  recipient: 'PAYER' | 'GUARDIAN' | 'SPONSOR'; channel: 'SMS' | 'EMAIL' | 'NONE'; sentTo?: string; amount: number;
+}
+const KIND: Record<Reminder['kind'], string> = { BEFORE: 'Before the due date', DUE: 'On the due date', OVERDUE: 'Overdue' };
+const RECIPIENT: Record<Reminder['recipient'], string> = { PAYER: 'Student / payer', GUARDIAN: 'Guardian', SPONSOR: 'Sponsor' };
 interface Penalty { id: number; invoiceId: number; invoiceNo: string; payerName: string; instalment: number; overdueAmount: number; amount: number; rule: string; appliedAt: string }
 interface RunResult { date: string; reminders: number; penalties: number; penaltyTotal: number }
 
@@ -31,6 +40,7 @@ export default function InstalmentsTab({ canEdit }: { canEdit: boolean }) {
     queryFn: () => api<{ instalment: number; dueDate: string }[]>(`/api/finance/instalment-dates?academicYearId=${yearId}`, staff) });
   const rules = useQuery({ queryKey: ['staff', 'collection-rules'], queryFn: () => api<Rules>('/api/finance/collection-rules', staff) });
   const penalties = useQuery({ queryKey: ['staff', 'penalties'], queryFn: () => api<Penalty[]>('/api/finance/penalties', staff) });
+  const reminders = useQuery({ queryKey: ['staff', 'fee-reminders'], queryFn: () => api<Reminder[]>('/api/finance/reminders?days=30', staff) });
   const [rows, setRows] = useState<{ instalment: number; dueDate: string }[]>([]);
   const [r, setR] = useState<Rules | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -42,11 +52,11 @@ export default function InstalmentsTab({ canEdit }: { canEdit: boolean }) {
   });
   const saveRules = useMutation({
     mutationFn: () => api('/api/finance/collection-rules', { ...staff, method: 'PUT', body: r }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff', 'collection-rules'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff', 'collection-rules'] }); },
   });
   const run = useMutation({
     mutationFn: () => api<RunResult>('/api/finance/reminders/run', { ...staff, method: 'POST' }),
-    onSuccess: (x) => { setResult(x); qc.invalidateQueries({ queryKey: ['staff', 'penalties'] }); },
+    onSuccess: (x) => { setResult(x); qc.invalidateQueries({ queryKey: ['staff', 'penalties'] }); qc.invalidateQueries({ queryKey: ['staff', 'fee-reminders'] }); },
   });
   if (years.isLoading || rules.isLoading) return <Loading />;
   const dirtyDates = JSON.stringify(rows) !== JSON.stringify(dates.data ?? []);
@@ -90,9 +100,20 @@ export default function InstalmentsTab({ canEdit }: { canEdit: boolean }) {
             {r && (
               <Stack spacing={1.5}>
                 <FormControlLabel control={<Switch checked={r.remindersEnabled} disabled={!canEdit} onChange={(e) => setR({ ...r, remindersEnabled: e.target.checked })} />}
-                  label="Remind payers by SMS before the due date, on the day, and once when overdue" />
-                <TextField size="small" type="number" label="Days before the due date" value={r.reminderDaysBefore} disabled={!canEdit || !r.remindersEnabled}
-                  onChange={(e) => setR({ ...r, reminderDaysBefore: Number(e.target.value) })} sx={{ width: 220 }} />
+                  label="Remind payers by SMS (and email, where verified) before the due date, on the day, and while overdue" />
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <TextField size="small" type="number" label="Days before the due date" value={r.reminderDaysBefore} disabled={!canEdit || !r.remindersEnabled}
+                    onChange={(e) => setR({ ...r, reminderDaysBefore: Number(e.target.value) })} sx={{ width: 190 }} />
+                  <TextField size="small" type="number" label="Repeat overdue every (days)" value={r.overdueRepeatDays} disabled={!canEdit || !r.remindersEnabled}
+                    onChange={(e) => setR({ ...r, overdueRepeatDays: Number(e.target.value) })} sx={{ width: 210 }} />
+                  <TextField size="small" type="number" label="Overdue reminders at most" value={r.overdueMaxReminders} disabled={!canEdit || !r.remindersEnabled}
+                    onChange={(e) => setR({ ...r, overdueMaxReminders: Number(e.target.value) })} sx={{ width: 200 }} />
+                </Stack>
+                <FormControlLabel control={<Switch checked={r.remindGuardians} disabled={!canEdit || !r.remindersEnabled} onChange={(e) => setR({ ...r, remindGuardians: e.target.checked })} />}
+                  label="From the second overdue reminder, also tell the student's parents and guardians" />
+                <FormControlLabel control={<Switch checked={r.remindSponsors} disabled={!canEdit || !r.remindersEnabled} onChange={(e) => setR({ ...r, remindSponsors: e.target.checked })} />}
+                  label="Remind sponsors whose share is overdue" />
+                <Typography variant="caption" color="text.secondary">Students who turned reminders off in the student app are not sent them; their guardians and sponsors still are.</Typography>
                 <Stack direction="row" spacing={1}>
                   <TextField select size="small" label="Late payment penalty" value={r.penaltyMode} disabled={!canEdit} onChange={(e) => setR({ ...r, penaltyMode: e.target.value as Rules['penaltyMode'] })} sx={{ minWidth: 200 }}>
                     <MenuItem value="NONE">No penalty</MenuItem><MenuItem value="PERCENT">Percentage of what is overdue</MenuItem><MenuItem value="FIXED">Fixed amount</MenuItem>
@@ -113,6 +134,34 @@ export default function InstalmentsTab({ canEdit }: { canEdit: boolean }) {
                 {result && <Alert severity="success" onClose={() => setResult(null)}>{formatDate(result.date)}: {result.reminders} reminder(s) sent, {result.penalties} penalty(ies) of {formatTzs(result.penaltyTotal)} added. It also runs every morning at 07:30.</Alert>}
               </Stack>
             )}
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid size={12}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6">Reminders sent</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>The last 30 days.</Typography>
+            <ErrorAlert error={reminders.error} />
+            <TableContainer><Table size="small" sx={{ minWidth: 760 }}>
+              <TableHead><TableRow>
+                <TableCell>When</TableCell><TableCell>Invoice</TableCell><TableCell>Student</TableCell><TableCell>Reminder</TableCell><TableCell>To</TableCell>
+                <TableCell>By</TableCell><TableCell align="right">Amount</TableCell>
+              </TableRow></TableHead>
+              <TableBody>
+                {reminders.data?.map((x) => (
+                  <TableRow key={x.id}>
+                    <TableCell>{formatDateTime(x.sentAt)}</TableCell><TableCell sx={{ fontFamily: 'monospace' }}>{x.invoiceNo}</TableCell>
+                    <TableCell>{x.payerName}{x.registrationNo ? ` · ${x.registrationNo}` : ''}</TableCell>
+                    <TableCell>{`${KIND[x.kind]}${x.kind === 'OVERDUE' && x.round > 1 ? ` (${x.round})` : ''} · instalment ${x.instalment}`}</TableCell>
+                    <TableCell>{RECIPIENT[x.recipient]}{x.sentTo ? ` · ${x.sentTo}` : ''}</TableCell>
+                    <TableCell>{x.channel === 'NONE' ? 'Not sent (turned off)' : x.channel === 'EMAIL' ? 'Email' : 'SMS'}</TableCell>
+                    <TableCell align="right">{formatTzs(x.amount)}</TableCell>
+                  </TableRow>
+                ))}
+                {reminders.data?.length === 0 && <TableRow><TableCell colSpan={7}><Box sx={{ color: 'text.secondary', py: 1 }}>No reminders in the last 30 days.</Box></TableCell></TableRow>}
+              </TableBody>
+            </Table></TableContainer>
           </CardContent>
         </Card>
       </Grid>

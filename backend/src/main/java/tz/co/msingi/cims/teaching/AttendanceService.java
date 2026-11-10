@@ -347,6 +347,16 @@ public class AttendanceService {
     @Transactional(readOnly = true)
     public MyAttendance mine(Long semesterId) {
         Student me = students.findByUserId(CurrentUser.requireId()).orElseThrow(() -> new NotFoundException("No student record is linked to this account"));
+        return attendanceOf(me, semesterId);
+    }
+
+    /** A student's attendance as the student sees it; also for the family portal. */
+    @Transactional(readOnly = true)
+    public MyAttendance attendanceOf(Long studentId, Long semesterId) {
+        return attendanceOf(students.findById(studentId).orElseThrow(() -> new NotFoundException("Student", studentId)), semesterId);
+    }
+
+    private MyAttendance attendanceOf(Student me, Long semesterId) {
         List<SemesterRegistration> regs = semesterRegistrations.findByStudentIdOrderBySubmittedAtDesc(me.getId()).stream()
                 .filter(r -> r.getStatus() == APPROVED).toList();
         SemesterRegistration reg = semesterId == null

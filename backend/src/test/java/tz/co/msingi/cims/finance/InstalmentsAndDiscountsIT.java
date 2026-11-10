@@ -18,6 +18,7 @@ import tz.co.msingi.cims.support.TestData;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,9 +99,10 @@ class InstalmentsAndDiscountsIT {
                 .andExpect(jsonPath("$.penaltyMode").value("PERCENT"));
         s.call(post("/api/finance/reminders/run?date=" + TODAY.plusDays(1)), bursar, null).andExpect(jsonPath("$.code").value("FUTURE_DATE"));
 
-        // instalment 1 is 20 days late (reminded, and penalised after 14 days' grace); instalment 2 is due in 7 days (reminded)
+        // instalment 1 is 20 days late (reminded once, at its third overdue round, so the next of kin is told too; penalised after
+        // 14 days' grace); instalment 2 is due in 7 days (reminded)
         JsonNode run = s.body(s.call(post("/api/finance/reminders/run"), bursar, null).andExpect(status().isOk()));
-        assertThat(run.get("reminders").asInt()).isEqualTo(2);
+        assertThat(run.get("reminders").asInt()).isEqualTo(3);
         assertThat(run.get("penalties").asInt()).isEqualTo(1);
         assertThat(run.get("penaltyTotal").decimalValue()).isEqualByComparingTo("16000");   // 5% of TZS 320,000 still owed on instalment 1
         // running again changes nothing
@@ -113,8 +115,53 @@ class InstalmentsAndDiscountsIT {
         JsonNode penalties = s.body(s.call(get("/api/finance/penalties"), accountant, null).andExpect(status().isOk()));
         assertThat(penalties.get(0).get("rule").asString()).contains("5% of TZS 320,000");
         Integer sms = TenantContext.callAs(inst.info(), () -> tx.execute(x -> jdbc.queryForObject(
-                "select count(*) from messages where template_code in ('FEE_REMINDER', 'FEE_PENALTY')", Integer.class)));
-        assertThat(sms).isEqualTo(3);
+                "select count(*) from messages where template_code in ('FEE_REMINDER', 'FEE_REMINDER_GUARDIAN', 'FEE_PENALTY')", Integer.class)));
+        assertThat(sms).isEqualTo(4);
+    }
+
+    @Test
+    void overdueRemindersRepeatReachTheGuardianAndRespectTheStudentsChoice() throws Exception {
+        LocalDate due = TODAY.minusDays(15);
+        s.call(put("/api/finance/instalment-dates?academicYearId=" + yearId), bursar,
+                "{\"dates\":[{\"instalment\":1,\"dueDate\":\"" + due + "\"},{\"instalment\":2,\"dueDate\":\"" + TODAY.plusDays(60) + "\"}]}")
+                .andExpect(status().isOk());
+        s.call(put("/api/finance/collection-rules"), bursar, "{\"remindersEnabled\":true,\"reminderDaysBefore\":7,\"penaltyMode\":\"NONE\",\"penaltyValue\":0,"
+                + "\"penaltyGraceDays\":14,\"overdueRepeatDays\":7,\"overdueMaxReminders\":3,\"remindGuardians\":true,\"remindSponsors\":true}")
+                .andExpect(jsonPath("$.overdueRepeatDays").value(7)).andExpect(jsonPath("$.remindGuardians").value(true));
+        s.call(put("/api/finance/collection-rules"), bursar, "{\"remindersEnabled\":true,\"reminderDaysBefore\":7,\"penaltyMode\":\"NONE\",\"penaltyValue\":0,"
+                + "\"penaltyGraceDays\":14,\"overdueRepeatDays\":0}").andExpect(status().isBadRequest());
+
+        // the day after: the payer only; a week later: the payer and the next of kin; running again sends nothing more
+        assertThat(runOn(due.plusDays(1))).isEqualTo(1);
+        assertThat(runOn(due.plusDays(8))).isEqualTo(2);
+        assertThat(runOn(due.plusDays(8))).isZero();
+        assertThat(runOn(due.plusDays(9))).isZero();
+        List<String> guardian = db(() -> jdbc.queryForList("select phone from messages where template_code = 'FEE_REMINDER_GUARDIAN'", String.class));
+        assertThat(guardian).containsExactly("255713000111");
+
+        // the student turns reminders off: the third round is recorded for the payer but not sent; the guardian is still told
+        String regNo = s.body(s.call(get("/api/registry/students"), registrar, null)).get("content").get(0).get("registrationNo").asString();
+        String student = s.body(s.call(post("/api/student-auth/login"), null, "{\"login\":\"" + regNo + "\",\"password\":\"Kifaru#Mto47\"}")
+                .andExpect(status().isOk())).get("accessToken").asString();
+        s.call(put("/api/student/preferences"), student, "{\"feeRemindersOptOut\":true}").andExpect(jsonPath("$.feeRemindersOptOut").value(true));
+        assertThat(runOn(due.plusDays(15))).isEqualTo(1);
+        assertThat(db(() -> jdbc.queryForObject("select count(*) from messages where template_code = 'FEE_REMINDER'", Integer.class))).isEqualTo(2);
+
+        JsonNode log = s.body(s.call(get("/api/finance/reminders?days=30"), accountant, null).andExpect(status().isOk()));
+        assertThat(log).hasSize(5);
+        assertThat(log.get(0).get("round").asInt()).isEqualTo(3);
+        assertThat(log.findValuesAsString("channel")).contains("NONE");
+        assertThat(log.findValuesAsString("recipient")).containsOnly("PAYER", "GUARDIAN");
+        assertThat(log.findValuesAsString("sentTo")).noneMatch(t -> t.contains("713000111"));   // masked
+        s.call(get("/api/finance/reminders"), registrar, null).andExpect(status().isForbidden());
+    }
+
+    private int runOn(LocalDate date) throws Exception {
+        return s.body(s.call(post("/api/finance/reminders/run?date=" + date), bursar, null).andExpect(status().isOk())).get("reminders").asInt();
+    }
+
+    private <T> T db(java.util.function.Supplier<T> work) {
+        return TenantContext.callAs(inst.info(), () -> tx.execute(x -> work.get()));
     }
 
     @Test

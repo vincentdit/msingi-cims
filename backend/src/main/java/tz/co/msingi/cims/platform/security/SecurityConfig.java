@@ -49,6 +49,7 @@ public class SecurityConfig {
             "/api/platform/auth/login",
             "/api/applicant-auth/**",
             "/api/student-auth/**",
+            "/api/family-auth/**",
             "/api/integrations/gepg/**",
             "/api/integrations/collections/**",
             "/api/integrations/msingi-billing/**",

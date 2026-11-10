@@ -86,6 +86,24 @@ public class AlumniController {
         return service.open(id);
     }
 
+    /** Reminds, by hand, the graduates who have not answered (not those reminded in the last three days). */
+    @PostMapping("/api/tracer-surveys/{id}/remind")
+    @PreAuthorize(WRITE)
+    public Map<String, Integer> remind(@PathVariable Long id) {
+        return Map.of("reminded", service.remind(id, false));
+    }
+
+    @GetMapping("/api/tracer-surveys/{id}/report")
+    @PreAuthorize(READ)
+    public ResponseEntity<byte[]> report(@PathVariable Long id) {
+        AlumniService.Download d = service.report(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment().filename(d.filename()).build().toString())
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(d.content());
+    }
+
     @PostMapping("/api/tracer-surveys/{id}/close")
     @PreAuthorize(WRITE)
     public AlumniService.SurveyView close(@PathVariable Long id) {

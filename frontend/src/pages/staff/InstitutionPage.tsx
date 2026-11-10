@@ -99,6 +99,7 @@ export default function InstitutionPage() {
         <Grid size={{ xs: 12, md: 5 }}><LogoCard /></Grid>
         <Grid size={{ xs: 12, md: 7 }}><ContactsCard /></Grid>
         <Grid size={12}><PrincipalCard /></Grid>
+        <Grid size={12}><FamilyPortalCard /></Grid>
       </Grid>
     </Container>
   );
@@ -343,3 +344,32 @@ function PrincipalCard() {
   );
 }
 
+
+/** The family and sponsor portal (FR-STU-05): whether parents, guardians and sponsors may sign in, and whether sponsors see results. */
+function FamilyPortalCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['staff', 'family-portal'], queryFn: () => api<{ enabled: boolean; sponsorsSeeResults: boolean }>('/api/family-portal/settings', staff) });
+  const save = useMutation({
+    mutationFn: (b: { enabled: boolean; sponsorsSeeResults: boolean }) => api<{ enabled: boolean; sponsorsSeeResults: boolean }>('/api/family-portal/settings', { ...staff, method: 'PUT', body: b }),
+    onSuccess: (d) => qc.setQueryData(['staff', 'family-portal'], d),
+  });
+  const s = q.data;
+  return (
+    <Card>
+      <CardContent>
+        <Typography variant="h6">Family portal</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {`Parents, guardians and sponsors sign in at ${window.location.host}/family with a code sent by SMS to the phone the college has for them. They see the student's fees and payments; results and attendance only when the student shares them.`}
+        </Typography>
+        <ErrorAlert error={q.error ?? save.error} />
+        {s && (
+          <Stack>
+            <FormControlLabel label="Open the family portal" control={<Checkbox checked={s.enabled} disabled={save.isPending} onChange={(e) => save.mutate({ ...s, enabled: e.target.checked })} />} />
+            <FormControlLabel label="Sponsors also see the results of the students they sponsor" disabled={!s.enabled}
+              control={<Checkbox checked={s.sponsorsSeeResults} disabled={save.isPending} onChange={(e) => save.mutate({ ...s, sponsorsSeeResults: e.target.checked })} />} />
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

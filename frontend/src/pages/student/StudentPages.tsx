@@ -31,6 +31,9 @@ import AlumniCard from '../../components/AlumniCard';
 import NinCard from '../../components/NinCard';
 import HealthCoverCard from '../../components/HealthCoverCard';
 import { PasswordField } from '../../components/PasswordFields';
+import { InstallAppCard } from '../../components/AppInstall';
+import { savedCopyAt, startOfflineView } from '../../api/offline';
+import StudentFamilyCard from './StudentFamilyCard';
 
 const student = { realm: 'student' as const };
 
@@ -60,6 +63,14 @@ export function StudentLoginPage() {
         <Card sx={{ borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
             {new URLSearchParams(window.location.search).get('idle') === '1' && <Alert severity="info" sx={{ mb: 2 }}>{t('idle.signedOut')}</Alert>}
+            {!navigator.onLine && savedCopyAt() !== null && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {t('student.offlineNoNetwork')}
+                <Button size="small" sx={{ display: 'block', mt: 1, px: 0 }} onClick={() => { startOfflineView(); navigate('/student'); }}>
+                  {t('student.offlineOpen', { when: new Date(savedCopyAt()!).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })}
+                </Button>
+              </Alert>
+            )}
             <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
               <Stack spacing={2}>
                 <Typography variant="body2" color="text.secondary">{t('student.signInHint')}</Typography>
@@ -97,6 +108,7 @@ export function StudentHome() {
   const paidPct = d.billed > 0 ? Math.min(100, Math.round((d.paid / d.billed) * 100)) : 0;
   return (
     <Stack spacing={2}>
+      <InstallAppCard />
       <Card sx={{ borderRadius: 3, bgcolor: 'primary.main', color: 'primary.contrastText', border: 0 }}>
         <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
           <Typography sx={{ opacity: 0.85 }}>{t('student.hello', { name: d.firstName })}</Typography>
@@ -482,6 +494,7 @@ export function StudentProfilePage() {
       <StudentTransferCard />
       <HealthCoverCard />
       <NinCard />
+      <StudentFamilyCard />
       <AlumniCard />
       <PrivacyCard realm="student" />
 

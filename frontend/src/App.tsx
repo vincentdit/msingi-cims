@@ -12,6 +12,7 @@ import DocumentVerifyPage from './pages/portal/VerifyPage';
 const StaffApp = lazy(() => import('./apps/StaffApp'));
 const StudentApp = lazy(() => import('./apps/StudentApp'));
 const PlatformApp = lazy(() => import('./apps/PlatformApp'));
+const FamilyApp = lazy(() => import('./apps/FamilyApp'));
 const ApplicationPage = lazy(() => import('./pages/applicant/ApplicationPage'));
 const HelpPage = lazy(() => import('./pages/portal/HelpPage'));
 const ProgrammePage = lazy(() => import('./pages/portal/ProgrammePage'));
@@ -43,6 +44,7 @@ export default function App() {
       </Route>
       <Route path="student/*" element={<Lazy><StudentApp /></Lazy>} />
       <Route path="platform/*" element={<Lazy><PlatformApp /></Lazy>} />
+      <Route path="family/*" element={<Lazy><FamilyApp /></Lazy>} />
       <Route path="staff/*" element={<Lazy><StaffApp /></Lazy>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

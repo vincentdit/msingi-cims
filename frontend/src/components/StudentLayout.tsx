@@ -21,6 +21,8 @@ import { useSession } from '../auth/session';
 import { setLanguage } from '../i18n';
 import { useInstitution } from './InstitutionContext';
 import IdleSignOut from './IdleSignOut';
+import { OfflineBanner } from './AppInstall';
+import { endOfflineView, inOfflineView } from '../api/offline';
 import { useCallback } from 'react';
 
 const TABS = [
@@ -38,7 +40,7 @@ export default function StudentLayout() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const wide = useMediaQuery(theme.breakpoints.up('md'));
-  const { signOut } = useSession();
+  const { signOut, user } = useSession();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dash = useQuery({ queryKey: ['student', 'dashboard'], queryFn: () => api<StudentDashboard>('/api/student/dashboard', { realm: 'student' }) });
@@ -46,11 +48,12 @@ export default function StudentLayout() {
     : [...TABS].reverse().find((x) => pathname === x.to || pathname.startsWith(`${x.to}/`))?.to ?? '/student';
   const unread = dash.data?.unreadNotices ?? 0;
   const label = (key: string) => t(`student.${key}`);
-  const idleOut = useCallback(() => { signOut('student'); navigate('/student/login?idle=1'); }, [signOut, navigate]);
+  // signing out for being idle keeps the installed app's saved copy; signing out by hand deletes it
+  const idleOut = useCallback(() => { signOut('student', true); navigate('/student/login?idle=1'); }, [signOut, navigate]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: wide ? 4 : 9 }}>
-      <IdleSignOut kind="student" onSignOut={idleOut} />
+      {user('student') && <IdleSignOut kind="student" onSignOut={idleOut} />}
       <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 1.5 }}>
           <Avatar sx={{ bgcolor: 'primary.main', fontFamily: 'Sora', fontWeight: 700, width: 36, height: 36, fontSize: 11 }}>
@@ -80,7 +83,9 @@ export default function StudentLayout() {
             <ToggleButton value="en" sx={{ px: 1, py: 0.25 }}>EN</ToggleButton>
             <ToggleButton value="sw" sx={{ px: 1, py: 0.25 }}>SW</ToggleButton>
           </ToggleButtonGroup>
-          {wide ? (
+          {inOfflineView() && !user('student') ? (
+            <Button variant="outlined" onClick={() => { endOfflineView(); navigate('/student/login'); }}>{t('student.signInAgain')}</Button>
+          ) : wide ? (
             <Button variant="outlined" onClick={() => { signOut('student'); navigate('/student/login'); }}>{t('nav.signOut')}</Button>
           ) : (
             <Tooltip title={t('nav.signOut')}>
@@ -97,6 +102,7 @@ export default function StudentLayout() {
         )}
       </AppBar>
       <Container maxWidth="md" sx={{ pt: { xs: 2, md: 3 } }}>
+        <OfflineBanner />
         <Outlet />
       </Container>
       {!wide && (

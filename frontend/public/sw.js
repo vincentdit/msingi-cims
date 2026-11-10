@@ -2,8 +2,8 @@
  * CIMS service worker: makes the portals installable and keeps the app shell available when the network drops.
  * API calls are never cached (personal and financial data); pages and built assets use network-first with a cached fallback.
  */
-const CACHE = 'cims-shell-v1';
-const SHELL = ['/', '/student', '/favicon.png', '/icon-192.png', '/manifest.webmanifest'];
+const CACHE = 'cims-shell-v2';
+const SHELL = ['/', '/student', '/student/login', '/favicon.png', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

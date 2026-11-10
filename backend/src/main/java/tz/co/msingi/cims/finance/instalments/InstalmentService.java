@@ -37,8 +37,10 @@ import java.util.Set;
 /**
  * Instalment plans, reminders and late-payment penalties (BR-24, FR-FIN-07). The Bursar sets when each instalment of an academic
  * year falls due, how many days before to remind, and the penalty rule. Each morning payers with an unpaid instalment are reminded by
- * SMS a few days before, on the due date and once when it is overdue; after the grace period a penalty line is added to the invoice once
- * per instalment (it can be waived through the usual waiver approval). Sponsor shares not yet paid are not chased.
+ * SMS (and email to a verified address) a few days before and on the due date; while it is overdue, again every few days up to a
+ * set number of times. From the second overdue reminder the student's guardians are told too, and a sponsor whose share is still
+ * unpaid is reminded of that share. A student may opt out of reminder SMS; the guardians and sponsors are still told. After the
+ * grace period a penalty line is added to the invoice once per instalment (it can be waived through the usual waiver approval).
  */
 @Slf4j
 @Service
@@ -55,6 +57,7 @@ public class InstalmentService {
     private final Messaging messaging;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
+    private final tz.co.msingi.cims.portal.family.GuardianLinks guardianLinks;
 
     public record DueDate(@Min(1) @Max(12) int instalment, @NotNull LocalDate dueDate) {
     }
@@ -62,8 +65,19 @@ public class InstalmentService {
     public record DueDatesRequest(@NotNull List<DueDate> dates) {
     }
 
+    /** The collection rules; the reminder fields left out of a request keep their current value. */
     public record Rules(boolean remindersEnabled, @Min(1) @Max(60) int reminderDaysBefore, @NotNull @Pattern(regexp = "NONE|PERCENT|FIXED") String penaltyMode,
-                        @NotNull @DecimalMin("0") BigDecimal penaltyValue, @Min(0) @Max(180) int penaltyGraceDays) {
+                        @NotNull @DecimalMin("0") BigDecimal penaltyValue, @Min(0) @Max(180) int penaltyGraceDays,
+                        @Min(1) @Max(60) Integer overdueRepeatDays, @Min(1) @Max(10) Integer overdueMaxReminders, Boolean remindGuardians,
+                        Boolean remindSponsors) {
+        public Rules(boolean remindersEnabled, int reminderDaysBefore, String penaltyMode, BigDecimal penaltyValue, int penaltyGraceDays) {
+            this(remindersEnabled, reminderDaysBefore, penaltyMode, penaltyValue, penaltyGraceDays, null, null, null, null);
+        }
+    }
+
+    /** One reminder sent (or recorded as not sent, channel NONE, for a student who opted out). */
+    public record ReminderView(Long id, OffsetDateTime sentAt, String invoiceNo, String payerName, String registrationNo, int instalment, String kind, int round,
+                               String recipient, String channel, String sentTo, BigDecimal amount) {
     }
 
     public record RunResult(LocalDate date, int reminders, int penalties, BigDecimal penaltyTotal) {
@@ -106,9 +120,12 @@ public class InstalmentService {
 
     @Transactional(readOnly = true)
     public Rules rules() {
-        List<Rules> r = jdbc.query("select reminders_enabled, reminder_days_before, penalty_mode, penalty_value, penalty_grace_days from finance_settings",
-                (rs, i) -> new Rules(rs.getBoolean(1), rs.getInt(2), rs.getString(3), rs.getBigDecimal(4), rs.getInt(5)));
-        return r.isEmpty() ? new Rules(true, 7, "NONE", BigDecimal.ZERO, 14) : r.get(0);
+        List<Rules> r = jdbc.query("""
+                select reminders_enabled, reminder_days_before, penalty_mode, penalty_value, penalty_grace_days, overdue_repeat_days, overdue_max_reminders,
+                       remind_guardians, remind_sponsors from finance_settings""",
+                (rs, i) -> new Rules(rs.getBoolean(1), rs.getInt(2), rs.getString(3), rs.getBigDecimal(4), rs.getInt(5), rs.getInt(6), rs.getInt(7),
+                        rs.getBoolean(8), rs.getBoolean(9)));
+        return r.isEmpty() ? new Rules(true, 7, "NONE", BigDecimal.ZERO, 14, 7, 3, true, true) : r.get(0);
     }
 
     @Transactional
@@ -120,12 +137,19 @@ public class InstalmentService {
             throw new BusinessRuleException("PENALTY_VALUE_REQUIRED", "Give the penalty amount or percentage");
         }
         Rules before = rules();
+        r = new Rules(r.remindersEnabled(), r.reminderDaysBefore(), r.penaltyMode(), r.penaltyValue(), r.penaltyGraceDays(),
+                r.overdueRepeatDays() != null ? r.overdueRepeatDays() : before.overdueRepeatDays(),
+                r.overdueMaxReminders() != null ? r.overdueMaxReminders() : before.overdueMaxReminders(),
+                r.remindGuardians() != null ? r.remindGuardians() : before.remindGuardians(),
+                r.remindSponsors() != null ? r.remindSponsors() : before.remindSponsors());
         int n = jdbc.update("update finance_settings set reminders_enabled = ?, reminder_days_before = ?, penalty_mode = ?, penalty_value = ?, "
                 + "penalty_grace_days = ?, updated_at = now()", r.remindersEnabled(), r.reminderDaysBefore(), r.penaltyMode(), r.penaltyValue(), r.penaltyGraceDays());
         if (n == 0) {
             jdbc.update("insert into finance_settings (tenant_id, reminders_enabled, reminder_days_before, penalty_mode, penalty_value, penalty_grace_days) "
                     + "values (cims_current_tenant(), ?, ?, ?, ?, ?)", r.remindersEnabled(), r.reminderDaysBefore(), r.penaltyMode(), r.penaltyValue(), r.penaltyGraceDays());
         }
+        jdbc.update("update finance_settings set overdue_repeat_days = ?, overdue_max_reminders = ?, remind_guardians = ?, remind_sponsors = ?",
+                r.overdueRepeatDays(), r.overdueMaxReminders(), r.remindGuardians(), r.remindSponsors());
         audit.record("COLLECTION_RULES_SET", "FinanceSettings", null, Map.of("before", before.toString(), "after", r.toString()));
         return rules();
     }
@@ -164,8 +188,15 @@ public class InstalmentService {
                     LocalDate date = due.getValue();
                     long days = java.time.temporal.ChronoUnit.DAYS.between(today, date);   // positive = before the due date
                     if (rules.remindersEnabled()) {
-                        String kind = days == rules.reminderDaysBefore() ? "BEFORE" : days == 0 ? "DUE" : days < 0 && -days >= 1 ? "OVERDUE" : null;
-                        if (kind != null && remind(inv, instalment, kind, thisOne, date)) reminders++;
+                        if (days == rules.reminderDaysBefore()) reminders += remind(inv, instalment, "BEFORE", 1, thisOne, date, rules);
+                        else if (days == 0) reminders += remind(inv, instalment, "DUE", 1, thisOne, date, rules);
+                        else if (days < 0) {
+                            // overdue: round 1 the day after, then every overdueRepeatDays, up to overdueMaxReminders; never a backlog at once
+                            int round = (int) Math.min(rules.overdueMaxReminders(), 1 + (-days - 1) / rules.overdueRepeatDays());
+                            reminders += remind(inv, instalment, "OVERDUE", round, thisOne, date, rules);
+                            BigDecimal share = sponsor == null ? BigDecimal.ZERO : sponsor;
+                            if (rules.remindSponsors() && share.signum() > 0) reminders += remindSponsor(inv, instalment, round, share, date);
+                        }
                     }
                     if (!"NONE".equals(rules.penaltyMode()) && -days > rules.penaltyGraceDays()) {
                         BigDecimal p = penalise(inv, instalment, thisOne, rules);
@@ -181,21 +212,100 @@ public class InstalmentService {
         return new RunResult(today, reminders, penalties, penaltyTotal);
     }
 
-    private boolean remind(Invoice inv, int instalment, String kind, BigDecimal amount, LocalDate date) {
-        int inserted = jdbc.update("""
-                insert into fee_reminders (tenant_id, invoice_id, instalment, kind, amount) values (cims_current_tenant(), ?, ?, ?, ?)
-                on conflict (invoice_id, instalment, kind) do nothing""", inv.getId(), instalment, kind, amount);
-        if (inserted == 0 || inv.getPayerPhone() == null || inv.getPayerPhone().isBlank()) return inserted > 0;
+    /**
+     * The reminders of one round to the payer (unless a student opted out), and from the second overdue round to the student's guardians.
+     * Each (invoice, instalment, kind, round, recipient, channel) is sent once, however often the job runs. Returns how many were sent.
+     */
+    private int remind(Invoice inv, int instalment, String kind, int round, BigDecimal amount, LocalDate date, Rules rules) {
         ControlNumber cn = billing.currentControlNumber(inv.getId());
+        String control = cn == null || cn.getStatus() == ControlNumber.Status.PAID ? "-" : cn.getControlNo();
         String when = switch (kind) {
             case "BEFORE" -> "is due on " + DAY.format(date);
             case "DUE" -> "is due today";
             default -> "was due on " + DAY.format(date) + " and is overdue";
         };
-        messaging.event("FEE_REMINDER", inv.getPayerPhone(), Map.of("amount", "TZS " + tzs(amount), "instalment", String.valueOf(instalment),
-                "when", when, "controlNo", cn == null || cn.getStatus() == ControlNumber.Status.PAID ? "-" : cn.getControlNo(),
-                "description", inv.getDescription()));
-        return true;
+        int sent = 0;
+        Map<String, Object> student = "STUDENT".equals(String.valueOf(inv.getPayerType())) ? jdbc.queryForList(
+                "select id, registration_no, concat_ws(' ', first_name, surname) as name, fee_reminders_opt_out from students where id = ?",
+                inv.getPayerId()).stream().findFirst().orElse(null) : null;
+        boolean optedOut = student != null && Boolean.TRUE.equals(student.get("fee_reminders_opt_out"));
+        String phone = inv.getPayerPhone() == null || inv.getPayerPhone().isBlank() ? null : inv.getPayerPhone();
+        if (record(inv, instalment, kind, round, "PAYER", optedOut || phone == null ? "NONE" : "SMS", optedOut ? "opted out" : phone, amount)
+                && !optedOut && phone != null) {
+            messaging.event("FEE_REMINDER", phone, Map.of("amount", "TZS " + tzs(amount), "instalment", String.valueOf(instalment),
+                    "when", when, "controlNo", control, "description", inv.getDescription()));
+            sent++;
+        }
+        if (student != null && rules.remindGuardians() && "OVERDUE".equals(kind) && round >= 2) {
+            guardianLinks.linkNextOfKin(((Number) student.get("id")).longValue());
+            for (Map<String, Object> g : jdbc.queryForList("select distinct phone from guardian_links where student_id = ? and active", student.get("id"))) {
+                String gp = (String) g.get("phone");
+                if (gp.equals(phone)) continue;
+                if (record(inv, instalment, kind, round, "GUARDIAN", "SMS", gp, amount)) {
+                    messaging.event("FEE_REMINDER_GUARDIAN", gp, Map.of("student", (String) student.get("name"), "amount", "TZS " + tzs(amount),
+                            "when", when, "controlNo", control));
+                    sent++;
+                }
+            }
+        }
+        return sent;
+    }
+
+    /** A sponsor whose committed share for the student is still unpaid after the due date: by SMS and email to its contact. */
+    private int remindSponsor(Invoice inv, int instalment, int round, BigDecimal share, LocalDate date) {
+        if (!"STUDENT".equals(String.valueOf(inv.getPayerType()))) return 0;
+        List<Map<String, Object>> sp = jdbc.queryForList("""
+                select sp.name, sp.contact_phone, sp.contact_email, s.registration_no, concat_ws(' ', s.first_name, s.surname) as student
+                from sponsorships x join sponsors sp on sp.id = x.sponsor_id join students s on s.id = x.student_id
+                where x.student_id = ? and x.academic_year_id = ? and x.status = 'ACTIVE' and sp.active""", inv.getPayerId(), inv.getAcademicYearId());
+        int sent = 0;
+        for (Map<String, Object> r : sp) {
+            Map<String, String> v = Map.of("sponsor", (String) r.get("name"), "student", (String) r.get("student"), "registrationNo", (String) r.get("registration_no"),
+                    "amount", "TZS " + tzs(share), "when", "was due on " + DAY.format(date));
+            String phone = (String) r.get("contact_phone");
+            if (phone != null && !phone.isBlank() && record(inv, instalment, "OVERDUE", round, "SPONSOR", "SMS", phone, share)) {
+                messaging.event("FEE_REMINDER_SPONSOR", phone, v);
+                sent++;
+            }
+            String mail = (String) r.get("contact_email");
+            if (mail != null && !mail.isBlank() && record(inv, instalment, "OVERDUE", round, "SPONSOR", "EMAIL", mail, share)) {
+                messaging.emailEvent("FEE_REMINDER_SPONSOR", mail, v);
+                sent++;
+            }
+        }
+        return sent;
+    }
+
+    private boolean record(Invoice inv, int instalment, String kind, int round, String recipient, String channel, String to, BigDecimal amount) {
+        return jdbc.update("""
+                insert into fee_reminders (tenant_id, invoice_id, instalment, kind, amount, round, recipient, channel, sent_to)
+                values (cims_current_tenant(), ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict (invoice_id, instalment, kind, round, recipient, channel) do nothing""",
+                inv.getId(), instalment, kind, amount, round, recipient, channel, to == null ? null : to.length() > 120 ? to.substring(0, 120) : to) > 0;
+    }
+
+    /** The reminders of the last days, newest first (Bursar, Accountant). */
+    @Transactional(readOnly = true)
+    public List<ReminderView> reminders(int days) {
+        return jdbc.query("""
+                select r.id, r.sent_at, i.invoice_no, i.payer_name, s.registration_no, r.instalment, r.kind, r.round, r.recipient, r.channel, r.sent_to, r.amount
+                from fee_reminders r join invoices i on i.id = r.invoice_id
+                left join students s on i.payer_type = 'STUDENT' and s.id = i.payer_id
+                where r.sent_at >= now() - make_interval(days => ?) order by r.sent_at desc, r.id desc limit 500""",
+                (rs, i) -> new ReminderView(rs.getLong(1), rs.getObject(2, OffsetDateTime.class), rs.getString(3), rs.getString(4), rs.getString(5),
+                        rs.getInt(6), rs.getString(7), rs.getInt(8), rs.getString(9), rs.getString(10), mask(rs.getString(11)), rs.getBigDecimal(12)),
+                Math.max(1, Math.min(days, 366)));
+    }
+
+    /** A phone shown as 2557•••••123; an email with its local part shortened. */
+    static String mask(String to) {
+        if (to == null) return null;
+        if (to.contains("@")) {
+            int at = to.indexOf('@');
+            return (at <= 2 ? to.substring(0, Math.min(1, at)) : to.substring(0, 2)) + "•••" + to.substring(at);
+        }
+        if (to.length() < 8) return to;
+        return to.substring(0, 4) + "•••••" + to.substring(to.length() - 3);
     }
 
     private BigDecimal penalise(Invoice inv, int instalment, BigDecimal overdue, Rules rules) {
