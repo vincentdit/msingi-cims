@@ -19,6 +19,7 @@ import {
 import { useSession } from '../../auth/session';
 import { ErrorAlert, Loading, PageTitle, humanise, statusColour } from '../../components/common';
 import { StaffLink } from '../../components/StaffLink';
+import NactvetCurriculumDialog from './NactvetCurriculumDialog';
 
 const staff = { realm: 'staff' as const };
 
@@ -471,6 +472,7 @@ function CurriculumList() {
   const can = useRoles();
   const [programmeId, setProgrammeId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [fromNactvet, setFromNactvet] = useState(false);
   const programmes = useQuery({ queryKey: ['staff', 'programmes'], queryFn: () => api<Programme[]>('/api/academic/programmes', staff) });
   const list = useQuery({
     queryKey: ['staff', 'curricula', programmeId],
@@ -489,7 +491,12 @@ function CurriculumList() {
           <MenuItem value="">All programmes</MenuItem>
           {programmes.data?.map((p) => <MenuItem key={p.id} value={String(p.id)}>{p.code} · {p.name}</MenuItem>)}
         </TextField>
-        {can(PREPARERS) && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>New curriculum</Button>}
+        {can(PREPARERS) && (
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+            <Button variant="outlined" onClick={() => setFromNactvet(true)} sx={{ whiteSpace: 'nowrap' }}>Get from NACTVET</Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)} sx={{ whiteSpace: 'nowrap' }}>New curriculum</Button>
+          </Stack>
+        )}
       </Stack>
       <ErrorAlert error={list.error ?? programmes.error} />
       {list.isLoading && <Loading />}
@@ -521,6 +528,7 @@ function CurriculumList() {
           </Alert>
         )}
       </Stack>
+      {fromNactvet && <NactvetCurriculumDialog onClose={() => setFromNactvet(false)} />}
       {creating && <NewCurriculumDialog programmes={programmes.data ?? []} onClose={() => setCreating(false)} onCreated={(id) => navigate(`/staff/curricula/${id}`)} />}
     </>
   );

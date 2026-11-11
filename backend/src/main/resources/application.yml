@@ -156,6 +156,11 @@ cims:
       mode: ${CIMS_NACTVET_CATALOGUE_MODE:${cims.nactvet.awards.mode}}
       catalogue-path: /nacteapi/index.php/api-out-service/institutionprogrammeall
       page-size: ${CIMS_NACTVET_CATALOGUE_PAGE_SIZE:200}
+    curriculum:
+      # Curriculum details of a programme (NACTVET api-out-service/curriculum-details): modules per NTA level and semester, imported
+      # into draft curricula. Live whenever the awards service is live, with the same NACTE credentials.
+      mode: ${CIMS_NACTVET_CURRICULUM_MODE:${cims.nactvet.awards.mode}}
+      path: /nacteapi/index.php/api-out-service/curriculum-details
     submission:
       # Student registration (FR-REG-07) and results (FR-EXM-11) by API: simulated (in CIMS) or live (nactvet-mock answers them).
       # The paths are placeholders until NACTVET publishes these services; the file exports remain available either way.

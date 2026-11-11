@@ -31,6 +31,7 @@ public class IntegrationLogQuery {
             Map.entry(ExternalSystem.NACTVET, "NACTVET admission verification"),
             Map.entry(ExternalSystem.NACTVET_AWARDS, "NACTVET award verification"),
             Map.entry(ExternalSystem.NACTVET_CATALOGUE, "NACTVET institution catalogue"),
+            Map.entry(ExternalSystem.NACTVET_CURRICULUM, "NACTVET curriculum details"),
             Map.entry(ExternalSystem.NACTVET_SUBMISSION, "NACTVET registration and results"),
             Map.entry(ExternalSystem.GEPG, "GePG payments"),
             Map.entry(ExternalSystem.COLLECTION, "Mobile money and bank collection"),
@@ -177,6 +178,7 @@ public class IntegrationLogQuery {
             case NACTVET -> NactvetGateway.class;
             case NACTVET_AWARDS -> NactvetAwardClient.class;
             case NACTVET_CATALOGUE -> tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class;
+            case NACTVET_CURRICULUM -> tz.co.msingi.cims.integration.nactvet.NactvetCurriculumClient.class;
             case GEPG -> null;
             case COLLECTION -> tz.co.msingi.cims.finance.collection.CollectionGateway.class;
             case SMS -> SmsGateway.class;

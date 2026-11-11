@@ -39,6 +39,8 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (NactvetAwardClient.class.isAssignableFrom(type)) return wrap(bean, NactvetAwardClient.class, ExternalSystem.NACTVET_AWARDS);
         if (tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class.isAssignableFrom(type))
             return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetCatalogueClient.class, ExternalSystem.NACTVET_CATALOGUE);
+        if (tz.co.msingi.cims.integration.nactvet.NactvetCurriculumClient.class.isAssignableFrom(type))
+            return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetCurriculumClient.class, ExternalSystem.NACTVET_CURRICULUM);
         if (GepgGateway.class.isAssignableFrom(type)) return wrap(bean, GepgGateway.class, ExternalSystem.GEPG);
         if (tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.class.isAssignableFrom(type))
             return wrap(bean, tz.co.msingi.cims.integration.nactvet.NactvetSubmissionClient.class, ExternalSystem.NACTVET_SUBMISSION);
@@ -98,6 +100,8 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
         if (result instanceof GepgGateway.ControlNumberResponse r && !r.issued()) return "Control number pending";
         if (result instanceof Collection<?> c) return c.size() + (c.size() == 1 ? " result" : " results");
         if (result instanceof Boolean b) return b ? "Confirmed" : "Not confirmed";
+        if (result instanceof tz.co.msingi.cims.integration.nactvet.NactvetCurriculumClient.Semester r)
+            return r.modules().size() + " modules" + (r.curriculumCode() == null ? "" : " · " + r.curriculumCode());
         if (result instanceof tz.co.msingi.cims.integration.nida.NidaClient.Result r) return "NIN " + r.status();
         if (result instanceof tz.co.msingi.cims.integration.muse.MuseClient.PostResult r) return "Posted as " + r.museRef();
         if (result instanceof tz.co.msingi.cims.integration.heslb.HeslbClient.SubmissionResult r) return r.accepted() + " of " + r.received() + " accepted";
@@ -114,6 +118,7 @@ public class IntegrationLoggingPostProcessor implements BeanPostProcessor {
                 case NECTA -> args.length >= 3 ? args[0] + " " + args[1] + " " + args[2] : null;
                 case NACTVET_AWARDS -> args.length >= 2 ? args[0] + " " + args[1] : null;
                 case NACTVET_CATALOGUE -> "institutions and programmes";
+                case NACTVET_CURRICULUM -> args.length >= 5 ? args[2] + " " + args[3] + " " + args[4] + " · " + args[1] : null;
                 case NACTVET -> switch (op) {
                     case "upload" -> args.length >= 2 && args[0] instanceof tz.co.msingi.cims.integration.nactvet.NactvetGateway.Heading h
                             && args[1] instanceof Collection<?> c ? c.size() + " applicants · programme " + h.programmeId() : null;
